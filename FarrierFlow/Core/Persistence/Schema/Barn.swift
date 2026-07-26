@@ -1,0 +1,26 @@
+import SwiftData
+
+extension FarrierFlowSchemaV1 {
+    @Model
+    final class Barn {
+        var name: String
+        var address: String?
+        var contactNotes: String?
+
+        @Relationship(deleteRule: .deny, inverse: \Horse.currentBarn)
+        var horses: [Horse] = []
+
+        @Relationship(deleteRule: .deny, inverse: \Appointment.barn)
+        var appointments: [Appointment] = []
+
+        init(
+            name: String,
+            address: String? = nil,
+            contactNotes: String? = nil
+        ) {
+            self.name = name
+            self.address = address
+            self.contactNotes = contactNotes
+        }
+    }
+}
