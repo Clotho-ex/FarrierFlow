@@ -2,27 +2,17 @@ import Foundation
 
 nonisolated enum AppointmentIntervalFormatter {
     static func string(weeks: Int, locale: Locale) -> String {
-        String(
-            localized: "\(weeks) weeks",
-            bundle: localizedBundle(for: locale),
-            locale: locale
-        )
-    }
+        let formatter = DateComponentsFormatter()
+        formatter.allowedUnits = [.weekOfMonth]
+        formatter.unitsStyle = .full
+        formatter.maximumUnitCount = 1
 
-    private static func localizedBundle(for locale: Locale) -> Bundle {
-        guard
-            let localization = Bundle.preferredLocalizations(
-                from: Bundle.main.localizations,
-                forPreferences: [locale.identifier]
-            ).first,
-            let path = Bundle.main.path(
-                forResource: localization,
-                ofType: "lproj"
-            ),
-            let bundle = Bundle(path: path)
-        else {
-            return .main
-        }
-        return bundle
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = locale
+        formatter.calendar = calendar
+
+        return formatter.string(
+            from: DateComponents(weekOfMonth: weeks)
+        ) ?? String(localized: "\(weeks) weeks", locale: locale)
     }
 }
