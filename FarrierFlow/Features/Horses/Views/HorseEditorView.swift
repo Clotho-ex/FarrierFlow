@@ -27,24 +27,37 @@ struct HorseEditorView: View {
                 Section("Horse") {
                     TextField("Name", text: $model.draft.name)
                         .accessibilityIdentifier("horse-name-field")
-                    Picker("Client", selection: $model.draft.clientID) {
-                        Text("Select Client").tag(PersistentIdentifier?.none)
-                        ForEach(model.clients, id: \.persistentModelID) {
-                            Text($0.name).tag(Optional($0.persistentModelID))
+                    if model.choicesLoadState == .loaded {
+                        if model.clients.isEmpty {
+                            Text("No clients available")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Picker("Client", selection: $model.draft.clientID) {
+                                Text("Select Client").tag(PersistentIdentifier?.none)
+                                ForEach(model.clients, id: \.persistentModelID) {
+                                    Text($0.name).tag(Optional($0.persistentModelID))
+                                }
+                            }
+                            .accessibilityIdentifier("horse-client-picker")
                         }
-                    }
-                    .accessibilityIdentifier("horse-client-picker")
-                    Picker("Service Location", selection: $model.draft.barnID) {
-                        Text("Select Service Location").tag(PersistentIdentifier?.none)
-                        ForEach(model.barns, id: \.persistentModelID) {
-                            Text($0.name).tag(Optional($0.persistentModelID))
+                        if model.barns.isEmpty {
+                            Text("No service locations available")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Picker("Service Location", selection: $model.draft.barnID) {
+                                Text("Select Service Location").tag(PersistentIdentifier?.none)
+                                ForEach(model.barns, id: \.persistentModelID) {
+                                    Text($0.name).tag(Optional($0.persistentModelID))
+                                }
+                            }
+                            .accessibilityIdentifier("horse-barn-picker")
                         }
-                    }
-                    .accessibilityIdentifier("horse-barn-picker")
-                    Button("Create Service Location", systemImage: "plus") {
-                        showsBarnEditor = true
+                        Button("Create Service Location", systemImage: "plus") {
+                            showsBarnEditor = true
+                        }
                     }
                 }
+                loadStateSection
                 Section("Safety Notes") {
                     TextEditor(text: $model.draft.safetyNotes)
                         .accessibilityLabel("Safety Notes")
@@ -81,6 +94,33 @@ struct HorseEditorView: View {
             .alert(item: $model.alert) {
                 Alert(title: Text($0.title), message: Text($0.message))
             }
+        }
+    }
+
+    @ViewBuilder
+    private var loadStateSection: some View {
+        switch model.choicesLoadState {
+        case .loading:
+            Section {
+                HStack {
+                    ProgressView()
+                    Text("Loading records…")
+                }
+            }
+        case .failed:
+            Section {
+                ContentUnavailableView {
+                    Label("Records Unavailable", systemImage: "exclamationmark.circle")
+                } description: {
+                    Text("FarrierFlow couldn’t load clients and service locations.")
+                } actions: {
+                    Button("Retry") {
+                        model.loadChoices(in: context)
+                    }
+                }
+            }
+        case .loaded:
+            EmptyView()
         }
     }
 }

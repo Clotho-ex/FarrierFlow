@@ -3,6 +3,7 @@ import SwiftUI
 
 struct AppointmentDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
     @State private var model = AppointmentDetailModel()
     @State private var showsEditor = false
@@ -24,10 +25,17 @@ struct AppointmentDetailView: View {
                         )
                         LabeledContent(
                             "Service Location",
-                            value: appointment.barn?.name ?? "Unavailable"
+                            value: appointment.barn?.name
+                                ?? String(localized: "Unavailable", locale: locale)
                         )
                         if let duration = appointment.expectedDurationMinutes {
-                            LabeledContent("Expected Duration", value: "\(duration) minutes")
+                            LabeledContent(
+                                "Expected Duration",
+                                value: AppointmentDurationFormatter.string(
+                                    minutes: duration,
+                                    locale: locale
+                                )
+                            )
                         }
                         if let notes = appointment.notes {
                             LabeledContent("Notes", value: notes)
@@ -42,7 +50,13 @@ struct AppointmentDetailView: View {
                                 ) {
                                     Text(horse.name)
                                         .font(Typography.recordTitle)
-                                    Text(horse.client?.name ?? "Client unavailable")
+                                    Text(
+                                        horse.client?.name
+                                            ?? String(
+                                                localized: "Client unavailable",
+                                                locale: locale
+                                            )
+                                    )
                                         .font(Typography.recordMetadata)
                                         .foregroundStyle(.secondary)
                                 }
@@ -53,7 +67,10 @@ struct AppointmentDetailView: View {
                         }
                     }
                 }
-                .navigationTitle(appointment.barn?.name ?? "Appointment")
+                .navigationTitle(
+                    appointment.barn?.name
+                        ?? String(localized: "Appointment", locale: locale)
+                )
                 .toolbar {
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         Button("Edit", systemImage: "pencil") { showsEditor = true }

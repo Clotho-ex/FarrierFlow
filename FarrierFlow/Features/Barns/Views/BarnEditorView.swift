@@ -25,6 +25,7 @@ struct BarnEditorView: View {
                 }
                 Section("Contact Notes") {
                     TextEditor(text: $model.draft.contactNotes)
+                        .accessibilityLabel("Contact Notes")
                 }
             }
             .navigationTitle(model.barnID == nil ? "New Service Location" : "Edit Service Location")

@@ -25,8 +25,9 @@ struct ClientEditorView: View {
                         .keyboardType(.emailAddress)
                         .textInputAutocapitalization(.never)
                 }
-                Section("Notes") {
+                Section("Client Notes") {
                     TextEditor(text: $model.draft.notes)
+                        .accessibilityLabel("Client Notes")
                 }
             }
             .navigationTitle(model.clientID == nil ? "New Client" : "Edit Client")

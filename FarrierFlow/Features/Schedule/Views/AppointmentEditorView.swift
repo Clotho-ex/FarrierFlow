@@ -14,19 +14,26 @@ struct AppointmentEditorView: View {
         NavigationStack {
             Form {
                 Section("Appointment") {
-                    Picker(
-                        "Service Location",
-                        selection: Binding(
-                            get: { model.draft.barnID },
-                            set: { model.selectBarn($0, in: context) }
-                        )
-                    ) {
-                        Text("Select Service Location").tag(PersistentIdentifier?.none)
-                        ForEach(model.barns, id: \.persistentModelID) {
-                            Text($0.name).tag(Optional($0.persistentModelID))
+                    if model.loadState == .loaded {
+                        if model.barns.isEmpty {
+                            Text("No service locations available")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Picker(
+                                "Service Location",
+                                selection: Binding(
+                                    get: { model.draft.barnID },
+                                    set: { model.selectBarn($0, in: context) }
+                                )
+                            ) {
+                                Text("Select Service Location").tag(PersistentIdentifier?.none)
+                                ForEach(model.barns, id: \.persistentModelID) {
+                                    Text($0.name).tag(Optional($0.persistentModelID))
+                                }
+                            }
+                            .accessibilityIdentifier("appointment-barn-picker")
                         }
                     }
-                    .accessibilityIdentifier("appointment-barn-picker")
                     DatePicker(
                         "Starts",
                         selection: $model.draft.startDate,
@@ -38,23 +45,35 @@ struct AppointmentEditorView: View {
                     )
                     .keyboardType(.numberPad)
                 }
-                Section("Horses") {
-                    ForEach(model.eligibleHorses, id: \.persistentModelID) { horse in
-                        HorseSelectionRow(
-                            horse: horse,
-                            isSelected: model.draft.selectedHorseIDs.contains(
-                                horse.persistentModelID
-                            )
-                        ) {
-                            model.toggleHorse(horse.persistentModelID)
+                loadStateSection
+                if model.loadState == .loaded {
+                    Section("Horses") {
+                        if model.draft.barnID == nil {
+                            Text("Select a service location to choose horses.")
+                                .foregroundStyle(.secondary)
+                        } else if model.eligibleHorses.isEmpty {
+                            Text("No eligible horses")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(model.eligibleHorses, id: \.persistentModelID) { horse in
+                                HorseSelectionRow(
+                                    horse: horse,
+                                    isSelected: model.draft.selectedHorseIDs.contains(
+                                        horse.persistentModelID
+                                    )
+                                ) {
+                                    model.toggleHorse(horse.persistentModelID)
+                                }
+                                .accessibilityIdentifier(
+                                    "appointment-horse-\(horse.name)"
+                                )
+                            }
                         }
-                        .accessibilityIdentifier(
-                            "appointment-horse-\(horse.name)"
-                        )
                     }
                 }
-                Section("Notes") {
+                Section("Appointment Notes") {
                     TextEditor(text: $model.draft.notes)
+                        .accessibilityLabel("Appointment Notes")
                 }
             }
             .navigationTitle(model.appointmentID == nil ? "New Appointment" : "Edit Appointment")
@@ -76,6 +95,33 @@ struct AppointmentEditorView: View {
             .alert(item: $model.alert) {
                 Alert(title: Text($0.title), message: Text($0.message))
             }
+        }
+    }
+
+    @ViewBuilder
+    private var loadStateSection: some View {
+        switch model.loadState {
+        case .loading:
+            Section {
+                HStack {
+                    ProgressView()
+                    Text("Loading records…")
+                }
+            }
+        case .failed:
+            Section {
+                ContentUnavailableView {
+                    Label("Appointment Records Unavailable", systemImage: "exclamationmark.circle")
+                } description: {
+                    Text("FarrierFlow couldn’t load service locations and horses.")
+                } actions: {
+                    Button("Retry") {
+                        model.load(in: context)
+                    }
+                }
+            }
+        case .loaded:
+            EmptyView()
         }
     }
 }

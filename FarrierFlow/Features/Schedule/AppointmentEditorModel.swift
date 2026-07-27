@@ -1,19 +1,57 @@
 import Foundation
 import Observation
+import OSLog
 import SwiftData
+
+nonisolated enum AppointmentEditorLoadState: Equatable {
+    case loading
+    case loaded
+    case failed
+}
 
 @MainActor
 @Observable
 final class AppointmentEditorModel {
+    private static let logger = Logger(
+        subsystem: "com.farrierflow.yusufcan.FarrierFlow",
+        category: "AppointmentEditor"
+    )
+
+    @ObservationIgnored
+    private let barnFetcher: (ModelContext) throws -> [Barn]
+    @ObservationIgnored
+    private let horseFetcher: (ModelContext) throws -> [Horse]
+
     var draft: AppointmentDraft
     private(set) var barns: [Barn] = []
     private(set) var eligibleHorses: [Horse] = []
+    private(set) var loadState = AppointmentEditorLoadState.loading
     let appointmentID: PersistentIdentifier?
     var alert: FeatureAlert?
 
-    var canSave: Bool { draft.isValid }
+    var canSave: Bool {
+        draft.isValid && loadState == .loaded
+    }
 
-    init(appointment: Appointment? = nil) {
+    init(
+        appointment: Appointment? = nil,
+        barnFetcher: @escaping (ModelContext) throws -> [Barn] = {
+            try $0.fetch(
+                FetchDescriptor<Barn>(
+                    sortBy: [SortDescriptor(\.name, comparator: .localizedStandard)]
+                )
+            )
+        },
+        horseFetcher: @escaping (ModelContext) throws -> [Horse] = {
+            try $0.fetch(
+                FetchDescriptor<Horse>(
+                    sortBy: [SortDescriptor(\.name, comparator: .localizedStandard)]
+                )
+            )
+        }
+    ) {
+        self.barnFetcher = barnFetcher
+        self.horseFetcher = horseFetcher
         appointmentID = appointment?.persistentModelID
         draft = AppointmentDraft(
             barnID: appointment?.barn?.persistentModelID,
@@ -27,19 +65,28 @@ final class AppointmentEditorModel {
     }
 
     func load(in context: ModelContext) {
-        barns = (try? context.fetch(
-            FetchDescriptor<Barn>(
-                sortBy: [SortDescriptor(\.name, comparator: .localizedStandard)]
+        loadState = .loading
+        do {
+            let loadedBarns = try barnFetcher(context)
+            let loadedHorses = try eligibleHorses(
+                at: draft.barnID,
+                in: context
             )
-        )) ?? []
-        loadEligibleHorses(in: context)
+            barns = loadedBarns
+            eligibleHorses = loadedHorses
+            retainEligibleSelections()
+            loadState = .loaded
+        } catch {
+            loadState = .failed
+            Self.logger.error(
+                "Failed to load appointment editor choices: \(error, privacy: .public)"
+            )
+        }
     }
 
     func selectBarn(_ id: PersistentIdentifier?, in context: ModelContext) {
         draft.barnID = id
         loadEligibleHorses(in: context)
-        let eligibleIDs = Set(eligibleHorses.map(\.persistentModelID))
-        draft.selectedHorseIDs.formIntersection(eligibleIDs)
     }
 
     func toggleHorse(_ id: PersistentIdentifier) {
@@ -129,16 +176,41 @@ final class AppointmentEditorModel {
     }
 
     private func loadEligibleHorses(in context: ModelContext) {
-        guard let barnID = draft.barnID else {
-            eligibleHorses = []
-            return
-        }
-        eligibleHorses = ((try? context.fetch(
-            FetchDescriptor<Horse>(
-                sortBy: [SortDescriptor(\.name, comparator: .localizedStandard)]
+        loadState = .loading
+        do {
+            eligibleHorses = try eligibleHorses(
+                at: draft.barnID,
+                in: context
             )
-        )) ?? []).filter {
+            retainEligibleSelections()
+            loadState = .loaded
+        } catch {
+            loadState = .failed
+            Self.logger.error(
+                "Failed to load eligible appointment horses: \(error, privacy: .public)"
+            )
+        }
+    }
+
+    private func eligibleHorses(
+        at barnID: PersistentIdentifier?,
+        in context: ModelContext
+    ) throws -> [Horse] {
+        guard let barnID else {
+            return []
+        }
+        return try horseFetcher(context).filter {
             $0.currentBarn?.persistentModelID == barnID && $0.client != nil
         }
+    }
+
+    private func retainEligibleSelections() {
+        guard draft.barnID != nil else {
+            eligibleHorses = []
+            draft.selectedHorseIDs = []
+            return
+        }
+        let eligibleIDs = Set(eligibleHorses.map(\.persistentModelID))
+        draft.selectedHorseIDs.formIntersection(eligibleIDs)
     }
 }

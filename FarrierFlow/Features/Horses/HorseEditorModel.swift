@@ -1,23 +1,59 @@
 import Foundation
 import Observation
+import OSLog
 import SwiftData
+
+nonisolated enum HorseEditorChoicesLoadState: Equatable {
+    case loading
+    case loaded
+    case failed
+}
 
 @MainActor
 @Observable
 final class HorseEditorModel {
+    private static let logger = Logger(
+        subsystem: "com.farrierflow.yusufcan.FarrierFlow",
+        category: "HorseEditor"
+    )
+
+    @ObservationIgnored
+    private let clientFetcher: (ModelContext) throws -> [Client]
+    @ObservationIgnored
+    private let barnFetcher: (ModelContext) throws -> [Barn]
+
     var draft: HorseDraft
     let horseID: PersistentIdentifier?
     private(set) var clients: [Client] = []
     private(set) var barns: [Barn] = []
+    private(set) var choicesLoadState = HorseEditorChoicesLoadState.loading
     var alert: FeatureAlert?
 
-    var canSave: Bool { draft.isValid }
+    var canSave: Bool {
+        draft.isValid && choicesLoadState == .loaded
+    }
 
     init(
         horse: Horse? = nil,
         preselectedClientID: PersistentIdentifier? = nil,
-        preselectedBarnID: PersistentIdentifier? = nil
+        preselectedBarnID: PersistentIdentifier? = nil,
+        clientFetcher: @escaping (ModelContext) throws -> [Client] = {
+            try $0.fetch(
+                FetchDescriptor<Client>(
+                    sortBy: [SortDescriptor(\.name, comparator: .localizedStandard)]
+                )
+            )
+        },
+        barnFetcher: @escaping (ModelContext) throws -> [Barn] = {
+            try $0.fetch(
+                FetchDescriptor<Barn>(
+                    sortBy: [SortDescriptor(\.name, comparator: .localizedStandard)]
+                )
+            )
+        }
     ) {
+        self.clientFetcher = clientFetcher
+        self.barnFetcher = barnFetcher
         horseID = horse?.persistentModelID
         draft = HorseDraft(
             name: horse?.name ?? "",
@@ -29,16 +65,19 @@ final class HorseEditorModel {
     }
 
     func loadChoices(in context: ModelContext) {
-        clients = (try? context.fetch(
-            FetchDescriptor<Client>(
-                sortBy: [SortDescriptor(\.name, comparator: .localizedStandard)]
+        choicesLoadState = .loading
+        do {
+            let loadedClients = try clientFetcher(context)
+            let loadedBarns = try barnFetcher(context)
+            clients = loadedClients
+            barns = loadedBarns
+            choicesLoadState = .loaded
+        } catch {
+            choicesLoadState = .failed
+            Self.logger.error(
+                "Failed to load horse editor choices: \(error, privacy: .public)"
             )
-        )) ?? []
-        barns = (try? context.fetch(
-            FetchDescriptor<Barn>(
-                sortBy: [SortDescriptor(\.name, comparator: .localizedStandard)]
-            )
-        )) ?? []
+        }
     }
 
     func save(in context: ModelContext) -> PersistentIdentifier? {

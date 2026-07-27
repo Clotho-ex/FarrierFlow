@@ -3,6 +3,7 @@ import SwiftUI
 
 struct HorseDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
     @State private var model = HorseDetailModel()
     @State private var showsEditor = false
@@ -18,18 +19,19 @@ struct HorseDetailView: View {
                         LabeledContent("Name", value: horse.name)
                         LabeledContent(
                             "Client",
-                            value: horse.client?.name ?? "Unavailable"
+                            value: horse.client?.name
+                                ?? String(localized: "Unavailable", locale: locale)
                         )
                             .accessibilityIdentifier("horse-detail-client")
                         LabeledContent(
                             "Service Location",
-                            value: horse.currentBarn?.name ?? "Unavailable"
+                            value: horse.currentBarn?.name
+                                ?? String(localized: "Unavailable", locale: locale)
                         )
                             .accessibilityIdentifier("horse-detail-service-location")
-                        LabeledContent(
-                            "Appointment Interval",
-                            value: "\(horse.appointmentIntervalWeeks) weeks"
-                        )
+                        LabeledContent("Appointment Interval") {
+                            Text("\(horse.appointmentIntervalWeeks) weeks")
+                        }
                     }
                     if let safetyNotes = horse.safetyNotes {
                         Section("Safety Notes") {

@@ -5,6 +5,10 @@ import Testing
 @Suite("Appointment editor model")
 @MainActor
 struct AppointmentEditorModelTests {
+    private enum ForcedFetchFailure: Error {
+        case unavailable
+    }
+
     @Test
     func createsOneBarnStopForHorsesFromMultipleClients() throws {
         let fixture = try makeTwoHorseFixture()
@@ -37,6 +41,59 @@ struct AppointmentEditorModelTests {
 
         editor.selectBarn(otherBarn.persistentModelID, in: fixture.context)
         #expect(editor.draft.selectedHorseIDs.isEmpty)
+    }
+
+    @Test
+    func loadPublishesRecords() throws {
+        let fixture = try makeTwoHorseFixture()
+        let editor = AppointmentEditorModel()
+        editor.load(in: fixture.context)
+        editor.selectBarn(fixture.barn.persistentModelID, in: fixture.context)
+
+        #expect(editor.loadState == .loaded)
+        #expect(editor.barns.map(\.name) == ["North Field"])
+        #expect(Set(editor.eligibleHorses.map(\.name)) == ["Milo", "Scout"])
+    }
+
+    @Test
+    func loadPublishesLegitimateEmptyResult() throws {
+        let container = try ModelContainerFactory.inMemoryTest()
+        let editor = AppointmentEditorModel()
+
+        editor.load(in: container.mainContext)
+
+        #expect(editor.loadState == .loaded)
+        #expect(editor.barns.isEmpty)
+        #expect(editor.eligibleHorses.isEmpty)
+    }
+
+    @Test
+    func loadFailurePreservesRecordsAndDraft() throws {
+        let fixture = try makeTwoHorseFixture()
+        var shouldFail = false
+        let editor = AppointmentEditorModel(
+            barnFetcher: { context in
+                if shouldFail { throw ForcedFetchFailure.unavailable }
+                return try context.fetch(FetchDescriptor<Barn>())
+            },
+            horseFetcher: { context in
+                if shouldFail { throw ForcedFetchFailure.unavailable }
+                return try context.fetch(FetchDescriptor<Horse>())
+            }
+        )
+        editor.load(in: fixture.context)
+        editor.selectBarn(fixture.barn.persistentModelID, in: fixture.context)
+        editor.toggleHorse(fixture.horses[0].persistentModelID)
+        editor.draft.notes = "Preserve this note"
+
+        shouldFail = true
+        editor.load(in: fixture.context)
+
+        #expect(editor.loadState == .failed)
+        #expect(editor.barns.map(\.name) == ["North Field"])
+        #expect(Set(editor.eligibleHorses.map(\.name)) == ["Milo", "Scout"])
+        #expect(editor.draft.selectedHorseIDs == [fixture.horses[0].persistentModelID])
+        #expect(editor.draft.notes == "Preserve this note")
     }
 
     private func makeTwoHorseFixture() throws -> (

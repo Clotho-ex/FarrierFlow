@@ -17,7 +17,22 @@ struct ExistingHorsePickerView: View {
                 }
             }
             .overlay {
-                if model.horses.isEmpty {
+                if model.loadState == .loading {
+                    ProgressView("Loading horses…")
+                } else if model.loadState == .failed {
+                    ContentUnavailableView {
+                        Label("Horses Unavailable", systemImage: "exclamationmark.circle")
+                    } description: {
+                        Text("FarrierFlow couldn’t load horses for this service location.")
+                    } actions: {
+                        Button("Retry") {
+                            model.load(
+                                destinationBarnID: destinationBarnID,
+                                in: context
+                            )
+                        }
+                    }
+                } else if model.horses.isEmpty {
                     ContentUnavailableView(
                         "No eligible horses",
                         systemImage: "figure.equestrian.sports",
@@ -39,7 +54,10 @@ struct ExistingHorsePickerView: View {
                             dismiss()
                         }
                     }
-                    .disabled(model.selectedHorseID == nil)
+                    .disabled(
+                        model.loadState != .loaded
+                            || model.selectedHorseID == nil
+                    )
                 }
             }
             .onAppear {

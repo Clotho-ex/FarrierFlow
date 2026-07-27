@@ -6,29 +6,10 @@ import SwiftData
 @Observable
 final class BarnDetailModel {
     private(set) var barn: Barn?
-    private(set) var eligibleHorses: [Horse] = []
     var alert: FeatureAlert?
 
     func load(id: PersistentIdentifier, in context: ModelContext) {
         barn = context.model(for: id) as? Barn
-        reloadEligibleHorses(in: context)
-    }
-
-    func reloadEligibleHorses(in context: ModelContext) {
-        guard let barn else {
-            eligibleHorses = []
-            return
-        }
-        let destinationID = barn.persistentModelID
-        let descriptor = FetchDescriptor<Horse>(
-            sortBy: [SortDescriptor(\.name, comparator: .localizedStandard)]
-        )
-        eligibleHorses = (try? context.fetch(descriptor))?.filter {
-            $0.appointmentHorses.isEmpty
-                && $0.currentBarn?.persistentModelID != destinationID
-                && $0.client != nil
-                && $0.currentBarn != nil
-        } ?? []
     }
 
     func delete(in context: ModelContext) -> Bool {
