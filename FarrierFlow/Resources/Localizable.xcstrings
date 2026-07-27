@@ -14,7 +14,40 @@
       }
     },
     "%lld weeks" : {
-
+      "comment" : "Complete appointment interval phrase. The argument is an integer and must remain %lld in every plural branch.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld week"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld weeks"
+                }
+              }
+            }
+          }
+        },
+        "tr" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld hafta"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "A horse with scheduled appointments can’t change service locations." : {
       "comment" : "Error message displayed when a user tries to move a horse with scheduled appointments to a different barn.",
@@ -179,6 +212,9 @@
     },
     "Delete Service Location?" : {
 
+    },
+    "Duration unavailable" : {
+      "comment" : "Safe fallback when an expected appointment duration cannot be formatted."
     },
     "Edit" : {
 

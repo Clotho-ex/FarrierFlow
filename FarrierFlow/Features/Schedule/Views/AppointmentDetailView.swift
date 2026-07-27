@@ -36,6 +36,9 @@ struct AppointmentDetailView: View {
                                     locale: locale
                                 )
                             )
+                            .accessibilityIdentifier(
+                                "appointment-detail-expected-duration"
+                            )
                         }
                         if let notes = appointment.notes {
                             LabeledContent("Notes", value: notes)

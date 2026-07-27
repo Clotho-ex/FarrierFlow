@@ -3,6 +3,7 @@ import SwiftUI
 
 struct HorseEditorView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
     @State private var model: HorseEditorModel
     @State private var showsBarnEditor = false
@@ -64,10 +65,16 @@ struct HorseEditorView: View {
                 }
                 Section("Appointment Interval") {
                     Stepper(
-                        "\(model.draft.appointmentIntervalWeeks) weeks",
                         value: $model.draft.appointmentIntervalWeeks,
                         in: 1...52
-                    )
+                    ) {
+                        Text(
+                            verbatim: AppointmentIntervalFormatter.string(
+                                weeks: model.draft.appointmentIntervalWeeks,
+                                locale: locale
+                            )
+                        )
+                    }
                 }
             }
             .navigationTitle(model.horseID == nil ? "New Horse" : "Edit Horse")

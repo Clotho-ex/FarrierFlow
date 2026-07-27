@@ -30,8 +30,16 @@ struct HorseDetailView: View {
                         )
                             .accessibilityIdentifier("horse-detail-service-location")
                         LabeledContent("Appointment Interval") {
-                            Text("\(horse.appointmentIntervalWeeks) weeks")
+                            Text(
+                                verbatim: AppointmentIntervalFormatter.string(
+                                    weeks: horse.appointmentIntervalWeeks,
+                                    locale: locale
+                                )
+                            )
                         }
+                        .accessibilityIdentifier(
+                            "horse-detail-appointment-interval"
+                        )
                     }
                     if let safetyNotes = horse.safetyNotes {
                         Section("Safety Notes") {
