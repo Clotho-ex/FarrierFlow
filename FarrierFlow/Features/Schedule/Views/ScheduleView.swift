@@ -68,6 +68,11 @@ struct ScheduleView: View {
 }
 
 #Preview("Schedule — Empty") {
-    ScheduleView()
-        .preferredColorScheme(.dark)
+    if let container = try? ModelContainerFactory.inMemoryTest() {
+        ScheduleView()
+            .modelContainer(container)
+            .preferredColorScheme(.dark)
+    } else {
+        ModelContainerFailureView()
+    }
 }

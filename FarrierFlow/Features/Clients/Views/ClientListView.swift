@@ -75,6 +75,11 @@ struct ClientListView: View {
 }
 
 #Preview("Clients — Empty, Accessibility") {
-    ClientListView()
-        .dynamicTypeSize(.accessibility3)
+    if let container = try? ModelContainerFactory.inMemoryTest() {
+        ClientListView()
+            .modelContainer(container)
+            .dynamicTypeSize(.accessibility3)
+    } else {
+        ModelContainerFailureView()
+    }
 }

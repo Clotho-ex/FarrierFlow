@@ -64,5 +64,10 @@ struct TodayView: View {
 }
 
 #Preview("Today — Empty") {
-    TodayView()
+    if let container = try? ModelContainerFactory.inMemoryTest() {
+        TodayView()
+            .modelContainer(container)
+    } else {
+        ModelContainerFailureView()
+    }
 }
