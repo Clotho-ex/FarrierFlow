@@ -19,30 +19,90 @@ struct HorseDraftAndRelocationTests {
     }
 
     @Test
-    func relocationRuleAllowsNoOpAndUnreferencedMove() throws {
-        let container = try ModelContainerFactory.inMemoryTest()
-        let context = container.mainContext
-        let first = Barn(name: "First")
-        let second = Barn(name: "Second")
-        context.insert(first)
-        context.insert(second)
-        try context.save()
-
+    func relocationRuleUsesTheFullVisitStateMatrix() {
         #expect(HorseRelocationRules.canRelocate(
-            appointmentMembershipCount: 1,
-            currentBarnID: first.persistentModelID,
-            destinationBarnID: first.persistentModelID
+            appointmentStates: [.noVisit],
+            hasInProgressVisitHorse: true,
+            isSameBarn: true
         ))
         #expect(HorseRelocationRules.canRelocate(
-            appointmentMembershipCount: 0,
-            currentBarnID: first.persistentModelID,
-            destinationBarnID: second.persistentModelID
+            appointmentStates: [],
+            hasInProgressVisitHorse: false,
+            isSameBarn: false
         ))
         #expect(!HorseRelocationRules.canRelocate(
-            appointmentMembershipCount: 1,
-            currentBarnID: first.persistentModelID,
-            destinationBarnID: second.persistentModelID
+            appointmentStates: [.noVisit],
+            hasInProgressVisitHorse: false,
+            isSameBarn: false
         ))
+        #expect(!HorseRelocationRules.canRelocate(
+            appointmentStates: [.inProgress],
+            hasInProgressVisitHorse: false,
+            isSameBarn: false
+        ))
+        #expect(HorseRelocationRules.canRelocate(
+            appointmentStates: [.completed],
+            hasInProgressVisitHorse: false,
+            isSameBarn: false
+        ))
+        #expect(!HorseRelocationRules.canRelocate(
+            appointmentStates: [.completed, .noVisit],
+            hasInProgressVisitHorse: false,
+            isSameBarn: false
+        ))
+        #expect(!HorseRelocationRules.canRelocate(
+            appointmentStates: [.invalid],
+            hasInProgressVisitHorse: false,
+            isSameBarn: false
+        ))
+        #expect(!HorseRelocationRules.canRelocate(
+            appointmentStates: [.completed],
+            hasInProgressVisitHorse: true,
+            isSameBarn: false
+        ))
+    }
+
+    @Test
+    func malformedCompletedVisitGraphsFailClosedForProjectionAndPicker() throws {
+        try assertMalformedCompletedGraphBlocksRelocation { appointment, _, _, _, _ in
+            appointment.barn = nil
+        }
+        try assertMalformedCompletedGraphBlocksRelocation { _, visit, _, _, _ in
+            visit.barn = nil
+        }
+        try assertMalformedCompletedGraphBlocksRelocation { _, visit, _, _, context in
+            let otherBarn = Barn(name: "Mismatched Barn")
+            context.insert(otherBarn)
+            visit.barn = otherBarn
+            otherBarn.visits.append(visit)
+        }
+        try assertMalformedCompletedGraphBlocksRelocation { _, visit, _, _, context in
+            let client = try #require(visit.visitHorses.first?.horse?.client)
+            let barn = try #require(visit.visitHorses.first?.horse?.currentBarn)
+            let replacement = Horse(name: "Replacement", client: client, currentBarn: barn)
+            context.insert(replacement)
+            client.horses.append(replacement)
+            barn.horses.append(replacement)
+            let membership = try #require(visit.visitHorses.first)
+            membership.horse = replacement
+            replacement.visitHorses.append(membership)
+        }
+        try assertMalformedCompletedGraphBlocksRelocation { _, visit, horse, _, context in
+            let duplicate = VisitHorse(visit: visit, horse: horse)
+            context.insert(duplicate)
+            visit.visitHorses.append(duplicate)
+            horse.visitHorses.append(duplicate)
+        }
+        try assertMalformedCompletedGraphBlocksRelocation { _, visit, _, _, _ in
+            visit.visitHorses[0].outcomeRawValue = VisitOutcome.pending.rawValue
+        }
+        try assertMalformedCompletedGraphBlocksRelocation { _, visit, _, _, _ in
+            visit.visitHorses[0].outcomeRawValue = VisitOutcome.notServiced.rawValue
+            visit.visitHorses[0].workNotes = "Invalid notes"
+        }
+        try assertMalformedCompletedGraphBlocksRelocation { _, visit, _, _, _ in
+            visit.completedAt = Date(timeIntervalSinceReferenceDate: 99)
+        }
     }
 
     @Test
@@ -174,57 +234,122 @@ struct HorseDraftAndRelocationTests {
             let originalBarn = Barn(name: "Barn A")
             let destinationBarn = Barn(name: "Barn B")
             let horse = Horse(name: "Milo", client: client, currentBarn: originalBarn)
-            let scheduledHorse = Horse(
-                name: "Scout",
-                client: client,
-                currentBarn: originalBarn
-            )
             context.insert(client)
             context.insert(originalBarn)
             context.insert(destinationBarn)
             context.insert(horse)
-            context.insert(scheduledHorse)
-            client.horses.append(contentsOf: [horse, scheduledHorse])
-            originalBarn.horses.append(contentsOf: [horse, scheduledHorse])
-            let appointment = ModelFixtures.makeAppointment(
+            client.horses.append(horse)
+            originalBarn.horses.append(horse)
+            let completedAppointment = ModelFixtures.makeAppointment(
                 barn: originalBarn,
-                horses: [scheduledHorse],
+                horses: [horse],
                 in: context
             )
             try DomainGraphValidator.save(context)
+            let clientID = client.persistentModelID
+            let horseID = horse.persistentModelID
+            let originalBarnID = originalBarn.persistentModelID
+            let destinationBarnID = destinationBarn.persistentModelID
+            let completedAppointmentID = completedAppointment.persistentModelID
 
-            let appointmentID = appointment.persistentModelID
-            let membershipID = try #require(
-                appointment.appointmentHorses.first?.persistentModelID
+            let completedVisitID = try VisitStartUseCase.start(
+                appointmentID: completedAppointmentID,
+                now: Date(timeIntervalSinceReferenceDate: 100),
+                in: container
             )
-            let invalidHorse = Horse(
-                name: "Unsaved invalid graph",
-                client: client,
-                currentBarn: originalBarn
+            let visitContext = ModelContext(container)
+            var completedDraft = try VisitSaveUseCase.loadDraft(
+                visitID: completedVisitID,
+                in: visitContext
             )
-            context.insert(invalidHorse)
-            invalidHorse.client = nil
-            invalidHorse.currentBarn = nil
+            let miloIndex = try #require(
+                completedDraft.horses.firstIndex(where: { $0.horseName == "Milo" })
+            )
+            completedDraft.horses[miloIndex].outcome = .serviced
+            completedDraft.horses[miloIndex].workNotes = "Completed work"
+            _ = try VisitSaveUseCase.complete(
+                draft: completedDraft,
+                completedAt: Date(timeIntervalSinceReferenceDate: 200),
+                in: visitContext
+            )
+
+            let relocationContext = ModelContext(container)
+            let relocationHorse = try #require(
+                relocationContext.model(for: horseID) as? Horse
+            )
+            let relocationOriginalBarn = try #require(
+                relocationContext.model(for: originalBarnID) as? Barn
+            )
+            let relocationDestinationBarn = try #require(
+                relocationContext.model(for: destinationBarnID) as? Barn
+            )
+            let relocationCompletedAppointment = try #require(
+                relocationContext.model(for: completedAppointmentID) as? Appointment
+            )
+            let completedMembership = try #require(
+                relocationCompletedAppointment.appointmentHorses.first
+            )
+            #expect(
+                HorseRelocationRules.appointmentVisitState(for: completedMembership) == .completed
+            )
 
             let picker = ExistingHorsePickerModel()
-            picker.selectedHorseID = horse.persistentModelID
+            picker.load(destinationBarnID: destinationBarnID, in: relocationContext)
+            #expect(picker.horses.map(\.name) == ["Milo"])
 
-            #expect(!picker.move(
-                to: destinationBarn.persistentModelID,
-                in: context
+            let unresolvedAppointment = ModelFixtures.makeAppointment(
+                startDate: Date(timeIntervalSinceReferenceDate: -86_400),
+                barn: relocationOriginalBarn,
+                horses: [relocationHorse],
+                in: relocationContext
+            )
+            try DomainGraphValidator.save(relocationContext)
+            let unresolvedMembership = try #require(
+                unresolvedAppointment.appointmentHorses.first
+            )
+            #expect(
+                HorseRelocationRules.appointmentVisitState(for: unresolvedMembership) == .noVisit
+            )
+            picker.load(destinationBarnID: destinationBarnID, in: relocationContext)
+            #expect(picker.horses.isEmpty)
+
+            try RecordDeletionRules.delete(unresolvedAppointment, in: relocationContext)
+            picker.load(destinationBarnID: destinationBarnID, in: relocationContext)
+            #expect(picker.horses.map(\.name) == ["Milo"])
+
+            let completedMembershipID = completedMembership.persistentModelID
+            let visitSnapshotName = try #require(
+                (relocationContext.model(for: completedVisitID) as? Visit)?.serviceLocationNameSnapshot
+            )
+            var observedRelocationBeforeFailure = false
+            let failingPicker = ExistingHorsePickerModel(
+                saving: { _ in
+                    observedRelocationBeforeFailure = relocationHorse.currentBarn === relocationDestinationBarn
+                    throw ForcedFetchFailure.unavailable
+                }
+            )
+            failingPicker.selectedHorseID = horseID
+
+            #expect(!failingPicker.move(
+                to: destinationBarnID,
+                in: relocationContext
             ))
-            #expect(horse.currentBarn === originalBarn)
-            #expect(appointment.persistentModelID == appointmentID)
-            #expect(appointment.appointmentHorses.count == 1)
-            #expect(appointment.appointmentHorses.first?.persistentModelID == membershipID)
-            #expect(appointment.appointmentHorses.first?.horse === scheduledHorse)
-
-            invalidHorse.client = client
-            invalidHorse.currentBarn = originalBarn
-            client.horses.append(invalidHorse)
-            originalBarn.horses.append(invalidHorse)
-            client.notes = "Unrelated later edit"
-            try DomainGraphValidator.save(context)
+            #expect(observedRelocationBeforeFailure)
+            #expect(relocationHorse.currentBarn === relocationOriginalBarn)
+            #expect(relocationCompletedAppointment.persistentModelID == completedAppointmentID)
+            #expect(relocationCompletedAppointment.appointmentHorses.first?.persistentModelID == completedMembershipID)
+            #expect(relocationCompletedAppointment.appointmentHorses.first?.horse === relocationHorse)
+            let visit = try #require(relocationContext.model(for: completedVisitID) as? Visit)
+            #expect(visit.startedAt == Date(timeIntervalSinceReferenceDate: 100))
+            #expect(visit.completedAt == Date(timeIntervalSinceReferenceDate: 200))
+            #expect(visit.serviceLocationNameSnapshot == visitSnapshotName)
+            #expect(visit.visitHorses.count == 1)
+            #expect(visit.visitHorses.first?.horse === relocationHorse)
+            let relocationClient = try #require(
+                relocationContext.model(for: clientID) as? Client
+            )
+            relocationClient.notes = "Unrelated later edit"
+            try DomainGraphValidator.save(relocationContext)
         }
 
         try autoreleasepool {
@@ -244,7 +369,13 @@ struct HorseDraftAndRelocationTests {
             #expect(horse.currentBarn?.name == "Barn A")
             #expect(appointment.barn?.name == "Barn A")
             #expect(appointment.appointmentHorses.count == 1)
-            #expect(membership.horse?.name == "Scout")
+            #expect(membership.horse?.name == "Milo")
+            let visit = try #require(context.fetch(FetchDescriptor<Visit>()).first)
+            #expect(visit.startedAt == Date(timeIntervalSinceReferenceDate: 100))
+            #expect(visit.completedAt == Date(timeIntervalSinceReferenceDate: 200))
+            #expect(visit.serviceLocationNameSnapshot == "Barn A")
+            #expect(visit.visitHorses.count == 1)
+            #expect(visit.visitHorses.first?.horse?.name == "Milo")
             try DomainGraphValidator.validateAll(in: context)
         }
     }
@@ -267,5 +398,76 @@ struct HorseDraftAndRelocationTests {
         _ = ModelFixtures.makeAppointment(barn: barn, horses: [horse], in: context)
         try context.save()
         return (container, context, horse)
+    }
+
+    private func assertMalformedCompletedGraphBlocksRelocation(
+        mutation: (Appointment, Visit, Horse, Barn, ModelContext) throws -> Void
+    ) throws {
+        let graph = try makeCompletedRelocationGraph()
+        let context = ModelContext(graph.container)
+        let horse = try #require(context.model(for: graph.horseID) as? Horse)
+        let appointment = try #require(context.model(for: graph.appointmentID) as? Appointment)
+        let visit = try #require(context.model(for: graph.visitID) as? Visit)
+        let destination = try #require(context.model(for: graph.destinationBarnID) as? Barn)
+        try mutation(appointment, visit, horse, destination, context)
+        try context.save()
+
+        let projection = try #require(
+            HorseRelocationRules.projection(for: horse, destinationBarnID: destination.persistentModelID)
+        )
+        #expect(projection.appointmentStates.contains(.invalid))
+        #expect(!HorseRelocationRules.canRelocate(
+            appointmentStates: projection.appointmentStates,
+            hasInProgressVisitHorse: projection.hasInProgressVisitHorse,
+            isSameBarn: projection.isSameBarn
+        ))
+
+        let picker = ExistingHorsePickerModel()
+        picker.load(destinationBarnID: destination.persistentModelID, in: context)
+        #expect(picker.horses.isEmpty)
+    }
+
+    private func makeCompletedRelocationGraph() throws -> (
+        container: ModelContainer,
+        horseID: PersistentIdentifier,
+        appointmentID: PersistentIdentifier,
+        visitID: PersistentIdentifier,
+        destinationBarnID: PersistentIdentifier
+    ) {
+        let container = try ModelContainerFactory.inMemoryTest()
+        let context = container.mainContext
+        let client = Client(name: "Alex")
+        let source = Barn(name: "Barn A")
+        let destination = Barn(name: "Barn B")
+        let horse = Horse(name: "Milo", client: client, currentBarn: source)
+        context.insert(client)
+        context.insert(source)
+        context.insert(destination)
+        context.insert(horse)
+        client.horses.append(horse)
+        source.horses.append(horse)
+        let appointment = ModelFixtures.makeAppointment(barn: source, horses: [horse], in: context)
+        try DomainGraphValidator.save(context)
+        let visitID = try VisitStartUseCase.start(
+            appointmentID: appointment.persistentModelID,
+            now: Date(timeIntervalSinceReferenceDate: 100),
+            in: container
+        )
+        let completionContext = ModelContext(container)
+        var draft = try VisitSaveUseCase.loadDraft(visitID: visitID, in: completionContext)
+        let miloIndex = try #require(draft.horses.firstIndex(where: { $0.horseName == "Milo" }))
+        draft.horses[miloIndex].outcome = .serviced
+        _ = try VisitSaveUseCase.complete(
+            draft: draft,
+            completedAt: Date(timeIntervalSinceReferenceDate: 200),
+            in: completionContext
+        )
+        return (
+            container,
+            horse.persistentModelID,
+            appointment.persistentModelID,
+            visitID,
+            destination.persistentModelID
+        )
     }
 }

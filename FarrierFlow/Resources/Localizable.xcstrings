@@ -448,6 +448,165 @@
     "Unavailable" : {
       "comment" : "Fallback value for a missing required relationship."
     },
+    "Changing this outcome will clear its Work Notes." : {
+      "comment" : "Explanation shown before changing a serviced Horse outcome when doing so would remove its notes."
+    },
+    "Clear Work Notes" : {
+      "comment" : "Destructive confirmation action that removes Work Notes before changing a Horse outcome."
+    },
+    "Clear Work Notes?" : {
+      "comment" : "Confirmation title shown before changing an outcome that would make existing Work Notes invalid."
+    },
+    "Completed work will appear here after a visit is completed." : {
+      "comment" : "Horse History empty-state explanation."
+    },
+    "Complete Visit" : {
+      "comment" : "Primary toolbar action that saves final Visit outcomes and marks the Visit completed."
+    },
+    "Completed" : {
+      "comment" : "Visit status shown after a successful completion save."
+    },
+    "Complete or remove unresolved appointments before changing this service location." : {
+      "comment" : "Blocked relocation explanation for unresolved or in-progress appointments."
+    },
+    "Complete or remove unresolved appointments before moving this horse." : {
+      "comment" : "Blocked existing-horse move explanation for unresolved or in-progress appointments."
+    },
+    "Couldn’t Complete Visit" : {
+      "comment" : "Error title when final Visit completion could not be saved."
+    },
+    "Couldn’t Discard Visit" : {
+      "comment" : "Error title when an in-progress Visit could not be discarded."
+    },
+    "Couldn’t Save Changes" : {
+      "comment" : "Error title when a completed Visit correction could not be saved."
+    },
+    "Couldn’t Save Progress" : {
+      "comment" : "Error title when in-progress Visit outcomes or Work Notes could not be saved."
+    },
+    "Couldn’t Start Visit" : {
+      "comment" : "Error title when a Visit could not be created from an Appointment."
+    },
+    "Discard Unsaved Changes" : {
+      "comment" : "Destructive confirmation action that restores the last saved Visit draft."
+    },
+    "Discard Unsaved Changes?" : {
+      "comment" : "Confirmation title before abandoning unsaved Visit editor changes."
+    },
+    "Discard Visit" : {
+      "comment" : "Destructive action that removes an in-progress Visit and its owned memberships."
+    },
+    "Discard Visit?" : {
+      "comment" : "Confirmation title before discarding an in-progress Visit."
+    },
+    "Done" : {
+      "comment" : "Closes a sheet-presented completed Visit detail."
+    },
+    "Horse history couldn’t be loaded." : {
+      "comment" : "Description shown when completed Visit history cannot be read for a Horse."
+    },
+    "History" : {
+      "comment" : "Horse Detail section containing completed Visit records."
+    },
+    "History Unavailable" : {
+      "comment" : "Horse History unavailable state title."
+    },
+    "In Progress" : {
+      "comment" : "Visit status shown before final completion."
+    },
+    "Keep Editing" : {
+      "comment" : "Cancel action that returns to the Visit editor without discarding or clearing changes."
+    },
+    "Keep Visit" : {
+      "comment" : "Cancel action that preserves an in-progress Visit."
+    },
+    "Loading History…" : {
+      "comment" : "Progress label while completed Horse History records load."
+    },
+    "Loading Visit…" : {
+      "comment" : "Progress label while Visit editor or detail data loads."
+    },
+    "No Completed Visits" : {
+      "comment" : "Horse History empty state title."
+    },
+    "Not Serviced" : {
+      "comment" : "Completed Visit outcome for a scheduled Horse that did not receive service."
+    },
+    "Only horses with no unresolved or in-progress appointments can move." : {
+      "comment" : "Existing Horse picker empty-state explanation."
+    },
+    "Outcome" : {
+      "comment" : "Label for the per-Horse serviced, not-serviced, or pending result."
+    },
+    "%@ Outcome" : {
+      "comment" : "VoiceOver label for a Horse outcome picker. The argument is the Horse name."
+    },
+    "Pending" : {
+      "comment" : "In-progress Visit outcome before a scheduled Horse is marked serviced or not serviced."
+    },
+    "Resume Visit" : {
+      "comment" : "Action that reopens an in-progress Visit editor."
+    },
+    "Save Changes" : {
+      "comment" : "Action that saves a completed Visit correction without changing completion metadata."
+    },
+    "Save Progress" : {
+      "comment" : "Action that saves an in-progress Visit without completing it."
+    },
+    "Serviced" : {
+      "comment" : "Visit outcome for a scheduled Horse that received service."
+    },
+    "Start Visit" : {
+      "comment" : "Action that creates an in-progress Visit from an Appointment."
+    },
+    "Status" : {
+      "comment" : "Label for a Visit's in-progress or completed state."
+    },
+    "The visit couldn’t be loaded." : {
+      "comment" : "Unavailable-state explanation when Visit data cannot be read."
+    },
+    "The visit couldn’t be loaded. Try again." : {
+      "comment" : "Retryable Visit loading error shown by a feature model."
+    },
+    "The visit wasn’t discarded. Try again." : {
+      "comment" : "Error explanation when discarding an in-progress Visit fails."
+    },
+    "The visit wasn’t started. Try again." : {
+      "comment" : "Error explanation when creating a Visit from an Appointment fails."
+    },
+    "This will delete the in-progress visit and its recorded outcomes." : {
+      "comment" : "Explanation in the destructive in-progress Visit discard confirmation."
+    },
+    "Unsaved Changes" : {
+      "comment" : "Visible state indicating the Visit editor draft differs from the last successful save."
+    },
+    "Visit" : {
+      "comment" : "Navigation title and section title for Visit editor and detail screens."
+    },
+    "View Visit" : {
+      "comment" : "Action that opens a completed Visit from its Appointment."
+    },
+    "Visit Unavailable" : {
+      "comment" : "Unavailable state title when a Visit or one of its required records cannot be loaded."
+    },
+    "Work Notes" : {
+      "comment" : "Visible and VoiceOver label for optional notes recorded only for a serviced Horse."
+    },
+    "Work" : {
+      "comment" : "Visit editor section containing per-Horse outcomes and Work Notes."
+    },
+    "Work Date" : {
+      "comment" : "Label for the immutable Visit start timestamp used as the historical work date."
+    },
+    "Your changes are still in the visit. Try completing it again." : {
+      "comment" : "Error explanation when completing a Visit fails without discarding its draft."
+    },
+    "Your changes are still in the visit. Try saving again." : {
+      "comment" : "Error explanation when saving Visit progress or a completed correction fails."
+    },
+    "Your unsaved visit changes will be lost." : {
+      "comment" : "Explanation shown before dismissing a dirty Visit editor."
+    },
     "Your changes are still in the form. Try saving again." : {
 
     }

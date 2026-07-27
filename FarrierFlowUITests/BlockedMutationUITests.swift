@@ -66,7 +66,7 @@ final class BlockedMutationUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["appointment-row-\(firstBarn)"].waitForExistence(timeout: 3))
         app.staticTexts["appointment-row-\(firstBarn)"].tap()
         app.buttons["Delete"].tap()
-        app.buttons["Delete Appointment"].tap()
+        app.buttons["Delete Appointment"].firstMatch.tap()
         XCTAssertTrue(
             app.staticTexts["No scheduled appointments"].waitForExistence(timeout: 3)
         )
@@ -75,7 +75,10 @@ final class BlockedMutationUITests: XCTestCase {
     @MainActor
     private func createClient(_ name: String, in app: XCUIApplication) {
         app.tabBars.buttons["Clients"].tap()
-        app.buttons["Add Client"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Clients"].waitForExistence(timeout: 10))
+        let addClient = app.buttons["Add Client"].firstMatch
+        XCTAssertTrue(addClient.waitForExistence(timeout: 10))
+        addClient.tap()
         app.textFields["client-name-field"].tap()
         app.textFields["client-name-field"].typeText(name)
         app.buttons["Save"].tap()
@@ -84,10 +87,17 @@ final class BlockedMutationUITests: XCTestCase {
     @MainActor
     private func createBarn(_ name: String, in app: XCUIApplication) {
         if !app.navigationBars["Service Locations"].exists {
-            app.buttons["More"].tap()
-            app.buttons["Service Locations"].tap()
+            let more = app.buttons["More"].firstMatch
+            XCTAssertTrue(more.waitForExistence(timeout: 10))
+            more.tap()
+            let serviceLocations = app.buttons["Service Locations"].firstMatch
+            XCTAssertTrue(serviceLocations.waitForExistence(timeout: 10))
+            serviceLocations.tap()
         }
-        app.buttons["Add Service Location"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Service Locations"].waitForExistence(timeout: 10))
+        let addServiceLocation = app.buttons["Add Service Location"].firstMatch
+        XCTAssertTrue(addServiceLocation.waitForExistence(timeout: 10))
+        addServiceLocation.tap()
         app.textFields["barn-name-field"].tap()
         app.textFields["barn-name-field"].typeText(name)
         app.buttons["Save"].tap()
@@ -99,7 +109,9 @@ final class BlockedMutationUITests: XCTestCase {
         barnName: String,
         in app: XCUIApplication
     ) {
-        app.buttons["Add Horse"].tap()
+        let addHorse = app.buttons["Add Horse"].firstMatch
+        XCTAssertTrue(addHorse.waitForExistence(timeout: 3))
+        addHorse.tap()
         app.textFields["horse-name-field"].tap()
         app.textFields["horse-name-field"].typeText(name)
         app.buttons["horse-barn-picker"].tap()
@@ -118,8 +130,14 @@ final class BlockedMutationUITests: XCTestCase {
         XCTAssertTrue(addAppointment.waitForExistence(timeout: 5))
         addAppointment.tap()
         app.buttons["appointment-barn-picker"].tap()
-        app.buttons[barnName].tap()
-        app.buttons["appointment-horse-\(horseName)"].tap()
+        let barnOptions = app.buttons.matching(identifier: barnName)
+        XCTAssertTrue(barnOptions.firstMatch.waitForExistence(timeout: 3))
+        XCTAssertGreaterThan(barnOptions.count, 0)
+        guard barnOptions.count > 0 else { return }
+        barnOptions.element(boundBy: barnOptions.count - 1).tap()
+        let horseButton = app.buttons["appointment-horse-\(horseName)"].firstMatch
+        XCTAssertTrue(horseButton.waitForExistence(timeout: 5))
+        horseButton.tap()
         app.buttons["Save"].tap()
     }
 }

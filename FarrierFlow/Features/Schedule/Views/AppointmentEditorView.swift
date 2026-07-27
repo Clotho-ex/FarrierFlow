@@ -14,7 +14,15 @@ struct AppointmentEditorView: View {
         NavigationStack {
             Form {
                 Section("Appointment") {
-                    if model.loadState == .loaded {
+                    if model.hasVisit {
+                        LabeledContent(
+                            "Service Location",
+                            value: model.lockedBarnName ?? "Unavailable"
+                        )
+                        Text("The service location and horses are fixed after work starts.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    } else if model.loadState == .loaded {
                         if model.barns.isEmpty {
                             Text("No service locations available")
                                 .foregroundStyle(.secondary)
@@ -48,7 +56,9 @@ struct AppointmentEditorView: View {
                 loadStateSection
                 if model.loadState == .loaded {
                     Section("Horses") {
-                        if model.draft.barnID == nil {
+                        if model.hasVisit {
+                            Text(model.lockedHorseNames.formatted(.list(type: .and)))
+                        } else if model.draft.barnID == nil {
                             Text("Select a service location to choose horses.")
                                 .foregroundStyle(.secondary)
                         } else if model.eligibleHorses.isEmpty {

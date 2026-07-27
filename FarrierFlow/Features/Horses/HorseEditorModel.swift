@@ -95,22 +95,27 @@ final class HorseEditorModel {
             guard let existing = context.model(for: horseID) as? Horse else {
                 return nil
             }
-            guard let currentBarnID = existing.currentBarn?.persistentModelID else {
+            guard existing.currentBarn != nil else {
                 alert = FeatureAlert(
                     title: "Horse Unavailable",
                     message: "This horse is missing its current service location."
                 )
                 return nil
             }
-            if currentBarnID != barnID
-                && !HorseRelocationRules.canRelocate(
-                    appointmentMembershipCount: existing.appointmentHorses.count,
-                    currentBarnID: currentBarnID,
+            guard
+                let projection = HorseRelocationRules.projection(
+                    for: existing,
                     destinationBarnID: barnID
-                ) {
+                ),
+                HorseRelocationRules.canRelocate(
+                    appointmentStates: projection.appointmentStates,
+                    hasInProgressVisitHorse: projection.hasInProgressVisitHorse,
+                    isSameBarn: projection.isSameBarn
+                )
+            else {
                 alert = FeatureAlert(
                     title: "Can’t Change Service Location",
-                    message: "This horse is referenced by an appointment. Remove the appointment before changing its service location."
+                    message: "Complete or remove unresolved appointments before changing this service location."
                 )
                 return nil
             }

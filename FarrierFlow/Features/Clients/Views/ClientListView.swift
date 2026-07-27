@@ -49,6 +49,8 @@ struct ClientListView: View {
                     ClientDetailView(clientID: id)
                 case .horse(let id):
                     HorseDetailView(horseID: id)
+                case .visit(let id):
+                    VisitDetailView(visitID: id, container: context.container)
                 }
             }
             .navigationDestination(for: BarnRoute.self) { route in

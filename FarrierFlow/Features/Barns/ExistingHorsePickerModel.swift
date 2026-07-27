@@ -19,6 +19,8 @@ final class ExistingHorsePickerModel {
 
     @ObservationIgnored
     private let horseFetcher: (ModelContext) throws -> [Horse]
+    @ObservationIgnored
+    private let saving: (ModelContext) throws -> Void
 
     private(set) var horses: [Horse] = []
     private(set) var loadState = ExistingHorsePickerLoadState.loading
@@ -32,19 +34,32 @@ final class ExistingHorsePickerModel {
                     sortBy: [SortDescriptor(\.name, comparator: .localizedStandard)]
                 )
             )
+        },
+        saving: @escaping (ModelContext) throws -> Void = {
+            try DomainGraphValidator.save($0)
         }
     ) {
         self.horseFetcher = horseFetcher
+        self.saving = saving
     }
 
     func load(destinationBarnID: PersistentIdentifier, in context: ModelContext) {
         loadState = .loading
         do {
-            horses = try horseFetcher(context).filter {
-                $0.currentBarn?.persistentModelID != destinationBarnID
-                    && $0.appointmentHorses.isEmpty
-                    && $0.client != nil
-                    && $0.currentBarn != nil
+            horses = try horseFetcher(context).filter { horse in
+                guard horse.client != nil, horse.currentBarn != nil,
+                      let projection = HorseRelocationRules.projection(
+                          for: horse,
+                          destinationBarnID: destinationBarnID
+                      )
+                else {
+                    return false
+                }
+                return !projection.isSameBarn && HorseRelocationRules.canRelocate(
+                    appointmentStates: projection.appointmentStates,
+                    hasInProgressVisitHorse: projection.hasInProgressVisitHorse,
+                    isSameBarn: projection.isSameBarn
+                )
             }
             loadState = .loaded
         } catch {
@@ -61,15 +76,19 @@ final class ExistingHorsePickerModel {
             let horse = context.model(for: selectedHorseID) as? Horse,
             let destination = context.model(for: destinationBarnID) as? Barn,
             let originalBarn = horse.currentBarn,
-            HorseRelocationRules.canRelocate(
-                appointmentMembershipCount: horse.appointmentHorses.count,
-                currentBarnID: originalBarn.persistentModelID,
+            let projection = HorseRelocationRules.projection(
+                for: horse,
                 destinationBarnID: destinationBarnID
+            ),
+            HorseRelocationRules.canRelocate(
+                appointmentStates: projection.appointmentStates,
+                hasInProgressVisitHorse: projection.hasInProgressVisitHorse,
+                isSameBarn: projection.isSameBarn
             )
         else {
             alert = FeatureAlert(
                 title: "Can’t Move Horse",
-                message: "A horse with scheduled appointments can’t change service locations."
+                message: "Complete or remove unresolved appointments before moving this horse."
             )
             return false
         }
@@ -80,7 +99,7 @@ final class ExistingHorsePickerModel {
         }
 
         do {
-            try DomainGraphValidator.save(context)
+            try saving(context)
             return true
         } catch {
             horse.currentBarn = originalBarn

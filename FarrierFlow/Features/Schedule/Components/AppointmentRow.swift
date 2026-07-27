@@ -28,6 +28,17 @@ struct AppointmentRow: View {
             }
             Text(horseNames)
                 .font(Typography.recordMetadata)
+            if let visit = appointment.visit {
+                if visit.completedAt == nil {
+                    Text("In Progress")
+                        .font(Typography.recordMetadata)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Completed")
+                        .font(Typography.recordMetadata)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("appointment-row-\(barnName)")

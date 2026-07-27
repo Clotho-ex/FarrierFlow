@@ -51,6 +51,15 @@ one continuous field workflow rather than separate generic business modules.
   manually reproduce Liquid Glass.
 - Core records must connect appointments, horses and their history, performed
   work, hoof photographs, invoices, payment status, and future appointments.
+- Slice 2 records performed work as a Visit started from an existing
+  Appointment. Every scheduled horse receives a serviced or not-serviced
+  outcome before completion, and serviced horses may include free-text Work
+  Notes.
+- An in-progress Visit can be saved and resumed. A completed Visit remains
+  available from its Appointment and from Horse History.
+- Visit history preserves the actual Visit start time and immutable
+  service-location name and address snapshots. It does not rewrite history when
+  the current service-location record changes.
 - Core business records are local-first and must remain usable without a
   network connection. Cloud backup, synchronization, accounts, and multi-device
   behavior are not yet confirmed.
@@ -74,10 +83,13 @@ one continuous field workflow rather than separate generic business modules.
 
 ## Evidence on Hand
 
-- The repository contains an iPhone-only SwiftUI and SwiftData application
-  scaffold in `FarrierFlow/`.
+- The repository contains a completed iPhone-only SwiftUI and SwiftData Slice 0
+  and Slice 1 implementation in `FarrierFlow/`.
 - The Xcode project declares iOS 18.0 for the app, unit-test, and UI-test
   targets and includes iPhone device support.
+- The approved Slice 2 design is recorded in
+  `docs/superpowers/specs/2026-07-27-slice-2-visit-completion-design.md`.
+- Slice 2 implementation is not yet present in Swift source.
 - No production horse photography, logo, customer evidence, testimonials,
   pricing, integrations, or operational sample data is currently present in the
   repository. Future work must not fabricate these.

@@ -37,7 +37,7 @@ struct ExistingHorsePickerView: View {
                         "No eligible horses",
                         systemImage: "figure.equestrian.sports",
                         description: Text(
-                            "Only horses without appointments at another service location can move."
+                            "Only horses with no unresolved or in-progress appointments can move."
                         )
                     )
                 }

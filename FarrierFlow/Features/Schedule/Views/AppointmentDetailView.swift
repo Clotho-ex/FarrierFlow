@@ -76,10 +76,28 @@ struct AppointmentDetailView: View {
                 )
                 .toolbar {
                     ToolbarItemGroup(placement: .topBarTrailing) {
+                        if let visit = appointment.visit {
+                            Button(
+                                visit.completedAt == nil ? "Resume Visit" : "View Visit"
+                            ) {
+                                model.present(visit)
+                            }
+                            .accessibilityIdentifier(
+                                visit.completedAt == nil
+                                    ? "visit-resume-action"
+                                    : "visit-view-action"
+                            )
+                        } else {
+                            Button("Start Visit") {
+                                model.startVisit(in: context.container)
+                            }
+                            .accessibilityIdentifier("visit-start-action")
+                        }
                         Button("Edit", systemImage: "pencil") { showsEditor = true }
                         Button("Delete", systemImage: "trash", role: .destructive) {
                             showsDeleteConfirmation = true
                         }
+                        .accessibilityIdentifier("appointment-delete-action")
                     }
                 }
                 .sheet(isPresented: $showsEditor, onDismiss: reload) {
@@ -91,8 +109,9 @@ struct AppointmentDetailView: View {
                     titleVisibility: .visible
                 ) {
                     Button("Delete Appointment", role: .destructive) {
-                        if model.delete(in: context) { dismiss() }
+                        if model.delete(in: ModelContext(context.container)) { dismiss() }
                     }
+                    .accessibilityIdentifier("appointment-delete-confirmation")
                 }
             } else {
                 ContentUnavailableView(
@@ -102,12 +121,43 @@ struct AppointmentDetailView: View {
             }
         }
         .onAppear(perform: reload)
+        .sheet(item: editorPresentation, onDismiss: reload) { presentation in
+            if case let .editor(visitID) = presentation {
+                VisitEditorView(visitID: visitID, container: context.container)
+            }
+        }
+        .sheet(item: detailPresentation, onDismiss: reload) { presentation in
+            if case let .detail(visitID) = presentation {
+                VisitDetailView(
+                    visitID: visitID,
+                    container: context.container,
+                    showsDismissAction: true
+                )
+            }
+        }
         .alert(item: $model.alert) {
             Alert(title: Text($0.title), message: Text($0.message))
         }
     }
 
     private func reload() {
-        model.load(id: appointmentID, in: context)
+        // Visit start and progress actions use their own contexts. Resolve the
+        // Appointment in a fresh context after a sheet closes so stale state
+        // cannot leave a Start Visit action visible.
+        model.load(id: appointmentID, in: ModelContext(context.container))
+    }
+
+    private var editorPresentation: Binding<VisitPresentation?> {
+        Binding(
+            get: { model.editorPresentation },
+            set: { model.editorPresentation = $0 }
+        )
+    }
+
+    private var detailPresentation: Binding<VisitPresentation?> {
+        Binding(
+            get: { model.detailPresentation },
+            set: { model.detailPresentation = $0 }
+        )
     }
 }

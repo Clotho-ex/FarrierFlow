@@ -1,3 +1,4 @@
+import Foundation
 import SwiftData
 import Testing
 @testable import FarrierFlow
@@ -100,9 +101,244 @@ struct DomainGraphValidatorTests {
         }
     }
 
+    @Test
+    func validCompletedVisitGraphSatisfiesEveryRequiredRelationship() throws {
+        let graph = try makeGraph()
+        let visit = ModelFixtures.makeVisit(
+            startedAt: Date(timeIntervalSinceReferenceDate: 100),
+            completedAt: Date(timeIntervalSinceReferenceDate: 200),
+            appointment: graph.appointment,
+            in: graph.context
+        )
+        let visitHorse = try #require(visit.visitHorses.first)
+        visitHorse.outcomeRawValue = VisitOutcome.serviced.rawValue
+
+        try DomainGraphValidator.validateAll(in: graph.context)
+    }
+
+    @Test(arguments: [
+        ("appointment", DomainGraphViolation.visitMissingAppointment),
+        ("barn", DomainGraphViolation.visitMissingBarn),
+    ])
+    func saveRejectsVisitWithoutRequiredRelationship(
+        missingRelationship: String,
+        expectedViolation: DomainGraphViolation
+    ) throws {
+        let graph = try makeGraph()
+        let visit = ModelFixtures.makeVisit(appointment: graph.appointment, in: graph.context)
+
+        switch missingRelationship {
+        case "appointment":
+            visit.appointment = nil
+        case "barn":
+            visit.barn = nil
+        default:
+            Issue.record("Unexpected relationship fixture")
+        }
+
+        #expect(throws: expectedViolation) {
+            try DomainGraphValidator.save(graph.context)
+        }
+    }
+
+    @Test
+    func saveRejectsVisitWithoutHorseMembership() throws {
+        let graph = try makeGraph()
+        let visit = ModelFixtures.makeVisit(appointment: graph.appointment, in: graph.context)
+        for visitHorse in visit.visitHorses {
+            graph.context.delete(visitHorse)
+        }
+
+        #expect(throws: DomainGraphViolation.visitHasNoHorse) {
+            try DomainGraphValidator.save(graph.context)
+        }
+    }
+
+    @Test(arguments: [
+        ("visit", DomainGraphViolation.visitHorseMissingVisit),
+        ("horse", DomainGraphViolation.visitHorseMissingHorse),
+    ])
+    func saveRejectsVisitHorseWithoutRequiredRelationship(
+        missingRelationship: String,
+        expectedViolation: DomainGraphViolation
+    ) throws {
+        let graph = try makeGraph()
+        let visit = ModelFixtures.makeVisit(appointment: graph.appointment, in: graph.context)
+        let visitHorse = try #require(visit.visitHorses.first)
+
+        switch missingRelationship {
+        case "visit":
+            visitHorse.visit = nil
+        case "horse":
+            visitHorse.horse = nil
+        default:
+            Issue.record("Unexpected relationship fixture")
+        }
+
+        #expect(throws: expectedViolation) {
+            try DomainGraphValidator.save(graph.context)
+        }
+    }
+
+    @Test
+    func saveRejectsDuplicateVisitHorseMembership() throws {
+        let graph = try makeGraph()
+        let visit = ModelFixtures.makeVisit(appointment: graph.appointment, in: graph.context)
+        let duplicate = VisitHorse(visit: visit, horse: graph.horse)
+        graph.context.insert(duplicate)
+        visit.visitHorses.append(duplicate)
+        graph.horse.visitHorses.append(duplicate)
+
+        #expect(throws: DomainGraphViolation.duplicateVisitHorseMembership) {
+            try DomainGraphValidator.save(graph.context)
+        }
+    }
+
+    @Test
+    func saveRejectsVisitHorseSetThatDiffersFromAppointmentHorseSet() throws {
+        let graph = try makeGraph()
+        let visit = ModelFixtures.makeVisit(appointment: graph.appointment, in: graph.context)
+        let secondClient = Client(name: "Jordan")
+        let secondHorse = Horse(name: "Scout", client: secondClient, currentBarn: graph.barn)
+        graph.context.insert(secondClient)
+        graph.context.insert(secondHorse)
+        secondClient.horses.append(secondHorse)
+        graph.barn.horses.append(secondHorse)
+        let visitHorse = try #require(visit.visitHorses.first)
+        visitHorse.horse = secondHorse
+        secondHorse.visitHorses.append(visitHorse)
+
+        #expect(throws: DomainGraphViolation.visitMembershipMismatch) {
+            try DomainGraphValidator.save(graph.context)
+        }
+    }
+
+    @Test
+    func saveRejectsVisitWithBlankLocationNameSnapshot() throws {
+        let graph = try makeGraph()
+        let visit = ModelFixtures.makeVisit(appointment: graph.appointment, in: graph.context)
+        visit.serviceLocationNameSnapshot = " \n "
+
+        #expect(throws: DomainGraphViolation.visitLocationNameMissing) {
+            try DomainGraphValidator.save(graph.context)
+        }
+    }
+
+    @Test
+    func saveRejectsInProgressValidationWhenVisitAlreadyHasCompletionDate() throws {
+        let graph = try makeGraph()
+        let visit = ModelFixtures.makeVisit(
+            startedAt: Date(timeIntervalSinceReferenceDate: 100),
+            completedAt: Date(timeIntervalSinceReferenceDate: 200),
+            appointment: graph.appointment,
+            in: graph.context
+        )
+
+        #expect(throws: DomainGraphViolation.inProgressVisitHasCompletionDate) {
+            try DomainGraphValidator.validateInProgress(visit)
+        }
+    }
+
+    @Test
+    func saveRejectsCompletedVisitWithPendingHorse() throws {
+        let graph = try makeGraph()
+        _ = ModelFixtures.makeVisit(
+            startedAt: Date(timeIntervalSinceReferenceDate: 100),
+            completedAt: Date(timeIntervalSinceReferenceDate: 200),
+            appointment: graph.appointment,
+            in: graph.context
+        )
+
+        #expect(throws: DomainGraphViolation.completedVisitHasPendingHorse) {
+            try DomainGraphValidator.save(graph.context)
+        }
+    }
+
+    @Test
+    func saveRejectsCompletedVisitWithoutServicedHorse() throws {
+        let graph = try makeGraph()
+        let visit = ModelFixtures.makeVisit(
+            startedAt: Date(timeIntervalSinceReferenceDate: 100),
+            completedAt: Date(timeIntervalSinceReferenceDate: 200),
+            appointment: graph.appointment,
+            in: graph.context
+        )
+        for visitHorse in visit.visitHorses {
+            visitHorse.outcomeRawValue = VisitOutcome.notServiced.rawValue
+        }
+
+        #expect(throws: DomainGraphViolation.completedVisitHasNoServicedHorse) {
+            try DomainGraphValidator.save(graph.context)
+        }
+    }
+
+    @Test
+    func saveRejectsCompletionBeforeStart() throws {
+        let graph = try makeGraph()
+        let visit = ModelFixtures.makeVisit(
+            startedAt: Date(timeIntervalSinceReferenceDate: 200),
+            completedAt: Date(timeIntervalSinceReferenceDate: 100),
+            appointment: graph.appointment,
+            in: graph.context
+        )
+        let visitHorse = try #require(visit.visitHorses.first)
+        visitHorse.outcomeRawValue = VisitOutcome.serviced.rawValue
+
+        #expect(throws: DomainGraphViolation.completionPredatesStart) {
+            try DomainGraphValidator.save(graph.context)
+        }
+    }
+
+    @Test
+    func saveRejectsWorkNotesForUnservicedHorse() throws {
+        let graph = try makeGraph()
+        let visit = ModelFixtures.makeVisit(appointment: graph.appointment, in: graph.context)
+        let visitHorse = try #require(visit.visitHorses.first)
+        visitHorse.outcomeRawValue = VisitOutcome.notServiced.rawValue
+        visitHorse.workNotes = "Could not safely handle"
+
+        #expect(throws: DomainGraphViolation.workNotesRequireServicedOutcome) {
+            try DomainGraphValidator.save(graph.context)
+        }
+    }
+
+    @Test
+    func saveRejectsAppointmentAndVisitWithMismatchedInverse() throws {
+        let graph = try makeGraph()
+        let visit = ModelFixtures.makeVisit(appointment: graph.appointment, in: graph.context)
+        let otherBarn = Barn(name: "South Field")
+        graph.context.insert(otherBarn)
+        visit.barn = otherBarn
+        otherBarn.visits.append(visit)
+
+        #expect(throws: DomainGraphViolation.appointmentVisitMismatch) {
+            try DomainGraphValidator.save(graph.context)
+        }
+    }
+
+    @Test
+    func completedVisitAllowsHorseToMoveAfterItsAppointment() throws {
+        let graph = try makeGraph()
+        let visit = ModelFixtures.makeVisit(
+            startedAt: Date(timeIntervalSinceReferenceDate: 100),
+            completedAt: Date(timeIntervalSinceReferenceDate: 200),
+            appointment: graph.appointment,
+            in: graph.context
+        )
+        let visitHorse = try #require(visit.visitHorses.first)
+        visitHorse.outcomeRawValue = VisitOutcome.serviced.rawValue
+        let otherBarn = Barn(name: "South Field")
+        graph.context.insert(otherBarn)
+        graph.horse.currentBarn = otherBarn
+        otherBarn.horses.append(graph.horse)
+
+        try DomainGraphValidator.save(graph.context)
+    }
+
     private func makeGraph() throws -> (
         container: ModelContainer,
         context: ModelContext,
+        barn: Barn,
         horse: Horse,
         appointment: Appointment,
         appointmentHorse: AppointmentHorse
@@ -124,6 +360,6 @@ struct DomainGraphValidatorTests {
         )
         try context.save()
         let appointmentHorse = try #require(appointment.appointmentHorses.first)
-        return (container, context, horse, appointment, appointmentHorse)
+        return (container, context, barn, horse, appointment, appointmentHorse)
     }
 }

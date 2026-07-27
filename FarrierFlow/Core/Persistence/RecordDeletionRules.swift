@@ -6,7 +6,11 @@ nonisolated enum RecordDeletionBlock: Error, Equatable {
     case barnHasHorses
     case barnHasAppointments
     case barnHasHorsesAndAppointments
+    case barnHasVisits
     case horseHasAppointments
+    case horseHasVisits
+    case appointmentHasVisit
+    case completedVisitCannotBeDeleted
 
     var alert: FeatureAlert {
         switch self {
@@ -30,10 +34,30 @@ nonisolated enum RecordDeletionBlock: Error, Equatable {
                 title: "Can’t Delete Service Location",
                 message: "Move or remove its horses and delete its appointments first."
             )
+        case .barnHasVisits:
+            FeatureAlert(
+                title: "Can’t Delete Service Location",
+                message: "This service location is referenced by visit history."
+            )
         case .horseHasAppointments:
             FeatureAlert(
                 title: "Can’t Delete Horse",
                 message: "Delete appointments that reference this horse first."
+            )
+        case .horseHasVisits:
+            FeatureAlert(
+                title: "Can’t Delete Horse",
+                message: "This horse is referenced by visit history."
+            )
+        case .appointmentHasVisit:
+            FeatureAlert(
+                title: "Can’t Delete Appointment",
+                message: "This appointment has a visit."
+            )
+        case .completedVisitCannotBeDeleted:
+            FeatureAlert(
+                title: "Can’t Delete Visit",
+                message: "Completed visits remain part of horse history."
             )
         }
     }
@@ -49,6 +73,9 @@ enum RecordDeletionRules {
     }
 
     static func delete(_ barn: Barn, in context: ModelContext) throws {
+        if !barn.visits.isEmpty {
+            throw RecordDeletionBlock.barnHasVisits
+        }
         switch (barn.horses.isEmpty, barn.appointments.isEmpty) {
         case (false, false):
             throw RecordDeletionBlock.barnHasHorsesAndAppointments
@@ -64,6 +91,9 @@ enum RecordDeletionRules {
     }
 
     static func delete(_ horse: Horse, in context: ModelContext) throws {
+        if !horse.visitHorses.isEmpty {
+            throw RecordDeletionBlock.horseHasVisits
+        }
         guard horse.appointmentHorses.isEmpty else {
             throw RecordDeletionBlock.horseHasAppointments
         }
@@ -73,8 +103,26 @@ enum RecordDeletionRules {
     }
 
     static func delete(_ appointment: Appointment, in context: ModelContext) throws {
+        guard appointment.visit == nil else {
+            throw RecordDeletionBlock.appointmentHasVisit
+        }
         try persistDeletion(in: context) {
             context.delete(appointment)
+        }
+    }
+
+    static func delete(_ visit: Visit, in context: ModelContext) throws {
+        guard visit.completedAt == nil else {
+            throw RecordDeletionBlock.completedVisitCannotBeDeleted
+        }
+        try persistDeletion(in: context) {
+            let appointment = visit.appointment
+            let barn = visit.barn
+            appointment?.visit = nil
+            visit.appointment = nil
+            barn?.visits.removeAll { $0 === visit }
+            visit.barn = nil
+            context.delete(visit)
         }
     }
 

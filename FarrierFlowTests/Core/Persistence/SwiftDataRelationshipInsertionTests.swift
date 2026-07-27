@@ -45,4 +45,33 @@ struct SwiftDataRelationshipInsertionTests {
         #expect(appointmentHorse.appointment === appointment)
         #expect(appointmentHorse.horse === horse)
     }
+
+    @Test
+    func explicitlyConnectingBothSidesPersistsVisitRelationships() throws {
+        let container = try ModelContainerFactory.inMemoryTest()
+        let context = container.mainContext
+        let client = ModelFixtures.makeClient()
+        let barn = ModelFixtures.makeBarn()
+        context.insert(client)
+        context.insert(barn)
+        let horse = ModelFixtures.makeHorse(client: client, barn: barn)
+        context.insert(horse)
+        client.horses.append(horse)
+        barn.horses.append(horse)
+        let appointment = ModelFixtures.makeAppointment(barn: barn, horses: [horse], in: context)
+        let visit = ModelFixtures.makeVisit(appointment: appointment, in: context)
+
+        try context.save()
+
+        let visitHorse = try #require(visit.visitHorses.first)
+        #expect(try context.fetchCount(FetchDescriptor<Visit>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<VisitHorse>()) == 1)
+        #expect(appointment.visit === visit)
+        #expect(visit.appointment === appointment)
+        #expect(visit.barn === barn)
+        #expect(barn.visits.contains { $0 === visit })
+        #expect(visitHorse.visit === visit)
+        #expect(visitHorse.horse === horse)
+        #expect(horse.visitHorses.contains { $0 === visitHorse })
+    }
 }

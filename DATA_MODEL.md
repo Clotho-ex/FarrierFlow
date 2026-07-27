@@ -2,13 +2,14 @@
 
 ## Scope
 
-This document defines the complete SwiftData contract for the first vertical
-slice. The graph supports independent clients and service locations, horses
-owned by clients and currently located at one service location, and barn-centric
-appointments containing one or more horses.
+This document defines the complete SwiftData contract through Slice 2. The
+graph supports independent clients and service locations, horses owned by
+clients and currently located at one service location, barn-centric
+appointments containing one or more horses, and Visit records that preserve
+performed-work outcomes and Horse History.
 
-SwiftData is the local source of truth. No model in this schema represents
-visits, hoof photographs, services, pricing, invoices, payments, subscriptions,
+SwiftData is the local source of truth. No model in this schema represents hoof
+photographs, structured services, pricing, invoices, payments, subscriptions,
 cloud synchronization, or backup.
 
 ## Relationship Contract
@@ -25,6 +26,12 @@ cloud synchronization, or backup.
   location.
 - Client information for an appointment is derived from its selected horses.
 - One appointment may contain horses owned by multiple clients.
+- An appointment has zero or one Visit.
+- A Visit belongs to exactly one Appointment and one Barn.
+- A Visit contains exactly one VisitHorse for every AppointmentHorse.
+- A VisitHorse belongs to exactly one Visit and one Horse.
+- Visit history displays immutable service-location name and optional address
+  snapshots captured when Start Visit succeeds.
 
 “Barn” is the persisted domain name for any service location, including a
 commercial barn, private stable, or client residence. User-facing copy may use
@@ -37,12 +44,18 @@ the user or to the product domain. Controlled creation and mutation paths must
 provide every required relationship and validate the complete graph before
 saving.
 
-## Schema Version
+## Schema Versions and Migration
 
-The first persisted graph is `FarrierFlowSchemaV1`. The declared fields below
-are the complete V1 application schema; SwiftData supplies model identity.
-Navigation uses SwiftData persistent identifiers and tests verify records by
-their persisted fields and relationships.
+`FarrierFlowSchemaV1` remains the immutable five-model prior snapshot.
+`FarrierFlowSchemaV2` is the current complete seven-model snapshot and adds
+Visit, VisitHorse, and their inverse relationships to existing entities.
+SwiftData supplies model identity.
+
+The migration plan registers V1 followed by V2 with a lightweight V1-to-V2
+stage. It preserves the existing production store identity and every V1 record
+and relationship. Existing Appointments receive no fabricated Visit, VisitHorse,
+or snapshot data and therefore continue blocking Horse relocation until
+deleted or completed through a new Visit.
 
 ## Client
 
@@ -96,8 +109,9 @@ private stable, or client residence.
 
 - `horses: [Horse]` is the inverse of `Horse.currentBarn`.
 - `appointments: [Appointment]` is the inverse of `Appointment.barn`.
+- `visits: [Visit]` is the inverse of `Visit.barn`.
 - There is no direct relationship to `Client`.
-- Neither relationship cascades.
+- No Barn relationship cascades.
 
 ### Validation
 
@@ -109,10 +123,10 @@ private stable, or client residence.
 
 ### Deletion
 
-A barn may be deleted only when both `horses` and `appointments` are empty. If
-either relationship exists, the feature model prevents deletion and presents a
-native alert naming the records that must be reassigned or removed. Barn
-deletion never cascades to horses or appointments.
+A barn may be deleted only when `horses`, `appointments`, and `visits` are all
+empty. If any relationship exists, the feature model prevents deletion and
+presents a native alert naming the records that must be reassigned, removed, or
+retained. Barn deletion never cascades to horses, appointments, or visits.
 
 ## Horse
 
@@ -134,6 +148,7 @@ deletion never cascades to horses or appointments.
   validated before save.
 - `appointmentHorses: [AppointmentHorse]` is the inverse of
   `AppointmentHorse.horse`.
+- `visitHorses: [VisitHorse]` is the inverse of `VisitHorse.horse`.
 - No relationship cascades from Horse.
 
 ### Validation
@@ -149,24 +164,30 @@ deletion never cascades to horses or appointments.
 
 ### Relocation
 
-`currentBarn` may change only when `appointmentHorses` is empty. If any
-`AppointmentHorse` references the horse, the feature model prevents the change,
-keeps the existing barn, and presents a native alert explaining why relocation
-is blocked.
+`currentBarn` may change only when every AppointmentHorse membership resolves
+to an Appointment with a completed Visit.
 
-Add Existing Horse from a service-location detail applies the same rule. Its
-eligible set contains only horses whose `appointmentHorses` collection is empty
-and whose `currentBarn` is not already the destination barn.
+- Appointment with no Visit: blocks relocation.
+- Appointment with an in-progress Visit: blocks relocation.
+- Appointment with a completed Visit: does not block relocation.
+- Missing or invalid relationships: fail closed and block relocation.
 
-Relocation never moves, deletes, retargets, or otherwise rewrites an existing
-Appointment or AppointmentHorse.
+Scheduled time does not infer completion. A past Appointment without a
+completed Visit still blocks relocation.
+
+Add Existing Horse applies the same rule and excludes horses already assigned
+to the destination. As a defensive invariant, an independently encountered
+in-progress VisitHorse also blocks relocation.
+
+Relocation never moves, deletes, retargets, or otherwise rewrites Appointment,
+AppointmentHorse, Visit, VisitHorse, or snapshot data.
 
 ### Deletion
 
-A horse may be deleted only when `appointmentHorses` is empty. If any
-appointment references it, the feature model prevents deletion and explains
-that referenced horses cannot be removed in this slice. Deleting a horse never
-deletes its client, barn, appointment, or join records.
+A horse may be deleted only when `appointmentHorses` and `visitHorses` are
+empty. If an Appointment or Visit references it, the feature model prevents
+deletion. Deleting a horse never deletes its client, barn, appointment, visit,
+or join records.
 
 Archiving and historical retention are intentionally not represented in this
 schema.
@@ -188,8 +209,10 @@ schema.
   validated before save.
 - `appointmentHorses: [AppointmentHorse]` is required to contain at least one
   join and is the inverse of `AppointmentHorse.appointment`.
+- `visit: Visit?` is the inverse of `Visit.appointment` and expresses zero or
+  one Visit.
 - Appointment owns the persistence lifetime of its join records.
-- Appointment does not own Barn, Horse, or Client.
+- Appointment does not own Barn, Horse, Client, or Visit.
 
 ### Validation
 
@@ -200,6 +223,9 @@ schema.
 - The appointment must contain at least one `AppointmentHorse`.
 - Every joined horse's `currentBarn` must equal the appointment's `barn`.
 - The same horse may appear no more than once in an appointment.
+- Once a Visit exists, Barn and AppointmentHorse membership are immutable.
+- Scheduled start, notes, and expected duration remain editable only when their
+  mutation leaves the Visit graph unchanged and valid.
 
 Expected duration is not derived from horse count and is not populated
 automatically. When it is absent, Today and Schedule display only the start
@@ -207,14 +233,15 @@ time.
 
 ### Deletion
 
-Deleting an appointment cascades only to its `AppointmentHorse` records. It
-never deletes its barn, horses, or clients.
+An Appointment with a Visit cannot be deleted. When no Visit exists, deleting
+an Appointment cascades only to its AppointmentHorse records. It never deletes
+its Barn, Horses, Clients, or Visit.
 
 ## AppointmentHorse
 
 ### Fields
 
-AppointmentHorse has no scalar application fields in V1.
+AppointmentHorse has no scalar application fields in V1 or V2.
 
 ### Relationships
 
@@ -232,10 +259,108 @@ AppointmentHorse has no scalar application fields in V1.
 - `horse.currentBarn` equals `appointment.barn` when the graph is saved.
 - Removing a join removes only appointment membership.
 - Removing a join never deletes the horse.
+- Once the Appointment has a Visit, membership cannot be added, removed, or
+  replaced.
 
 SwiftData relationship metadata does not replace the uniqueness check. The
 appointment feature model prevents duplicate selection before inserting a join
 and validates the complete set again before saving.
+
+## Visit
+
+### Fields
+
+| Field | Type | Requirement |
+| --- | --- | --- |
+| `startedAt` | `Date` | Required and immutable |
+| `completedAt` | `Date?` | Nil in progress; set once on completion |
+| `serviceLocationNameSnapshot` | `String` | Required, normalized, immutable |
+| `serviceLocationAddressSnapshot` | `String?` | Optional, normalized, immutable |
+
+Visit state is derived from `completedAt`; it is not redundantly persisted.
+
+- `completedAt == nil` means in progress.
+- `completedAt != nil` means completed.
+- `completedAt` must not be earlier than `startedAt`.
+- Normal editing and completed correction never change either timestamp.
+
+### Relationships
+
+- `appointment: Appointment?` is the inverse of `Appointment.visit`. Optional
+  in SwiftData storage for iOS 18 deletion compatibility; required by the
+  domain contract and validated before save.
+- `barn: Barn?` is the inverse of `Barn.visits`. Optional in SwiftData storage
+  for iOS 18 deletion compatibility; required by the domain contract and
+  validated before save.
+- `visitHorses: [VisitHorse]` is the inverse of `VisitHorse.visit`, contains at
+  least one valid membership, and uses cascade because Visit owns the joins.
+
+The Barn reference preserves service-location identity and supports navigation
+when the record resolves. Visit Detail and Horse History always display the
+immutable name and address snapshots captured from the Appointment Barn when
+Start Visit succeeds. Missing Barn storage never makes those snapshots
+unreadable.
+
+### Creation and validation
+
+Start Visit requires:
+
+- An Appointment with no Visit.
+- A valid Appointment Barn with a nonempty normalized name.
+- At least one valid, unique AppointmentHorse.
+- Every Horse at the Appointment Barn with valid Client and current Barn
+  relationships.
+
+One save creates the Visit and exactly one pending VisitHorse for every
+AppointmentHorse. No partial graph may remain if validation or saving fails.
+
+Save Progress permits pending outcomes and requires `completedAt == nil`.
+Completion requires every outcome to be resolved, at least one serviced Horse,
+exact VisitHorse-to-AppointmentHorse Horse equality, and all required
+relationships. Completion saves the current draft and `completedAt` atomically.
+
+### Correction and deletion
+
+Completed correction may change only serviced/not-serviced outcomes and Work
+Notes. It preserves relationships, membership, timestamps, snapshots, and
+completed state and must continue satisfying every completion invariant.
+
+An in-progress Visit may be discarded with confirmation, cascading only its
+VisitHorse records. A completed Visit cannot be deleted during Slice 2.
+
+## VisitHorse
+
+### Fields
+
+| Field | Type | Requirement |
+| --- | --- | --- |
+| `outcomeRawValue` | `String` | Required; defaults to `pending` |
+| `workNotes` | `String?` | Optional only when serviced |
+
+The domain outcome is exactly one of:
+
+- `pending`
+- `serviced`
+- `notServiced`
+
+Unknown raw values are invalid and are never displayed directly. Work Notes
+store `nil` after normalization when empty and must be nil for pending or
+not-serviced outcomes.
+
+### Relationships
+
+- `visit: Visit?` is the inverse of `Visit.visitHorses`. Optional in SwiftData
+  storage for iOS 18 deletion compatibility; required by the domain contract.
+- `horse: Horse?` is the inverse of `Horse.visitHorses`. Optional in SwiftData
+  storage for iOS 18 deletion compatibility; required by the domain contract.
+
+VisitHorse does not reference AppointmentHorse directly. The pair
+`(visit, horse)` is unique, and the VisitHorse Horse set must exactly equal the
+owning Appointment's AppointmentHorse Horse set.
+
+VisitHorse membership is owned by Visit. It cannot be individually added,
+removed, or deleted after Start Visit. Deleting an owned VisitHorse never
+deletes its Horse.
 
 ## Ownership and Delete-Rule Matrix
 
@@ -251,13 +376,21 @@ and validates the complete set again before saving.
 | `AppointmentHorse.horse` | `Horse.appointmentHorses` | Nullify | Deleting a join removes it from the horse's inverse collection; Horse remains |
 | `Appointment.appointmentHorses` | `AppointmentHorse.appointment` | Cascade | Deleting an appointment deletes its joins |
 | `AppointmentHorse.appointment` | `Appointment.appointmentHorses` | Nullify | Deleting a join removes it from the appointment's inverse collection; Appointment remains |
+| `Appointment.visit` | `Visit.appointment` | Deny | Appointment cannot be deleted while a Visit exists |
+| `Visit.appointment` | `Appointment.visit` | Nullify | Discarding an allowed Visit clears the Appointment inverse; Appointment remains |
+| `Barn.visits` | `Visit.barn` | Deny | Barn cannot be deleted while any Visit references it |
+| `Visit.barn` | `Barn.visits` | Nullify | Deleting an allowed Visit removes it from the Barn inverse; Barn remains |
+| `Horse.visitHorses` | `VisitHorse.horse` | Deny | Horse cannot be deleted while Visit history references it |
+| `VisitHorse.horse` | `Horse.visitHorses` | Nullify | Deleting an owned join removes only the inverse; Horse remains |
+| `Visit.visitHorses` | `VisitHorse.visit` | Cascade | Discarding an in-progress Visit deletes its joins |
+| `VisitHorse.visit` | `Visit.visitHorses` | Nullify | Deleting an owned join never deletes its Visit |
 
 Feature-model preflight checks are required even where the SwiftData delete rule
 also denies deletion. The preflight provides a clear user explanation; the
 schema rule protects the graph if a call site bypasses that interface.
-The Nullify entries for required domain relationships are enabled by their
-optional SwiftData storage. They support safe inverse cleanup during deletion;
-they do not permit controlled application writes to omit a relationship.
+The Nullify entries for required domain relationships are enabled by optional
+SwiftData storage. They support safe inverse cleanup during deletion; they do
+not permit controlled application writes to omit a relationship.
 
 ## Validation Boundaries
 
@@ -266,6 +399,11 @@ they do not permit controlled application writes to omit a relationship.
 Editors normalize strings, require mandatory selections, validate positive
 numeric values, and disable Save until their draft is locally valid.
 
+The Visit editor owns an in-memory draft separate from the last saved
+VisitHorse state. It tracks dirty state, preserves the draft on save failure,
+and requires confirmation before dismissing unsaved changes. Save Progress and
+Complete Visit are explicit persistence actions.
+
 ### Domain Boundary
 
 Domain rules validate relationships that span models:
@@ -273,11 +411,17 @@ Domain rules validate relationships that span models:
 - Appointment has at least one horse.
 - Appointment horses are unique.
 - Appointment horses currently belong to the selected barn.
-- Horse relocation is allowed only when the horse has no appointment
-  memberships.
-- An Add Existing Horse candidate has no appointment memberships and is not
-  already assigned to the destination barn.
+- Horse relocation is allowed only when every Appointment membership has a
+  completed Visit and no in-progress VisitHorse is encountered.
+- An Add Existing Horse candidate passes the same Visit-aware relocation rule
+  and is not already assigned to the destination barn.
 - Delete preconditions are satisfied.
+- Visit has exactly one Appointment and Barn.
+- VisitHorse membership exactly matches AppointmentHorse membership.
+- Visit timestamps and immutable snapshots are valid.
+- Visit outcome and Work Notes match the current Visit state.
+- Completed correction preserves relationships, timestamps, snapshots, and
+  completed state.
 
 These checks run immediately before persistence even if the interface already
 constrained the selection.
@@ -296,10 +440,25 @@ Immediately before every controlled save, complete-graph validation rejects:
 - An Appointment without at least one valid AppointmentHorse.
 - A joined Horse whose current Barn differs from the Appointment Barn.
 - Duplicate Horse membership in one Appointment.
+- A Visit without Appointment, Barn, startedAt, a nonempty name snapshot, or
+  at least one VisitHorse.
+- A VisitHorse without Visit or Horse.
+- Duplicate Horse membership in one Visit.
+- VisitHorse membership different from AppointmentHorse membership.
+- An in-progress Visit with `completedAt`.
+- A completed Visit with pending outcomes or no serviced Horse.
+- `completedAt` earlier than `startedAt`.
+- Work Notes on pending or not-serviced membership.
 
 SwiftData relationship cardinality metadata is not the domain enforcement
-boundary. Persistent-store integration tests verify both valid graph reopening
-and appointment deletion followed by reopening.
+boundary. Persistent-store integration tests verify migration, in-progress and
+completed reopening, correction, discard, relocation after completion, and
+delete behavior after reopening.
+
+Best-effort background saving calls the same Save Progress boundary. If the
+same process resumes after failure, it may retain the dirty draft and surface
+the error. If iOS terminates the process, neither the unsaved draft nor its
+in-memory error survives; relaunch restores the last successful save.
 
 ## Calendar Semantics
 
@@ -312,28 +471,45 @@ boundary case.
 six-week default does not create an appointment and does not infer an expected
 duration.
 
+`Visit.startedAt` is stored as an absolute Date captured once when Start Visit
+succeeds and is the primary Horse History date. `Visit.completedAt` is captured
+once when completion succeeds and must not precede `startedAt`.
+
+Horse History contains completed Visits only and orders its projection by:
+
+1. `Visit.startedAt` descending.
+2. `Visit.completedAt` descending.
+3. `serviceLocationNameSnapshot` ascending with localized comparison.
+4. Horse name ascending with localized comparison.
+
+No persisted UUID or ordering field is added solely for this tie-break.
+
 ## Explicit Exclusions
 
-The V1 schema does not include:
+The V2 schema does not include:
 
 - A Client–Barn relationship.
 - Profile photos or photo paths.
 - A service catalog or default service.
 - Breed, age, sex, shoe size, veterinary data, or detailed medical data.
-- Visit or work-performed records.
 - Pricing, invoices, payment status, or payment processing.
 - Next-appointment records generated from an interval.
 - Archive or generalized soft-delete fields.
 - Synchronization, server identifiers, user accounts, or CloudKit metadata.
+- Unscheduled Visit horses.
+- Cancellation, no-show, or rescheduling state.
+- Completed Visit deletion or historical-date correction.
+- Background tasks, external draft files, or per-change autosave.
 
 ## Future Schema Evolution
 
 Every approved persisted change creates a new versioned schema snapshot and an
-explicit migration stage from the previous version. A later slice may add new
-models or fields only after its product rules, ownership, deletion behavior,
-privacy implications, and migration defaults are defined.
+explicit migration stage from the previous version. V2 follows that rule with
+an additive lightweight stage from V1. A later slice may add new models or
+fields only after its product rules, ownership, deletion behavior, privacy
+implications, and migration defaults are defined.
 
-Future capability is not pre-modeled in V1. This avoids nullable speculative
+Future capability is not pre-modeled in V2. This avoids nullable speculative
 fields, unstable enums, and identifiers without an owning domain. Migration
 tests will open a prior-version store, migrate it, and verify that all existing
 relationships and user data remain intact.

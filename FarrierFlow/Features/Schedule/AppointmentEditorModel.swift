@@ -26,11 +26,16 @@ final class AppointmentEditorModel {
     private(set) var barns: [Barn] = []
     private(set) var eligibleHorses: [Horse] = []
     private(set) var loadState = AppointmentEditorLoadState.loading
+    private(set) var hasVisit = false
+    private(set) var lockedBarnName: String?
+    private(set) var lockedHorseNames: [String] = []
+    private var lockedBarnID: PersistentIdentifier?
+    private var lockedHorseIDs = Set<PersistentIdentifier>()
     let appointmentID: PersistentIdentifier?
     var alert: FeatureAlert?
 
     var canSave: Bool {
-        draft.isValid && loadState == .loaded
+        draft.isValid && loadState == .loaded && lockedDraftMatchesPersistedMembership
     }
 
     init(
@@ -62,11 +67,17 @@ final class AppointmentEditorModel {
             notes: appointment?.notes ?? "",
             expectedDurationText: appointment?.expectedDurationMinutes.map(String.init) ?? ""
         )
+        updateVisitLock(from: appointment)
     }
 
     func load(in context: ModelContext) {
         loadState = .loading
         do {
+            if let appointmentID {
+                updateVisitLock(
+                    from: context.model(for: appointmentID) as? Appointment
+                )
+            }
             let loadedBarns = try barnFetcher(context)
             let loadedHorses = try eligibleHorses(
                 at: draft.barnID,
@@ -85,11 +96,13 @@ final class AppointmentEditorModel {
     }
 
     func selectBarn(_ id: PersistentIdentifier?, in context: ModelContext) {
+        guard !hasVisit else { return }
         draft.barnID = id
         loadEligibleHorses(in: context)
     }
 
     func toggleHorse(_ id: PersistentIdentifier) {
+        guard !hasVisit else { return }
         if draft.selectedHorseIDs.contains(id) {
             draft.selectedHorseIDs.remove(id)
         } else {
@@ -103,6 +116,42 @@ final class AppointmentEditorModel {
             let barnID = draft.barnID,
             let barn = context.model(for: barnID) as? Barn
         else { return nil }
+
+        let appointment: Appointment
+        if let appointmentID {
+            guard let existing = context.model(for: appointmentID) as? Appointment else {
+                return nil
+            }
+            updateVisitLock(from: existing)
+            if hasVisit {
+                guard lockedDraftMatchesPersistedMembership else {
+                    alert = FeatureAlert(
+                        title: "Work Has Started",
+                        message: "The service location and horses can’t change after a visit starts."
+                    )
+                    return nil
+                }
+
+                existing.startDate = draft.startDate
+                existing.notes = TextNormalization.optional(draft.notes)
+                existing.expectedDurationMinutes = draft.expectedDurationMinutes
+                do {
+                    try DomainGraphValidator.save(context)
+                    return existing.persistentModelID
+                } catch {
+                    context.rollback()
+                    alert = FeatureAlert(
+                        title: "Couldn’t Save Appointment",
+                        message: "Your changes are still in the form. Try saving again."
+                    )
+                    return nil
+                }
+            }
+            appointment = existing
+        } else {
+            appointment = Appointment(startDate: draft.startDate, barn: barn)
+            context.insert(appointment)
+        }
 
         let horses = draft.selectedHorseIDs.compactMap {
             context.model(for: $0) as? Horse
@@ -123,17 +172,6 @@ final class AppointmentEditorModel {
                 message: "Every selected horse must be at this service location."
             )
             return nil
-        }
-
-        let appointment: Appointment
-        if let appointmentID {
-            guard let existing = context.model(for: appointmentID) as? Appointment else {
-                return nil
-            }
-            appointment = existing
-        } else {
-            appointment = Appointment(startDate: draft.startDate, barn: barn)
-            context.insert(appointment)
         }
 
         appointment.startDate = draft.startDate
@@ -205,6 +243,7 @@ final class AppointmentEditorModel {
     }
 
     private func retainEligibleSelections() {
+        guard !hasVisit else { return }
         guard draft.barnID != nil else {
             eligibleHorses = []
             draft.selectedHorseIDs = []
@@ -212,5 +251,33 @@ final class AppointmentEditorModel {
         }
         let eligibleIDs = Set(eligibleHorses.map(\.persistentModelID))
         draft.selectedHorseIDs.formIntersection(eligibleIDs)
+    }
+
+    private var lockedDraftMatchesPersistedMembership: Bool {
+        !hasVisit || (
+            draft.barnID == lockedBarnID
+                && draft.selectedHorseIDs == lockedHorseIDs
+        )
+    }
+
+    private func updateVisitLock(from appointment: Appointment?) {
+        guard let appointment, appointment.visit != nil else {
+            hasVisit = false
+            lockedBarnID = nil
+            lockedBarnName = nil
+            lockedHorseIDs = []
+            lockedHorseNames = []
+            return
+        }
+
+        hasVisit = true
+        lockedBarnID = appointment.barn?.persistentModelID
+        lockedBarnName = appointment.barn?.name
+        lockedHorseIDs = Set(
+            appointment.appointmentHorses.compactMap { $0.horse?.persistentModelID }
+        )
+        lockedHorseNames = appointment.appointmentHorses
+            .compactMap(\.horse?.name)
+            .sorted(using: String.StandardComparator(.localizedStandard))
     }
 }

@@ -1,3 +1,4 @@
+import Foundation
 import SwiftData
 import Testing
 @testable import FarrierFlow
@@ -94,6 +95,153 @@ struct AppointmentEditorModelTests {
         #expect(Set(editor.eligibleHorses.map(\.name)) == ["Milo", "Scout"])
         #expect(editor.draft.selectedHorseIDs == [fixture.horses[0].persistentModelID])
         #expect(editor.draft.notes == "Preserve this note")
+    }
+
+    @Test
+    func visitLocksBarnAndHorseMembershipWhileKeepingAppointmentFieldsEditable() throws {
+        let fixture = try makeTwoHorseFixture()
+        let otherBarn = Barn(name: "South Field")
+        let otherClient = Client(name: "Casey")
+        fixture.context.insert(otherBarn)
+        fixture.context.insert(otherClient)
+        let otherHorse = Horse(name: "River", client: otherClient, currentBarn: otherBarn)
+        fixture.context.insert(otherHorse)
+        otherClient.horses.append(otherHorse)
+        otherBarn.horses.append(otherHorse)
+
+        let appointment = ModelFixtures.makeAppointment(
+            startDate: Date(timeIntervalSinceReferenceDate: 100),
+            barn: fixture.barn,
+            horses: fixture.horses,
+            in: fixture.context
+        )
+        let visit = ModelFixtures.makeVisit(
+            startedAt: Date(timeIntervalSinceReferenceDate: 200),
+            appointment: appointment,
+            in: fixture.context
+        )
+        try DomainGraphValidator.save(fixture.context)
+
+        let originalBarnID = try #require(appointment.barn?.persistentModelID)
+        let originalHorseIDs = Set(
+            appointment.appointmentHorses.compactMap { $0.horse?.persistentModelID }
+        )
+        let originalVisitHorseIDs = Set(visit.visitHorses.map { $0.persistentModelID })
+        let originalStartedAt = visit.startedAt
+        let originalNameSnapshot = visit.serviceLocationNameSnapshot
+        let originalAddressSnapshot = visit.serviceLocationAddressSnapshot
+
+        let editor = AppointmentEditorModel(appointment: appointment)
+        editor.load(in: fixture.context)
+
+        #expect(editor.hasVisit)
+        #expect(editor.lockedBarnName == "North Field")
+        #expect(editor.lockedHorseNames == ["Milo", "Scout"])
+        #expect(editor.draft.barnID == originalBarnID)
+        #expect(editor.draft.selectedHorseIDs == originalHorseIDs)
+
+        editor.selectBarn(otherBarn.persistentModelID, in: fixture.context)
+        editor.toggleHorse(fixture.horses[0].persistentModelID)
+
+        #expect(editor.draft.barnID == originalBarnID)
+        #expect(editor.draft.selectedHorseIDs == originalHorseIDs)
+
+        editor.draft.barnID = otherBarn.persistentModelID
+        editor.draft.selectedHorseIDs = [otherHorse.persistentModelID]
+
+        #expect(editor.save(in: fixture.context) == nil)
+        #expect(appointment.barn?.persistentModelID == originalBarnID)
+        #expect(
+            Set(appointment.appointmentHorses.compactMap { $0.horse?.persistentModelID })
+                == originalHorseIDs
+        )
+        #expect(Set(visit.visitHorses.map { $0.persistentModelID }) == originalVisitHorseIDs)
+        #expect(visit.startedAt == originalStartedAt)
+        #expect(visit.serviceLocationNameSnapshot == originalNameSnapshot)
+        #expect(visit.serviceLocationAddressSnapshot == originalAddressSnapshot)
+
+        editor.draft.barnID = originalBarnID
+        editor.draft.selectedHorseIDs = originalHorseIDs
+        editor.draft.startDate = Date(timeIntervalSinceReferenceDate: 300)
+        editor.draft.notes = "  Gate code changed  "
+        editor.draft.expectedDurationText = "45"
+
+        #expect(editor.save(in: fixture.context) == appointment.persistentModelID)
+        #expect(appointment.startDate == Date(timeIntervalSinceReferenceDate: 300))
+        #expect(appointment.notes == "Gate code changed")
+        #expect(appointment.expectedDurationMinutes == 45)
+        #expect(appointment.barn?.persistentModelID == originalBarnID)
+        #expect(
+            Set(appointment.appointmentHorses.compactMap { $0.horse?.persistentModelID })
+                == originalHorseIDs
+        )
+        #expect(Set(visit.visitHorses.map { $0.persistentModelID }) == originalVisitHorseIDs)
+        #expect(visit.startedAt == originalStartedAt)
+        #expect(visit.serviceLocationNameSnapshot == originalNameSnapshot)
+        #expect(visit.serviceLocationAddressSnapshot == originalAddressSnapshot)
+    }
+
+    @Test
+    func completedVisitRetainsLockedMembershipAfterHorseRelocationAndEditableSave() throws {
+        let fixture = try makeTwoHorseFixture()
+        let relocatedBarn = Barn(name: "South Field")
+        fixture.context.insert(relocatedBarn)
+        let appointment = ModelFixtures.makeAppointment(
+            startDate: Date(timeIntervalSinceReferenceDate: 100),
+            barn: fixture.barn,
+            horses: fixture.horses,
+            in: fixture.context
+        )
+        let visit = ModelFixtures.makeVisit(
+            startedAt: Date(timeIntervalSinceReferenceDate: 200),
+            completedAt: Date(timeIntervalSinceReferenceDate: 300),
+            appointment: appointment,
+            in: fixture.context
+        )
+        for visitHorse in visit.visitHorses {
+            visitHorse.outcomeRawValue = VisitOutcome.serviced.rawValue
+        }
+        try DomainGraphValidator.save(fixture.context)
+
+        let relocatedHorse = fixture.horses[0]
+        relocatedHorse.currentBarn = relocatedBarn
+        relocatedBarn.horses.append(relocatedHorse)
+        try DomainGraphValidator.save(fixture.context)
+
+        let originalHorseIDs = Set(
+            appointment.appointmentHorses.compactMap { $0.horse?.persistentModelID }
+        )
+        let originalVisitHorseIDs = Set(visit.visitHorses.map { $0.persistentModelID })
+        let originalStartedAt = visit.startedAt
+        let originalCompletedAt = visit.completedAt
+        let originalNameSnapshot = visit.serviceLocationNameSnapshot
+        let originalAddressSnapshot = visit.serviceLocationAddressSnapshot
+
+        let editor = AppointmentEditorModel(appointment: appointment)
+        editor.load(in: fixture.context)
+
+        #expect(editor.hasVisit)
+        #expect(editor.lockedHorseNames == ["Milo", "Scout"])
+        #expect(editor.draft.selectedHorseIDs == originalHorseIDs)
+        #expect(editor.eligibleHorses.map(\.name) == ["Scout"])
+
+        editor.draft.startDate = Date(timeIntervalSinceReferenceDate: 400)
+        editor.draft.notes = "  Updated schedule  "
+        editor.draft.expectedDurationText = "50"
+
+        #expect(editor.save(in: fixture.context) == appointment.persistentModelID)
+        #expect(appointment.startDate == Date(timeIntervalSinceReferenceDate: 400))
+        #expect(appointment.notes == "Updated schedule")
+        #expect(appointment.expectedDurationMinutes == 50)
+        #expect(
+            Set(appointment.appointmentHorses.compactMap { $0.horse?.persistentModelID })
+                == originalHorseIDs
+        )
+        #expect(Set(visit.visitHorses.map { $0.persistentModelID }) == originalVisitHorseIDs)
+        #expect(visit.startedAt == originalStartedAt)
+        #expect(visit.completedAt == originalCompletedAt)
+        #expect(visit.serviceLocationNameSnapshot == originalNameSnapshot)
+        #expect(visit.serviceLocationAddressSnapshot == originalAddressSnapshot)
     }
 
     private func makeTwoHorseFixture() throws -> (

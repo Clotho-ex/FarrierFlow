@@ -9,7 +9,7 @@ import Foundation
 import SwiftData
 
 enum ModelContainerFactory {
-    private static let schema = Schema(versionedSchema: FarrierFlowSchemaV1.self)
+    private static let schema = Schema(versionedSchema: FarrierFlowSchemaV2.self)
 
     static func production() throws -> ModelContainer {
         let configuration = ModelConfiguration(

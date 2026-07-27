@@ -39,4 +39,39 @@ enum ModelFixtures {
         }
         return appointment
     }
+
+    static func makeVisit(
+        startedAt: Date = .now,
+        completedAt: Date? = nil,
+        appointment: Appointment,
+        in context: ModelContext
+    ) -> Visit {
+        precondition(appointment.visit == nil)
+        guard let barn = appointment.barn else {
+            preconditionFailure("A Visit fixture requires an Appointment barn.")
+        }
+
+        let visit = Visit(
+            startedAt: startedAt,
+            completedAt: completedAt,
+            serviceLocationNameSnapshot: barn.name,
+            serviceLocationAddressSnapshot: barn.address,
+            appointment: appointment,
+            barn: barn
+        )
+        context.insert(visit)
+        appointment.visit = visit
+        barn.visits.append(visit)
+
+        for appointmentHorse in appointment.appointmentHorses {
+            guard let horse = appointmentHorse.horse else {
+                preconditionFailure("A Visit fixture requires every AppointmentHorse to have a Horse.")
+            }
+            let visitHorse = VisitHorse(visit: visit, horse: horse)
+            context.insert(visitHorse)
+            visit.visitHorses.append(visitHorse)
+            horse.visitHorses.append(visitHorse)
+        }
+        return visit
+    }
 }

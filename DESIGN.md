@@ -7,9 +7,11 @@ the United States. The interface should feel durable, calm, professional,
 efficient, and specific to farrier work. It should help a farrier act quickly
 while standing at a barn, often outdoors and with one hand available.
 
-The first slice covers clients, independent service locations, horses,
-appointments, and the Today schedule. It does not visually imply later
-capabilities such as visits, invoicing, payments, or subscriptions.
+The completed first slice covers clients, independent service locations,
+horses, appointments, and the Today schedule. Slice 2 adds Visit completion and
+Horse History without introducing a new tab. It does not visually imply later
+capabilities such as services, photographs, invoicing, payments, or
+subscriptions.
 
 ## Platform Character
 
@@ -55,9 +57,9 @@ The app opens on Today and uses three native tabs:
 3. Clients
 
 Today and Schedule expose an appointment-creation action. Clients exposes a
-client-creation action and a toolbar menu containing Service Locations. The
-first slice has no Settings route, screen, folder, or toolbar item. Settings may
-be introduced later only when concrete settings exist.
+client-creation action and a toolbar menu containing Service Locations. Through
+Slice 2 there is no Settings route, screen, folder, or toolbar item. Settings
+may be introduced later only when concrete settings exist.
 
 Creation remains contextual:
 
@@ -70,17 +72,32 @@ Creation remains contextual:
   in a nested sheet and returns with it selected.
 - Service-location detail: Add Horse supports creating a horse for that
   location or choosing Add Existing Horse. Existing-horse selection includes
-  only horses with no appointment memberships that are not already assigned to
-  the location.
+  only horses that pass the Visit-aware relocation rule and are not already
+  assigned to the location.
 
 Native back navigation preserves context. No global create flow, custom tab bar,
 custom back button, or hidden gesture is used.
 
-Changing an existing horse's service location is allowed only when the horse
-has no appointment memberships. If any appointment references the horse, keep
-the existing location and present a native alert explaining that the location
-cannot be changed while appointments reference the horse. The interface never
-moves, deletes, or rewrites appointments as a side effect of relocation.
+Visit creation is contextual to Appointment Detail:
+
+- An Appointment with no Visit offers Start Visit.
+- An Appointment with an in-progress Visit offers Resume Visit.
+- An Appointment with a completed Visit offers View Visit.
+- Visit Detail is shared by Appointment Detail and Horse History.
+- Horse Detail contains completed Visit history; there is no global history
+  destination.
+
+Once a Visit exists, Appointment service location and horse membership are
+read-only. Scheduled start, Appointment Notes, and expected duration remain
+editable, but changing them must not alter Visit timestamps, location
+snapshots, membership, or Horse History ordering.
+
+Changing an existing horse's service location is allowed only when every
+Appointment membership has a completed Visit. An Appointment with no Visit or
+an in-progress Visit blocks relocation regardless of scheduled date. A
+completed Visit releases only its Appointment's relocation block. The
+interface never moves, deletes, or rewrites Appointment or Visit records as a
+side effect of relocation.
 
 ## Lists and Record Hierarchy
 
@@ -92,6 +109,11 @@ Rows prioritize the information needed for the next decision:
 - Service location: name first, then address when supplied.
 - Horse: name first, followed by owner and current service location. Safety
   Notes are visibly labeled and announced when present.
+- Visit: actual work date, immutable service-location name snapshot, state, and
+  each scheduled horse's outcome.
+- Horse History: completed Visits ordered newest first, showing work date,
+  immutable service-location name, serviced or not-serviced outcome, and a
+  Work Notes indication when present.
 
 Use standard disclosure indicators when a row navigates. Avoid turning every
 row into a card. Secondary metadata may wrap under Dynamic Type; names and
@@ -100,8 +122,12 @@ primary actions must remain legible.
 Schedule includes appointments from the start of the current local calendar day
 onward. It groups appointments by local calendar day, orders groups from
 earliest to latest, and orders appointments chronologically within each group.
-Appointments before today's local-day boundary are excluded. Past appointment
-and visit history are deferred.
+Appointments before today's local-day boundary are excluded. Past Appointment
+history remains excluded. Completed Visit history is reached from Horse Detail.
+
+Appointment rows retain scheduled time, service location, and horses. When a
+Visit exists, they add a concise localized In Progress or Completed secondary
+status.
 
 ## Forms and Validation
 
@@ -123,6 +149,20 @@ least one eligible horse. Horse selection shows only horses whose current
 service location matches the appointment location. Expected duration is
 optional and has no automatic value.
 
+Starting a Visit creates one pending outcome for every scheduled horse. Save
+Progress permits pending outcomes and keeps the editor open. Complete Visit is
+available only when every horse is serviced or not serviced and at least one
+horse is serviced.
+
+Work Notes are optional and available only for serviced horses. Changing a
+serviced horse with notes to another outcome requires confirmation before the
+notes are cleared.
+
+The Visit editor visibly indicates unsaved changes. Dismissing with a dirty
+draft requires confirmation. Discard Unsaved Changes restores the last saved
+progress, while Discard Visit is a separate destructive action available only
+for an in-progress Visit.
+
 ## Empty and Unavailable States
 
 Empty states explain why the screen is empty and offer one relevant next step:
@@ -133,14 +173,22 @@ Empty states explain why the screen is empty and offer one relevant next step:
 - Service Locations: no locations; offer Add Service Location.
 - Client detail: no horses for this client; offer Add Horse.
 - Service-location detail: no eligible existing horses; explain that only
-  horses without appointment memberships that are assigned elsewhere can be
-  relocated.
+  horses assigned elsewhere whose Appointment memberships all have completed
+  Visits can be relocated.
 - Appointment horse selection: no eligible horses at the selected location;
   explain that a horse must first be assigned there.
+- Horse History: no completed visits; explain that completed work will appear
+  after a Visit is completed.
+- Visit or VisitHorse unavailable: explain that the record cannot be loaded and
+  disable unsafe actions.
 
 When a feature cannot operate because prerequisite data is missing, state the
 prerequisite directly. Do not display an inactive dashboard, fabricated sample
 data, or decorative illustration in place of guidance.
+
+Visit history remains readable from immutable service-location snapshots when
+the current Barn relationship is unexpectedly missing. In that state, no
+service-location navigation affordance is shown.
 
 ## Toolbars and Primary Actions
 
@@ -156,10 +204,22 @@ Frequent actions should be reachable without stretching across the screen.
 Primary form completion stays in the standard toolbar so it remains predictable
 with the keyboard and assistive technologies.
 
+Save Progress and Complete Visit are distinct, plainly labeled actions.
+Destructive Visit discard remains in a menu or confirmation flow rather than
+competing visually with completion.
+
 ## Status and Feedback
 
-The first slice has no invoice, payment, visit, or service status system.
-Feedback is limited to facts the app currently knows:
+Slice 2 adds only Visit state and per-horse Visit outcome:
+
+- A Visit is In Progress while `completedAt` is absent and Completed after a
+  successful completion save.
+- A VisitHorse is Pending, Serviced, or Not Serviced.
+- Status and outcome use localized text and are not communicated by color
+  alone.
+- Completed Visit correction never changes Visit timestamps or state.
+
+Other feedback remains limited to facts the app currently knows:
 
 - Safety Notes are presented as clearly labeled text and are announced by
   VoiceOver.
@@ -186,6 +246,10 @@ animation.
 - Prefer short inputs, sensible keyboard types, and system content types for
   phone and email.
 - Preserve entered form data across nested service-location creation.
+- Announce each horse's Visit outcome and selection state.
+- Give Work Notes a visible localized label and an explicit VoiceOver label.
+- Keep Save Progress, Complete Visit, and destructive discard distinguishable
+  in the accessibility hierarchy.
 - Keep essential actions usable with one hand and without precision gestures.
 
 ## Explicitly Excluded Patterns
@@ -203,7 +267,7 @@ Do not introduce:
 
 ## Design Acceptance
 
-A first-slice screen is ready only when it:
+A current-slice screen is ready only when it:
 
 - Uses native controls and navigation on both iOS 18 and iOS 26.
 - Remains legible outdoors and at supported Dynamic Type sizes.

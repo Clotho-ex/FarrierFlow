@@ -7,10 +7,12 @@ coherent user outcome, preserve the approved data contract, build successfully,
 pass relevant tests, and work after relaunch before the next slice begins.
 
 Later capabilities remain high-level until their product decisions, data
-ownership, and migration behavior are shaped. They must not influence the first
-schema or interface.
+ownership, and migration behavior are shaped. They must not influence the
+current schema or interface.
 
 ## Slice 0 — Foundation
+
+**Status:** Complete.
 
 ### Outcome
 
@@ -49,6 +51,8 @@ the connected-record slice.
 
 ## Slice 1 — Connected Records
 
+**Status:** Complete.
+
 ### Outcome
 
 Complete the first useful workflow and prove the entire SwiftData graph survives
@@ -71,8 +75,9 @@ process termination and store reopening.
 - No persisted Client–Barn relationship.
 - Service-location detail supports creating a horse for that location or adding
   an eligible existing horse.
-- Add Existing Horse lists only horses with no appointment memberships that are
-  not already assigned to the destination location.
+- At Slice 1 completion, Add Existing Horse listed only horses with no
+  appointment memberships that were not already assigned to the destination
+  location. Slice 2 replaces this with the Visit-aware relocation rule.
 - Deletion is blocked while a horse or appointment references the location.
 
 #### Horses
@@ -85,8 +90,9 @@ process termination and store reopening.
 - Horse creation can open a nested new-location sheet and return with the
   created location selected.
 - Horse deletion is blocked while an appointment references it.
-- Horse relocation is blocked while any appointment references it. The existing
-  location remains unchanged and a native alert explains the rule.
+- At Slice 1 completion, Horse relocation was blocked while any appointment
+  referenced it. Slice 2 replaces this with the Visit-aware relocation rule.
+  A blocked relocation keeps the existing location and presents a native alert.
 - Relocation never moves, deletes, or rewrites an existing appointment.
 
 #### Appointments
@@ -109,7 +115,9 @@ process termination and store reopening.
   day onward and excludes appointments before that boundary.
 - Schedule groups appointments by local calendar day, orders date groups
   ascending, and orders appointments chronologically within each group.
-- Past appointment and visit history are deferred.
+- At Slice 1 completion, past Appointment and Visit history were deferred.
+  Slice 2 adds completed Visit history only from Horse Detail; a general past
+  Appointment destination remains deferred.
 - Appointment rows show start time, service location, and selected horses.
 - When duration is absent, rows show no inferred end time.
 - Empty states lead directly to appointment creation.
@@ -132,8 +140,9 @@ The slice is accepted only after this sequence succeeds:
 - Unit tests cover normalization, required fields, interval validation,
   optional duration, horse eligibility, duplicate membership, deletion
   preflight, eligible existing-horse filtering, and local-day calculations.
-- Relocation tests prove that any appointment membership blocks the change,
-  preserves the horse's existing location, and leaves every Appointment and
+- Slice 1 relocation tests prove its then-current any-membership rule. Slice 2
+  replaces that coverage with Visit-aware blocking while continuing to prove
+  that failed relocation preserves the Horse and leaves every Appointment and
   AppointmentHorse unchanged.
 - Schedule tests cover the current local-day boundary, exclusion of earlier
   appointments, inclusion of today and future appointments, ascending day
@@ -151,19 +160,123 @@ The slice is accepted only after this sequence succeeds:
   compatibility pass.
 - No deferred model, screen, dependency, or visual effect is introduced.
 
+## Slice 2 — Visit Completion
+
+**Status:** Authorized for implementation planning.
+
+### Outcome
+
+Start work from an existing Appointment, record an outcome for every scheduled
+Horse, complete the Visit, view it from Horse History, and prove the complete
+historical graph survives process termination and store reopening.
+
+### Scope
+
+#### Visit graph
+
+- Add separate Visit and VisitHorse models in a complete V2 SwiftData schema.
+- One Appointment has zero or one Visit.
+- Start Visit atomically captures actual `startedAt`, the Appointment and Barn
+  relationships, immutable service-location name and optional address
+  snapshots, and one pending VisitHorse per AppointmentHorse.
+- Visit state derives from optional `completedAt`; no redundant Visit status is
+  persisted.
+- VisitHorse outcome is Pending, Serviced, or Not Serviced.
+- Work Notes are optional only for serviced Horses.
+- Unscheduled Horses cannot be added.
+
+#### Progress and completion
+
+- Save Progress persists valid pending or resolved outcomes and keeps the Visit
+  in progress.
+- Complete Visit requires every outcome resolved, at least one serviced Horse,
+  exact Appointment-to-Visit membership, valid relationships, and valid Work
+  Notes.
+- Completion saves the draft and immutable `completedAt` atomically.
+- Dirty drafts require dismissal confirmation.
+- Backgrounding makes a best-effort Save Progress attempt only.
+- Process termination loses unsaved draft and in-memory error state; relaunch
+  restores the last successful save.
+- An in-progress Visit may be discarded with confirmation, cascading only its
+  VisitHorse records.
+- A completed Visit may be corrected without changing relationships,
+  timestamps, snapshots, membership, or completed state.
+- Completed Visits cannot be deleted.
+
+#### Appointment and deletion rules
+
+- Appointment Detail offers Start Visit, Resume Visit, or View Visit according
+  to Visit state.
+- Once a Visit exists, Appointment Barn and horse membership are read-only.
+- Scheduled start, Appointment Notes, and expected duration remain editable but
+  cannot invalidate or alter the Visit.
+- Appointment deletion is blocked while any Visit exists.
+- Barn deletion is blocked while any Visit references it.
+- Horse deletion is blocked while VisitHorse references it.
+
+#### Relocation and history
+
+- Appointment with no Visit blocks Horse relocation regardless of date.
+- Appointment with an in-progress Visit blocks Horse relocation.
+- Appointment with a completed Visit does not block Horse relocation.
+- Missing or invalid relationships fail closed.
+- Relocation never rewrites Appointment or Visit history.
+- Horse Detail adds completed Visit history with no new tab.
+- Visit Detail and Horse History display immutable location snapshots.
+- The current Barn record is navigable only while its optional stored reference
+  resolves.
+- Horse History orders by Visit start descending, completion descending,
+  service-location name ascending, and Horse name ascending without adding a
+  persisted ordering identifier.
+
+#### Migration
+
+- Preserve `FarrierFlowSchemaV1` as the prior five-model snapshot.
+- Add the complete seven-model `FarrierFlowSchemaV2`.
+- Use an explicit lightweight V1-to-V2 migration stage.
+- Preserve the production store identity and every existing V1 record and
+  relationship.
+- Fabricate no Visit, VisitHorse, or snapshot for existing Appointments.
+- Stop and return for schema review if the additive migration is not safe on
+  iOS 18; never recreate or replace the production store.
+
+### Exact Acceptance Flow
+
+1. Open an existing Appointment.
+2. Start Visit.
+3. Verify every scheduled Horse begins pending.
+4. Mark each Horse serviced or not serviced.
+5. Add optional Work Notes to a serviced Horse.
+6. Save Progress.
+7. Terminate and relaunch.
+8. Verify the saved in-progress state.
+9. Complete Visit.
+10. View the completed Visit.
+11. Open it from Horse History.
+12. Terminate and relaunch.
+13. Verify the complete historical graph persisted.
+
+### Exit Criteria
+
+- V1-to-V2 migration preserves the complete connected-record graph on iOS 18
+  and iOS 26 without fabricating Visit data.
+- Start, Save Progress, completion, correction, discard, deletion, and
+  relocation rules pass unit and SwiftData integration tests.
+- In-progress, completed, corrected, discarded, and post-relocation graphs pass
+  persistent-store reopening tests.
+- The exact UI acceptance flow passes on iOS 26 with focused iOS 18
+  compatibility coverage.
+- VoiceOver, Dynamic Type, Light Mode, Dark Mode, Increased Contrast, Reduce
+  Motion, dirty-state confirmation, and localized Visit status are verified.
+- Full unit and integration suites pass on iOS 18 and iOS 26.
+- Both platform builds report zero project diagnostics.
+- No deferred model, screen, dependency, service, or visual effect is
+  introduced.
+
 ## Later Slices
 
 The order below expresses product sequence, not an approved implementation
 design. Each slice requires shaping before implementation.
-
-### Slice 2 — Visit Completion
-
-Record completed work against an appointment and establish horse history.
-
-Before introducing completed visits or permanent horse history, re-evaluate
-horse relocation and historical service-location semantics. Future records must
-preserve where an appointment or visit occurred without permanently preventing
-`Horse.currentBarn` from changing.
 
 ### Slice 3 — Hoof Photographs
 
@@ -208,10 +321,8 @@ Evaluate an opt-in backup or synchronization design only after privacy,
 conflict, account, recovery, migration, and operational requirements are
 defined. CloudKit is not assumed.
 
-## Deferred and Outside the First Slice
+## Deferred Beyond Slice 2
 
-- Visits and work performed.
-- Horse history beyond the connected first-slice graph.
 - Hoof photographs and file storage.
 - Service catalog, default service, pricing, and service presets.
 - Invoices, PDFs, payment status, and payment processing.
@@ -223,6 +334,9 @@ defined. CloudKit is not assumed.
 - Archive or generalized soft deletion.
 - Custom navigation, custom tab bars, or custom iOS 26 visual effects.
 - Settings until concrete settings exist.
+- Cancellation, no-show, rescheduling, and time-based Appointment resolution.
+- Completed Visit deletion and historical-date correction.
+- Background tasks, external Visit draft files, and per-change autosave.
 
-The first slice must not add fields, routes, empty screens, services, or
-abstractions for these deferred capabilities.
+Slice 2 must not add fields, routes, empty screens, services, or abstractions
+for these deferred capabilities.

@@ -47,6 +47,7 @@ struct HorseDetailView: View {
                                 .accessibilityLabel("Safety Notes, \(safetyNotes)")
                         }
                     }
+                    historySection
                 }
                 .navigationTitle(horse.name)
                 .toolbar {
@@ -80,6 +81,79 @@ struct HorseDetailView: View {
     }
 
     private func reload() {
-        model.load(id: horseID, in: context)
+        model.load(id: horseID, in: context, locale: locale)
     }
+
+    @ViewBuilder
+    private var historySection: some View {
+        Section("History") {
+            switch model.historyLoadState {
+            case .loading:
+                HStack {
+                    ProgressView()
+                    Text("Loading History…")
+                }
+            case .loaded:
+                if model.history.isEmpty {
+                    ContentUnavailableView(
+                        "No Completed Visits",
+                        systemImage: "clock",
+                        description: Text("Completed work will appear here after a visit is completed.")
+                    )
+                } else {
+                    historyRows
+                }
+            case .failed:
+                if !model.history.isEmpty {
+                    historyRows
+                }
+                ContentUnavailableView {
+                    Label("History Unavailable", systemImage: "exclamationmark.circle")
+                } description: {
+                    Text("Horse history couldn’t be loaded.")
+                } actions: {
+                    Button("Retry") {
+                        model.retryHistory()
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var historyRows: some View {
+        ForEach(model.history) { entry in
+            NavigationLink(value: ClientRoute.visit(entry.visitID)) {
+                HorseHistoryRow(entry: entry)
+            }
+            .accessibilityIdentifier("horse-history-visit-\(entry.horseName)")
+        }
+    }
+}
+
+private struct HorseHistoryPreview: View {
+    private let fixture: PreviewFixtures.HorseHistoryPreviewFixture?
+
+    init(populated: Bool) {
+        fixture = try? PreviewFixtures.horseHistoryPreview(populated: populated)
+    }
+
+    var body: some View {
+        if let fixture {
+            HorseDetailView(horseID: fixture.horseID)
+                .modelContainer(fixture.container)
+        } else {
+            ModelContainerFailureView()
+        }
+    }
+}
+
+#Preview("Horse History — Populated") {
+    HorseHistoryPreview(populated: true)
+}
+
+#Preview("Horse History — Empty, Accessibility") {
+    HorseHistoryPreview(populated: false)
+        .dynamicTypeSize(.accessibility3)
+        .preferredColorScheme(.dark)
 }
