@@ -61,8 +61,9 @@ one continuous field workflow rather than separate generic business modules.
   service-location name and address snapshots. It does not rewrite history when
   the current service-location record changes.
 - Core business records are local-first and must remain usable without a
-  network connection. Cloud backup, synchronization, accounts, and multi-device
-  behavior are not yet confirmed.
+  network connection. Standard operating-system device backup is permitted;
+  FarrierFlow provides no app-managed backup, synchronization, accounts, or
+  multi-device behavior.
 - Payment status is in scope. Payment processing and external integrations are
   not yet confirmed.
 - The application must remain efficient under field conditions and must not
@@ -83,15 +84,16 @@ one continuous field workflow rather than separate generic business modules.
 
 ## Evidence on Hand
 
-- The repository contains a completed iPhone-only SwiftUI and SwiftData Slice 0
-  and Slice 1 implementation in `FarrierFlow/`.
+- The repository contains the iPhone-only SwiftUI and SwiftData implementation
+  through Slice 3 in `FarrierFlow/`.
 - The Xcode project declares iOS 18.0 for the app, unit-test, and UI-test
   targets and includes iPhone device support.
 - The approved Slice 2 design is recorded in
   `docs/superpowers/specs/2026-07-27-slice-2-visit-completion-design.md`.
-- Slice 2 implementation is not yet present in Swift source.
-- No production horse photography, logo, customer evidence, testimonials,
-  pricing, integrations, or operational sample data is currently present in the
+- The approved Slice 3 design is recorded in
+  `docs/superpowers/specs/2026-07-28-slice-3-hoof-photographs-design.md`.
+- No bundled customer imagery, logo, customer evidence, testimonials, pricing,
+  integrations, or operational sample data is currently present in the
   repository. Future work must not fabricate these.
 
 ## Product Principles

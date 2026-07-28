@@ -4,6 +4,7 @@ import SwiftUI
 struct VisitEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(PhotographLibrary.self) private var photographLibrary
     @State private var model: VisitEditorModel
     @State private var showsDismissConfirmation = false
     @State private var showsDiscardVisitConfirmation = false
@@ -150,8 +151,16 @@ struct VisitEditorView: View {
             titleVisibility: .visible
         ) {
             Button("Discard Visit", role: .destructive) {
-                if model.discardVisit() {
-                    dismiss()
+                Task {
+                    do {
+                        try await photographLibrary.discardInProgressVisit(id: model.visitID)
+                        dismiss()
+                    } catch {
+                        model.alert = FeatureAlert(
+                            title: "Couldn’t Discard Visit",
+                            message: "The visit and its photographs were kept. Try again."
+                        )
+                    }
                 }
             }
             Button("Keep Visit", role: .cancel) {}
@@ -199,6 +208,19 @@ struct VisitEditorView: View {
                                 )
                             }
                         )
+                        NavigationLink {
+                            PhotographCollectionView(
+                                visitHorseID: horse.id,
+                                horseName: horse.horseName,
+                                library: photographLibrary
+                            )
+                        } label: {
+                            PhotographCountLabel(
+                                visitHorseID: horse.id,
+                                library: photographLibrary
+                            )
+                        }
+                        .accessibilityIdentifier("visit-photographs-\(horse.horseName)")
                     }
                 }
             }

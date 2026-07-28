@@ -2,15 +2,17 @@
 
 ## Scope
 
-This document defines the complete SwiftData contract through Slice 2. The
+This document defines the complete SwiftData contract through Slice 3. The
 graph supports independent clients and service locations, horses owned by
 clients and currently located at one service location, barn-centric
-appointments containing one or more horses, and Visit records that preserve
-performed-work outcomes and Horse History.
+appointments containing one or more horses, Visit records that preserve
+performed-work outcomes and Horse History, and Photograph metadata owned by
+individual VisitHorse records.
 
-SwiftData is the local source of truth. No model in this schema represents hoof
-photographs, structured services, pricing, invoices, payments, subscriptions,
-cloud synchronization, or backup.
+SwiftData is the local metadata source of truth. Canonical Photograph JPEGs are
+stored in Application Support and resolved only from their UUID. No model in
+this schema represents structured services, pricing, invoices, payments,
+subscriptions, cloud synchronization, or app-managed backup.
 
 ## Relationship Contract
 
@@ -30,6 +32,8 @@ cloud synchronization, or backup.
 - A Visit belongs to exactly one Appointment and one Barn.
 - A Visit contains exactly one VisitHorse for every AppointmentHorse.
 - A VisitHorse belongs to exactly one Visit and one Horse.
+- A Photograph belongs to exactly one VisitHorse and never changes ownership.
+- A VisitHorse may own photographs while Pending, Serviced, or Not Serviced.
 - Visit history displays immutable service-location name and optional address
   snapshots captured when Start Visit succeeds.
 
@@ -47,15 +51,16 @@ saving.
 ## Schema Versions and Migration
 
 `FarrierFlowSchemaV1` remains the immutable five-model prior snapshot.
-`FarrierFlowSchemaV2` is the current complete seven-model snapshot and adds
-Visit, VisitHorse, and their inverse relationships to existing entities.
+`FarrierFlowSchemaV2` remains the complete seven-model Visit snapshot.
+`FarrierFlowSchemaV3` is the current complete eight-model snapshot and adds
+Photograph plus `VisitHorse.photographs`.
 SwiftData supplies model identity.
 
-The migration plan registers V1 followed by V2 with a lightweight V1-to-V2
-stage. It preserves the existing production store identity and every V1 record
-and relationship. Existing Appointments receive no fabricated Visit, VisitHorse,
-or snapshot data and therefore continue blocking Horse relocation until
-deleted or completed through a new Visit.
+The migration plan registers V1, V2, and V3 with lightweight V1-to-V2 and
+V2-to-V3 stages. It preserves the existing production store identity and every
+prior record and relationship. Existing VisitHorse records receive empty
+Photograph collections; migration fabricates no Photograph metadata, files, or
+ownership.
 
 ## Client
 
@@ -353,6 +358,8 @@ not-serviced outcomes.
   storage for iOS 18 deletion compatibility; required by the domain contract.
 - `horse: Horse?` is the inverse of `Horse.visitHorses`. Optional in SwiftData
   storage for iOS 18 deletion compatibility; required by the domain contract.
+- `photographs: [Photograph]` is the inverse of `Photograph.visitHorse`.
+  VisitHorse owns Photograph persistence lifetime through a cascade rule.
 
 VisitHorse does not reference AppointmentHorse directly. The pair
 `(visit, horse)` is unique, and the VisitHorse Horse set must exactly equal the
@@ -361,6 +368,35 @@ owning Appointment's AppointmentHorse Horse set.
 VisitHorse membership is owned by Visit. It cannot be individually added,
 removed, or deleted after Start Visit. Deleting an owned VisitHorse never
 deletes its Horse.
+
+## Photograph
+
+### Fields
+
+| Field | Type | Requirement |
+| --- | --- | --- |
+| `id` | `UUID` | Required and unique |
+| `createdAt` | `Date` | Required |
+| `pixelWidth` | `Int` | Required and positive |
+| `pixelHeight` | `Int` | Required and positive |
+| `byteCount` | `Int64` | Required and positive |
+
+The maximum dimension is 2,560 pixels. The UUID, creation date, dimensions,
+byte count, and owner are assigned only during creation. Slice 3 supports no
+metadata edit, owner reassignment, identifier mutation, or in-place file
+replacement.
+
+### Relationships and file identity
+
+- `visitHorse: VisitHorse?` is optional only as an iOS 18 deletion-safe
+  SwiftData representation and is required by the domain.
+- The canonical file URL is derived exclusively from `id` as
+  `Application Support/HoofPhotographs/<lowercase-uuid>.jpg`.
+- No path, source kind, original filename, asset identifier, caption,
+  classification, EXIF data, or thumbnail metadata is persisted.
+- Deleting a Photograph deletes only that record and its canonical file.
+- Deleting an in-progress Visit removes its Photograph records and files through
+  the photo-aware discard transaction.
 
 ## Ownership and Delete-Rule Matrix
 
@@ -384,6 +420,8 @@ deletes its Horse.
 | `VisitHorse.horse` | `Horse.visitHorses` | Nullify | Deleting an owned join removes only the inverse; Horse remains |
 | `Visit.visitHorses` | `VisitHorse.visit` | Cascade | Discarding an in-progress Visit deletes its joins |
 | `VisitHorse.visit` | `Visit.visitHorses` | Nullify | Deleting an owned join never deletes its Visit |
+| `VisitHorse.photographs` | `Photograph.visitHorse` | Cascade | Deleting an owned VisitHorse deletes its Photograph metadata after its files are quarantined |
+| `Photograph.visitHorse` | `VisitHorse.photographs` | Nullify | Deleting a Photograph removes only the inverse; VisitHorse remains |
 
 Feature-model preflight checks are required even where the SwiftData delete rule
 also denies deletion. The preflight provides a clear user explanation; the
@@ -422,6 +460,9 @@ Domain rules validate relationships that span models:
 - Visit outcome and Work Notes match the current Visit state.
 - Completed correction preserves relationships, timestamps, snapshots, and
   completed state.
+- Photograph has one current inverse-matching VisitHorse owner.
+- Photograph dimensions and byte count are positive, the longest edge is at
+  most 2,560 pixels, and Photograph UUIDs are unique.
 
 These checks run immediately before persistence even if the interface already
 constrained the selection.
@@ -449,6 +490,8 @@ Immediately before every controlled save, complete-graph validation rejects:
 - A completed Visit with pending outcomes or no serviced Horse.
 - `completedAt` earlier than `startedAt`.
 - Work Notes on pending or not-serviced membership.
+- A Photograph without an inverse-matching VisitHorse, with invalid dimensions
+  or byte count, or with a duplicate UUID.
 
 SwiftData relationship cardinality metadata is not the domain enforcement
 boundary. Persistent-store integration tests verify migration, in-progress and
@@ -486,10 +529,11 @@ No persisted UUID or ordering field is added solely for this tie-break.
 
 ## Explicit Exclusions
 
-The V2 schema does not include:
+The V3 schema does not include:
 
 - A Client–Barn relationship.
-- Profile photos or photo paths.
+- Persisted photo paths, source filenames, source asset identifiers, EXIF,
+  captions, classifications, thumbnails, or replacement history.
 - A service catalog or default service.
 - Breed, age, sex, shoe size, veterinary data, or detailed medical data.
 - Pricing, invoices, payment status, or payment processing.
@@ -504,12 +548,12 @@ The V2 schema does not include:
 ## Future Schema Evolution
 
 Every approved persisted change creates a new versioned schema snapshot and an
-explicit migration stage from the previous version. V2 follows that rule with
-an additive lightweight stage from V1. A later slice may add new models or
+explicit migration stage from the previous version. V3 follows that rule with
+an additive lightweight stage from V2 while retaining V1-to-V2. A later slice may add new models or
 fields only after its product rules, ownership, deletion behavior, privacy
 implications, and migration defaults are defined.
 
-Future capability is not pre-modeled in V2. This avoids nullable speculative
+Future capability is not pre-modeled in V3. This avoids nullable speculative
 fields, unstable enums, and identifiers without an owning domain. Migration
 tests will open a prior-version store, migrate it, and verify that all existing
 relationships and user data remain intact.

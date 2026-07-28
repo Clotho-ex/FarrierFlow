@@ -609,6 +609,114 @@
     },
     "Your changes are still in the form. Try saving again." : {
 
+    },
+    "Add a hoof photograph with the camera or photo library." : {
+      "comment" : "Empty-state guidance for a VisitHorse without photographs."
+    },
+    "Add Photograph" : {
+      "comment" : "Toolbar menu that adds one hoof photograph."
+    },
+    "Allow camera access in Settings, or use the photo library." : {
+      "comment" : "Camera-permission recovery guidance."
+    },
+    "Camera" : {
+      "comment" : "Photograph source action that opens the system camera."
+    },
+    "Camera Access Needed" : {
+      "comment" : "Error title when camera permission is denied or restricted."
+    },
+    "Camera Unavailable" : {
+      "comment" : "Error title when the current device has no available camera."
+    },
+    "Couldn’t Add Photograph" : {
+      "comment" : "Error title when photograph normalization or persistence fails."
+    },
+    "Couldn’t Capture Photograph" : {
+      "comment" : "Error title when the system camera cannot supply the captured image file."
+    },
+    "Couldn’t Delete Photograph" : {
+      "comment" : "Error title when a photograph deletion transaction fails."
+    },
+    "Couldn’t Import Photograph" : {
+      "comment" : "Error title when the system photo picker cannot supply image data."
+    },
+    "Delete Photograph" : {
+      "comment" : "Destructive action that deletes one Photograph record and file."
+    },
+    "Delete Photograph?" : {
+      "comment" : "Confirmation title before deleting a Photograph."
+    },
+    "Free some device storage, then try adding the photograph again." : {
+      "comment" : "Recovery guidance after an insufficient-storage failure."
+    },
+    "Hoof Photographs" : {
+      "comment" : "Navigation title and VisitHorse row label for hoof photographs."
+    },
+    "Loading Photographs…" : {
+      "comment" : "Progress label while Photograph metadata is loading."
+    },
+    "No Photographs" : {
+      "comment" : "Empty-state title for a VisitHorse without photographs."
+    },
+    "Not Enough Storage" : {
+      "comment" : "Error title when a normalized Photograph cannot be stored."
+    },
+    "Photo Library" : {
+      "comment" : "Photograph source action that opens the system photo picker."
+    },
+    "Photograph" : {
+      "comment" : "Navigation title for a full-size Photograph."
+    },
+    "Photograph Limit Reached" : {
+      "comment" : "Error title when a VisitHorse already has 16 available photographs."
+    },
+    "Photograph Unavailable" : {
+      "comment" : "Unavailable-state title for a missing canonical Photograph file."
+    },
+    "Photographs Unavailable" : {
+      "comment" : "Error title when Photograph metadata cannot be loaded."
+    },
+    "Processing Photograph…" : {
+      "comment" : "Progress label during Photograph normalization and persistence."
+    },
+    "The image couldn’t be processed or saved. Try again." : {
+      "comment" : "Generic recovery guidance after Photograph ingestion fails."
+    },
+    "The captured image couldn’t be read. Try taking another photograph." : {
+      "comment" : "Recovery guidance when the system camera returns an unreadable image file."
+    },
+    "The photograph was kept. Try deleting it again." : {
+      "comment" : "Recovery guidance after a Photograph deletion rollback."
+    },
+    "The photographs couldn’t be loaded. Try again." : {
+      "comment" : "Retryable error shown when Photograph metadata cannot be loaded."
+    },
+    "The selected image couldn’t be read. Choose another image." : {
+      "comment" : "Recovery guidance when the system photo picker returns unreadable data."
+    },
+    "The stored photograph file is missing." : {
+      "comment" : "Explanation for Photograph metadata whose canonical file is unavailable."
+    },
+    "This horse already has 16 photographs. Delete one before adding another." : {
+      "comment" : "Limit error explaining how to free a Photograph slot."
+    },
+    "This horse has 16 photographs. Delete one before adding another." : {
+      "comment" : "Visible Photograph collection limit explanation."
+    },
+    "This removes the photograph from this horse’s visit." : {
+      "comment" : "Deletion confirmation for an available Photograph."
+    },
+    "This removes the unavailable photograph record." : {
+      "comment" : "Deletion confirmation for broken Photograph metadata."
+    },
+    "Unavailable" : {
+      "comment" : "Visible and VoiceOver state for missing Photograph files."
+    },
+    "Use the photo library to add a photograph on this device." : {
+      "comment" : "Recovery guidance when camera capture is unavailable."
+    },
+    "The visit and its photographs were kept. Try again." : {
+      "comment" : "Error guidance after photo-aware Visit discard fails."
     }
   },
   "version" : "1.1"

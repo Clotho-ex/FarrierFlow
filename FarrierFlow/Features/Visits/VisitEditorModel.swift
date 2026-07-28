@@ -36,14 +36,11 @@ final class VisitEditorModel {
     private let completing: (VisitDraft, Date, ModelContext) throws -> VisitDraft
     @ObservationIgnored
     private let correcting: (VisitDraft, ModelContext) throws -> VisitDraft
-    @ObservationIgnored
-    private let discarding: (PersistentIdentifier, ModelContext) throws -> Void
 
     private(set) var loadState: VisitEditorLoadState = .loading
     private(set) var lastSavedDraft: VisitDraft?
     var draft: VisitDraft?
     private(set) var pendingOutcomeChange: VisitOutcomeChange?
-    private(set) var didDiscardVisit = false
     private var backgroundSaveErrorPending = false
     var alert: FeatureAlert?
 
@@ -84,9 +81,6 @@ final class VisitEditorModel {
         },
         correcting: @escaping (VisitDraft, ModelContext) throws -> VisitDraft = {
             try VisitSaveUseCase.saveCorrection(draft: $0, in: $1)
-        },
-        discarding: @escaping (PersistentIdentifier, ModelContext) throws -> Void = {
-            try VisitDiscardUseCase.discard(visitID: $0, in: $1)
         }
     ) {
         self.visitID = visitID
@@ -96,7 +90,6 @@ final class VisitEditorModel {
         self.saving = saving
         self.completing = completing
         self.correcting = correcting
-        self.discarding = discarding
     }
 
     func load() {
@@ -239,25 +232,6 @@ final class VisitEditorModel {
             alert = FeatureAlert(
                 title: "Couldn’t Save Changes",
                 message: "Your changes are still in the visit. Try saving again."
-            )
-            return false
-        }
-    }
-
-    @discardableResult
-    func discardVisit() -> Bool {
-        guard mode == .inProgress, loadState == .loaded else { return false }
-
-        do {
-            try discarding(visitID, context)
-            didDiscardVisit = true
-            alert = nil
-            return true
-        } catch {
-            Self.logger.error("Failed to discard visit: \(error, privacy: .public)")
-            alert = FeatureAlert(
-                title: "Couldn’t Discard Visit",
-                message: "The visit wasn’t discarded. Try again."
             )
             return false
         }

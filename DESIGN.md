@@ -7,10 +7,10 @@ the United States. The interface should feel durable, calm, professional,
 efficient, and specific to farrier work. It should help a farrier act quickly
 while standing at a barn, often outdoors and with one hand available.
 
-The completed first slice covers clients, independent service locations,
-horses, appointments, and the Today schedule. Slice 2 adds Visit completion and
-Horse History without introducing a new tab. It does not visually imply later
-capabilities such as services, photographs, invoicing, payments, or
+The completed workflow through Slice 3 covers clients, independent service
+locations, horses, appointments, Visit completion, Horse History, and
+VisitHorse-owned hoof photographs without introducing a new tab. It does not
+visually imply later capabilities such as services, invoicing, payments, or
 subscriptions.
 
 ## Platform Character
@@ -41,12 +41,13 @@ Distinction should come from:
 - Field-specific labels and concise action copy.
 - Strong information hierarchy.
 - Consistent spacing and alignment.
-- Useful horse photography when that capability is introduced.
+- Useful VisitHorse-specific hoof photography inside the Visit workflow.
 - Clear empty states that explain the next valid action.
 - Subtle success and warning haptics where they confirm a meaningful result.
 
-The first slice does not include horse photography. It should reserve no empty
-photo frames or decorative image treatments.
+Photographs appear only when the user opens a scheduled horse from an
+in-progress or completed Visit. Other records reserve no empty photo frames or
+decorative image treatments.
 
 ## Navigation
 
@@ -58,7 +59,7 @@ The app opens on Today and uses three native tabs:
 
 Today and Schedule expose an appointment-creation action. Clients exposes a
 client-creation action and a toolbar menu containing Service Locations. Through
-Slice 2 there is no Settings route, screen, folder, or toolbar item. Settings
+Slice 3 there is no Settings route, screen, folder, or toolbar item. Settings
 may be introduced later only when concrete settings exist.
 
 Creation remains contextual:
@@ -86,6 +87,8 @@ Visit creation is contextual to Appointment Detail:
 - Visit Detail is shared by Appointment Detail and Horse History.
 - Horse Detail contains completed Visit history; there is no global history
   destination.
+- Each VisitHorse row in an in-progress editor or completed Visit Detail opens
+  its Hoof Photographs collection.
 
 Once a Visit exists, Appointment service location and horse membership are
 read-only. Scheduled start, Appointment Notes, and expected duration remain
@@ -210,7 +213,7 @@ competing visually with completion.
 
 ## Status and Feedback
 
-Slice 2 adds only Visit state and per-horse Visit outcome:
+Visit state and per-horse outcome remain:
 
 - A Visit is In Progress while `completedAt` is absent and Completed after a
   successful completion save.
@@ -218,6 +221,16 @@ Slice 2 adds only Visit state and per-horse Visit outcome:
 - Status and outcome use localized text and are not communicated by color
   alone.
 - Completed Visit correction never changes Visit timestamps or state.
+
+Photograph feedback distinguishes:
+
+- Available files that may be opened or deleted.
+- Missing canonical files that remain visible as Unavailable metadata records
+  and may be deleted.
+- Active processing, storage failure, camera unavailability, camera permission
+  denial, and the 16-available-photograph limit.
+- Protected-data access deferral, which must not be presented as a missing
+  photograph.
 
 Other feedback remains limited to facts the app currently knows:
 

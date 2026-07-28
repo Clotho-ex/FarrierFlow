@@ -75,7 +75,10 @@ final class VisitCompletionUITests: XCTestCase {
     @MainActor
     func testPendingAndAllNotServicedOutcomesBlockCompletionAndDirtyCancelKeepsEditor() throws {
         let graph = makeGraph(prefix: "Draft")
-        let app = launch(storeName: "VisitDraftRules-\(UUID().uuidString)")
+        let app = launch(
+            storeName: "VisitDraftRules-\(UUID().uuidString)",
+            forcesCameraUnavailable: true
+        )
         createConnectedGraph(graph, in: app, includesSecondaryBarn: false)
 
         openAppointment(at: graph.primaryBarnName, in: app)
@@ -83,6 +86,19 @@ final class VisitCompletionUITests: XCTestCase {
         let complete = app.buttons["visit-complete"]
         XCTAssertTrue(complete.waitForExistence(timeout: 3))
         XCTAssertFalse(complete.isEnabled)
+
+        app.buttons["visit-photographs-\(graph.servicedHorseName)"].tap()
+        XCTAssertTrue(app.navigationBars["Hoof Photographs"].waitForExistence(timeout: 3))
+        app.buttons["photograph-add-menu"].tap()
+        app.buttons["Camera"].tap()
+        XCTAssertTrue(app.alerts["Camera Unavailable"].waitForExistence(timeout: 3))
+        app.alerts.buttons["OK"].tap()
+
+        app.buttons["photograph-add-menu"].tap()
+        app.buttons["Photo Library"].tap()
+        XCTAssertTrue(app.navigationBars["Photos"].waitForExistence(timeout: 5))
+        app.buttons["Cancel"].firstMatch.tap()
+        app.navigationBars.buttons["Visit"].tap()
 
         select(.notServiced, for: graph.servicedHorseName, in: app)
         select(.notServiced, for: graph.notServicedHorseName, in: app)
@@ -127,9 +143,15 @@ final class VisitCompletionUITests: XCTestCase {
     }
 
     @MainActor
-    private func launch(storeName: String) -> XCUIApplication {
+    private func launch(
+        storeName: String,
+        forcesCameraUnavailable: Bool = false
+    ) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] = storeName
+        if forcesCameraUnavailable {
+            app.launchEnvironment["FARRIERFLOW_UI_TEST_CAMERA_UNAVAILABLE"] = "1"
+        }
         app.launch()
         return app
     }

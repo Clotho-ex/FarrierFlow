@@ -126,6 +126,69 @@ struct SchemaContractTests {
     }
 
     @Test
+    func v3SchemaRegistersExactlyEightModels() {
+        let schema = Schema(versionedSchema: FarrierFlowSchemaV3.self)
+
+        #expect(Set(schema.entities.map(\.name)) == [
+            "Client",
+            "Barn",
+            "Horse",
+            "Appointment",
+            "AppointmentHorse",
+            "Visit",
+            "VisitHorse",
+            "Photograph",
+        ])
+    }
+
+    @Test
+    func v3PhotographOwnershipAndDeleteRulesAreRegistered() throws {
+        let schema = Schema(versionedSchema: FarrierFlowSchemaV3.self)
+
+        let photographs = try relationship(in: schema, "VisitHorse", "photographs")
+        #expect(photographs.inverseName == "visitHorse")
+        #expect(photographs.deleteRule == .cascade)
+
+        let visitHorse = try relationship(in: schema, "Photograph", "visitHorse")
+        #expect(visitHorse.inverseName == "photographs")
+        #expect(visitHorse.deleteRule == .nullify)
+        #expect(visitHorse.minimumModelCount == nil)
+        #expect(visitHorse.maximumModelCount == nil)
+    }
+
+    @Test
+    func photographInitializerStoresApprovedMetadataAndOwnership() {
+        let client = Client(name: "Alex Carter")
+        let barn = Barn(name: "North Field")
+        let horse = Horse(name: "Milo", client: client, currentBarn: barn)
+        let appointment = Appointment(startDate: .now, barn: barn)
+        let visit = Visit(
+            startedAt: .now,
+            serviceLocationNameSnapshot: barn.name,
+            appointment: appointment,
+            barn: barn
+        )
+        let visitHorse = VisitHorse(visit: visit, horse: horse)
+        let id = UUID(uuidString: "D4586522-AF85-4D45-826A-C4379B6DBD1E")!
+        let createdAt = Date(timeIntervalSinceReferenceDate: 500)
+        let photograph = Photograph(
+            id: id,
+            createdAt: createdAt,
+            pixelWidth: 2_560,
+            pixelHeight: 1_920,
+            byteCount: 712_345,
+            visitHorse: visitHorse
+        )
+
+        #expect(photograph.id == id)
+        #expect(photograph.createdAt == createdAt)
+        #expect(photograph.pixelWidth == 2_560)
+        #expect(photograph.pixelHeight == 1_920)
+        #expect(photograph.byteCount == 712_345)
+        #expect(photograph.visitHorse === visitHorse)
+    }
+
+    @Test
     func horseDefaultsToSixWeeks() {
         let client = Client(name: "Alex Carter")
         let barn = Barn(name: "North Field")

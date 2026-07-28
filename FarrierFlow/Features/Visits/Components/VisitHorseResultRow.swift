@@ -16,6 +16,5 @@ struct VisitHorseResultRow: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("visit-result-\(horse.horseName)")
     }
 }

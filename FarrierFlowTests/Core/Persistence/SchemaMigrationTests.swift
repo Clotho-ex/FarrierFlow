@@ -3,7 +3,7 @@ import SwiftData
 import Testing
 @testable import FarrierFlow
 
-@Suite("V1 to V2 schema migration")
+@Suite("Schema migration")
 @MainActor
 struct SchemaMigrationTests {
     @Test
@@ -71,7 +71,38 @@ struct SchemaMigrationTests {
 
             #expect(try context.fetchCount(FetchDescriptor<Visit>()) == 0)
             #expect(try context.fetchCount(FetchDescriptor<VisitHorse>()) == 0)
+            #expect(try context.fetchCount(FetchDescriptor<Photograph>()) == 0)
             #expect(appointment.visit == nil)
+        }
+    }
+
+    @Test
+    func existingV2VisitGraphMigratesWithoutFabricatingPhotographs() throws {
+        let directory = try TemporaryStoreFixtures.makeDirectory(
+            prefix: "FarrierFlow-V2-to-V3-Migration-"
+        )
+        let storeURL = directory.appending(path: "FarrierFlow.store")
+
+        try autoreleasepool {
+            try V2StoreFixture.writeCompleteVisitGraph(to: storeURL)
+        }
+
+        try autoreleasepool {
+            let container = try ModelContainerFactory.persistentStoreTest(at: storeURL)
+            let context = ModelContext(container)
+            let visits = try context.fetch(FetchDescriptor<Visit>())
+            let visitHorses = try context.fetch(FetchDescriptor<VisitHorse>())
+
+            let visit = try #require(visits.first)
+            let visitHorse = try #require(visitHorses.first)
+
+            #expect(visits.count == 1)
+            #expect(visitHorses.count == 1)
+            #expect(visit.completedAt == Date(timeIntervalSince1970: 1_722_000_500))
+            #expect(visitHorse.outcomeRawValue == "serviced")
+            #expect(visitHorse.workNotes == "Front shoes")
+            #expect(visitHorse.photographs.isEmpty)
+            #expect(try context.fetchCount(FetchDescriptor<Photograph>()) == 0)
         }
     }
 }

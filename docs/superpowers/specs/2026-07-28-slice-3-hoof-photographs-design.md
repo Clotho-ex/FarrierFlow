@@ -1,10 +1,10 @@
 # Slice 3 — Hoof Photographs Design
 
-**Status:** Approved for specification review
+**Status:** Approved
 
 **Date:** 2026-07-28
 
-**Implementation:** Not started
+**Implementation:** Implemented on `codex/slice-3-hoof-photographs`; review pending
 
 ## Purpose
 
@@ -997,9 +997,8 @@ Slice 3 does not add:
 - Generalized storage repositories, locks, schedulers, or dependency injection.
 - Third-party dependencies.
 
-## Implementation Gate
+## Implementation Authorization
 
-This document authorizes specification review only.
-
-Do not begin Slice 3 implementation or create the implementation plan until the
-user approves this written specification.
+The user approved this specification and later authorized implementation. This
+document remains the normative Slice 3 product, durability, and verification
+contract.

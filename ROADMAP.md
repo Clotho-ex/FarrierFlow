@@ -162,7 +162,7 @@ The slice is accepted only after this sequence succeeds:
 
 ## Slice 2 — Visit Completion
 
-**Status:** Authorized for implementation planning.
+**Status:** Complete.
 
 ### Outcome
 
@@ -273,15 +273,45 @@ historical graph survives process termination and store reopening.
 - No deferred model, screen, dependency, service, or visual effect is
   introduced.
 
+## Slice 3 — Hoof Photographs
+
+**Status:** Implemented; final review pending.
+
+### Outcome
+
+Capture or import hoof photographs for any scheduled Horse, keep them attached
+to the same VisitHorse across outcome changes, and preserve the combined
+SwiftData-and-file record across relaunch and crash recovery.
+
+### Scope
+
+- Add Photograph and `VisitHorse.photographs` in the complete V3 schema.
+- Migrate V2 to V3 lightly while preserving the chained V1-to-V2-to-V3 path.
+- Support camera capture and the permission-scoped system photo picker.
+- Normalize one upright, metadata-free, opaque sRGB JPEG with a maximum
+  2,560-pixel longest edge and JPEG quality 0.82; retain no source or thumbnail.
+- Store canonical files at
+  `Application Support/HoofPhotographs/<photograph-uuid>.jpg`.
+- Limit each VisitHorse to 16 available photographs without silently removing
+  an existing record.
+- Serialize add, delete, photo-aware Visit discard, and reconciliation through
+  one feature-owned coordination boundary.
+- Use temporary and quarantine files for rollback-safe mutations and
+  filesystem-based, idempotent crash recovery.
+- Preserve missing-file metadata as an explicit unavailable Photograph that
+  the user may delete.
+- Apply complete file protection and retain standard device-backup eligibility.
+- Provide photograph management from in-progress Visit editing, completed Visit
+  detail and correction, and Horse History through Visit Detail.
+
+The complete durability, reconciliation, image-processing, privacy, and testing
+contract is recorded in
+`docs/superpowers/specs/2026-07-28-slice-3-hoof-photographs-design.md`.
+
 ## Later Slices
 
 The order below expresses product sequence, not an approved implementation
 design. Each slice requires shaping before implementation.
-
-### Slice 3 — Hoof Photographs
-
-Capture and manage hoof photographs with files stored in Application Support
-and metadata stored in SwiftData.
 
 ### Slice 4 — Services and Pricing
 
@@ -321,9 +351,8 @@ Evaluate an opt-in backup or synchronization design only after privacy,
 conflict, account, recovery, migration, and operational requirements are
 defined. CloudKit is not assumed.
 
-## Deferred Beyond Slice 2
+## Deferred Beyond Slice 3
 
-- Hoof photographs and file storage.
 - Service catalog, default service, pricing, and service presets.
 - Invoices, PDFs, payment status, and payment processing.
 - Automatic next-appointment creation.
@@ -338,5 +367,5 @@ defined. CloudKit is not assumed.
 - Completed Visit deletion and historical-date correction.
 - Background tasks, external Visit draft files, and per-change autosave.
 
-Slice 2 must not add fields, routes, empty screens, services, or abstractions
+Slice 3 must not add fields, routes, empty screens, services, or abstractions
 for these deferred capabilities.

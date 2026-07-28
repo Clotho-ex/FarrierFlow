@@ -1,3 +1,4 @@
+import Foundation
 import SwiftData
 
 nonisolated enum DomainGraphViolation: Error, Equatable {
@@ -23,6 +24,11 @@ nonisolated enum DomainGraphViolation: Error, Equatable {
     case completionPredatesStart
     case workNotesRequireServicedOutcome
     case appointmentVisitMismatch
+    case photographMissingVisitHorse
+    case photographInverseMismatch
+    case invalidPhotographDimensions
+    case invalidPhotographByteCount
+    case duplicatePhotographID
 }
 
 @MainActor
@@ -38,6 +44,7 @@ enum DomainGraphValidator {
         let appointmentHorses = try context.fetch(FetchDescriptor<AppointmentHorse>())
         let visits = try context.fetch(FetchDescriptor<Visit>())
         let visitHorses = try context.fetch(FetchDescriptor<VisitHorse>())
+        let photographs = try context.fetch(FetchDescriptor<Photograph>())
 
         for horse in horses {
             try validate(horse)
@@ -57,6 +64,14 @@ enum DomainGraphValidator {
             try validate(visitHorse)
             if let visit = visitHorse.visit {
                 visitMemberships[visit.persistentModelID, default: []].append(visitHorse)
+            }
+        }
+
+        var photographIDs = Set<UUID>()
+        for photograph in photographs {
+            try validate(photograph)
+            guard photographIDs.insert(photograph.id).inserted else {
+                throw DomainGraphViolation.duplicatePhotographID
             }
         }
 
@@ -111,6 +126,25 @@ enum DomainGraphValidator {
         }
         guard visitHorse.horse != nil else {
             throw DomainGraphViolation.visitHorseMissingHorse
+        }
+    }
+
+    private static func validate(_ photograph: Photograph) throws {
+        guard let visitHorse = photograph.visitHorse else {
+            throw DomainGraphViolation.photographMissingVisitHorse
+        }
+        guard visitHorse.photographs.contains(where: { $0 === photograph }) else {
+            throw DomainGraphViolation.photographInverseMismatch
+        }
+        guard
+            photograph.pixelWidth > 0,
+            photograph.pixelHeight > 0,
+            max(photograph.pixelWidth, photograph.pixelHeight) <= 2_560
+        else {
+            throw DomainGraphViolation.invalidPhotographDimensions
+        }
+        guard photograph.byteCount > 0 else {
+            throw DomainGraphViolation.invalidPhotographByteCount
         }
     }
 

@@ -4,6 +4,7 @@ import SwiftUI
 struct VisitDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
+    @Environment(PhotographLibrary.self) private var photographLibrary
     @State private var model: VisitDetailModel
     @State private var showsEditor = false
     private let showsDismissAction: Bool
@@ -124,7 +125,22 @@ struct VisitDetailView: View {
                 }
                 Section("Horses") {
                     ForEach(detail.horses) { horse in
-                        VisitHorseResultRow(horse: horse)
+                        NavigationLink {
+                            PhotographCollectionView(
+                                visitHorseID: horse.id,
+                                horseName: horse.horseName,
+                                library: photographLibrary
+                            )
+                        } label: {
+                            VStack(alignment: .leading, spacing: 8) {
+                                VisitHorseResultRow(horse: horse)
+                                PhotographCountLabel(
+                                    visitHorseID: horse.id,
+                                    library: photographLibrary
+                                )
+                            }
+                        }
+                        .accessibilityIdentifier("visit-result-\(horse.horseName)")
                     }
                 }
             }

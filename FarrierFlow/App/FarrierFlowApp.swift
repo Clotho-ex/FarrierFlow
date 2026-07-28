@@ -10,32 +10,68 @@ import SwiftUI
 
 @main
 struct FarrierFlowApp: App {
-    private let containerResult: Result<ModelContainer, Error>
+    private let dependenciesResult: Result<AppDependencies, Error>
 
     init() {
-        containerResult = Result {
+        dependenciesResult = Result {
             #if DEBUG
             if let storeURL = UITestLaunchConfiguration().storeURL {
                 try FileManager.default.createDirectory(
                     at: storeURL.deletingLastPathComponent(),
                     withIntermediateDirectories: true
                 )
-                return try ModelContainerFactory.persistentStoreTest(at: storeURL)
+                let container = try ModelContainerFactory.persistentStoreTest(at: storeURL)
+                return AppDependencies(
+                    container: container,
+                    photographLibrary: PhotographLibrary(
+                        container: container,
+                        fileStore: PhotographFileStore(
+                            rootURL: storeURL
+                                .deletingPathExtension()
+                                .appending(
+                                    path: PhotographConstants.rootDirectoryName,
+                                    directoryHint: .isDirectory
+                                )
+                        )
+                    )
+                )
             }
             #endif
-            return try ModelContainerFactory.production()
+            let container = try ModelContainerFactory.production()
+            let applicationSupportURL = try FileManager.default.url(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask,
+                appropriateFor: nil,
+                create: true
+            )
+            return AppDependencies(
+                container: container,
+                photographLibrary: PhotographLibrary(
+                    container: container,
+                    fileStore: PhotographFileStore(
+                        applicationSupportURL: applicationSupportURL
+                    )
+                )
+            )
         }
     }
 
     var body: some Scene {
         WindowGroup {
-            switch containerResult {
-            case .success(let container):
+            switch dependenciesResult {
+            case .success(let dependencies):
                 RootView()
-                    .modelContainer(container)
+                    .modelContainer(dependencies.container)
+                    .environment(dependencies.photographLibrary)
             case .failure:
                 ModelContainerFailureView()
             }
         }
     }
+}
+
+@MainActor
+private struct AppDependencies {
+    let container: ModelContainer
+    let photographLibrary: PhotographLibrary
 }

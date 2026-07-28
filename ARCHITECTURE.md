@@ -2,11 +2,11 @@
 
 ## Architectural Goals
 
-FarrierFlow is a local-first, iPhone-only SwiftUI application. Slice 0 and
-Slice 1 proved native navigation, SwiftData relationships, validation, deletion
-behavior, and durable persistence. Slice 2 adds Visit completion, Horse
-History, and a tested V1-to-V2 migration without adding networking, CloudKit,
-third-party dependencies, or speculative infrastructure.
+FarrierFlow is a local-first, iPhone-only SwiftUI application. Slice 1 proved
+connected persistence, Slice 2 added Visit completion and Horse History, and
+Slice 3 adds VisitHorse-owned photographs, bounded image normalization,
+coordinated file-and-database mutations, and a tested V1-to-V2-to-V3 migration.
+It adds no networking, CloudKit, or third-party dependency.
 
 The dependency direction is:
 
@@ -26,7 +26,7 @@ local source of truth.
 
 ## Source Organization
 
-Active ownership through Slice 2 uses the approved feature-first structure:
+Active ownership through Slice 3 uses the approved feature-first structure:
 
 ```text
 FarrierFlow/
@@ -53,15 +53,16 @@ FarrierFlow/
 │   ├── Clients/
 │   ├── Barns/
 │   ├── Horses/
-│   └── Visits/
+│   ├── Visits/
+│   └── Photographs/
 └── Resources/
     ├── Assets.xcassets
     └── Localizable.xcstrings
 ```
 
-This tree contains only active ownership through Slice 2. `Core/Utilities`
+This tree contains only active ownership through Slice 3. `Core/Utilities`
 contains only utilities genuinely shared by active features with no clearer
-domain owner. Later features such as photographs, services, invoices, payments,
+domain owner. Later features such as services, invoices, payments,
 export, subscriptions, backup, and Settings receive their own feature
 ownership only after each capability is shaped. No empty directory or
 destination is created for deferred work.
@@ -84,12 +85,10 @@ directory.
 
 ## App Composition
 
-`FarrierFlowApp` creates the production `ModelContainer` and supplies it through
-SwiftUI's model-container environment. Slice 0 does not require an application
-dependency container because no concrete app-level dependency exists beyond
-the model container. A small composition value may be introduced later only
-when a real app-level dependency requires it; it must not become a mutable
-global singleton or service locator.
+`FarrierFlowApp` creates the production `ModelContainer` and one
+`PhotographLibrary`, then supplies both through SwiftUI's environment. The
+small composition value owns the concrete Photograph file store and serial
+coordinator; it is neither a mutable global singleton nor a service locator.
 
 `RootView` owns the root `TabView` and the selected tab. It opens on Today and
 contains three tabs:
@@ -109,15 +108,17 @@ does not discard navigation state or combine unrelated routes.
   and appointment editing.
 - Visits owns Visit start, in-progress editing, progress saving, completion,
   correction, detail presentation, and Visit-specific validation.
+- Photographs owns camera and picker ingestion, normalization, file storage,
+  VisitHorse collections, deletion, and reconciliation.
 - Clients owns client list, client detail, and client creation.
 - Horses owns horse list/detail/editor behavior reached from client or
   service-location context.
 - Barns owns the Service Locations list, service-location detail, and
   service-location editor.
-- The Clients toolbar menu exposes only Service Locations through Slice 2.
+- The Clients toolbar menu exposes only Service Locations through Slice 3.
   Service Locations is pushed within the Clients navigation stack.
 - No Settings route, screen, folder, toolbar item, or empty destination exists
-  through Slice 2. Settings may be introduced later only when concrete
+  through Slice 3. Settings may be introduced later only when concrete
   settings require a destination.
 
 Appointment Detail owns the entry into Visits: Start Visit when none exists,
@@ -154,9 +155,11 @@ Do not mark actor-neutral values `@MainActor` merely because a view consumes
 them. Do not move `ModelContext` across actors. Persistence mutations initiated
 by a feature model occur on the feature model's main-actor context.
 
-Slice 2 includes no background tasks or other long-running work. Its
-best-effort scene-background save calls the existing main-actor Save Progress
-boundary and does not claim additional execution time.
+Image normalization and display downsampling use bounded ImageIO work away from
+SwiftUI rendering. SwiftData contexts stay on the main actor. One feature-owned
+actor holds an explicit permit across every await in Photograph add, delete,
+photo-aware Visit discard, and reconciliation. Image display reads remain
+nonexclusive and tolerate completed deletion.
 
 ## Persistence Containers
 
@@ -172,9 +175,9 @@ must not silently replace a failed durable store with an in-memory store.
 Preview and test fixtures never enter production startup code.
 
 The schema and migration plan live under `Core/Persistence`. V1 remains the
-five-model prior snapshot. V2 is the seven-model current snapshot that adds
-Visit and VisitHorse plus their inverses. The migration plan contains an
-explicit lightweight V1-to-V2 stage. Production keeps the existing store
+five-model connected-record snapshot, V2 the seven-model Visit snapshot, and V3
+the current eight-model Photograph snapshot. The migration plan contains
+lightweight V1-to-V2 and V2-to-V3 stages. Production keeps the existing store
 identity and URL; a schema change must never create a replacement empty store.
 
 ## Domain and Persistence Boundaries
@@ -214,6 +217,33 @@ construct complete graphs, and complete-graph validation runs immediately
 before every save. It rejects missing relationships, a Horse outside the
 Appointment Barn, and duplicate Horse membership. SwiftData optionality and
 `minimumModelCount` are not relied on as domain validation.
+
+V3 applies the same representation rule to `Photograph.visitHorse`.
+Photograph ownership remains domain-required and inverse-validated. Production
+supports only Photograph creation and deletion; no update or reassignment path
+exists after insertion.
+
+### Photograph File Transactions
+
+The canonical file is derived from Photograph UUID under
+`Application Support/HoofPhotographs`; SwiftData stores no path. Temporary and
+quarantine directories live beneath the same protected root so moves are
+atomic on one volume.
+
+Add writes and validates a normalized temporary JPEG, moves it to the
+collision-safe canonical URL, then inserts and saves metadata. A failed save
+rolls back the context and removes the canonical orphan. Delete first moves the
+canonical file to quarantine, then deletes metadata; a failed save restores the
+file. In-progress Visit discard applies the same quarantine pattern to every
+owned photograph.
+
+Launch and protected-data-availability reconciliation fetches all Photograph
+metadata and safely inspects every managed directory before planning any
+mutation. It restores a unique quarantine for existing metadata and purges only
+strictly named managed temporary, quarantine, or canonical orphans. Ambiguous,
+unknown, malformed, directory, and symbolic-link entries fail safe or remain
+untouched. The filesystem state is the idempotent crash-recovery record; there
+is no journal or background task.
 
 Reads never force-unwrap stored relationships. If corrupted or externally
 invalid persisted data is encountered, views render an unavailable value or
@@ -345,6 +375,18 @@ Slice 2 adds:
   discarded, and post-completion-relocation graphs.
 - UI acceptance coverage from Start Visit through Horse History and relaunch.
 
+Slice 3 adds:
+
+- V2-to-V3 and chained V1-to-V2-to-V3 migration coverage with no fabricated
+  Photograph data.
+- Image orientation, bounded resizing, sRGB conversion, metadata stripping,
+  collision, file-protection, and backup-eligibility tests.
+- Add, delete, rollback, missing-file, quarantine, orphan, protected-data, and
+  idempotent reconciliation tests.
+- Deterministic suspension-point tests proving exclusive serialization and the
+  16-available-photograph limit under concurrent adds.
+- Persistent reopening and camera/photo-picker entry coverage.
+
 Production, preview, and test container creation use the same schema
 registration so tests cannot accidentally validate a different model graph.
 
@@ -359,15 +401,15 @@ validation, and accessibility behavior must work on both platform generations.
 Standard controls, rather than simulated platform effects, provide the
 appropriate appearance on each OS.
 
-## Explicit Non-Goals Through Slice 2
+## Explicit Non-Goals Through Slice 3
 
 - Networking or server-backed repositories.
 - CloudKit synchronization or backup.
 - A dependency-injection framework or global service container.
 - Third-party packages or a third-party design system.
-- A generalized repository, coordinator, or event bus.
+- A generalized repository, global coordinator, or event bus.
 - Unscheduled Visit horses, cancellation, no-show, or rescheduling state.
-- Structured services, photo storage, PDFs, invoices, payments, StoreKit, or
+- Structured services, PDFs, invoices, payments, StoreKit, or
   notifications.
 - Background tasks, external draft files, or per-change autosave.
 - Completed Visit deletion or historical-date correction.

@@ -7,7 +7,7 @@ import Testing
 @MainActor
 struct ModelContainerFactoryTests {
     @Test
-    func inMemoryTestIsCleanWritableAndRegistersCurrentV2() throws {
+    func inMemoryTestIsCleanWritableAndRegistersCurrentV3() throws {
         let container = try ModelContainerFactory.inMemoryTest()
         let configuration = try #require(container.configurations.first)
 
@@ -20,6 +20,7 @@ struct ModelContainerFactoryTests {
             "AppointmentHorse",
             "Visit",
             "VisitHorse",
+            "Photograph",
         ])
         #expect(try container.mainContext.fetchCount(FetchDescriptor<Client>()) == 0)
 
