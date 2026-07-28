@@ -76,6 +76,129 @@ struct PhotographLibraryTests {
     }
 
     @Test
+    func postWriteCapacityDoesNotRejectAlreadyWrittenTemporaryJPEG() async throws {
+        let graph = try PhotographTestFixtures.makeVisitGraph()
+        let directory = try TemporaryStoreFixtures.makeDirectory(
+            prefix: "FarrierFlow-Photograph-Capacity-Post-Write-"
+        )
+        let sourceData = try PhotographTestFixtures.jpeg(
+            width: 800,
+            height: 600,
+            quality: 0.01,
+            detailed: true
+        )
+        let store = PhotographFileStore(
+            rootURL: directory.appending(path: "HoofPhotographs", directoryHint: .isDirectory),
+            capacityProvider: { _ in Int64(sourceData.count) }
+        )
+        let library = PhotographTestFixtures.makeLibrary(
+            graph: graph,
+            rootURL: store.rootURL,
+            fileStore: store
+        )
+
+        let id = try await library.add(sourceData: sourceData, to: graph.visitHorseID)
+        let normalizedByteCount = try #require(
+            library.items(for: graph.visitHorseID).first?.byteCount
+        )
+
+        #expect(normalizedByteCount > Int64(sourceData.count))
+        #expect(FileManager.default.fileExists(atPath: store.canonicalURL(for: id).path))
+    }
+
+    @Test
+    func insufficientCapacityPreflightFailsBeforePermanentMutation() async throws {
+        let graph = try PhotographTestFixtures.makeVisitGraph()
+        let directory = try TemporaryStoreFixtures.makeDirectory(
+            prefix: "FarrierFlow-Photograph-Capacity-Preflight-"
+        )
+        let store = PhotographFileStore(
+            rootURL: directory.appending(path: "HoofPhotographs", directoryHint: .isDirectory),
+            capacityProvider: { _ in 0 }
+        )
+        let library = PhotographTestFixtures.makeLibrary(
+            graph: graph,
+            rootURL: store.rootURL,
+            fileStore: store
+        )
+        let id = UUID()
+
+        await #expect(throws: PhotographLibraryError.insufficientStorage) {
+            try await library.add(
+                sourceData: PhotographTestFixtures.jpeg(),
+                to: graph.visitHorseID,
+                id: id
+            )
+        }
+
+        let context = ModelContext(graph.container)
+        #expect(try context.fetchCount(FetchDescriptor<Photograph>()) == 0)
+        #expect(!FileManager.default.fileExists(atPath: store.canonicalURL(for: id).path))
+    }
+
+    @Test
+    func temporaryWriteOutOfSpaceCreatesNoMetadataOrCanonicalFile() async throws {
+        let graph = try PhotographTestFixtures.makeVisitGraph()
+        let directory = try TemporaryStoreFixtures.makeDirectory(
+            prefix: "FarrierFlow-Photograph-Capacity-Write-"
+        )
+        let store = PhotographFileStore(
+            rootURL: directory.appending(path: "HoofPhotographs", directoryHint: .isDirectory)
+        )
+        let library = PhotographTestFixtures.makeLibrary(
+            graph: graph,
+            rootURL: store.rootURL,
+            fileStore: store,
+            normalizer: PhotographNormalizer(
+                writeData: { _, _ in throw CocoaError(.fileWriteOutOfSpace) }
+            )
+        )
+        let id = UUID()
+
+        await #expect(throws: PhotographLibraryError.insufficientStorage) {
+            try await library.add(
+                sourceData: PhotographTestFixtures.jpeg(),
+                to: graph.visitHorseID,
+                id: id
+            )
+        }
+
+        let context = ModelContext(graph.container)
+        #expect(try context.fetchCount(FetchDescriptor<Photograph>()) == 0)
+        #expect(!FileManager.default.fileExists(atPath: store.canonicalURL(for: id).path))
+        #expect(try store.inspectAllEntries().temporaryFiles.isEmpty)
+    }
+
+    @Test
+    func genericTemporaryWriteFailureIsNotReportedAsInsufficientStorage() async throws {
+        let graph = try PhotographTestFixtures.makeVisitGraph()
+        let directory = try TemporaryStoreFixtures.makeDirectory(
+            prefix: "FarrierFlow-Photograph-Capacity-Generic-"
+        )
+        let store = PhotographFileStore(
+            rootURL: directory.appending(path: "HoofPhotographs", directoryHint: .isDirectory)
+        )
+        let library = PhotographTestFixtures.makeLibrary(
+            graph: graph,
+            rootURL: store.rootURL,
+            fileStore: store,
+            normalizer: PhotographNormalizer(
+                writeData: { _, _ in throw CocoaError(.fileWriteUnknown) }
+            )
+        )
+
+        await #expect(throws: CocoaError.self) {
+            try await library.add(
+                sourceData: PhotographTestFixtures.jpeg(),
+                to: graph.visitHorseID
+            )
+        }
+
+        let context = ModelContext(graph.container)
+        #expect(try context.fetchCount(FetchDescriptor<Photograph>()) == 0)
+    }
+
+    @Test
     func failedDeleteSaveRestoresCanonicalAndMetadata() async throws {
         let initial = try makeFixture()
         let id = try await initial.library.add(

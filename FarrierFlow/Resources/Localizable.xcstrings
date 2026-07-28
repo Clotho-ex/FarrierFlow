@@ -712,6 +712,9 @@
     "Unavailable" : {
       "comment" : "Visible and VoiceOver state for missing Photograph files."
     },
+    "Unlock your device, then try again." : {
+      "comment" : "Recovery guidance when protected Photograph data cannot be accessed."
+    },
     "Use the photo library to add a photograph on this device." : {
       "comment" : "Recovery guidance when camera capture is unavailable."
     },

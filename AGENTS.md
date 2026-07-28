@@ -126,3 +126,74 @@ Before implementation:
 Do not modify unrelated files or silently expand the requested scope.
 
 A task is not complete until the application builds and relevant tests pass.
+
+## Resource-constrained verification policy
+
+The development machine is an 8 GB M3 MacBook Air.
+
+Local execution must prioritize system responsiveness and avoid sustained memory
+pressure.
+
+### During implementation
+
+For each individual edit or small group of related edits:
+
+1. Run only the smallest relevant focused test target.
+2. Do not run both iOS 18 and iOS 26.
+3. Do not run UI tests unless the change directly affects UI behavior.
+4. Do not run a complete build when the focused test command already compiles
+   the affected target.
+5. Do not run independent commands concurrently.
+6. Confirm the previous command and all child processes have exited before
+   starting another command.
+
+### Checkpoint verification
+
+Run one broader unit/integration suite only after a coherent implementation
+checkpoint is complete.
+
+Use one platform for intermediate verification. Prefer the primary iOS 26
+destination unless the change specifically concerns iOS 18 compatibility or
+migration.
+
+### Final slice verification only
+
+Run the following only after implementation and focused reviews are complete:
+
+1. Full iOS 18 unit/integration suite
+2. Full iOS 26 unit/integration suite
+3. Focused iOS 18 UI flow
+4. Full iOS 26 UI suite
+5. Migration and persistent-reopening gates
+6. iOS 18 build
+7. iOS 26 build
+8. `git diff --check`
+
+Run these serially. Never use parallel test workers, simulator clones,
+concurrent destinations, or overlapping `xcodebuild` processes.
+
+### Command configuration
+
+For test commands:
+
+- set parallel testing to disabled
+- use a maximum of one parallel testing worker
+- target one simulator destination
+- do not boot additional simulators
+- do not retry timed-out tests until surviving processes are inspected and
+  terminated
+
+### Resource-stop condition
+
+Before starting a command, check for an existing `xcodebuild`, `xctest`, or
+active simulator test runner.
+
+If memory pressure is already elevated or swap is increasing:
+
+- do not start another command
+- terminate stale test/build processes
+- shut down unused simulators
+- report that verification was deferred due to local resource pressure
+
+A full verification suite must not be repeated unless source code changed after
+the previous successful run.

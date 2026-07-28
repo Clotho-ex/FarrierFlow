@@ -4,18 +4,32 @@ import ImageIO
 import UniformTypeIdentifiers
 
 nonisolated struct PhotographNormalizer: Sendable {
+    private let writeData: @Sendable (Data, URL) throws -> Void
+
+    init(
+        writeData: @escaping @Sendable (Data, URL) throws -> Void = Self.writeWithoutOverwriting
+    ) {
+        self.writeData = writeData
+    }
+
     func normalize(
         data: Data,
         destinationURL: URL
     ) async throws -> NormalizedPhotograph {
-        try await Task.detached(priority: .userInitiated) {
-            try Self.normalizeSynchronously(data: data, destinationURL: destinationURL)
+        let writeData = writeData
+        return try await Task.detached(priority: .userInitiated) {
+            try Self.normalizeSynchronously(
+                data: data,
+                destinationURL: destinationURL,
+                writeData: writeData
+            )
         }.value
     }
 
     private static func normalizeSynchronously(
         data: Data,
-        destinationURL: URL
+        destinationURL: URL,
+        writeData: @escaping @Sendable (Data, URL) throws -> Void
     ) throws -> NormalizedPhotograph {
         guard !FileManager.default.fileExists(atPath: destinationURL.path) else {
             throw PhotographNormalizationError.destinationExists
@@ -112,15 +126,19 @@ nonisolated struct PhotographNormalizer: Sendable {
             let metadataFreeData = try removingJPEGMetadataSegments(
                 from: encodedData as Data
             )
-            try metadataFreeData.write(
-                to: destinationURL,
-                options: .withoutOverwriting
-            )
+            try writeData(metadataFreeData, destinationURL)
             return try validateOutput(at: destinationURL)
         } catch {
             try? FileManager.default.removeItem(at: destinationURL)
             throw error
         }
+    }
+
+    private static func writeWithoutOverwriting(
+        _ data: Data,
+        _ destinationURL: URL
+    ) throws {
+        try data.write(to: destinationURL, options: .withoutOverwriting)
     }
 
     private static func validateOutput(at url: URL) throws -> NormalizedPhotograph {

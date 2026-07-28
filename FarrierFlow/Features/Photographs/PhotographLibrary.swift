@@ -151,6 +151,8 @@ final class PhotographLibrary {
             throw PhotographLibraryError.photographLimitReached
         }
 
+        try ensureCapacityBeforeNormalization(for: sourceData)
+
         let operationID = UUID()
         let temporaryURL = fileStore.temporaryURL(photoID: id, operationID: operationID)
         let canonicalURL = fileStore.canonicalURL(for: id)
@@ -166,10 +168,6 @@ final class PhotographLibrary {
                 destinationURL: temporaryURL
             )
             try fileStore.applyCompleteProtection(to: temporaryURL)
-            let availableCapacity = try? fileStore.availableCapacityForImportantUsage()
-            if let availableCapacity, availableCapacity < normalized.byteCount {
-                throw PhotographLibraryError.insufficientStorage
-            }
             try fileStore.moveWithoutOverwriting(from: temporaryURL, to: canonicalURL)
             movedToCanonical = true
             try fileStore.applyCompleteProtection(to: canonicalURL)
@@ -183,7 +181,7 @@ final class PhotographLibrary {
                     throw PhotographLibraryError.rollbackCleanupFailed
                 }
             }
-            throw error
+            throw mappedAddError(error)
         }
 
         let photograph = Photograph(
@@ -347,6 +345,40 @@ final class PhotographLibrary {
         if FileManager.default.fileExists(atPath: url.path) {
             try fileStore.removeManagedFile(at: url)
         }
+    }
+
+    private func ensureCapacityBeforeNormalization(for sourceData: Data) throws {
+        let requiredCapacity = min(
+            Int64(max(sourceData.count, 1)),
+            PhotographConstants.capacityPreflightMaximumBytes
+        )
+        if let availableCapacity = try? fileStore.availableCapacityForImportantUsage(),
+           availableCapacity < requiredCapacity {
+            throw PhotographLibraryError.insufficientStorage
+        }
+    }
+
+    private func mappedAddError(_ error: any Error) -> any Error {
+        guard Self.isOutOfSpace(error) else {
+            return error
+        }
+        return PhotographLibraryError.insufficientStorage
+    }
+
+    private static func isOutOfSpace(_ error: any Error) -> Bool {
+        let error = error as NSError
+        if error.domain == NSCocoaErrorDomain,
+           error.code == CocoaError.fileWriteOutOfSpace.rawValue {
+            return true
+        }
+        if error.domain == NSPOSIXErrorDomain,
+           error.code == POSIXErrorCode.ENOSPC.rawValue {
+            return true
+        }
+        if let underlying = error.userInfo[NSUnderlyingErrorKey] as? any Error {
+            return isOutOfSpace(underlying)
+        }
+        return false
     }
 
 }

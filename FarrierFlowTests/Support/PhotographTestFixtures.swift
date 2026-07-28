@@ -68,6 +68,8 @@ enum PhotographTestFixtures {
     static func makeLibrary(
         graph: VisitGraph,
         rootURL: URL,
+        fileStore: PhotographFileStore? = nil,
+        normalizer: PhotographNormalizer = PhotographNormalizer(),
         coordinator: PhotographStorageCoordinator = PhotographStorageCoordinator(),
         protectedDataAvailable: @escaping @MainActor () -> Bool = { true },
         saving: @escaping @MainActor (ModelContext) throws -> Void = {
@@ -80,7 +82,8 @@ enum PhotographTestFixtures {
     ) -> PhotographLibrary {
         PhotographLibrary(
             container: graph.container,
-            fileStore: PhotographFileStore(rootURL: rootURL),
+            fileStore: fileStore ?? PhotographFileStore(rootURL: rootURL),
+            normalizer: normalizer,
             coordinator: coordinator,
             protectedDataAvailable: protectedDataAvailable,
             saving: saving,
@@ -91,7 +94,9 @@ enum PhotographTestFixtures {
 
     nonisolated static func jpeg(
         width: Int = 80,
-        height: Int = 60
+        height: Int = 60,
+        quality: Double = 0.95,
+        detailed: Bool = false
     ) throws -> Data {
         let colorSpace = try #require(CGColorSpace(name: CGColorSpace.sRGB))
         let context = try #require(
@@ -106,8 +111,28 @@ enum PhotographTestFixtures {
                     | CGBitmapInfo.byteOrder32Big.rawValue
             )
         )
-        context.setFillColor(CGColor(red: 0.4, green: 0.2, blue: 0.1, alpha: 1))
-        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        if detailed {
+            let tileSize = 8
+            for y in stride(from: 0, to: height, by: tileSize) {
+                for x in stride(from: 0, to: width, by: tileSize) {
+                    let value = (x * 31 + y * 17) % 255
+                    context.setFillColor(
+                        CGColor(
+                            red: CGFloat(value) / 255,
+                            green: CGFloat((value * 3) % 255) / 255,
+                            blue: CGFloat((value * 7) % 255) / 255,
+                            alpha: 1
+                        )
+                    )
+                    context.fill(
+                        CGRect(x: x, y: y, width: tileSize, height: tileSize)
+                    )
+                }
+            }
+        } else {
+            context.setFillColor(CGColor(red: 0.4, green: 0.2, blue: 0.1, alpha: 1))
+            context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        }
         let image = try #require(context.makeImage())
         let data = NSMutableData()
         let destination = try #require(
@@ -118,7 +143,11 @@ enum PhotographTestFixtures {
                 nil
             )
         )
-        CGImageDestinationAddImage(destination, image, nil)
+        CGImageDestinationAddImage(
+            destination,
+            image,
+            [kCGImageDestinationLossyCompressionQuality: quality] as CFDictionary
+        )
         #expect(CGImageDestinationFinalize(destination))
         return data as Data
     }

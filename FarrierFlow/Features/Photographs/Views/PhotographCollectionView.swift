@@ -47,6 +47,13 @@ struct PhotographCollectionView: View {
             .task {
                 model.load()
             }
+            .onReceive(
+                NotificationCenter.default.publisher(
+                    for: UIApplication.protectedDataDidBecomeAvailableNotification
+                )
+            ) { _ in
+                model.load()
+            }
             .onChange(of: pickerItem) { _, item in
                 guard let item else { return }
                 Task {
@@ -114,8 +121,10 @@ struct PhotographCollectionView: View {
 
     @ViewBuilder
     private var content: some View {
-        if model.isLoading {
+        if model.isLoading, model.items.isEmpty {
             ProgressView("Loading Photographs…")
+        } else if model.hasInitialLoadFailure {
+            unavailableContent
         } else if model.items.isEmpty {
             ContentUnavailableView(
                 "No Photographs",
@@ -123,35 +132,80 @@ struct PhotographCollectionView: View {
                 description: Text("Add a hoof photograph with the camera or photo library.")
             )
         } else {
-            ScrollView {
-                LazyVGrid(
-                    columns: [
-                        GridItem(.adaptive(minimum: 140), spacing: 12),
-                    ],
-                    spacing: 12
-                ) {
-                    ForEach(Array(model.items.enumerated()), id: \.element.id) { index, item in
-                        PhotographGridItemView(
-                            item: item,
-                            url: library.canonicalURL(for: item.id),
-                            position: index + 1,
-                            total: model.items.count,
-                            onOpen: { selectedPhotograph = item },
-                            onDelete: { pendingDeletion = item }
-                        )
+            VStack(spacing: 0) {
+                if model.loadState == .failed {
+                    refreshFailure
+                }
+
+                ScrollView {
+                    LazyVGrid(
+                        columns: [
+                            GridItem(.adaptive(minimum: 140), spacing: 12),
+                        ],
+                        spacing: 12
+                    ) {
+                        ForEach(Array(model.items.enumerated()), id: \.element.id) { index, item in
+                            PhotographGridItemView(
+                                item: item,
+                                url: library.canonicalURL(for: item.id),
+                                position: index + 1,
+                                total: model.items.count,
+                                onOpen: { selectedPhotograph = item },
+                                onDelete: { pendingDeletion = item }
+                            )
+                        }
+                    }
+                    .padding()
+
+                    if !model.canAdd,
+                       model.availableCount >= PhotographConstants.maximumPhotographsPerVisitHorse {
+                        Text("This horse has 16 photographs. Delete one before adding another.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal)
+                            .accessibilityIdentifier("photograph-limit-message")
                     }
                 }
-                .padding()
-
-                if !model.canAdd,
-                   model.availableCount >= PhotographConstants.maximumPhotographsPerVisitHorse {
-                    Text("This horse has 16 photographs. Delete one before adding another.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal)
-                        .accessibilityIdentifier("photograph-limit-message")
-                }
             }
+        }
+    }
+
+    private var unavailableContent: some View {
+        ContentUnavailableView {
+            Label("Photographs Unavailable", systemImage: "exclamationmark.triangle")
+        } description: {
+            loadFailureMessage
+        } actions: {
+            Button("Retry") {
+                model.load()
+            }
+        }
+    }
+
+    private var refreshFailure: some View {
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Photographs Unavailable")
+                    .font(.subheadline.weight(.semibold))
+                loadFailureMessage
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button("Retry") {
+                model.load()
+            }
+        }
+        .padding()
+        .background(.bar)
+    }
+
+    @ViewBuilder
+    private var loadFailureMessage: some View {
+        if let loadFailure = model.loadFailure {
+            Text(loadFailure.message)
+        } else {
+            Text("The photographs couldn’t be loaded. Try again.")
         }
     }
 
@@ -173,9 +227,18 @@ struct PhotographCollectionView: View {
         }
         .disabled(!model.canAdd)
         .accessibilityIdentifier("photograph-add-menu")
-        .accessibilityValue(
+        .accessibilityValue(addMenuAccessibilityValue)
+    }
+
+    private var addMenuAccessibilityValue: String {
+        switch model.loadState {
+        case .loading:
+            "Loading photographs"
+        case .loaded:
             "\(model.availableCount) of \(PhotographConstants.maximumPhotographsPerVisitHorse)"
-        )
+        case .failed:
+            "Photographs unavailable"
+        }
     }
 
     private func requestCamera() {

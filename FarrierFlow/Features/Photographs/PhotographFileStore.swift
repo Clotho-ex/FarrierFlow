@@ -15,6 +15,7 @@ nonisolated struct PhotographFileInspection: Equatable, Sendable {
 
 nonisolated struct PhotographFileStore: Sendable {
     let rootURL: URL
+    private let capacityProvider: @Sendable (URL) throws -> Int64?
 
     var temporaryDirectoryURL: URL {
         rootURL.appending(path: PhotographConstants.temporaryDirectoryName, directoryHint: .isDirectory)
@@ -24,15 +25,23 @@ nonisolated struct PhotographFileStore: Sendable {
         rootURL.appending(path: PhotographConstants.quarantineDirectoryName, directoryHint: .isDirectory)
     }
 
-    init(applicationSupportURL: URL) {
+    init(
+        applicationSupportURL: URL,
+        capacityProvider: @escaping @Sendable (URL) throws -> Int64? = Self.systemCapacity
+    ) {
         rootURL = applicationSupportURL.appending(
             path: PhotographConstants.rootDirectoryName,
             directoryHint: .isDirectory
         )
+        self.capacityProvider = capacityProvider
     }
 
-    init(rootURL: URL) {
+    init(
+        rootURL: URL,
+        capacityProvider: @escaping @Sendable (URL) throws -> Int64? = Self.systemCapacity
+    ) {
         self.rootURL = rootURL
+        self.capacityProvider = capacityProvider
     }
 
     func canonicalURL(for id: UUID) -> URL {
@@ -134,6 +143,10 @@ nonisolated struct PhotographFileStore: Sendable {
     }
 
     func availableCapacityForImportantUsage() throws -> Int64? {
+        try capacityProvider(rootURL)
+    }
+
+    private static func systemCapacity(for rootURL: URL) throws -> Int64? {
         let values = try rootURL.resourceValues(
             forKeys: [.volumeAvailableCapacityForImportantUsageKey]
         )

@@ -15,42 +15,56 @@ final class PhotographCollectionModel {
     let visitHorseID: PersistentIdentifier
     let horseName: String
 
+    @ObservationIgnored private let itemsLoader: @MainActor (PersistentIdentifier) throws -> [PhotographItem]
     private(set) var items: [PhotographItem] = []
-    private(set) var isLoading = true
+    private(set) var loadState: PhotographCollectionLoadState = .loading
     private(set) var isProcessing = false
+    private(set) var loadFailure: FeatureAlert?
     var alert: FeatureAlert?
+
+    var isLoading: Bool {
+        loadState == .loading
+    }
+
+    var hasInitialLoadFailure: Bool {
+        loadState == .failed && items.isEmpty
+    }
 
     var availableCount: Int {
         items.count { $0.availability == .available }
     }
 
     var canAdd: Bool {
-        !isProcessing
+        loadState == .loaded
+            && !isProcessing
             && availableCount < PhotographConstants.maximumPhotographsPerVisitHorse
     }
 
     init(
         visitHorseID: PersistentIdentifier,
         horseName: String,
-        library: PhotographLibrary
+        library: PhotographLibrary,
+        itemsLoader: (@MainActor (PersistentIdentifier) throws -> [PhotographItem])? = nil
     ) {
         self.visitHorseID = visitHorseID
         self.horseName = horseName
         self.library = library
+        self.itemsLoader = itemsLoader ?? { try library.items(for: $0) }
     }
 
     func load() {
+        if items.isEmpty {
+            loadState = .loading
+        }
         do {
-            items = try library.items(for: visitHorseID)
-            alert = nil
+            items = try itemsLoader(visitHorseID)
+            loadState = .loaded
+            loadFailure = nil
         } catch {
             Self.logger.error("Failed to load photographs: \(error, privacy: .public)")
-            alert = FeatureAlert(
-                title: "Photographs Unavailable",
-                message: "The photographs couldn’t be loaded. Try again."
-            )
+            loadState = .failed
+            loadFailure = loadErrorAlert(for: error)
         }
-        isLoading = false
     }
 
     func add(sourceData: Data) async {
@@ -108,6 +122,19 @@ final class PhotographCollectionModel {
         return FeatureAlert(
             title: "Couldn’t Add Photograph",
             message: "The image couldn’t be processed or saved. Try again."
+        )
+    }
+
+    private func loadErrorAlert(for error: any Error) -> FeatureAlert {
+        if error as? PhotographLibraryError == .protectedDataUnavailable {
+            return FeatureAlert(
+                title: "Photographs Unavailable",
+                message: "Unlock your device, then try again."
+            )
+        }
+        return FeatureAlert(
+            title: "Photographs Unavailable",
+            message: "The photographs couldn’t be loaded. Try again."
         )
     }
 }

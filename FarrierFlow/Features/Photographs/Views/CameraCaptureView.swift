@@ -38,17 +38,10 @@ struct CameraCaptureView: UIViewControllerRepresentable {
             _: UIImagePickerController,
             didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
         ) {
-            guard let sourceURL = info[.imageURL] as? URL else {
-                parent.onFailure()
-                parent.dismiss()
-                return
-            }
             Task {
                 do {
-                    let data = try await Task.detached(priority: .userInitiated) {
-                        try Data(contentsOf: sourceURL, options: .mappedIfSafe)
-                    }.value
-                    parent.onCapture(data)
+                    let sourceData = try await CameraCaptureResultAdapter.sourceData(from: info)
+                    parent.onCapture(sourceData)
                 } catch {
                     parent.onFailure()
                 }
