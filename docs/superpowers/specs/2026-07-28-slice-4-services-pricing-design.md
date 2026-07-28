@@ -163,6 +163,27 @@ WorkItem does not persist:
 
 ### Existing-model additions
 
+#### Visit
+
+Add:
+
+- `workItemPolicyVersion: Int`, required and immutable after creation or
+  migration, with a migration-safe property default of `0`.
+
+Exactly two persisted values are supported:
+
+- `0` — Legacy Visit policy.
+- `1` — Slice 4 WorkItem-required policy.
+
+Every Visit migrated from V1, V2, or V3 receives `0`. Every Visit created after
+Slice 4 ships explicitly receives `1` during Start Visit. The creation path
+must not rely only on the property default.
+
+The value is a narrow compatibility discriminator for Visit completion rules.
+Slice 4 does not add a generalized policy framework, policy model, or
+user-editable policy state. Any value other than `0` or `1` is invalid and
+fails closed.
+
 #### Horse
 
 Add:
@@ -186,7 +207,8 @@ The collection may be empty for:
 - A Pending VisitHorse.
 - An in-progress Serviced VisitHorse not yet ready for completion.
 - A Not Serviced VisitHorse.
-- A VisitHorse migrated from V1, V2, or V3.
+- A VisitHorse on a legacy policy-`0` Visit, including completed Serviced
+  history migrated from V1, V2, or V3.
 
 ## Ownership and Delete Rules
 
@@ -498,12 +520,20 @@ fixed to `en-US` for Slice 4.
 
 Totals are derived and never persisted.
 
-- VisitHorse subtotal is the sum of its WorkItem amounts.
-- Visit total is the sum of every VisitHorse subtotal.
+- A VisitHorse subtotal with recorded WorkItems is the sum of their amounts.
+- When every required subtotal is available, Visit total is the sum of every
+  VisitHorse subtotal.
 - Completed Visit totals contain only Serviced WorkItems because Not Serviced
   VisitHorses must contain none.
 - In-progress totals may include WorkItems owned by Pending or Serviced
   VisitHorses.
+
+For a completed policy-`0` Visit, a Serviced VisitHorse with no WorkItems has
+an unavailable subtotal, not a zero subtotal. If any Serviced VisitHorse has
+no recorded WorkItems, the complete Visit total is also unavailable.
+Validation still checks every recorded WorkItem and every sum that can be
+formed; the interface never presents a partial recorded sum as the complete
+historical total.
 
 Every sum uses checked `Int64` addition. No intermediate or final operation may
 wrap, clamp, saturate, truncate, or convert through floating point.
@@ -565,15 +595,16 @@ Start Visit remains one atomic persistence action.
 Before mutation, retain all existing Appointment, Barn, Horse, membership,
 snapshot, and uniqueness validation. Add:
 
-1. Resolve each Horse default Service.
-2. Require every non-nil default to be active and valid.
-3. Create one VisitHorse for every AppointmentHorse.
-4. For each non-nil default, create exactly one WorkItem.
-5. Copy Service identity, normalized name, default amount, and `USD`.
-6. Validate `(VisitHorse, Service)` uniqueness.
-7. Validate WorkItem relationships, snapshots, amounts, and currency.
-8. Validate every checked subtotal and Visit total.
-9. Save the complete Visit, VisitHorse, and WorkItem graph once.
+1. Create the Visit with `workItemPolicyVersion` explicitly set to `1`.
+2. Resolve each Horse default Service.
+3. Require every non-nil default to be active and valid.
+4. Create one VisitHorse for every AppointmentHorse.
+5. For each non-nil default, create exactly one WorkItem.
+6. Copy Service identity, normalized name, default amount, and `USD`.
+7. Validate `(VisitHorse, Service)` uniqueness.
+8. Validate WorkItem relationships, snapshots, amounts, and currency.
+9. Validate every checked subtotal and Visit total.
+10. Save the complete Visit, VisitHorse, and WorkItem graph once.
 
 If any default Service is missing, archived, invalid, inverse-mismatched, or
 would produce invalid WorkItem data:
@@ -583,7 +614,11 @@ would produce invalid WorkItem data:
 - Create no partial Visit, VisitHorse, or WorkItem.
 - Present a localized recoverable error.
 
-Existing migrated VisitHorses receive no fabricated WorkItems.
+The Visit, every VisitHorse, and every default WorkItem are inserted and saved
+in the same atomic transaction. A failed action persists none of them.
+
+Existing migrated Visits retain policy `0`. Their VisitHorses receive no
+fabricated WorkItems.
 
 ## In-Progress Visit Editing
 
@@ -607,14 +642,15 @@ existing Photograph feature.
 
 ### Pending
 
-Pending may contain zero or more valid WorkItems while Visit remains in
-progress.
+Under either policy, Pending may contain zero or more valid WorkItems while the
+Visit remains in progress.
 
 ### Serviced
 
 An in-progress Serviced VisitHorse may temporarily contain zero WorkItems while
-the farrier edits or saves progress. It must contain at least one valid
-WorkItem before completion.
+the farrier edits or saves progress. On a policy-`1` Visit, it must contain at
+least one valid WorkItem before completion. A policy-`0` Visit may complete
+with zero or more valid WorkItems for a Serviced VisitHorse.
 
 ### Not Serviced
 
@@ -650,6 +686,7 @@ Save Progress permits Pending outcomes.
 It requires:
 
 - Existing Visit and membership invariants.
+- A supported immutable `workItemPolicyVersion` of `0` or `1`.
 - Valid WorkItem ownership and inverse relationships.
 - Valid Service relationships.
 - Unique `(VisitHorse, Service)` pairs.
@@ -661,7 +698,7 @@ It requires:
 - Existing Work Notes eligibility.
 
 Save Progress does not require every Serviced VisitHorse to have a WorkItem.
-That requirement belongs to completion.
+The policy-`1` minimum belongs to completion.
 
 One persistence action applies WorkItem insertion, deletion, replacement,
 amount override, outcomes, and Work Notes.
@@ -678,9 +715,9 @@ Failure:
 
 Completion retains every existing V3 invariant and additionally requires:
 
+- `workItemPolicyVersion` is exactly `0` or `1`.
 - Every VisitHorse is Serviced or Not Serviced.
 - At least one VisitHorse is Serviced.
-- Every Serviced VisitHorse has at least one WorkItem.
 - Every Not Serviced VisitHorse has zero WorkItems.
 - Every WorkItem resolves one VisitHorse and one Service.
 - Every `(VisitHorse, Service)` pair is unique.
@@ -688,6 +725,15 @@ Completion retains every existing V3 invariant and additionally requires:
 - Every amount is nonnegative.
 - Every currency code is `USD`.
 - Every subtotal and Visit total completes without overflow.
+
+The WorkItem-count rule for a completed Serviced VisitHorse depends only on the
+Visit's immutable policy:
+
+- Policy `0`: zero or more valid WorkItems are allowed.
+- Policy `1`: at least one valid WorkItem is required.
+
+Policy `0` preserves valid pre-Slice-4 history without inferring or fabricating
+performed work. Unknown policy values fail closed.
 
 The current draft and `completedAt` are saved atomically. Completion is not
 reported unless the save succeeds.
@@ -711,6 +757,7 @@ Correction must preserve:
 - Barn relationship.
 - Horse and VisitHorse membership.
 - VisitHorse ownership.
+- `workItemPolicyVersion`.
 - `startedAt`.
 - `completedAt`.
 - Service-location snapshots.
@@ -718,7 +765,17 @@ Correction must preserve:
 - Completed Visit state.
 
 Correction must continue satisfying every completion and WorkItem invariant,
-including pair uniqueness and checked totals.
+including policy-specific Serviced requirements, pair uniqueness, and checked
+totals.
+
+A legacy Visit remains policy `0` throughout correction. A Serviced
+VisitHorse may remain without WorkItems, although the farrier may add known
+WorkItems. The app does not force invention of historical work.
+
+A Slice 4 Visit remains policy `1` throughout correction and every Serviced
+VisitHorse must continue owning at least one valid WorkItem.
+
+No correction path upgrades, downgrades, or otherwise edits the policy value.
 
 Existing WorkItems referencing archived Services remain valid during
 correction. They may be repriced, removed, or replaced. Archived Services
@@ -744,6 +801,12 @@ Catalog archive does not rewrite or remove WorkItems.
 Horse default changes affect future Start Visit actions only.
 
 Horse relocation does not change WorkItems.
+
+Visit migration and completed correction do not rewrite
+`workItemPolicyVersion`.
+
+Policy `0` preserves the absence of structured WorkItems as unknown historical
+detail. It does not mean that no work was performed.
 
 WorkItem ownership never moves between VisitHorses.
 
@@ -894,6 +957,16 @@ Each Horse section shows:
 
 Visit Detail shows a checked derived Visit total.
 
+A legacy policy-`0` Serviced Horse with no WorkItems still shows the Serviced
+outcome and no fabricated service lines. Its subtotal is omitted or shown as
+unavailable rather than as zero or Complimentary. If explanatory copy is
+needed, use “No recorded services.” The interface must not imply that no work
+was performed merely because structured WorkItems are absent.
+
+If any Serviced Horse on that Visit has no recorded WorkItems, Visit Detail
+shows the total as unavailable rather than presenting a partial sum as the
+complete Visit total.
+
 A WorkItem may navigate to current Service Detail when the relationship
 resolves. Snapshot display remains authoritative for historical name and
 amount.
@@ -904,6 +977,10 @@ Horse History rows add:
 
 - WorkItem count for Serviced outcomes.
 - Derived Horse subtotal.
+
+For a legacy policy-`0` Serviced Horse with no WorkItems, omit the count and
+subtotal or present the subtotal as unavailable. Do not show zero services,
+zero dollars, or Complimentary in a way that implies no work occurred.
 
 Selecting a row still opens shared Visit Detail. No global work-history or
 invoice destination is added.
@@ -995,6 +1072,8 @@ Migration requirements:
 - Preserve production store identity, configuration name, URL, and location.
 - Preserve every V1, V2, and V3 record and relationship.
 - Preserve Photograph metadata and external canonical files.
+- Add `Visit.workItemPolicyVersion` with a migration-safe default of `0`.
+- Assign `workItemPolicyVersion == 0` to every existing Visit.
 - Add empty Service and WorkItem populations.
 - Existing Horses receive nil default Service.
 - Existing VisitHorses receive empty WorkItem collections.
@@ -1009,18 +1088,30 @@ Migration requirements:
 Required migration coverage:
 
 1. Direct V3-to-V4 migration with complete Visit, VisitHorse, Photograph, and
-   file-backed Photograph state.
-2. Chained V2-to-V3-to-V4 migration.
-3. Chained V1-to-V2-to-V3-to-V4 migration.
+   file-backed Photograph state, proving every existing Visit receives policy
+   `0`.
+2. Chained V2-to-V3-to-V4 migration proving every existing Visit receives
+   policy `0`.
+3. Chained V1-to-V2-to-V3-to-V4 migration proving every existing Visit
+   receives policy `0`.
 4. Verification of every prior field, inverse, delete rule, and Photograph.
 5. Verification that Horses have nil defaults.
-6. Verification that VisitHorses have no WorkItems.
-7. Creation of valid V4 Services, defaults, and WorkItems after migration.
-8. Release and reopening of the same V4 store.
+6. Verification that VisitHorses have no WorkItems and migration fabricates no
+   WorkItem data.
+7. Validation and reopening of a migrated completed Serviced VisitHorse with no
+   WorkItems under policy `0`.
+8. Creation of valid policy-`1` V4 Services, defaults, and WorkItems after
+   migration.
+9. Release and reopening of the same V4 store with the policy value preserved.
 
-If executable migration tests show that additive models or optional
-relationships are unsafe on iOS 18, implementation stops for schema review.
-Never recreate, replace, or silently empty the production store.
+The additive V3-to-V4 migration must be proven on iOS 18 before any other Slice
+4 implementation work proceeds. The chained V1-to-V2-to-V3-to-V4 fixture must
+be non-vacuous: it creates a Visit after reaching the first schema version that
+supports Visits, then proves the Visit receives policy `0` when the same store
+reaches V4. If executable migration tests show that the scalar default,
+additive models, or optional relationships are unsafe, implementation stops
+for schema review. Never recreate, replace, or silently empty the production
+store.
 
 ## Validation Boundaries
 
@@ -1041,6 +1132,8 @@ Editors validate:
 
 Domain rules validate:
 
+- Visit policy is exactly `0` or `1` and never changes after creation or
+  migration.
 - Service fields and `USD`.
 - Archived Service has no Horse-default references.
 - Every non-nil Horse default resolves an active Service with matching inverse.
@@ -1051,7 +1144,8 @@ Domain rules validate:
 - WorkItem currency is exactly `USD`.
 - `(VisitHorse, Service)` pair is unique.
 - Not Serviced owns no WorkItems.
-- Completed Serviced owns at least one WorkItem.
+- Completed policy-`0` Serviced owns zero or more valid WorkItems.
+- Completed policy-`1` Serviced owns at least one valid WorkItem.
 - Every checked subtotal and Visit total succeeds.
 - Catalog edits do not mutate WorkItem snapshots.
 - Existing V3 Visit, Photograph, and history invariants remain valid.
@@ -1069,6 +1163,7 @@ success only after validation and persistence succeed.
 
 Persistent reopening revalidates:
 
+- Supported and preserved Visit policy.
 - V4 ownership and inverses.
 - Pair uniqueness.
 - Service lifecycle constraints.
@@ -1095,7 +1190,8 @@ Controlled writes never create:
 - Non-`USD` WorkItem.
 - Duplicate `(VisitHorse, Service)` pair.
 - Not Serviced VisitHorse with WorkItems.
-- Completed Serviced VisitHorse without WorkItems.
+- Completed policy-`1` Serviced VisitHorse without WorkItems.
+- Unknown Visit WorkItem policy.
 - Overflowing subtotal or Visit total.
 
 When invalid persisted data is read:
@@ -1205,13 +1301,20 @@ Tests prove no `Double` or `Float` path is used for conversion.
 
 - Pending may retain WorkItems.
 - In-progress Serviced may temporarily have none.
-- Not Serviced always has none at save.
-- Completion requires WorkItem for every Serviced Horse.
+- Not Serviced with WorkItems fails under policy `0` and policy `1`.
+- Policy-`0` completion permits a Serviced Horse with no WorkItems.
+- Policy-`1` completion requires a WorkItem for every Serviced Horse.
+- A policy-`0` Serviced Horse with no WorkItems has an unavailable subtotal and
+  makes the complete Visit total unavailable.
 - Confirmation cancellation preserves outcome, notes, WorkItems, and amounts.
 - Confirmation acceptance clears WorkItems and Work Notes.
 - Completed correction can add, remove, replace, and reprice.
 - Archived existing WorkItem may be repriced or removed.
 - Archived Service cannot be selected for new or replacement WorkItem.
+- Legacy correction retains policy `0` and permits known WorkItems without
+  requiring fabricated history.
+- Slice 4 correction retains policy `1` and its WorkItem requirement.
+- Unknown policy values fail closed.
 - Correction preserves Visit, Photograph, membership, timestamp, and snapshot
   invariants.
 
@@ -1235,6 +1338,8 @@ Tests prove no `Double` or `Float` path is used for conversion.
 
 - V4 registers exactly ten models.
 - V1, V2, and V3 remain frozen.
+- Visit has one immutable `workItemPolicyVersion` with supported values `0` and
+  `1`.
 - Every new inverse is registered.
 - Delete rules match the approved matrix.
 - Domain-required WorkItem relationships use deletion-safe storage.
@@ -1245,11 +1350,15 @@ Tests prove no `Double` or `Float` path is used for conversion.
 
 ### Migration and reopening
 
-- Direct V3-to-V4 migration.
+- Direct V3-to-V4 migration assigns policy `0`.
 - Chained V2-to-V3-to-V4 migration.
-- Chained V1-to-V2-to-V3-to-V4 migration.
+- Chained V1-to-V2-to-V3-to-V4 migration assigns policy `0`.
 - No fabricated Services, defaults, WorkItems, snapshots, amounts, or currency.
+- Migrated completed Serviced Visits with no WorkItems validate and reopen.
 - Photograph metadata and files preserved.
+- New Visits are explicitly created with policy `1`.
+- New completed policy-`1` Serviced Visits without WorkItems fail validation.
+- The policy value survives persistent-store reopening.
 - V4 graph creation after migration.
 - Relaunch with Horse defaults.
 - Relaunch with in-progress WorkItems.
@@ -1340,6 +1449,7 @@ Slice 4 does not add:
 - Generalized Settings.
 - Custom navigation, custom tabs, or manually simulated Liquid Glass.
 - Speculative invoice or generic-charge abstractions.
+- A generalized Visit-policy framework or policy model.
 
 ## Specification Authorization
 
@@ -1349,6 +1459,8 @@ corrections captured here:
 1. Enforce one WorkItem per Service per VisitHorse.
 2. Define exact `en-US` USD entry parsing with checked integer minor-unit
    persistence.
+3. Preserve pre-Slice-4 Visit history through immutable
+   `workItemPolicyVersion` values `0` and `1`, without fabricating WorkItems.
 
 This specification authorizes design documentation only. It does not authorize
 an implementation plan, schema implementation, migration implementation,
