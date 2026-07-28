@@ -52,7 +52,15 @@ nonisolated enum HorseHistoryRules {
             if serviceLocationOrder != .orderedSame {
                 return serviceLocationOrder == .orderedAscending
             }
-            return localizedOrder(lhs.horseName, rhs.horseName, locale: locale) == .orderedAscending
+            let horseNameOrder = localizedOrder(
+                lhs.horseName,
+                rhs.horseName,
+                locale: locale
+            )
+            if horseNameOrder != .orderedSame {
+                return horseNameOrder == .orderedAscending
+            }
+            return lhs.id < rhs.id
         }
     }
 

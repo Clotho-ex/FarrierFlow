@@ -9,6 +9,11 @@ nonisolated enum AppointmentEditorLoadState: Equatable {
     case failed
 }
 
+nonisolated enum AppointmentEditorLoadError: Error, Equatable {
+    case appointmentUnavailable
+    case invalidLockedGraph
+}
+
 @MainActor
 @Observable
 final class AppointmentEditorModel {
@@ -74,9 +79,21 @@ final class AppointmentEditorModel {
         loadState = .loading
         do {
             if let appointmentID {
-                updateVisitLock(
-                    from: context.model(for: appointmentID) as? Appointment
-                )
+                guard let appointment = try context.existingModel(
+                    Appointment.self,
+                    for: appointmentID
+                ) else {
+                    throw AppointmentEditorLoadError.appointmentUnavailable
+                }
+                if appointment.visit != nil {
+                    let lock = try visitLock(for: appointment)
+                    apply(lock, synchronizingDraft: true)
+                    barns = []
+                    eligibleHorses = []
+                    loadState = .loaded
+                    return
+                }
+                updateVisitLock(from: appointment)
             }
             let loadedBarns = try barnFetcher(context)
             let loadedHorses = try eligibleHorses(
@@ -122,8 +139,18 @@ final class AppointmentEditorModel {
             guard let existing = context.model(for: appointmentID) as? Appointment else {
                 return nil
             }
-            updateVisitLock(from: existing)
-            if hasVisit {
+            if existing.visit != nil {
+                let lock: AppointmentVisitLock
+                do {
+                    lock = try visitLock(for: existing)
+                    apply(lock, synchronizingDraft: false)
+                } catch {
+                    alert = FeatureAlert(
+                        title: "Appointment Unavailable",
+                        message: "The appointment’s locked visit records couldn’t be verified."
+                    )
+                    return nil
+                }
                 guard lockedDraftMatchesPersistedMembership else {
                     alert = FeatureAlert(
                         title: "Work Has Started",
@@ -280,4 +307,105 @@ final class AppointmentEditorModel {
             .compactMap(\.horse?.name)
             .sorted(using: String.StandardComparator(.localizedStandard))
     }
+
+    private func visitLock(for appointment: Appointment) throws -> AppointmentVisitLock {
+        guard
+            let barn = appointment.barn,
+            let barnName = TextNormalization.required(barn.name),
+            let visit = appointment.visit,
+            visit.appointment === appointment,
+            visit.barn === barn,
+            TextNormalization.required(visit.serviceLocationNameSnapshot) != nil,
+            !appointment.appointmentHorses.isEmpty,
+            !visit.visitHorses.isEmpty
+        else {
+            throw AppointmentEditorLoadError.invalidLockedGraph
+        }
+
+        var appointmentHorseIDs = Set<PersistentIdentifier>()
+        var horseNames: [String] = []
+        for membership in appointment.appointmentHorses {
+            guard
+                membership.appointment === appointment,
+                let horse = membership.horse,
+                horse.client != nil,
+                horse.currentBarn != nil,
+                let horseName = TextNormalization.required(horse.name),
+                appointmentHorseIDs.insert(horse.persistentModelID).inserted
+            else {
+                throw AppointmentEditorLoadError.invalidLockedGraph
+            }
+            horseNames.append(horseName)
+        }
+
+        var visitHorseIDs = Set<PersistentIdentifier>()
+        var hasPendingHorse = false
+        var hasServicedHorse = false
+        for membership in visit.visitHorses {
+            guard
+                membership.visit === visit,
+                let horse = membership.horse,
+                horse.client != nil,
+                horse.currentBarn != nil,
+                visitHorseIDs.insert(horse.persistentModelID).inserted,
+                let outcome = VisitOutcome(rawValue: membership.outcomeRawValue),
+                TextNormalization.optional(membership.workNotes ?? "") == nil
+                    || outcome == .serviced
+            else {
+                throw AppointmentEditorLoadError.invalidLockedGraph
+            }
+            hasPendingHorse = hasPendingHorse || outcome == .pending
+            hasServicedHorse = hasServicedHorse || outcome == .serviced
+        }
+
+        guard visitHorseIDs == appointmentHorseIDs else {
+            throw AppointmentEditorLoadError.invalidLockedGraph
+        }
+        if let completedAt = visit.completedAt {
+            guard
+                completedAt >= visit.startedAt,
+                !hasPendingHorse,
+                hasServicedHorse
+            else {
+                throw AppointmentEditorLoadError.invalidLockedGraph
+            }
+        } else {
+            guard visit.visitHorses.allSatisfy({
+                $0.horse?.currentBarn === barn
+            }) else {
+                throw AppointmentEditorLoadError.invalidLockedGraph
+            }
+        }
+
+        return AppointmentVisitLock(
+            barnID: barn.persistentModelID,
+            barnName: barnName,
+            horseIDs: appointmentHorseIDs,
+            horseNames: horseNames.sorted(
+                using: String.StandardComparator(.localizedStandard)
+            )
+        )
+    }
+
+    private func apply(
+        _ lock: AppointmentVisitLock,
+        synchronizingDraft: Bool
+    ) {
+        hasVisit = true
+        lockedBarnID = lock.barnID
+        lockedBarnName = lock.barnName
+        lockedHorseIDs = lock.horseIDs
+        lockedHorseNames = lock.horseNames
+        if synchronizingDraft {
+            draft.barnID = lock.barnID
+            draft.selectedHorseIDs = lock.horseIDs
+        }
+    }
+}
+
+private struct AppointmentVisitLock {
+    let barnID: PersistentIdentifier
+    let barnName: String
+    let horseIDs: Set<PersistentIdentifier>
+    let horseNames: [String]
 }

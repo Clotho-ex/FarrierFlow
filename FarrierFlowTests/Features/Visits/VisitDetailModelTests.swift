@@ -49,12 +49,16 @@ struct VisitDetailModelTests {
         let model = VisitDetailModel(
             visitID: graph.visitID,
             in: graph.container,
-            loading: { visitID, context in
+            loading: { visitID, context, locale in
                 attempt += 1
                 if attempt == 1 {
                     throw VisitDetailTestFailure.unavailable
                 }
-                return try VisitDetailModel.loadDetail(visitID: visitID, in: context)
+                return try VisitDetailModel.loadDetail(
+                    visitID: visitID,
+                    in: context,
+                    locale: locale
+                )
             }
         )
 
@@ -161,6 +165,92 @@ struct VisitDetailModelTests {
         #expect(model.detail?.serviceLocationNameSnapshot == "North Field")
     }
 
+    @Test
+    func horseRowsUseLocalizedNameAndIdentifierOrderAcrossStoreReopening() throws {
+        let directory = try TemporaryStoreFixtures.makeDirectory(
+            prefix: "FarrierFlow-Visit-Detail-Order-"
+        )
+        let storeURL = directory.appending(path: "FarrierFlow.store")
+        var expectedIDs: [PersistentIdentifier] = []
+        var firstOrder: [PersistentIdentifier] = []
+        var expectedIdentifierKeys: [Data] = []
+
+        try autoreleasepool {
+            let container = try ModelContainerFactory.persistentStoreTest(at: storeURL)
+            let context = container.mainContext
+            let client = Client(name: "Alex")
+            let barn = Barn(name: "North Field")
+            context.insert(client)
+            context.insert(barn)
+            let horses = [
+                Horse(name: "Same", client: client, currentBarn: barn),
+                Horse(name: "Alpha", client: client, currentBarn: barn),
+                Horse(name: "Same", client: client, currentBarn: barn),
+            ]
+            for horse in horses {
+                context.insert(horse)
+            }
+            client.horses.append(contentsOf: horses)
+            barn.horses.append(contentsOf: horses)
+            let appointment = ModelFixtures.makeAppointment(
+                barn: barn,
+                horses: horses,
+                in: context
+            )
+            try DomainGraphValidator.save(context)
+            _ = try VisitStartUseCase.start(
+                appointmentID: appointment.persistentModelID,
+                now: Date(timeIntervalSinceReferenceDate: 100),
+                in: container
+            )
+
+            let detailContext = ModelContext(container)
+            let visit = try #require(
+                detailContext.fetch(FetchDescriptor<Visit>()).first
+            )
+            let storedVisitID = visit.persistentModelID
+            let alphaID = try #require(
+                visit.visitHorses.first { $0.horse?.name == "Alpha" }?
+                    .persistentModelID
+            )
+            let sameIDs = visit.visitHorses
+                .filter { $0.horse?.name == "Same" }
+                .map(\.persistentModelID)
+                .sorted()
+            expectedIDs = [alphaID] + sameIDs
+            visit.visitHorses.sort { $0.persistentModelID > $1.persistentModelID }
+            try detailContext.save()
+
+            let detail = try VisitDetailModel.loadDetail(
+                visitID: storedVisitID,
+                in: detailContext,
+                locale: Locale(identifier: "en_US")
+            )
+            firstOrder = detail.horses.map(\.id)
+            expectedIdentifierKeys = try expectedIDs.map(identifierKey)
+            #expect(detail.horses.map(\.horseName) == ["Alpha", "Same", "Same"])
+            #expect(firstOrder == expectedIDs)
+        }
+
+        try autoreleasepool {
+            let container = try ModelContainerFactory.persistentStoreTest(at: storeURL)
+            let context = ModelContext(container)
+            let storedVisitID = try #require(
+                context.fetch(FetchDescriptor<Visit>()).first
+            ).persistentModelID
+            let reopened = try VisitDetailModel.loadDetail(
+                visitID: storedVisitID,
+                in: context,
+                locale: Locale(identifier: "en_US")
+            )
+            let reopenedIdentifierKeys = try reopened.horses.map {
+                try identifierKey($0.id)
+            }
+
+            #expect(reopenedIdentifierKeys == expectedIdentifierKeys)
+        }
+    }
+
     private func makeInProgressGraph() throws -> VisitDetailGraph {
         let container = try ModelContainerFactory.inMemoryTest()
         return try makeGraph(container: container, completedAt: nil)
@@ -219,6 +309,12 @@ struct VisitDetailModelTests {
 
     private func horseIndex(named horseName: String, in draft: VisitDraft) throws -> Int {
         try #require(draft.horses.firstIndex(where: { $0.horseName == horseName }))
+    }
+
+    private func identifierKey(_ identifier: PersistentIdentifier) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        return try encoder.encode(identifier)
     }
 
     private func assertUnavailableAfterDirectSave(

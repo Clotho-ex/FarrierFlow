@@ -98,6 +98,156 @@ struct AppointmentEditorModelTests {
     }
 
     @Test
+    func visitLockedAppointmentLoadsAndSavesMetadataWithoutChoiceFetches() throws {
+        let fixture = try makeTwoHorseFixture()
+        let appointment = ModelFixtures.makeAppointment(
+            startDate: Date(timeIntervalSinceReferenceDate: 100),
+            barn: fixture.barn,
+            horses: fixture.horses,
+            in: fixture.context
+        )
+        let visit = ModelFixtures.makeVisit(
+            startedAt: Date(timeIntervalSinceReferenceDate: 200),
+            appointment: appointment,
+            in: fixture.context
+        )
+        try DomainGraphValidator.save(fixture.context)
+
+        let originalBarnID = try #require(appointment.barn?.persistentModelID)
+        let originalHorseIDs = Set(
+            appointment.appointmentHorses.compactMap(\.horse?.persistentModelID)
+        )
+        let originalVisitHorseIDs = Set(visit.visitHorses.map(\.persistentModelID))
+        var barnFetchCount = 0
+        var horseFetchCount = 0
+        let editor = AppointmentEditorModel(
+            appointment: appointment,
+            barnFetcher: { _ in
+                barnFetchCount += 1
+                throw ForcedFetchFailure.unavailable
+            },
+            horseFetcher: { _ in
+                horseFetchCount += 1
+                throw ForcedFetchFailure.unavailable
+            }
+        )
+
+        editor.load(in: fixture.context)
+
+        #expect(editor.loadState == .loaded)
+        #expect(editor.canSave)
+        #expect(barnFetchCount == 0)
+        #expect(horseFetchCount == 0)
+        #expect(editor.lockedBarnName == "North Field")
+        #expect(editor.lockedHorseNames == ["Milo", "Scout"])
+
+        editor.draft.startDate = Date(timeIntervalSinceReferenceDate: 300)
+        editor.draft.notes = "  Gate code changed  "
+        editor.draft.expectedDurationText = "45"
+
+        #expect(editor.save(in: fixture.context) == appointment.persistentModelID)
+        #expect(appointment.startDate == Date(timeIntervalSinceReferenceDate: 300))
+        #expect(appointment.notes == "Gate code changed")
+        #expect(appointment.expectedDurationMinutes == 45)
+        #expect(appointment.barn?.persistentModelID == originalBarnID)
+        #expect(
+            Set(appointment.appointmentHorses.compactMap(\.horse?.persistentModelID))
+                == originalHorseIDs
+        )
+        #expect(Set(visit.visitHorses.map(\.persistentModelID)) == originalVisitHorseIDs)
+    }
+
+    @Test
+    func appointmentWithoutVisitStillFailsWhenChoiceFetchesFail() throws {
+        let fixture = try makeTwoHorseFixture()
+        let appointment = ModelFixtures.makeAppointment(
+            barn: fixture.barn,
+            horses: fixture.horses,
+            in: fixture.context
+        )
+        try DomainGraphValidator.save(fixture.context)
+        let editor = AppointmentEditorModel(
+            appointment: appointment,
+            barnFetcher: { _ in throw ForcedFetchFailure.unavailable },
+            horseFetcher: { _ in throw ForcedFetchFailure.unavailable }
+        )
+
+        editor.load(in: fixture.context)
+
+        #expect(editor.loadState == .failed)
+    }
+
+    @Test
+    func invalidVisitLockedGraphFailsClosedWithoutChoiceFetches() throws {
+        let fixture = try makeTwoHorseFixture()
+        let appointment = ModelFixtures.makeAppointment(
+            barn: fixture.barn,
+            horses: fixture.horses,
+            in: fixture.context
+        )
+        let visit = ModelFixtures.makeVisit(
+            appointment: appointment,
+            in: fixture.context
+        )
+        try DomainGraphValidator.save(fixture.context)
+        visit.barn = nil
+        var barnFetchCount = 0
+        var horseFetchCount = 0
+        let editor = AppointmentEditorModel(
+            appointment: appointment,
+            barnFetcher: { _ in
+                barnFetchCount += 1
+                return []
+            },
+            horseFetcher: { _ in
+                horseFetchCount += 1
+                return []
+            }
+        )
+
+        editor.load(in: fixture.context)
+
+        #expect(editor.loadState == .failed)
+        #expect(barnFetchCount == 0)
+        #expect(horseFetchCount == 0)
+    }
+
+    @Test
+    func invalidAppointmentMembershipFailsClosedWithoutChoiceFetches() throws {
+        let fixture = try makeTwoHorseFixture()
+        let appointment = ModelFixtures.makeAppointment(
+            barn: fixture.barn,
+            horses: fixture.horses,
+            in: fixture.context
+        )
+        _ = ModelFixtures.makeVisit(
+            appointment: appointment,
+            in: fixture.context
+        )
+        try DomainGraphValidator.save(fixture.context)
+        appointment.appointmentHorses[0].horse = nil
+        var barnFetchCount = 0
+        var horseFetchCount = 0
+        let editor = AppointmentEditorModel(
+            appointment: appointment,
+            barnFetcher: { _ in
+                barnFetchCount += 1
+                return []
+            },
+            horseFetcher: { _ in
+                horseFetchCount += 1
+                return []
+            }
+        )
+
+        editor.load(in: fixture.context)
+
+        #expect(editor.loadState == .failed)
+        #expect(barnFetchCount == 0)
+        #expect(horseFetchCount == 0)
+    }
+
+    @Test
     func visitLocksBarnAndHorseMembershipWhileKeepingAppointmentFieldsEditable() throws {
         let fixture = try makeTwoHorseFixture()
         let otherBarn = Barn(name: "South Field")
@@ -223,7 +373,7 @@ struct AppointmentEditorModelTests {
         #expect(editor.hasVisit)
         #expect(editor.lockedHorseNames == ["Milo", "Scout"])
         #expect(editor.draft.selectedHorseIDs == originalHorseIDs)
-        #expect(editor.eligibleHorses.map(\.name) == ["Scout"])
+        #expect(editor.eligibleHorses.isEmpty)
 
         editor.draft.startDate = Date(timeIntervalSinceReferenceDate: 400)
         editor.draft.notes = "  Updated schedule  "

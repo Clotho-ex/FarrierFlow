@@ -1,3 +1,4 @@
+import Foundation
 import Observation
 import OSLog
 import SwiftData
@@ -42,7 +43,7 @@ final class VisitDetailModel {
     @ObservationIgnored
     private let context: ModelContext
     @ObservationIgnored
-    private let loading: (PersistentIdentifier, ModelContext) throws -> VisitDetail
+    private let loading: (PersistentIdentifier, ModelContext, Locale) throws -> VisitDetail
 
     private(set) var loadState: VisitDetailLoadState = .loading
     private(set) var detail: VisitDetail?
@@ -54,8 +55,8 @@ final class VisitDetailModel {
     init(
         visitID: PersistentIdentifier,
         in container: ModelContainer,
-        loading: @escaping (PersistentIdentifier, ModelContext) throws -> VisitDetail = {
-            try VisitDetailModel.loadDetail(visitID: $0, in: $1)
+        loading: @escaping (PersistentIdentifier, ModelContext, Locale) throws -> VisitDetail = {
+            try VisitDetailModel.loadDetail(visitID: $0, in: $1, locale: $2)
         }
     ) {
         self.visitID = visitID
@@ -63,10 +64,10 @@ final class VisitDetailModel {
         self.loading = loading
     }
 
-    func load() {
+    func load(locale: Locale = .current) {
         loadState = .loading
         do {
-            let loadedDetail = try loading(visitID, context)
+            let loadedDetail = try loading(visitID, context, locale)
             detail = loadedDetail
             editorMode = loadedDetail.completedAt == nil ? .inProgress : .correction
             alert = nil
@@ -82,13 +83,14 @@ final class VisitDetailModel {
         }
     }
 
-    func retry() {
-        load()
+    func retry(locale: Locale = .current) {
+        load(locale: locale)
     }
 
     static func loadDetail(
         visitID: PersistentIdentifier,
-        in context: ModelContext
+        in context: ModelContext,
+        locale: Locale = .current
     ) throws -> VisitDetail {
         guard let visit = try context.existingModel(Visit.self, for: visitID) else {
             throw VisitDetailLoadError.visitUnavailable
@@ -108,6 +110,17 @@ final class VisitDetailModel {
                 outcome: outcome,
                 workNotes: TextNormalization.optional(visitHorse.workNotes ?? "")
             )
+        }.sorted { lhs, rhs in
+            let horseNameOrder = lhs.horseName.compare(
+                rhs.horseName,
+                options: [.caseInsensitive, .diacriticInsensitive],
+                range: nil,
+                locale: locale
+            )
+            if horseNameOrder != .orderedSame {
+                return horseNameOrder == .orderedAscending
+            }
+            return lhs.id < rhs.id
         }
 
         return VisitDetail(

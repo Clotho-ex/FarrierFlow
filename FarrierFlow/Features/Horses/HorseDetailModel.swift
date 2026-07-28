@@ -84,7 +84,8 @@ final class HorseDetailModel {
             guard horse.persistentModelID == horseID else { return nil }
             let detail = try VisitDetailModel.loadDetail(
                 visitID: visit.persistentModelID,
-                in: context
+                in: context,
+                locale: locale
             )
             guard let result = detail.horses.first(where: { $0.id == membership.persistentModelID }) else {
                 throw HorseHistoryLoadError.invalidHistory

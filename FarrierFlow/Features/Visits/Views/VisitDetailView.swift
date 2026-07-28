@@ -42,7 +42,7 @@ struct VisitDetailView: View {
                     Text("The visit couldn’t be loaded.")
                 } actions: {
                     Button("Retry") {
-                        model.retry()
+                        model.retry(locale: locale)
                     }
                 }
             case .loaded:
@@ -74,9 +74,11 @@ struct VisitDetailView: View {
             }
         }
         .onAppear {
-            model.load()
+            model.load(locale: locale)
         }
-        .sheet(isPresented: $showsEditor, onDismiss: model.load) {
+        .sheet(isPresented: $showsEditor, onDismiss: {
+            model.load(locale: locale)
+        }) {
             VisitEditorView(
                 visitID: model.visitID,
                 container: modelContainer,

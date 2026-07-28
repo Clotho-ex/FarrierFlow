@@ -92,6 +92,128 @@ struct HorseHistoryRulesTests {
     }
 
     @Test
+    func identicalHistoryFieldsUseTheEntryIdentifierAsFinalTieBreak() throws {
+        let identifiers = try makeIdentifiers(count: 6).sorted()
+        let startedAt = Date(timeIntervalSinceReferenceDate: 100)
+        let completedAt = Date(timeIntervalSinceReferenceDate: 200)
+        let records = [
+            HorseHistoryRecord(
+                id: identifiers[3],
+                visitID: identifiers[4],
+                horseID: identifiers[5],
+                horseName: "Milo",
+                startedAt: startedAt,
+                completedAt: completedAt,
+                serviceLocationName: "North Field",
+                outcomeRawValue: VisitOutcome.serviced.rawValue,
+                workNotes: nil
+            ),
+            HorseHistoryRecord(
+                id: identifiers[0],
+                visitID: identifiers[1],
+                horseID: identifiers[2],
+                horseName: "Milo",
+                startedAt: startedAt,
+                completedAt: completedAt,
+                serviceLocationName: "North Field",
+                outcomeRawValue: VisitOutcome.serviced.rawValue,
+                workNotes: nil
+            ),
+        ]
+
+        let entries = try HorseHistoryRules.entries(
+            from: records,
+            locale: Locale(identifier: "en_US")
+        )
+
+        #expect(entries.map(\.id) == [identifiers[0], identifiers[3]])
+    }
+
+    @Test
+    func identicalHistoryOrderRemainsStableAcrossStoreReopening() throws {
+        let directory = try TemporaryStoreFixtures.makeDirectory(
+            prefix: "FarrierFlow-Horse-History-Order-"
+        )
+        let storeURL = directory.appending(path: "FarrierFlow.store")
+        var expectedIDs: [PersistentIdentifier] = []
+        var firstOrder: [PersistentIdentifier] = []
+        var expectedIdentifierKeys: [Data] = []
+
+        try autoreleasepool {
+            let container = try ModelContainerFactory.persistentStoreTest(at: storeURL)
+            let context = container.mainContext
+            let client = Client(name: "Alex")
+            let barn = Barn(name: "North Field")
+            context.insert(client)
+            context.insert(barn)
+            let horse = Horse(name: "Milo", client: client, currentBarn: barn)
+            context.insert(horse)
+            client.horses.append(horse)
+            barn.horses.append(horse)
+
+            let firstAppointment = ModelFixtures.makeAppointment(
+                barn: barn,
+                horses: [horse],
+                in: context
+            )
+            let secondAppointment = ModelFixtures.makeAppointment(
+                barn: barn,
+                horses: [horse],
+                in: context
+            )
+            let firstVisit = ModelFixtures.makeVisit(
+                startedAt: Date(timeIntervalSinceReferenceDate: 100),
+                completedAt: Date(timeIntervalSinceReferenceDate: 200),
+                appointment: firstAppointment,
+                in: context
+            )
+            let secondVisit = ModelFixtures.makeVisit(
+                startedAt: Date(timeIntervalSinceReferenceDate: 100),
+                completedAt: Date(timeIntervalSinceReferenceDate: 200),
+                appointment: secondAppointment,
+                in: context
+            )
+            firstVisit.visitHorses[0].outcomeRawValue = VisitOutcome.serviced.rawValue
+            secondVisit.visitHorses[0].outcomeRawValue = VisitOutcome.serviced.rawValue
+            try DomainGraphValidator.save(context)
+
+            let verificationContext = ModelContext(container)
+            let storedHorse = try #require(
+                verificationContext.fetch(FetchDescriptor<Horse>())
+                    .first { $0.name == "Milo" }
+            )
+            expectedIDs = try verificationContext
+                .fetch(FetchDescriptor<VisitHorse>())
+                .map(\.persistentModelID)
+                .sorted()
+            firstOrder = try HorseDetailModel.loadHistory(
+                horseID: storedHorse.persistentModelID,
+                in: verificationContext,
+                locale: Locale(identifier: "en_US")
+            ).map(\.id)
+            expectedIdentifierKeys = try expectedIDs.map(identifierKey)
+            #expect(firstOrder == expectedIDs)
+        }
+
+        try autoreleasepool {
+            let container = try ModelContainerFactory.persistentStoreTest(at: storeURL)
+            let context = ModelContext(container)
+            let storedHorseID = try #require(
+                context.fetch(FetchDescriptor<Horse>())
+                    .first { $0.name == "Milo" }
+            ).persistentModelID
+            let reopenedOrder = try HorseDetailModel.loadHistory(
+                horseID: storedHorseID,
+                in: context,
+                locale: Locale(identifier: "en_US")
+            ).map(\.id)
+            let reopenedIdentifierKeys = try reopenedOrder.map(identifierKey)
+
+            #expect(reopenedIdentifierKeys == expectedIdentifierKeys)
+        }
+    }
+
+    @Test
     func invalidHistoricalRecordsFailClosedInsteadOfDisplayingRawValues() throws {
         let identifiers = try makeIdentifiers(count: 3)
         let invalidSource = HorseHistoryRecord(
@@ -298,6 +420,12 @@ struct HorseHistoryRulesTests {
         }
         try context.save()
         return clients.map(\.persistentModelID)
+    }
+
+    private func identifierKey(_ identifier: PersistentIdentifier) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        return try encoder.encode(identifier)
     }
 }
 
