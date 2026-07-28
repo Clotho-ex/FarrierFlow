@@ -11,6 +11,9 @@ nonisolated enum RecordDeletionBlock: Error, Equatable {
     case horseHasVisits
     case appointmentHasVisit
     case completedVisitCannotBeDeleted
+    case serviceHasHorseDefaults
+    case serviceHasWorkItems
+    case serviceHasHorseDefaultsAndWorkItems
 
     var alert: FeatureAlert {
         switch self {
@@ -58,6 +61,21 @@ nonisolated enum RecordDeletionBlock: Error, Equatable {
             FeatureAlert(
                 title: "Can’t Delete Visit",
                 message: "Completed visits remain part of horse history."
+            )
+        case .serviceHasHorseDefaults:
+            FeatureAlert(
+                title: "Can’t Delete Service",
+                message: "Clear or replace every Horse default first."
+            )
+        case .serviceHasWorkItems:
+            FeatureAlert(
+                title: "Can’t Delete Service",
+                message: "This service is referenced by recorded work."
+            )
+        case .serviceHasHorseDefaultsAndWorkItems:
+            FeatureAlert(
+                title: "Can’t Delete Service",
+                message: "Clear Horse defaults and remove recorded work first."
             )
         }
     }
@@ -132,6 +150,42 @@ enum RecordDeletionRules {
     ) throws {
         try persistDeletion(in: context) {
             context.delete(appointmentHorse)
+        }
+    }
+
+    static func archive(_ service: Service, in context: ModelContext) throws {
+        guard service.horsesUsingAsDefault.isEmpty else {
+            throw RecordDeletionBlock.serviceHasHorseDefaults
+        }
+        service.isArchived = true
+        do {
+            try DomainGraphValidator.save(context)
+        } catch {
+            context.rollback()
+            throw error
+        }
+    }
+
+    static func delete(_ service: Service, in context: ModelContext) throws {
+        switch (service.horsesUsingAsDefault.isEmpty, service.workItems.isEmpty) {
+        case (false, false):
+            throw RecordDeletionBlock.serviceHasHorseDefaultsAndWorkItems
+        case (false, true):
+            throw RecordDeletionBlock.serviceHasHorseDefaults
+        case (true, false):
+            throw RecordDeletionBlock.serviceHasWorkItems
+        case (true, true):
+            try persistDeletion(in: context) {
+                context.delete(service)
+            }
+        }
+    }
+
+    static func delete(_ workItem: WorkItem, in context: ModelContext) throws {
+        try persistDeletion(in: context) {
+            workItem.service?.workItems.removeAll { $0 === workItem }
+            workItem.visitHorse?.workItems.removeAll { $0 === workItem }
+            context.delete(workItem)
         }
     }
 
