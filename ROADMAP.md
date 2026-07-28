@@ -275,7 +275,7 @@ historical graph survives process termination and store reopening.
 
 ## Slice 3 — Hoof Photographs
 
-**Status:** Implemented; final review pending.
+**Status:** Complete.
 
 ### Outcome
 
