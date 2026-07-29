@@ -6,6 +6,7 @@ nonisolated enum VisitSaveError: Error, Equatable {
     case visitIsCompleted
     case correctionRequiresCompletedVisit
     case completionPredatesStart
+    case workItemPolicyMismatch
 }
 
 @MainActor
@@ -39,12 +40,26 @@ enum VisitSaveUseCase {
             guard let outcome = VisitOutcome(rawValue: visitHorse.outcomeRawValue) else {
                 throw VisitDraftViolation.unknownOutcome
             }
+            let workItems = try visitHorse.workItems.map { workItem in
+                guard let service = workItem.service else {
+                    throw DomainGraphViolation.workItemMissingService
+                }
+                return WorkItemDraft(
+                    persistentID: workItem.persistentModelID,
+                    serviceID: service.persistentModelID,
+                    serviceNameSnapshot: workItem.serviceNameSnapshot,
+                    amountMinorUnits: workItem.amountMinorUnits,
+                    currencyCode: workItem.currencyCode,
+                    serviceIsArchived: service.isArchived
+                )
+            }
             return VisitHorseDraft(
                 id: visitHorse.persistentModelID,
                 horseID: horse.persistentModelID,
                 horseName: horse.name,
                 outcome: outcome,
-                workNotes: visitHorse.workNotes ?? ""
+                workNotes: visitHorse.workNotes ?? "",
+                workItems: WorkItemRules.sorted(workItems)
             )
         }
 
@@ -53,6 +68,7 @@ enum VisitSaveUseCase {
         }
         return VisitDraft(
             visitID: visitID,
+            workItemPolicyVersion: visit.workItemPolicyVersion,
             horses: horses.sorted { lhs, rhs in
                 let comparison = lhs.horseName.localizedStandardCompare(rhs.horseName)
                 if comparison == .orderedSame {
@@ -193,6 +209,9 @@ enum VisitSaveUseCase {
             throw VisitSaveError.visitUnavailable
         }
         try DomainGraphValidator.validateAll(in: context)
+        guard draft.workItemPolicyVersion == visit.workItemPolicyVersion else {
+            throw VisitSaveError.workItemPolicyMismatch
+        }
         return visit
     }
 
@@ -223,6 +242,68 @@ enum VisitSaveUseCase {
 
             visitHorse.outcomeRawValue = horseDraft.outcome.rawValue
             visitHorse.workNotes = TextNormalization.optional(horseDraft.workNotes)
+            try applyWorkItems(horseDraft.workItems, to: visitHorse, in: context)
+        }
+    }
+
+    private static func applyWorkItems(
+        _ drafts: [WorkItemDraft],
+        to visitHorse: VisitHorse,
+        in context: ModelContext
+    ) throws {
+        let existingByID = Dictionary(
+            uniqueKeysWithValues: visitHorse.workItems.map { ($0.persistentModelID, $0) }
+        )
+        let persistedDraftIDs = drafts.compactMap(\.persistentID)
+        guard Set(persistedDraftIDs).count == persistedDraftIDs.count else {
+            throw DomainGraphViolation.workItemVisitHorseInverseMismatch
+        }
+
+        let persistedDraftIDSet = Set(persistedDraftIDs)
+        for workItem in visitHorse.workItems where !persistedDraftIDSet.contains(workItem.persistentModelID) {
+            visitHorse.workItems.removeAll { $0 === workItem }
+            workItem.service?.workItems.removeAll { $0 === workItem }
+            context.delete(workItem)
+        }
+
+        for draft in drafts {
+            guard let service = try context.existingModel(Service.self, for: draft.serviceID) else {
+                throw DomainGraphViolation.workItemMissingService
+            }
+
+            if let persistentID = draft.persistentID {
+                guard let workItem = existingByID[persistentID] else {
+                    throw DomainGraphViolation.workItemVisitHorseInverseMismatch
+                }
+                let serviceChanged = workItem.service?.persistentModelID != service.persistentModelID
+                guard !serviceChanged || !service.isArchived else {
+                    throw DomainGraphViolation.horseDefaultServiceArchived
+                }
+                if serviceChanged {
+                    workItem.service?.workItems.removeAll { $0 === workItem }
+                    workItem.service = service
+                    if !service.workItems.contains(where: { $0 === workItem }) {
+                        service.workItems.append(workItem)
+                    }
+                }
+                workItem.serviceNameSnapshot = draft.serviceNameSnapshot
+                workItem.amountMinorUnits = draft.amountMinorUnits
+                workItem.currencyCode = draft.currencyCode
+            } else {
+                guard !service.isArchived else {
+                    throw DomainGraphViolation.horseDefaultServiceArchived
+                }
+                let workItem = WorkItem(
+                    serviceNameSnapshot: draft.serviceNameSnapshot,
+                    amountMinorUnits: draft.amountMinorUnits,
+                    currencyCode: draft.currencyCode,
+                    service: service,
+                    visitHorse: visitHorse
+                )
+                context.insert(workItem)
+                service.workItems.append(workItem)
+                visitHorse.workItems.append(workItem)
+            }
         }
     }
 }
@@ -234,6 +315,7 @@ private struct VisitImmutableState {
     let completedAt: Date?
     let serviceLocationNameSnapshot: String
     let serviceLocationAddressSnapshot: String?
+    let workItemPolicyVersion: Int
     let visitHorseIDs: Set<PersistentIdentifier>
 
     init(visit: Visit) {
@@ -243,6 +325,7 @@ private struct VisitImmutableState {
         completedAt = visit.completedAt
         serviceLocationNameSnapshot = visit.serviceLocationNameSnapshot
         serviceLocationAddressSnapshot = visit.serviceLocationAddressSnapshot
+        workItemPolicyVersion = visit.workItemPolicyVersion
         visitHorseIDs = Set(visit.visitHorses.map(\.persistentModelID))
     }
 
@@ -253,6 +336,7 @@ private struct VisitImmutableState {
             && completedAt == visit.completedAt
             && serviceLocationNameSnapshot == visit.serviceLocationNameSnapshot
             && serviceLocationAddressSnapshot == visit.serviceLocationAddressSnapshot
+            && workItemPolicyVersion == visit.workItemPolicyVersion
             && visitHorseIDs == Set(visit.visitHorses.map(\.persistentModelID))
     }
 }

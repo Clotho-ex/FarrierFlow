@@ -77,6 +77,120 @@ struct VisitEditorModelTests {
     }
 
     @Test
+    func workItemEditsExcludeUsedAndArchivedServicesAndPersistAtomically() throws {
+        let graph = try makeVisitGraph()
+        let setupContext = ModelContext(graph.container)
+        let trim = ModelFixtures.makeService(
+            name: "Trim",
+            defaultAmountMinorUnits: 8_000,
+            in: setupContext
+        )
+        let pads = ModelFixtures.makeService(
+            name: "Pads",
+            defaultAmountMinorUnits: 3_500,
+            in: setupContext
+        )
+        _ = ModelFixtures.makeService(
+            name: "Archived Service",
+            defaultAmountMinorUnits: 2_000,
+            isArchived: true,
+            in: setupContext
+        )
+        try DomainGraphValidator.save(setupContext)
+
+        let model = VisitEditorModel(visitID: graph.visitID, in: graph.container)
+        model.load()
+        let milo = try #require(model.draft?.horses.first(where: { $0.horseName == "Milo" }))
+        let defaultWorkItem = try #require(milo.workItems.first)
+
+        let initialEligible = model.eligibleServices(for: milo.id)
+        #expect(initialEligible.map(\.id).contains(trim.persistentModelID))
+        #expect(initialEligible.map(\.id).contains(pads.persistentModelID))
+        #expect(!initialEligible.map(\.id).contains(defaultWorkItem.serviceID))
+        #expect(!initialEligible.contains(where: { $0.name == "Archived Service" }))
+
+        #expect(model.addService(trim.persistentModelID, to: milo.id))
+        #expect(!model.addService(trim.persistentModelID, to: milo.id))
+        let addedWorkItem = try #require(
+            model.draft?.horses.first(where: { $0.id == milo.id })?.workItems
+                .first(where: { $0.serviceID == trim.persistentModelID })
+        )
+        #expect(model.replaceWorkItem(addedWorkItem.id, with: pads.persistentModelID, for: milo.id))
+        #expect(model.updateWorkItem(
+            defaultWorkItem.id,
+            serviceID: defaultWorkItem.serviceID,
+            priceInput: "$140.25",
+            for: milo.id
+        ))
+        #expect(!model.updateWorkItem(
+            defaultWorkItem.id,
+            serviceID: defaultWorkItem.serviceID,
+            priceInput: "12.345",
+            for: milo.id
+        ))
+        #expect(model.saveProgress())
+
+        let verificationContext = ModelContext(graph.container)
+        let visit = try #require(verificationContext.model(for: graph.visitID) as? Visit)
+        let visitHorse = try #require(visit.visitHorses.first(where: { $0.horse?.name == "Milo" }))
+        #expect(visitHorse.workItems.count == 2)
+        #expect(visitHorse.workItems.contains {
+            $0.service?.persistentModelID == defaultWorkItem.serviceID
+                && $0.amountMinorUnits == 14_025
+        })
+        #expect(visitHorse.workItems.contains {
+            $0.service?.persistentModelID == pads.persistentModelID
+                && $0.serviceNameSnapshot == "Pads"
+                && $0.amountMinorUnits == 3_500
+        })
+        #expect(visitHorse.workItems.allSatisfy { workItem in
+            workItem.service?.workItems.contains(where: { $0.persistentModelID == workItem.persistentModelID }) == true
+        })
+
+        let persistedDraft = try #require(model.draft)
+        let workItemToRemove = try #require(
+            persistedDraft.horses.first(where: { $0.id == milo.id })?.workItems
+                .first(where: { $0.serviceID == pads.persistentModelID })
+        )
+        #expect(model.removeWorkItem(workItemToRemove.id, from: milo.id))
+        #expect(model.saveProgress())
+
+        let afterRemovalContext = ModelContext(graph.container)
+        let afterRemovalVisit = try #require(afterRemovalContext.model(for: graph.visitID) as? Visit)
+        let afterRemovalHorse = try #require(
+            afterRemovalVisit.visitHorses.first(where: { $0.horse?.name == "Milo" })
+        )
+        #expect(afterRemovalHorse.workItems.count == 1)
+        try DomainGraphValidator.validateAll(in: afterRemovalContext)
+    }
+
+    @Test
+    func failedWorkItemSaveKeepsDraftAndRollsBackAllWorkItemMutations() throws {
+        let graph = try makeVisitGraph()
+        let setupContext = ModelContext(graph.container)
+        let service = ModelFixtures.makeService(name: "Trim", in: setupContext)
+        try DomainGraphValidator.save(setupContext)
+        let model = VisitEditorModel(
+            visitID: graph.visitID,
+            in: graph.container,
+            saving: { _, _ in throw VisitEditorTestFailure.unavailable }
+        )
+        model.load()
+        let milo = try #require(model.draft?.horses.first(where: { $0.horseName == "Milo" }))
+
+        #expect(model.addService(service.persistentModelID, to: milo.id))
+        let editedDraft = try #require(model.draft)
+        #expect(!model.saveProgress())
+        #expect(model.draft == editedDraft)
+
+        let verificationContext = ModelContext(graph.container)
+        let visit = try #require(verificationContext.model(for: graph.visitID) as? Visit)
+        let visitHorse = try #require(visit.visitHorses.first(where: { $0.horse?.name == "Milo" }))
+        #expect(visitHorse.workItems.count == 1)
+        #expect(!visitHorse.workItems.contains { $0.service?.persistentModelID == service.persistentModelID })
+    }
+
+    @Test
     func servicedNotesRequireConfirmationBeforeAnOutcomeChangeClearsThem() throws {
         let graph = try makeVisitGraph()
         let model = VisitEditorModel(visitID: graph.visitID, in: graph.container)
@@ -99,6 +213,7 @@ struct VisitEditorModelTests {
         #expect(model.pendingOutcomeChange == nil)
         #expect(model.draft?.horses.first(where: { $0.horseName == "Milo" })?.outcome == .notServiced)
         #expect(model.draft?.horses.first(where: { $0.horseName == "Milo" })?.workNotes.isEmpty == true)
+        #expect(model.draft?.horses.first(where: { $0.horseName == "Milo" })?.workItems.isEmpty == true)
         #expect(model.isDirty)
     }
 
@@ -370,9 +485,18 @@ struct VisitEditorModelTests {
         var draft = try #require(model.draft)
         let miloIndex = try horseIndex(named: "Milo", in: draft)
         let scoutIndex = try horseIndex(named: "Scout", in: draft)
+        let miloWorkItem = try #require(draft.horses[miloIndex].workItems.first)
         draft.horses[miloIndex].outcome = .notServiced
         draft.horses[miloIndex].workNotes = "Cannot remain"
+        draft.horses[miloIndex].workItems = []
         draft.horses[scoutIndex].outcome = .serviced
+        draft.horses[scoutIndex].workItems = [
+            WorkItemDraft(
+                serviceID: miloWorkItem.serviceID,
+                serviceNameSnapshot: miloWorkItem.serviceNameSnapshot,
+                amountMinorUnits: miloWorkItem.amountMinorUnits
+            ),
+        ]
         model.draft = draft
         #expect(!model.canComplete)
         #expect(!model.completeVisit(at: Date(timeIntervalSinceReferenceDate: 200)))
@@ -458,6 +582,7 @@ struct VisitEditorModelTests {
         let verificationContext = ModelContext(graph.container)
         #expect(try verificationContext.fetch(FetchDescriptor<Visit>()).isEmpty)
         #expect(try verificationContext.fetch(FetchDescriptor<VisitHorse>()).isEmpty)
+        #expect(try verificationContext.fetch(FetchDescriptor<WorkItem>()).isEmpty)
         #expect(try verificationContext.fetch(FetchDescriptor<Appointment>()).count == 1)
         #expect(try verificationContext.fetch(FetchDescriptor<AppointmentHorse>()).count == 2)
         #expect(try verificationContext.fetch(FetchDescriptor<Barn>()).count == 1)
@@ -501,10 +626,19 @@ struct VisitEditorModelTests {
             )
             let miloIndex = try horseIndex(named: "Milo", in: correction)
             let scoutIndex = try horseIndex(named: "Scout", in: correction)
+            let miloWorkItem = try #require(correction.horses[miloIndex].workItems.first)
             correction.horses[miloIndex].outcome = .notServiced
             correction.horses[miloIndex].workNotes = ""
+            correction.horses[miloIndex].workItems = []
             correction.horses[scoutIndex].outcome = .serviced
             correction.horses[scoutIndex].workNotes = "Corrected work"
+            correction.horses[scoutIndex].workItems = [
+                WorkItemDraft(
+                    serviceID: miloWorkItem.serviceID,
+                    serviceNameSnapshot: miloWorkItem.serviceNameSnapshot,
+                    amountMinorUnits: miloWorkItem.amountMinorUnits
+                ),
+            ]
             _ = try VisitSaveUseCase.saveCorrection(draft: correction, in: actionContext)
         }
 
@@ -549,6 +683,13 @@ struct VisitEditorModelTests {
             horses: [firstHorse, secondHorse],
             in: context
         )
+        let defaultService = ModelFixtures.makeService(
+            name: "Front Shoes",
+            defaultAmountMinorUnits: 12_500,
+            in: context
+        )
+        firstHorse.defaultService = defaultService
+        defaultService.horsesUsingAsDefault.append(firstHorse)
         try DomainGraphValidator.save(context)
         let visitID = try VisitStartUseCase.start(
             appointmentID: appointment.persistentModelID,
