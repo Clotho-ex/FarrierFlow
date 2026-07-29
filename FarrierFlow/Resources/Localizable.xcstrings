@@ -150,6 +150,15 @@
     "Clear Work Notes?" : {
       "comment" : "Confirmation title shown before changing an outcome that would make existing Work Notes invalid."
     },
+    "Clear Recorded Work" : {
+      "comment" : "Destructive confirmation action that removes a horse's recorded Services and Work Notes before changing the outcome to Not Serviced."
+    },
+    "Clear Recorded Work?" : {
+      "comment" : "Confirmation title shown before changing a horse with recorded Services or Work Notes to Not Serviced."
+    },
+    "Changing this outcome will clear its recorded services and Work Notes." : {
+      "comment" : "Explanation shown before changing a horse with recorded Services or Work Notes to Not Serviced."
+    },
     "Client" : {
 
     },
@@ -868,6 +877,45 @@
     },
     "Some services may not be current. Try loading again." : {
       "comment" : "Stale-content warning after a Service catalog refresh failure."
+    },
+    "Add or reactivate a Service before recording work." : {
+      "comment" : "Empty-state guidance when no active eligible Service can be added to a horse's Visit."
+    },
+    "Amount" : {
+      "comment" : "Section header for a WorkItem's editable USD amount."
+    },
+    "Couldn’t Update Work Item" : {
+      "comment" : "Alert title when a WorkItem draft change can no longer be applied."
+    },
+    "No Recorded Services" : {
+      "comment" : "Empty-state text shown when a pending or serviced horse has no WorkItems in the Visit editor."
+    },
+    "No Services Available" : {
+      "comment" : "Empty-state title when no active eligible Service can be added to a WorkItem."
+    },
+    "Price" : {
+      "comment" : "Label for an editable WorkItem USD amount."
+    },
+    "Remove Service" : {
+      "comment" : "Destructive action that removes a WorkItem from one horse's Visit."
+    },
+    "Remove Service?" : {
+      "comment" : "Confirmation title before removing a WorkItem from one horse's Visit."
+    },
+    "Replace Service" : {
+      "comment" : "Action that replaces one WorkItem's Service with another active eligible Service."
+    },
+    "Subtotal" : {
+      "comment" : "Checked subtotal of one horse's WorkItems in the Visit editor."
+    },
+    "Subtotal Unavailable" : {
+      "comment" : "Fallback shown when a WorkItem subtotal cannot be represented safely."
+    },
+    "The Service is still in the visit. Try again." : {
+      "comment" : "Recovery guidance after a WorkItem draft action cannot be applied."
+    },
+    "This removes the Service from this horse’s visit. The reusable Service is kept." : {
+      "comment" : "Confirmation explanation before removing a WorkItem from a horse's Visit."
     },
     "The service remains active. Try again." : {
       "comment" : "Recovery guidance after a failed Service archive action."
