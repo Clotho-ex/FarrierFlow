@@ -10,6 +10,32 @@ nonisolated struct HorseHistoryEntry: Identifiable, Equatable {
     let serviceLocationName: String
     let outcome: VisitOutcome
     let hasWorkNotes: Bool
+    let workItemCount: Int?
+    let subtotal: MoneyAvailability
+
+    init(
+        id: PersistentIdentifier,
+        visitID: PersistentIdentifier,
+        horseName: String,
+        startedAt: Date,
+        completedAt: Date,
+        serviceLocationName: String,
+        outcome: VisitOutcome,
+        hasWorkNotes: Bool,
+        workItemCount: Int? = nil,
+        subtotal: MoneyAvailability = .unavailable
+    ) {
+        self.id = id
+        self.visitID = visitID
+        self.horseName = horseName
+        self.startedAt = startedAt
+        self.completedAt = completedAt
+        self.serviceLocationName = serviceLocationName
+        self.outcome = outcome
+        self.hasWorkNotes = hasWorkNotes
+        self.workItemCount = workItemCount
+        self.subtotal = subtotal
+    }
 }
 
 nonisolated struct HorseHistoryRecord: Equatable {
@@ -22,6 +48,37 @@ nonisolated struct HorseHistoryRecord: Equatable {
     let serviceLocationName: String
     let outcomeRawValue: String
     let workNotes: String?
+    let workItemPolicyVersion: Int
+    let workItemCount: Int?
+    let subtotal: MoneyAvailability
+
+    init(
+        id: PersistentIdentifier,
+        visitID: PersistentIdentifier,
+        horseID: PersistentIdentifier,
+        horseName: String,
+        startedAt: Date,
+        completedAt: Date?,
+        serviceLocationName: String,
+        outcomeRawValue: String,
+        workNotes: String?,
+        workItemPolicyVersion: Int = 0,
+        workItemCount: Int? = nil,
+        subtotal: MoneyAvailability = .unavailable
+    ) {
+        self.id = id
+        self.visitID = visitID
+        self.horseID = horseID
+        self.horseName = horseName
+        self.startedAt = startedAt
+        self.completedAt = completedAt
+        self.serviceLocationName = serviceLocationName
+        self.outcomeRawValue = outcomeRawValue
+        self.workNotes = workNotes
+        self.workItemPolicyVersion = workItemPolicyVersion
+        self.workItemCount = workItemCount
+        self.subtotal = subtotal
+    }
 }
 
 nonisolated enum HorseHistoryLoadState: Equatable {

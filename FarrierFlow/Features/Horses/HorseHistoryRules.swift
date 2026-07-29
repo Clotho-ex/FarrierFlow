@@ -15,7 +15,8 @@ nonisolated enum HorseHistoryRules {
             guard
                 completedAt >= record.startedAt,
                 TextNormalization.required(record.horseName) != nil,
-                TextNormalization.required(record.serviceLocationName) != nil
+                TextNormalization.required(record.serviceLocationName) != nil,
+                record.workItemPolicyVersion == 0 || record.workItemPolicyVersion == 1
             else {
                 throw HorseHistoryLoadError.invalidHistory
             }
@@ -23,6 +24,34 @@ nonisolated enum HorseHistoryRules {
             let hasWorkNotes = TextNormalization.optional(record.workNotes ?? "") != nil
             guard outcome != .pending, !hasWorkNotes || outcome == .serviced else {
                 throw HorseHistoryLoadError.invalidHistory
+            }
+
+            let workItemCount: Int?
+            let subtotal: MoneyAvailability
+            if outcome == .serviced {
+                if record.workItemPolicyVersion == 0, record.workItemCount == nil {
+                    guard record.subtotal == .unavailable else {
+                        throw HorseHistoryLoadError.invalidHistory
+                    }
+                    workItemCount = nil
+                    subtotal = .unavailable
+                } else {
+                    guard
+                        let count = record.workItemCount,
+                        count > 0,
+                        case .available = record.subtotal
+                    else {
+                        throw HorseHistoryLoadError.invalidHistory
+                    }
+                    workItemCount = count
+                    subtotal = record.subtotal
+                }
+            } else {
+                guard record.workItemCount == nil else {
+                    throw HorseHistoryLoadError.invalidHistory
+                }
+                workItemCount = nil
+                subtotal = record.subtotal
             }
 
             return HorseHistoryEntry(
@@ -33,7 +62,9 @@ nonisolated enum HorseHistoryRules {
                 completedAt: completedAt,
                 serviceLocationName: record.serviceLocationName,
                 outcome: outcome,
-                hasWorkNotes: hasWorkNotes
+                hasWorkNotes: hasWorkNotes,
+                workItemCount: workItemCount,
+                subtotal: subtotal
             )
         }
 

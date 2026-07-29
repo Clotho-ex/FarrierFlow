@@ -130,7 +130,12 @@ final class HorseDetailModel {
                 completedAt: detail.completedAt,
                 serviceLocationName: detail.serviceLocationNameSnapshot,
                 outcomeRawValue: result.outcome.rawValue,
-                workNotes: result.workNotes
+                workNotes: result.workNotes,
+                workItemPolicyVersion: detail.workItemPolicyVersion,
+                workItemCount: result.outcome == .serviced
+                    ? (result.subtotal == .unavailable ? nil : result.workItems.count)
+                    : nil,
+                subtotal: result.subtotal
             )
         }
         return try HorseHistoryRules.entries(from: records, locale: locale)

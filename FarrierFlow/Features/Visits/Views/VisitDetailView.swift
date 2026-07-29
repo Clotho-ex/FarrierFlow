@@ -125,22 +125,15 @@ struct VisitDetailView: View {
                 }
                 Section("Horses") {
                     ForEach(detail.horses) { horse in
-                        NavigationLink {
-                            PhotographCollectionView(
-                                visitHorseID: horse.id,
-                                horseName: horse.horseName,
-                                library: photographLibrary
-                            )
-                        } label: {
-                            VStack(alignment: .leading, spacing: 8) {
-                                VisitHorseResultRow(horse: horse)
-                                PhotographCountLabel(
-                                    visitHorseID: horse.id,
-                                    library: photographLibrary
-                                )
-                            }
-                        }
-                        .accessibilityIdentifier("visit-result-\(horse.horseName)")
+                        VisitHorseResultRow(horse: horse)
+                        recordedServices(for: horse)
+                        hoofPhotographsLink(for: horse)
+                    }
+                }
+                if detail.completedAt != nil {
+                    Section("Visit Total") {
+                        LabeledContent("Total", value: totalText(for: detail.total))
+                            .accessibilityIdentifier("visit-detail-total")
                     }
                 }
             }
@@ -177,6 +170,115 @@ struct VisitDetailView: View {
         [name, address]
             .compactMap { $0 }
             .formatted(.list(type: .and).locale(locale))
+    }
+
+    @ViewBuilder
+    private func recordedServices(for horse: VisitHorseResult) -> some View {
+        if horse.outcome != .notServiced {
+            if !horse.workItems.isEmpty {
+                Text("Services")
+                    .font(Typography.recordMetadata)
+                    .foregroundStyle(.secondary)
+                ForEach(horse.workItems) { workItem in
+                    if let serviceID = workItem.serviceID {
+                        NavigationLink {
+                            ServiceDetailView(serviceID: serviceID)
+                        } label: {
+                            workItemRow(workItem)
+                        }
+                        .accessibilityIdentifier("visit-detail-work-item-\(horse.id)-\(workItem.id)")
+                    } else {
+                        workItemRow(workItem)
+                            .accessibilityIdentifier("visit-detail-work-item-\(horse.id)-\(workItem.id)")
+                    }
+                }
+            }
+
+            if horse.outcome == .serviced {
+                LabeledContent("Subtotal", value: subtotalText(for: horse.subtotal))
+                    .accessibilityIdentifier("visit-detail-subtotal-\(horse.horseName)")
+                if horse.subtotal == .unavailable {
+                    Text("No recorded services")
+                        .font(Typography.recordMetadata)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("visit-detail-no-recorded-services-\(horse.horseName)")
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func workItemRow(_ workItem: VisitWorkItemResult) -> some View {
+        VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(workItem.serviceNameSnapshot)
+                    .font(Typography.recordMetadata)
+                Spacer(minLength: SpacingTokens.rowContent)
+                Text(formattedAmount(workItem.amountMinorUnits))
+                    .font(Typography.recordMetadata)
+                    .foregroundStyle(.secondary)
+            }
+            if workItem.serviceIsArchived == true {
+                Text("Archived")
+                    .font(Typography.recordMetadata)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(workItem.serviceNameSnapshot)
+        .accessibilityValue(workItemAccessibilityValue(workItem))
+    }
+
+    private func hoofPhotographsLink(for horse: VisitHorseResult) -> some View {
+        NavigationLink {
+            PhotographCollectionView(
+                visitHorseID: horse.id,
+                horseName: horse.horseName,
+                library: photographLibrary
+            )
+        } label: {
+            HStack {
+                Label("Hoof Photos", systemImage: "photo.on.rectangle")
+                Spacer()
+                PhotographCountLabel(
+                    visitHorseID: horse.id,
+                    library: photographLibrary
+                )
+            }
+        }
+        .accessibilityIdentifier("visit-result-\(horse.horseName)")
+    }
+
+    private func subtotalText(for subtotal: MoneyAvailability) -> String {
+        switch subtotal {
+        case let .available(minorUnits):
+            return formattedAmount(minorUnits)
+        case .unavailable:
+            return String(localized: "Subtotal Unavailable", locale: locale)
+        }
+    }
+
+    private func totalText(for total: MoneyAvailability) -> String {
+        switch total {
+        case let .available(minorUnits):
+            return formattedAmount(minorUnits)
+        case .unavailable:
+            return String(localized: "Total Unavailable", locale: locale)
+        }
+    }
+
+    private func formattedAmount(_ minorUnits: Int64) -> String {
+        MoneyFormatter.usd(minorUnits: minorUnits, locale: locale)
+            ?? String(localized: "Unavailable", locale: locale)
+    }
+
+    private func workItemAccessibilityValue(_ workItem: VisitWorkItemResult) -> String {
+        [
+            formattedAmount(workItem.amountMinorUnits),
+            workItem.serviceIsArchived == true ? String(localized: "Archived", locale: locale) : nil,
+        ]
+        .compactMap { $0 }
+        .formatted(.list(type: .and).locale(locale))
     }
 }
 

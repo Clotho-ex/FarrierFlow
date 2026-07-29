@@ -872,6 +872,9 @@
     "Services" : {
       "comment" : "Navigation destination for the global reusable Service catalog."
     },
+    "Services: %lld" : {
+      "comment" : "WorkItem count shown in a completed Horse History row. The integer is the number of recorded Services."
+    },
     "Services Unavailable" : {
       "comment" : "Unavailable-state title when the Service catalog cannot load."
     },
@@ -910,6 +913,21 @@
     },
     "Subtotal Unavailable" : {
       "comment" : "Fallback shown when a WorkItem subtotal cannot be represented safely."
+    },
+    "Total" : {
+      "comment" : "Label for the checked total of all recorded WorkItems on a completed Visit."
+    },
+    "Total Unavailable" : {
+      "comment" : "Fallback shown when a completed Visit total cannot be represented safely because historical recorded work is incomplete."
+    },
+    "Visit Total" : {
+      "comment" : "Section title for the checked total of all recorded WorkItems on a completed Visit."
+    },
+    "No recorded services" : {
+      "comment" : "Explanation for legacy completed Serviced work whose structured WorkItems were never recorded."
+    },
+    "Hoof Photos" : {
+      "comment" : "Navigation label for photographs attached to one horse during a Visit."
     },
     "The Service is still in the visit. Try again." : {
       "comment" : "Recovery guidance after a WorkItem draft action cannot be applied."
