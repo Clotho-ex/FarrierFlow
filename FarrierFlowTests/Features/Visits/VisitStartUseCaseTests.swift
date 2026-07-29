@@ -36,6 +36,7 @@ struct VisitStartUseCaseTests {
         #expect(visit.visitHorses.allSatisfy { $0.outcomeRawValue == VisitOutcome.pending.rawValue })
         #expect(visit.startedAt == startedAt)
         #expect(visit.completedAt == nil)
+        #expect(visit.workItemPolicyVersion == 1)
         #expect(visit.serviceLocationNameSnapshot == "North Field")
         #expect(visit.serviceLocationAddressSnapshot == "South gate")
         #expect(visit.appointment === appointment)
@@ -46,6 +47,73 @@ struct VisitStartUseCaseTests {
             membership.visit === visit
                 && membership.horse?.visitHorses.contains { $0 === membership } == true
         })
+        #expect(visit.visitHorses.allSatisfy { $0.workItems.isEmpty })
+    }
+
+    @Test
+    func startingVisitCopiesEachActiveHorseDefaultServiceIntoExactlyOneWorkItem() throws {
+        let graph = try makeTwoHorseGraph()
+        let defaultService = ModelFixtures.makeService(
+            name: "Full Set",
+            defaultAmountMinorUnits: 12_500,
+            in: graph.context
+        )
+        graph.horses[0].defaultService = defaultService
+        defaultService.horsesUsingAsDefault.append(graph.horses[0])
+        try DomainGraphValidator.save(graph.context)
+
+        let visitID = try VisitStartUseCase.start(
+            appointmentID: graph.appointment.persistentModelID,
+            now: Date(timeIntervalSinceReferenceDate: 123_456),
+            in: graph.container
+        )
+
+        let context = ModelContext(graph.container)
+        let visit = try #require(context.model(for: visitID) as? Visit)
+        let service = try #require(
+            context.model(for: defaultService.persistentModelID) as? Service
+        )
+        let defaultedVisitHorse = try #require(
+            visit.visitHorses.first { $0.horse?.persistentModelID == graph.horses[0].persistentModelID }
+        )
+
+        #expect(visit.workItemPolicyVersion == 1)
+        #expect(defaultedVisitHorse.workItems.count == 1)
+        let workItem = try #require(defaultedVisitHorse.workItems.first)
+        #expect(workItem.service?.persistentModelID == service.persistentModelID)
+        #expect(workItem.serviceNameSnapshot == "Full Set")
+        #expect(workItem.amountMinorUnits == 12_500)
+        #expect(workItem.currencyCode == "USD")
+        #expect(service.workItems.contains { $0.persistentModelID == workItem.persistentModelID })
+        #expect(workItem.visitHorse === defaultedVisitHorse)
+        #expect(try context.fetchCount(FetchDescriptor<WorkItem>()) == 1)
+    }
+
+    @Test
+    func archivedHorseDefaultBlocksStartWithoutCreatingAnyVisitRecords() throws {
+        let graph = try makeTwoHorseGraph()
+        let service = ModelFixtures.makeService(
+            name: "Full Set",
+            defaultAmountMinorUnits: 12_500,
+            isArchived: true,
+            in: graph.context
+        )
+        graph.horses[0].defaultService = service
+        service.horsesUsingAsDefault.append(graph.horses[0])
+        try graph.context.save()
+
+        #expect(throws: DomainGraphViolation.horseDefaultServiceArchived) {
+            try VisitStartUseCase.start(
+                appointmentID: graph.appointment.persistentModelID,
+                now: Date(timeIntervalSinceReferenceDate: 123_456),
+                in: graph.container
+            )
+        }
+
+        #expect(try graph.context.fetchCount(FetchDescriptor<Visit>()) == 0)
+        #expect(try graph.context.fetchCount(FetchDescriptor<VisitHorse>()) == 0)
+        #expect(try graph.context.fetchCount(FetchDescriptor<WorkItem>()) == 0)
+        #expect(graph.appointment.visit == nil)
     }
 
     @Test(arguments: VisitStartInvalidGraph.allCases)
@@ -107,6 +175,10 @@ struct VisitStartUseCaseTests {
             let container = try ModelContainerFactory.persistentStoreTest(at: storeURL)
             let context = ModelContext(container)
             let graph = try makeTwoHorseGraph(in: context, container: container)
+            let service = ModelFixtures.makeService(in: context)
+            graph.horses[0].defaultService = service
+            service.horsesUsingAsDefault.append(graph.horses[0])
+            try DomainGraphValidator.save(context)
 
             #expect(throws: ForcedSaveFailure.unavailable) {
                 try VisitStartUseCase.start(
@@ -119,6 +191,7 @@ struct VisitStartUseCaseTests {
 
             #expect(try context.fetchCount(FetchDescriptor<Visit>()) == 0)
             #expect(try context.fetchCount(FetchDescriptor<VisitHorse>()) == 0)
+            #expect(try context.fetchCount(FetchDescriptor<WorkItem>()) == 0)
             #expect(graph.appointment.visit == nil)
             #expect(graph.barn.visits.isEmpty)
             #expect(graph.horses.allSatisfy { $0.visitHorses.isEmpty })
@@ -134,6 +207,7 @@ struct VisitStartUseCaseTests {
 
             #expect(try context.fetchCount(FetchDescriptor<Visit>()) == 0)
             #expect(try context.fetchCount(FetchDescriptor<VisitHorse>()) == 0)
+            #expect(try context.fetchCount(FetchDescriptor<WorkItem>()) == 0)
             let appointment = try #require(
                 context.fetch(FetchDescriptor<Appointment>()).first
             )
