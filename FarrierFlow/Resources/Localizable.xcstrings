@@ -770,6 +770,102 @@
     "Your changes are still in the form. Try saving again." : {
 
     },
+    "Active" : {
+      "comment" : "Service catalog section and accessibility status for Services available for future use."
+    },
+    "Add a service to use its name and default price on future visits." : {
+      "comment" : "Empty-state guidance for the Service catalog."
+    },
+    "Add Service" : {
+      "comment" : "Action that creates a reusable Service."
+    },
+    "Archive" : {
+      "comment" : "Lifecycle action that removes a Service from future selection without deleting history."
+    },
+    "Archived" : {
+      "comment" : "Service catalog section and accessibility status for inactive Services."
+    },
+    "Can’t Archive Service" : {
+      "comment" : "Alert title when a Service cannot be archived because a Horse uses it as a default."
+    },
+    "Couldn’t Archive Service" : {
+      "comment" : "Alert title when archiving a Service could not be saved."
+    },
+    "Couldn’t Reactivate Service" : {
+      "comment" : "Alert title when reactivating a Service could not be saved."
+    },
+    "Couldn’t Save Service" : {
+      "comment" : "Alert title when a Service editor save could not be persisted."
+    },
+    "Default Price" : {
+      "comment" : "Label for the reusable default USD amount of a Service."
+    },
+    "Default price %@" : {
+      "comment" : "VoiceOver announcement of the formatted default Service price."
+    },
+    "Delete Service" : {
+      "comment" : "Destructive action that permanently deletes an unreferenced Service."
+    },
+    "Delete Service?" : {
+      "comment" : "Confirmation title before permanently deleting an unreferenced Service."
+    },
+    "Edit Service" : {
+      "comment" : "Navigation title for editing a Service."
+    },
+    "Enter a U.S. dollar amount with up to two decimal places." : {
+      "comment" : "Price-entry guidance in the Service editor."
+    },
+    "Enter a valid U.S. dollar amount." : {
+      "comment" : "Inline validation shown for an invalid Service price."
+    },
+    "FarrierFlow couldn’t load services." : {
+      "comment" : "Recovery guidance when the Service catalog cannot load."
+    },
+    "Horse Defaults" : {
+      "comment" : "Service detail section listing Horses that use this Service as their default."
+    },
+    "Loading Services…" : {
+      "comment" : "Progress label while the Service catalog loads."
+    },
+    "New Service" : {
+      "comment" : "Navigation title for creating a Service."
+    },
+    "No active services. Reactivate an archived service or add a new one." : {
+      "comment" : "Guidance when the Service catalog contains only archived Services."
+    },
+    "No Services" : {
+      "comment" : "Empty-state title for the Service catalog."
+    },
+    "Reactivate" : {
+      "comment" : "Lifecycle action that returns an archived Service to future selection."
+    },
+    "Service Unavailable" : {
+      "comment" : "Unavailable-state title when a Service no longer resolves from persistence."
+    },
+    "Services" : {
+      "comment" : "Navigation destination for the global reusable Service catalog."
+    },
+    "Services Unavailable" : {
+      "comment" : "Unavailable-state title when the Service catalog cannot load."
+    },
+    "Some services may not be current. Try loading again." : {
+      "comment" : "Stale-content warning after a Service catalog refresh failure."
+    },
+    "The service remains active. Try again." : {
+      "comment" : "Recovery guidance after a failed Service archive action."
+    },
+    "The service remains archived. Try again." : {
+      "comment" : "Recovery guidance after a failed Service reactivation action."
+    },
+    "The service wasn’t deleted. Try again." : {
+      "comment" : "Recovery guidance after a failed permanent Service deletion."
+    },
+    "This permanently deletes the service when it is not used by a Horse default or recorded work." : {
+      "comment" : "Destructive confirmation explanation for permanently deleting a Service."
+    },
+    "This service is no longer available." : {
+      "comment" : "Editor recovery guidance when the edited Service no longer resolves from persistence."
+    },
     "Your changes are still in the visit. Try completing it again." : {
       "comment" : "Error explanation when completing a Visit fails without discarding its draft."
     },
