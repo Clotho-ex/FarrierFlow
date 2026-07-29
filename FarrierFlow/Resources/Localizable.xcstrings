@@ -797,6 +797,15 @@
     "Couldn’t Save Service" : {
       "comment" : "Alert title when a Service editor save could not be persisted."
     },
+    "Choose an active service or None before saving this horse." : {
+      "comment" : "Recovery guidance when a Horse editor default Service selection is unavailable or archived."
+    },
+    "Default Service" : {
+      "comment" : "Horse editor and detail label for the optional reusable Service used on future Visits."
+    },
+    "Default Service Unavailable" : {
+      "comment" : "Alert title when a Horse editor default Service no longer qualifies for selection."
+    },
     "Default Price" : {
       "comment" : "Label for the reusable default USD amount of a Service."
     },
@@ -835,6 +844,15 @@
     },
     "No Services" : {
       "comment" : "Empty-state title for the Service catalog."
+    },
+    "No active services are available. You can continue without a default or add one from Clients, More, Services." : {
+      "comment" : "Horse editor guidance when no active Services are available for the optional default selection."
+    },
+    "None" : {
+      "comment" : "Picker option that clears the optional Horse default Service."
+    },
+    "Not Set" : {
+      "comment" : "Horse detail value when no default Service is assigned."
     },
     "Reactivate" : {
       "comment" : "Lifecycle action that returns an archived Service to future selection."

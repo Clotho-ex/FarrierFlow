@@ -46,7 +46,7 @@ nonisolated enum ServiceRules {
 
     @MainActor
     static func activeChoices(_ services: [Service], locale: Locale = .current) -> [ServiceChoice] {
-        sorted(services.filter { !$0.isArchived }, locale: locale).map { service in
+        sorted(services.filter(isEligibleForFutureSelection), locale: locale).map { service in
             ServiceChoice(
                 id: service.persistentModelID,
                 name: service.name,
@@ -54,5 +54,15 @@ nonisolated enum ServiceRules {
                 currencyCode: service.currencyCode
             )
         }
+    }
+
+    @MainActor
+    private static func isEligibleForFutureSelection(_ service: Service) -> Bool {
+        !service.isArchived
+            && TextNormalization.required(service.name) == service.name
+            && service.defaultAmountMinorUnits >= 0
+            && service.currencyCode == "USD"
+            && service.horsesUsingAsDefault.allSatisfy { $0.defaultService === service }
+            && service.workItems.allSatisfy { $0.service === service }
     }
 }

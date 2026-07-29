@@ -40,6 +40,13 @@ struct HorseDetailView: View {
                         .accessibilityIdentifier(
                             "horse-detail-appointment-interval"
                         )
+                        LabeledContent(
+                            "Default Service",
+                            value: model.defaultService.map {
+                                "\($0.name) · \($0.formattedAmount)"
+                            } ?? String(localized: "Not Set", locale: locale)
+                        )
+                        .accessibilityIdentifier("horse-detail-default-service")
                     }
                     if let safetyNotes = horse.safetyNotes {
                         Section("Safety Notes") {
