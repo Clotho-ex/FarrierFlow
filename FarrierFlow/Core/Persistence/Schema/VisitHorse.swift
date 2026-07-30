@@ -1,12 +1,18 @@
 import SwiftData
 
-extension FarrierFlowSchemaV2 {
+extension FarrierFlowSchemaV1 {
     @Model
     final class VisitHorse {
         var outcomeRawValue: String
         var workNotes: String?
         var visit: Visit?
         var horse: Horse?
+
+        @Relationship(deleteRule: .cascade, inverse: \Photograph.visitHorse)
+        var photographs: [Photograph] = []
+
+        @Relationship(deleteRule: .cascade, inverse: \WorkItem.visitHorse)
+        var workItems: [WorkItem] = []
 
         init(
             outcomeRawValue: String = "pending",

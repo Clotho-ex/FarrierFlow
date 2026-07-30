@@ -29,7 +29,6 @@ nonisolated enum DomainGraphViolation: Error, Equatable {
     case invalidPhotographDimensions
     case invalidPhotographByteCount
     case duplicatePhotographID
-    case invalidWorkItemPolicyVersion
     case serviceNameNotNormalized
     case serviceAmountNegative
     case serviceCurrencyInvalid
@@ -48,6 +47,37 @@ nonisolated enum DomainGraphViolation: Error, Equatable {
     case notServicedVisitHorseHasWorkItems
     case completedServicedVisitHorseHasNoWorkItems
     case workItemTotalOverflow
+    case duplicateBusinessProfile
+    case businessProfileMissing
+    case businessProfileNameNotNormalized
+    case businessProfileOptionalTextNotNormalized
+    case businessProfileSequenceInvalid
+    case invoiceNumberInvalid
+    case duplicateInvoiceNumber
+    case invoiceMissingClient
+    case invoiceClientInverseMismatch
+    case invoiceSnapshotNotNormalized
+    case invoiceCurrencyInvalid
+    case invoiceStatusInvalid
+    case invoiceHasNoVisit
+    case invoiceVisitMissingInvoice
+    case invoiceVisitMissingSourceVisit
+    case invoiceVisitInvoiceInverseMismatch
+    case invoiceVisitSourceInverseMismatch
+    case duplicateInvoiceVisitSource
+    case invoiceVisitSnapshotNotNormalized
+    case invoiceVisitHasNoLineItem
+    case invoiceLineItemMissingInvoiceVisit
+    case invoiceLineItemMissingSourceWorkItem
+    case invoiceLineItemVisitInverseMismatch
+    case invoiceLineItemWorkItemInverseMismatch
+    case invoiceLineItemSourceVisitMismatch
+    case invoiceLineItemSnapshotNotNormalized
+    case invoiceLineItemAmountNegative
+    case invoiceLineItemCurrencyInvalid
+    case invoiceLineItemClientMismatch
+    case duplicateInvoiceLineItemSource
+    case invoiceTotalOverflow
 }
 
 @MainActor
@@ -66,6 +96,38 @@ enum DomainGraphValidator {
         let photographs = try context.fetch(FetchDescriptor<Photograph>())
         let services = try context.fetch(FetchDescriptor<Service>())
         let workItems = try context.fetch(FetchDescriptor<WorkItem>())
+        let businessProfiles = try context.fetch(FetchDescriptor<BusinessProfile>())
+        let invoices = try context.fetch(FetchDescriptor<Invoice>())
+        let invoiceVisits = try context.fetch(FetchDescriptor<InvoiceVisit>())
+        let invoiceLineItems = try context.fetch(FetchDescriptor<InvoiceLineItem>())
+
+        guard businessProfiles.count <= 1 else {
+            throw DomainGraphViolation.duplicateBusinessProfile
+        }
+
+        if let businessProfile = businessProfiles.first {
+            try validate(businessProfile)
+        } else if !invoices.isEmpty {
+            throw DomainGraphViolation.businessProfileMissing
+        }
+
+        var invoiceNumbers = Set<Int64>()
+        for invoice in invoices {
+            guard invoice.number > 0 else {
+                throw DomainGraphViolation.invoiceNumberInvalid
+            }
+            guard invoiceNumbers.insert(invoice.number).inserted else {
+                throw DomainGraphViolation.duplicateInvoiceNumber
+            }
+        }
+
+        if
+            let businessProfile = businessProfiles.first,
+            let greatestNumber = invoices.map(\.number).max(),
+            businessProfile.nextInvoiceNumber <= greatestNumber
+        {
+            throw DomainGraphViolation.businessProfileSequenceInvalid
+        }
 
         for service in services {
             try validate(service)
@@ -77,6 +139,41 @@ enum DomainGraphValidator {
 
         for workItem in workItems {
             try validate(workItem)
+        }
+
+        var lineItemsByInvoiceVisit = [PersistentIdentifier: [InvoiceLineItem]]()
+        var billedWorkItemIDs = Set<PersistentIdentifier>()
+        for lineItem in invoiceLineItems {
+            try validate(lineItem)
+            guard let invoiceVisit = lineItem.invoiceVisit else {
+                throw DomainGraphViolation.invoiceLineItemMissingInvoiceVisit
+            }
+            guard
+                let sourceWorkItem = lineItem.sourceWorkItem,
+                billedWorkItemIDs.insert(sourceWorkItem.persistentModelID).inserted
+            else {
+                throw DomainGraphViolation.duplicateInvoiceLineItemSource
+            }
+            lineItemsByInvoiceVisit[invoiceVisit.persistentModelID, default: []].append(lineItem)
+        }
+
+        var visitsByInvoice = [PersistentIdentifier: [InvoiceVisit]]()
+        for invoiceVisit in invoiceVisits {
+            try validate(
+                invoiceVisit,
+                lineItems: lineItemsByInvoiceVisit[invoiceVisit.persistentModelID, default: []]
+            )
+            guard let invoice = invoiceVisit.invoice else {
+                throw DomainGraphViolation.invoiceVisitMissingInvoice
+            }
+            visitsByInvoice[invoice.persistentModelID, default: []].append(invoiceVisit)
+        }
+
+        for invoice in invoices {
+            try validate(
+                invoice,
+                visits: visitsByInvoice[invoice.persistentModelID, default: []]
+            )
         }
 
         var appointmentMemberships = [PersistentIdentifier: [AppointmentHorse]]()
@@ -206,6 +303,165 @@ enum DomainGraphValidator {
         guard workItem.currencyCode == "USD" else {
             throw DomainGraphViolation.workItemCurrencyInvalid
         }
+        if let lineItem = workItem.invoiceLineItem {
+            guard lineItem.sourceWorkItem === workItem else {
+                throw DomainGraphViolation.invoiceLineItemWorkItemInverseMismatch
+            }
+        }
+    }
+
+    private static func validate(_ businessProfile: BusinessProfile) throws {
+        guard TextNormalization.required(businessProfile.name) == businessProfile.name else {
+            throw DomainGraphViolation.businessProfileNameNotNormalized
+        }
+        guard
+            isNormalized(businessProfile.phone),
+            isNormalized(businessProfile.email),
+            isNormalized(businessProfile.address),
+            isNormalized(businessProfile.defaultInvoiceNote)
+        else {
+            throw DomainGraphViolation.businessProfileOptionalTextNotNormalized
+        }
+        guard businessProfile.nextInvoiceNumber > 0 else {
+            throw DomainGraphViolation.businessProfileSequenceInvalid
+        }
+    }
+
+    private static func validate(
+        _ invoice: Invoice,
+        visits: [InvoiceVisit]
+    ) throws {
+        guard let client = invoice.client else {
+            throw DomainGraphViolation.invoiceMissingClient
+        }
+        guard client.invoices.contains(where: { $0 === invoice }) else {
+            throw DomainGraphViolation.invoiceClientInverseMismatch
+        }
+        guard
+            TextNormalization.required(invoice.clientNameSnapshot) == invoice.clientNameSnapshot,
+            TextNormalization.required(invoice.businessNameSnapshot) == invoice.businessNameSnapshot,
+            isNormalized(invoice.clientPhoneSnapshot),
+            isNormalized(invoice.clientEmailSnapshot),
+            isNormalized(invoice.businessPhoneSnapshot),
+            isNormalized(invoice.businessEmailSnapshot),
+            isNormalized(invoice.businessAddressSnapshot),
+            isNormalized(invoice.note)
+        else {
+            throw DomainGraphViolation.invoiceSnapshotNotNormalized
+        }
+        guard invoice.currencyCode == "USD" else {
+            throw DomainGraphViolation.invoiceCurrencyInvalid
+        }
+        do {
+            _ = try InvoiceDomainRules.validatedStatus(
+                rawValue: invoice.statusRawValue,
+                paidAt: invoice.paidAt
+            )
+        } catch {
+            throw DomainGraphViolation.invoiceStatusInvalid
+        }
+        guard !visits.isEmpty else {
+            throw DomainGraphViolation.invoiceHasNoVisit
+        }
+        guard
+            visits.count == invoice.invoiceVisits.count,
+            visits.allSatisfy({ $0.invoice === invoice }),
+            invoice.invoiceVisits.allSatisfy({ $0.invoice === invoice })
+        else {
+            throw DomainGraphViolation.invoiceVisitInvoiceInverseMismatch
+        }
+
+        var sourceVisitIDs = Set<PersistentIdentifier>()
+        var amounts = [Int64]()
+        for invoiceVisit in visits {
+            guard let sourceVisit = invoiceVisit.sourceVisit else {
+                throw DomainGraphViolation.invoiceVisitMissingSourceVisit
+            }
+            guard sourceVisitIDs.insert(sourceVisit.persistentModelID).inserted else {
+                throw DomainGraphViolation.duplicateInvoiceVisitSource
+            }
+            amounts.append(contentsOf: invoiceVisit.lineItems.map(\.amountMinorUnits))
+        }
+        do {
+            _ = try InvoiceDomainRules.checkedTotal(amounts)
+        } catch {
+            throw DomainGraphViolation.invoiceTotalOverflow
+        }
+    }
+
+    private static func validate(
+        _ invoiceVisit: InvoiceVisit,
+        lineItems: [InvoiceLineItem]
+    ) throws {
+        guard let invoice = invoiceVisit.invoice else {
+            throw DomainGraphViolation.invoiceVisitMissingInvoice
+        }
+        guard let sourceVisit = invoiceVisit.sourceVisit else {
+            throw DomainGraphViolation.invoiceVisitMissingSourceVisit
+        }
+        guard invoice.invoiceVisits.contains(where: { $0 === invoiceVisit }) else {
+            throw DomainGraphViolation.invoiceVisitInvoiceInverseMismatch
+        }
+        guard sourceVisit.invoiceVisits.contains(where: { $0 === invoiceVisit }) else {
+            throw DomainGraphViolation.invoiceVisitSourceInverseMismatch
+        }
+        guard
+            TextNormalization.required(invoiceVisit.serviceLocationNameSnapshot)
+                == invoiceVisit.serviceLocationNameSnapshot,
+            isNormalized(invoiceVisit.serviceLocationAddressSnapshot)
+        else {
+            throw DomainGraphViolation.invoiceVisitSnapshotNotNormalized
+        }
+        guard !lineItems.isEmpty else {
+            throw DomainGraphViolation.invoiceVisitHasNoLineItem
+        }
+        guard
+            lineItems.count == invoiceVisit.lineItems.count,
+            lineItems.allSatisfy({ $0.invoiceVisit === invoiceVisit }),
+            invoiceVisit.lineItems.allSatisfy({ $0.invoiceVisit === invoiceVisit })
+        else {
+            throw DomainGraphViolation.invoiceLineItemVisitInverseMismatch
+        }
+    }
+
+    private static func validate(_ lineItem: InvoiceLineItem) throws {
+        guard let invoiceVisit = lineItem.invoiceVisit else {
+            throw DomainGraphViolation.invoiceLineItemMissingInvoiceVisit
+        }
+        guard let sourceWorkItem = lineItem.sourceWorkItem else {
+            throw DomainGraphViolation.invoiceLineItemMissingSourceWorkItem
+        }
+        guard invoiceVisit.lineItems.contains(where: { $0 === lineItem }) else {
+            throw DomainGraphViolation.invoiceLineItemVisitInverseMismatch
+        }
+        guard sourceWorkItem.invoiceLineItem === lineItem else {
+            throw DomainGraphViolation.invoiceLineItemWorkItemInverseMismatch
+        }
+        guard
+            let sourceVisitHorse = sourceWorkItem.visitHorse,
+            let sourceVisit = sourceVisitHorse.visit,
+            invoiceVisit.sourceVisit === sourceVisit
+        else {
+            throw DomainGraphViolation.invoiceLineItemSourceVisitMismatch
+        }
+        guard
+            TextNormalization.required(lineItem.horseNameSnapshot) == lineItem.horseNameSnapshot,
+            TextNormalization.required(lineItem.serviceNameSnapshot) == lineItem.serviceNameSnapshot
+        else {
+            throw DomainGraphViolation.invoiceLineItemSnapshotNotNormalized
+        }
+        guard lineItem.amountMinorUnits >= 0 else {
+            throw DomainGraphViolation.invoiceLineItemAmountNegative
+        }
+        guard lineItem.currencyCode == "USD" else {
+            throw DomainGraphViolation.invoiceLineItemCurrencyInvalid
+        }
+        guard
+            let invoiceClient = invoiceVisit.invoice?.client,
+            sourceVisitHorse.horse?.client === invoiceClient
+        else {
+            throw DomainGraphViolation.invoiceLineItemClientMismatch
+        }
     }
 
     private static func validate(_ photograph: Photograph) throws {
@@ -270,9 +526,6 @@ enum DomainGraphValidator {
         memberships: [VisitHorse],
         appointmentMemberships: inout [PersistentIdentifier: [AppointmentHorse]]
     ) throws {
-        guard visit.workItemPolicyVersion == 0 || visit.workItemPolicyVersion == 1 else {
-            throw DomainGraphViolation.invalidWorkItemPolicyVersion
-        }
         guard let appointment = visit.appointment else {
             throw DomainGraphViolation.visitMissingAppointment
         }
@@ -287,6 +540,9 @@ enum DomainGraphValidator {
         }
         guard !memberships.isEmpty else {
             throw DomainGraphViolation.visitHasNoHorse
+        }
+        guard visit.invoiceVisits.allSatisfy({ $0.sourceVisit === visit }) else {
+            throw DomainGraphViolation.invoiceVisitSourceInverseMismatch
         }
 
         let appointmentHorseIDs = try Set(
@@ -331,13 +587,10 @@ enum DomainGraphValidator {
                 }
             }
             do {
-                let unavailableWhenEmpty = visit.completedAt != nil
-                    && visit.workItemPolicyVersion == 0
-                    && outcome == .serviced
                 subtotals.append(
                     try CheckedMoneyTotal.projectedSubtotal(
                         workItems.map(\.amountMinorUnits),
-                        unavailableWhenEmpty: unavailableWhenEmpty
+                        unavailableWhenEmpty: false
                     )
                 )
             } catch {
@@ -347,7 +600,6 @@ enum DomainGraphValidator {
             hasServicedHorse = hasServicedHorse || outcome == .serviced
 
             if visit.completedAt != nil,
-               visit.workItemPolicyVersion == 1,
                outcome == .serviced,
                workItems.isEmpty {
                 throw DomainGraphViolation.completedServicedVisitHorseHasNoWorkItems
@@ -375,5 +627,10 @@ enum DomainGraphValidator {
         } catch {
             throw DomainGraphViolation.workItemTotalOverflow
         }
+    }
+
+    private static func isNormalized(_ value: String?) -> Bool {
+        guard let value else { return true }
+        return TextNormalization.optional(value) == value
     }
 }

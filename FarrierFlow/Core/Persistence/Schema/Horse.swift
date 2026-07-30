@@ -12,18 +12,25 @@ extension FarrierFlowSchemaV1 {
         @Relationship(deleteRule: .deny, inverse: \AppointmentHorse.horse)
         var appointmentHorses: [AppointmentHorse] = []
 
+        @Relationship(deleteRule: .deny, inverse: \VisitHorse.horse)
+        var visitHorses: [VisitHorse] = []
+
+        var defaultService: Service?
+
         init(
             name: String,
             safetyNotes: String? = nil,
             appointmentIntervalWeeks: Int = 6,
             client: Client,
-            currentBarn: Barn
+            currentBarn: Barn,
+            defaultService: Service? = nil
         ) {
             self.name = name
             self.safetyNotes = safetyNotes
             self.appointmentIntervalWeeks = appointmentIntervalWeeks
             self.client = client
             self.currentBarn = currentBarn
+            self.defaultService = defaultService
         }
     }
 }

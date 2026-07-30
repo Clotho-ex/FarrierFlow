@@ -11,16 +11,13 @@ nonisolated struct VisitHorseDraft: Equatable, Identifiable {
 
 nonisolated struct VisitDraft: Equatable {
     let visitID: PersistentIdentifier
-    let workItemPolicyVersion: Int
     var horses: [VisitHorseDraft]
 
     init(
         visitID: PersistentIdentifier,
-        workItemPolicyVersion: Int = 0,
         horses: [VisitHorseDraft]
     ) {
         self.visitID = visitID
-        self.workItemPolicyVersion = workItemPolicyVersion
         self.horses = horses
     }
 }

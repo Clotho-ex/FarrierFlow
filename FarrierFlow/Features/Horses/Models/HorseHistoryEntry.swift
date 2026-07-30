@@ -48,7 +48,6 @@ nonisolated struct HorseHistoryRecord: Equatable {
     let serviceLocationName: String
     let outcomeRawValue: String
     let workNotes: String?
-    let workItemPolicyVersion: Int
     let workItemCount: Int?
     let subtotal: MoneyAvailability
 
@@ -62,7 +61,6 @@ nonisolated struct HorseHistoryRecord: Equatable {
         serviceLocationName: String,
         outcomeRawValue: String,
         workNotes: String?,
-        workItemPolicyVersion: Int = 0,
         workItemCount: Int? = nil,
         subtotal: MoneyAvailability = .unavailable
     ) {
@@ -75,7 +73,6 @@ nonisolated struct HorseHistoryRecord: Equatable {
         self.serviceLocationName = serviceLocationName
         self.outcomeRawValue = outcomeRawValue
         self.workNotes = workNotes
-        self.workItemPolicyVersion = workItemPolicyVersion
         self.workItemCount = workItemCount
         self.subtotal = subtotal
     }

@@ -29,7 +29,6 @@ nonisolated struct VisitHorseResult: Equatable, Identifiable {
 
 nonisolated struct VisitDetail: Equatable {
     let visitID: PersistentIdentifier
-    let workItemPolicyVersion: Int
     let startedAt: Date
     let completedAt: Date?
     let serviceLocationNameSnapshot: String
@@ -125,9 +124,7 @@ final class VisitDetailModel {
                 workItems: workItems,
                 subtotal: try CheckedMoneyTotal.projectedSubtotal(
                     workItems.map(\.amountMinorUnits),
-                    unavailableWhenEmpty: visit.completedAt != nil
-                        && visit.workItemPolicyVersion == 0
-                        && outcome == .serviced
+                    unavailableWhenEmpty: false
                 )
             )
         }.sorted { lhs, rhs in
@@ -145,7 +142,6 @@ final class VisitDetailModel {
 
         return VisitDetail(
             visitID: visitID,
-            workItemPolicyVersion: visit.workItemPolicyVersion,
             startedAt: visit.startedAt,
             completedAt: visit.completedAt,
             serviceLocationNameSnapshot: visit.serviceLocationNameSnapshot,
@@ -214,7 +210,6 @@ final class VisitDetailModel {
     // Visit invariants remain required before detail UI can present data.
     private static func validateForDetail(_ visit: Visit) throws {
         guard
-            visit.workItemPolicyVersion == 0 || visit.workItemPolicyVersion == 1,
             let appointment = visit.appointment,
             appointment.visit === visit,
             let appointmentBarn = appointment.barn,
@@ -266,7 +261,6 @@ final class VisitDetailModel {
                 throw VisitDetailLoadError.invalidVisit
             }
             guard visit.completedAt == nil
-                || visit.workItemPolicyVersion == 0
                 || outcome != .serviced
                 || !visitHorse.workItems.isEmpty
             else {

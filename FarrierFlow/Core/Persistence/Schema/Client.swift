@@ -11,6 +11,9 @@ extension FarrierFlowSchemaV1 {
         @Relationship(deleteRule: .deny, inverse: \Horse.client)
         var horses: [Horse] = []
 
+        @Relationship(deleteRule: .deny, inverse: \Invoice.client)
+        var invoices: [Invoice] = []
+
         init(
             name: String,
             phone: String? = nil,

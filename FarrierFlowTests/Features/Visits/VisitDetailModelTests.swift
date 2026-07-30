@@ -3,7 +3,7 @@ import SwiftData
 import Testing
 @testable import FarrierFlow
 
-@Suite("Visit detail")
+@Suite("Visit detail", .serialized)
 @MainActor
 struct VisitDetailModelTests {
     @Test
@@ -70,23 +70,6 @@ struct VisitDetailModelTests {
         #expect(missingServiceWorkItem.amountMinorUnits == 5_000)
         #expect(missingServiceWorkItem.serviceID == nil)
         #expect(missingServiceWorkItem.serviceIsArchived == nil)
-    }
-
-    @Test
-    func legacyServicedHorseWithoutRecordedServicesKeepsTotalsUnavailable() throws {
-        let graph = try makeLegacyCompletedGraph()
-
-        let detail = try VisitDetailModel.loadDetail(
-            visitID: graph.visitID,
-            in: graph.container.mainContext,
-            locale: Locale(identifier: "en_US")
-        )
-
-        let horse = try #require(detail.horses.first)
-        #expect(horse.outcome == .serviced)
-        #expect(horse.workItems.isEmpty)
-        #expect(horse.subtotal == .unavailable)
-        #expect(detail.total == .unavailable)
     }
 
     @Test
@@ -377,38 +360,6 @@ struct VisitDetailModelTests {
             )
         }
         return VisitDetailGraph(container: container, visitID: visitID, barnID: barn.persistentModelID)
-    }
-
-    private func makeLegacyCompletedGraph() throws -> VisitDetailGraph {
-        let container = try ModelContainerFactory.inMemoryTest()
-        let context = container.mainContext
-        let client = Client(name: "Alex")
-        let barn = Barn(name: "North Field")
-        let horse = Horse(name: "Milo", client: client, currentBarn: barn)
-        context.insert(client)
-        context.insert(barn)
-        context.insert(horse)
-        client.horses.append(horse)
-        barn.horses.append(horse)
-        let appointment = ModelFixtures.makeAppointment(
-            barn: barn,
-            horses: [horse],
-            in: context
-        )
-        let visit = ModelFixtures.makeVisit(
-            startedAt: Date(timeIntervalSinceReferenceDate: 100),
-            completedAt: Date(timeIntervalSinceReferenceDate: 200),
-            workItemPolicyVersion: 0,
-            appointment: appointment,
-            in: context
-        )
-        visit.visitHorses[0].outcomeRawValue = VisitOutcome.serviced.rawValue
-        try DomainGraphValidator.save(context)
-        return VisitDetailGraph(
-            container: container,
-            visitID: visit.persistentModelID,
-            barnID: barn.persistentModelID
-        )
     }
 
     private func horseIndex(named horseName: String, in draft: VisitDraft) throws -> Int {

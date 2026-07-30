@@ -1,14 +1,13 @@
 import Foundation
 import SwiftData
 
-extension FarrierFlowSchemaV4 {
+extension FarrierFlowSchemaV1 {
     @Model
     final class Visit {
         var startedAt: Date
         var completedAt: Date?
         var serviceLocationNameSnapshot: String
         var serviceLocationAddressSnapshot: String?
-        var workItemPolicyVersion: Int = 0
         var appointment: Appointment?
         var barn: Barn?
 
@@ -19,12 +18,14 @@ extension FarrierFlowSchemaV4 {
         )
         var visitHorses: [VisitHorse] = []
 
+        @Relationship(deleteRule: .deny, inverse: \InvoiceVisit.sourceVisit)
+        var invoiceVisits: [InvoiceVisit] = []
+
         init(
             startedAt: Date,
             completedAt: Date? = nil,
             serviceLocationNameSnapshot: String,
             serviceLocationAddressSnapshot: String? = nil,
-            workItemPolicyVersion: Int = 0,
             appointment: Appointment,
             barn: Barn
         ) {
@@ -32,7 +33,6 @@ extension FarrierFlowSchemaV4 {
             self.completedAt = completedAt
             self.serviceLocationNameSnapshot = serviceLocationNameSnapshot
             self.serviceLocationAddressSnapshot = serviceLocationAddressSnapshot
-            self.workItemPolicyVersion = workItemPolicyVersion
             self.appointment = appointment
             self.barn = barn
         }

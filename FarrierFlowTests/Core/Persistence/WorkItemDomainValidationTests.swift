@@ -3,12 +3,12 @@ import SwiftData
 import Testing
 @testable import FarrierFlow
 
-@Suite("WorkItem domain validation")
+@Suite("WorkItem domain validation", .serialized)
 @MainActor
 struct WorkItemDomainValidationTests {
     @Test
-    func completedSlice4ServicedHorseRequiresRecordedWorkItem() throws {
-        let graph = try makeVisitGraph(policy: 1, completed: true)
+    func completedServicedHorseRequiresRecordedWorkItem() throws {
+        let graph = try makeVisitGraph(completed: true)
 
         #expect(throws: DomainGraphViolation.completedServicedVisitHorseHasNoWorkItems) {
             try DomainGraphValidator.validateAll(in: graph.context)
@@ -16,15 +16,8 @@ struct WorkItemDomainValidationTests {
     }
 
     @Test
-    func completedLegacyServicedHorseMayHaveNoRecordedService() throws {
-        let graph = try makeVisitGraph(policy: 0, completed: true)
-
-        try DomainGraphValidator.validateAll(in: graph.context)
-    }
-
-    @Test
-    func completedSlice4ServicedHorseWithValidWorkItemPasses() throws {
-        let graph = try makeVisitGraph(policy: 1, completed: true)
+    func completedServicedHorseWithValidWorkItemPasses() throws {
+        let graph = try makeVisitGraph(completed: true)
         let service = ModelFixtures.makeService(in: graph.context)
         _ = ModelFixtures.makeWorkItem(
             service: service,
@@ -36,17 +29,8 @@ struct WorkItemDomainValidationTests {
     }
 
     @Test
-    func rejectsUnknownVisitWorkItemPolicy() throws {
-        let graph = try makeVisitGraph(policy: 99, completed: false)
-
-        #expect(throws: DomainGraphViolation.invalidWorkItemPolicyVersion) {
-            try DomainGraphValidator.validateAll(in: graph.context)
-        }
-    }
-
-    @Test
     func rejectsWorkItemForNotServicedHorse() throws {
-        let graph = try makeVisitGraph(policy: 0, completed: false)
+        let graph = try makeVisitGraph(completed: false)
         graph.visitHorse.outcomeRawValue = VisitOutcome.notServiced.rawValue
         let service = ModelFixtures.makeService(in: graph.context)
         _ = ModelFixtures.makeWorkItem(
@@ -62,7 +46,7 @@ struct WorkItemDomainValidationTests {
 
     @Test
     func rejectsDuplicateServiceForOneVisitHorse() throws {
-        let graph = try makeVisitGraph(policy: 0, completed: false)
+        let graph = try makeVisitGraph(completed: false)
         let service = ModelFixtures.makeService(in: graph.context)
         _ = ModelFixtures.makeWorkItem(
             service: service,
@@ -89,7 +73,7 @@ struct WorkItemDomainValidationTests {
         mutation: String,
         expectedViolation: DomainGraphViolation
     ) throws {
-        let graph = try makeVisitGraph(policy: 0, completed: false)
+        let graph = try makeVisitGraph(completed: false)
         let service = ModelFixtures.makeService(in: graph.context)
 
         switch mutation {
@@ -110,7 +94,7 @@ struct WorkItemDomainValidationTests {
 
     @Test
     func rejectsArchivedHorseDefaultService() throws {
-        let graph = try makeVisitGraph(policy: 0, completed: false)
+        let graph = try makeVisitGraph(completed: false)
         let service = ModelFixtures.makeService(isArchived: true, in: graph.context)
         graph.horse.defaultService = service
         service.horsesUsingAsDefault.append(graph.horse)
@@ -131,7 +115,7 @@ struct WorkItemDomainValidationTests {
         mutation: String,
         expectedViolation: DomainGraphViolation
     ) throws {
-        let graph = try makeVisitGraph(policy: 0, completed: false)
+        let graph = try makeVisitGraph(completed: false)
         let service = ModelFixtures.makeService(in: graph.context)
         let workItem = ModelFixtures.makeWorkItem(
             service: service,
@@ -161,7 +145,7 @@ struct WorkItemDomainValidationTests {
 
     @Test
     func rejectsOverflowingRecordedVisitTotal() throws {
-        let graph = try makeVisitGraph(policy: 0, completed: false)
+        let graph = try makeVisitGraph(completed: false)
         let firstService = ModelFixtures.makeService(
             name: "First",
             defaultAmountMinorUnits: Int64.max,
@@ -188,10 +172,7 @@ struct WorkItemDomainValidationTests {
         }
     }
 
-    private func makeVisitGraph(
-        policy: Int,
-        completed: Bool
-    ) throws -> (
+    private func makeVisitGraph(completed: Bool) throws -> (
         container: ModelContainer,
         context: ModelContext,
         horse: Horse,
@@ -215,7 +196,6 @@ struct WorkItemDomainValidationTests {
         let visit = ModelFixtures.makeVisit(
             startedAt: Date(timeIntervalSinceReferenceDate: 100),
             completedAt: completed ? Date(timeIntervalSinceReferenceDate: 200) : nil,
-            workItemPolicyVersion: policy,
             appointment: appointment,
             in: context
         )

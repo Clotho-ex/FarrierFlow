@@ -3,7 +3,7 @@ import SwiftData
 import Testing
 @testable import FarrierFlow
 
-@Suite("Visit start")
+@Suite("Visit start", .serialized)
 @MainActor
 struct VisitStartUseCaseTests {
     @Test
@@ -36,7 +36,6 @@ struct VisitStartUseCaseTests {
         #expect(visit.visitHorses.allSatisfy { $0.outcomeRawValue == VisitOutcome.pending.rawValue })
         #expect(visit.startedAt == startedAt)
         #expect(visit.completedAt == nil)
-        #expect(visit.workItemPolicyVersion == 1)
         #expect(visit.serviceLocationNameSnapshot == "North Field")
         #expect(visit.serviceLocationAddressSnapshot == "South gate")
         #expect(visit.appointment === appointment)
@@ -77,7 +76,6 @@ struct VisitStartUseCaseTests {
             visit.visitHorses.first { $0.horse?.persistentModelID == graph.horses[0].persistentModelID }
         )
 
-        #expect(visit.workItemPolicyVersion == 1)
         #expect(defaultedVisitHorse.workItems.count == 1)
         let workItem = try #require(defaultedVisitHorse.workItems.first)
         #expect(workItem.service?.persistentModelID == service.persistentModelID)

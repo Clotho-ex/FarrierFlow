@@ -3,7 +3,7 @@ import SwiftData
 import Testing
 @testable import FarrierFlow
 
-@Suite("Record deletion rules")
+@Suite("Record deletion rules", .serialized)
 @MainActor
 struct RecordDeletionRulesTests {
     @Test
@@ -251,6 +251,67 @@ struct RecordDeletionRulesTests {
         #expect(try graph.context.fetchCount(FetchDescriptor<WorkItem>()) == 0)
         #expect(try graph.context.fetchCount(FetchDescriptor<Service>()) == 1)
         #expect(try graph.context.fetchCount(FetchDescriptor<VisitHorse>()) == 1)
+    }
+
+    @Test
+    func businessProfileCannotBeDeleted() throws {
+        let graph = try makeGraph()
+        let profile = ModelFixtures.makeBusinessProfile(in: graph.context)
+        try DomainGraphValidator.save(graph.context)
+
+        #expect(throws: RecordDeletionBlock.businessProfileCannotBeDeleted) {
+            try RecordDeletionRules.delete(profile, in: graph.context)
+        }
+        #expect(try graph.context.fetchCount(FetchDescriptor<BusinessProfile>()) == 1)
+    }
+
+    @Test
+    func invoiceReferencesBlockClientVisitAndWorkItemDeletion() throws {
+        let graph = try makeGraph()
+        let visit = ModelFixtures.makeVisit(
+            startedAt: Date(timeIntervalSinceReferenceDate: 100),
+            completedAt: Date(timeIntervalSinceReferenceDate: 200),
+            appointment: graph.appointment,
+            in: graph.context
+        )
+        let visitHorse = try #require(visit.visitHorses.first)
+        visitHorse.outcomeRawValue = VisitOutcome.serviced.rawValue
+        let service = ModelFixtures.makeService(in: graph.context)
+        let workItem = ModelFixtures.makeWorkItem(
+            service: service,
+            visitHorse: visitHorse,
+            in: graph.context
+        )
+        let profile = ModelFixtures.makeBusinessProfile(nextInvoiceNumber: 2, in: graph.context)
+        let invoice = ModelFixtures.makeInvoice(
+            number: 1,
+            client: graph.client,
+            businessProfile: profile,
+            in: graph.context
+        )
+        let invoiceVisit = ModelFixtures.makeInvoiceVisit(
+            invoice: invoice,
+            sourceVisit: visit,
+            in: graph.context
+        )
+        _ = try ModelFixtures.makeInvoiceLineItem(
+            invoiceVisit: invoiceVisit,
+            sourceWorkItem: workItem,
+            in: graph.context
+        )
+        try DomainGraphValidator.save(graph.context)
+
+        #expect(throws: RecordDeletionBlock.clientHasInvoices) {
+            try RecordDeletionRules.delete(graph.client, in: graph.context)
+        }
+        #expect(throws: RecordDeletionBlock.visitHasInvoiceLineItems) {
+            try RecordDeletionRules.delete(visit, in: graph.context)
+        }
+        #expect(throws: RecordDeletionBlock.workItemHasInvoiceLineItem) {
+            try RecordDeletionRules.delete(workItem, in: graph.context)
+        }
+        #expect(try graph.context.fetchCount(FetchDescriptor<Invoice>()) == 1)
+        #expect(try graph.context.fetchCount(FetchDescriptor<WorkItem>()) == 1)
     }
 
     @Test

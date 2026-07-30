@@ -3,11 +3,11 @@ import SwiftData
 import Testing
 @testable import FarrierFlow
 
-@Suite("Model container configurations")
+@Suite("Model container configurations", .serialized)
 @MainActor
 struct ModelContainerFactoryTests {
     @Test
-    func inMemoryTestIsCleanWritableAndRegistersCurrentV4() throws {
+    func inMemoryTestIsCleanWritableAndRegistersShippingSchema() throws {
         let container = try ModelContainerFactory.inMemoryTest()
         let configuration = try #require(container.configurations.first)
 
@@ -23,6 +23,10 @@ struct ModelContainerFactoryTests {
             "Photograph",
             "Service",
             "WorkItem",
+            "BusinessProfile",
+            "Invoice",
+            "InvoiceVisit",
+            "InvoiceLineItem",
         ])
         #expect(try container.mainContext.fetchCount(FetchDescriptor<Client>()) == 0)
 

@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-extension FarrierFlowSchemaV4 {
+extension FarrierFlowSchemaV1 {
     @Model
     final class Photograph {
         @Attribute(.unique) var id: UUID

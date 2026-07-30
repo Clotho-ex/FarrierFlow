@@ -3,6 +3,7 @@ import SwiftData
 
 nonisolated enum RecordDeletionBlock: Error, Equatable {
     case clientHasHorses
+    case clientHasInvoices
     case barnHasHorses
     case barnHasAppointments
     case barnHasHorsesAndAppointments
@@ -11,6 +12,9 @@ nonisolated enum RecordDeletionBlock: Error, Equatable {
     case horseHasVisits
     case appointmentHasVisit
     case completedVisitCannotBeDeleted
+    case visitHasInvoiceLineItems
+    case workItemHasInvoiceLineItem
+    case businessProfileCannotBeDeleted
     case serviceHasHorseDefaults
     case serviceHasWorkItems
     case serviceHasHorseDefaultsAndWorkItems
@@ -21,6 +25,11 @@ nonisolated enum RecordDeletionBlock: Error, Equatable {
             FeatureAlert(
                 title: "Can’t Delete Client",
                 message: "Reassign or remove this client’s horses first."
+            )
+        case .clientHasInvoices:
+            FeatureAlert(
+                title: "Can’t Delete Client",
+                message: "This client is referenced by invoice history."
             )
         case .barnHasHorses:
             FeatureAlert(
@@ -62,6 +71,21 @@ nonisolated enum RecordDeletionBlock: Error, Equatable {
                 title: "Can’t Delete Visit",
                 message: "Completed visits remain part of horse history."
             )
+        case .visitHasInvoiceLineItems:
+            FeatureAlert(
+                title: "Can’t Delete Visit",
+                message: "This visit is referenced by an invoice."
+            )
+        case .workItemHasInvoiceLineItem:
+            FeatureAlert(
+                title: "Can’t Delete Recorded Work",
+                message: "This recorded work is referenced by an invoice."
+            )
+        case .businessProfileCannotBeDeleted:
+            FeatureAlert(
+                title: "Can’t Delete Business Profile",
+                message: "Edit the existing business profile instead."
+            )
         case .serviceHasHorseDefaults:
             FeatureAlert(
                 title: "Can’t Delete Service",
@@ -84,6 +108,7 @@ nonisolated enum RecordDeletionBlock: Error, Equatable {
 @MainActor
 enum RecordDeletionRules {
     static func delete(_ client: Client, in context: ModelContext) throws {
+        guard client.invoices.isEmpty else { throw RecordDeletionBlock.clientHasInvoices }
         guard client.horses.isEmpty else { throw RecordDeletionBlock.clientHasHorses }
         try persistDeletion(in: context) {
             context.delete(client)
@@ -130,6 +155,9 @@ enum RecordDeletionRules {
     }
 
     static func delete(_ visit: Visit, in context: ModelContext) throws {
+        guard visit.invoiceVisits.isEmpty else {
+            throw RecordDeletionBlock.visitHasInvoiceLineItems
+        }
         guard visit.completedAt == nil else {
             throw RecordDeletionBlock.completedVisitCannotBeDeleted
         }
@@ -182,11 +210,21 @@ enum RecordDeletionRules {
     }
 
     static func delete(_ workItem: WorkItem, in context: ModelContext) throws {
+        guard workItem.invoiceLineItem == nil else {
+            throw RecordDeletionBlock.workItemHasInvoiceLineItem
+        }
         try persistDeletion(in: context) {
             workItem.service?.workItems.removeAll { $0 === workItem }
             workItem.visitHorse?.workItems.removeAll { $0 === workItem }
             context.delete(workItem)
         }
+    }
+
+    static func delete(
+        _ businessProfile: BusinessProfile,
+        in context: ModelContext
+    ) throws {
+        throw RecordDeletionBlock.businessProfileCannotBeDeleted
     }
 
     private static func persistDeletion(

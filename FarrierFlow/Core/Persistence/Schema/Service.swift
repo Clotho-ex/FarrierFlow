@@ -1,6 +1,6 @@
 import SwiftData
 
-extension FarrierFlowSchemaV4 {
+extension FarrierFlowSchemaV1 {
     @Model
     final class Service {
         var name: String

@@ -13,6 +13,9 @@ extension FarrierFlowSchemaV1 {
         @Relationship(deleteRule: .deny, inverse: \Appointment.barn)
         var appointments: [Appointment] = []
 
+        @Relationship(deleteRule: .deny, inverse: \Visit.barn)
+        var visits: [Visit] = []
+
         init(
             name: String,
             address: String? = nil,

@@ -3,11 +3,10 @@ nonisolated enum VisitDraftViolation: Error, Equatable {
     case duplicateHorse
     case workNotesRequireServicedOutcome
     case notServicedHorseHasWorkItems
-    case invalidWorkItemPolicyVersion
     case invalidWorkItem(WorkItemDraftViolation)
     case pendingOutcomePreventsCompletion
     case completionRequiresServicedHorse
-    case policyOneServicedHorseRequiresWorkItem
+    case servicedHorseRequiresWorkItem
 }
 
 nonisolated enum VisitRules {
@@ -28,9 +27,6 @@ nonisolated enum VisitRules {
     }
 
     static func progressViolation(in draft: VisitDraft) -> VisitDraftViolation? {
-        guard draft.workItemPolicyVersion == 0 || draft.workItemPolicyVersion == 1 else {
-            return .invalidWorkItemPolicyVersion
-        }
         guard Set(draft.horses.map(\.horseID)).count == draft.horses.count else {
             return .duplicateHorse
         }
@@ -60,10 +56,10 @@ nonisolated enum VisitRules {
         guard draft.horses.contains(where: { $0.outcome == .serviced }) else {
             return .completionRequiresServicedHorse
         }
-        guard draft.workItemPolicyVersion == 0 || draft.horses.allSatisfy({
+        guard draft.horses.allSatisfy({
             $0.outcome != .serviced || !$0.workItems.isEmpty
         }) else {
-            return .policyOneServicedHorseRequiresWorkItem
+            return .servicedHorseRequiresWorkItem
         }
         return nil
     }

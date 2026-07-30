@@ -3,12 +3,12 @@ import SwiftData
 import Testing
 @testable import FarrierFlow
 
-@Suite("Horse history")
+@Suite("Horse history", .serialized)
 @MainActor
 struct HorseHistoryRulesTests {
     @Test
-    func completedHistoryKeepsRecordedWorkTotalsSeparateFromLegacyUnknownWork() throws {
-        let identifiers = try makeIdentifiers(count: 6)
+    func completedHistoryRequiresRecordedWorkTotals() throws {
+        let identifiers = try makeIdentifiers(count: 3)
         let records = [
             HorseHistoryRecord(
                 id: identifiers[0],
@@ -20,23 +20,8 @@ struct HorseHistoryRulesTests {
                 serviceLocationName: "North Field",
                 outcomeRawValue: VisitOutcome.serviced.rawValue,
                 workNotes: nil,
-                workItemPolicyVersion: 1,
                 workItemCount: 2,
                 subtotal: .available(12_500)
-            ),
-            HorseHistoryRecord(
-                id: identifiers[3],
-                visitID: identifiers[4],
-                horseID: identifiers[5],
-                horseName: "Milo",
-                startedAt: Date(timeIntervalSinceReferenceDate: 100),
-                completedAt: Date(timeIntervalSinceReferenceDate: 200),
-                serviceLocationName: "North Field",
-                outcomeRawValue: VisitOutcome.serviced.rawValue,
-                workNotes: nil,
-                workItemPolicyVersion: 0,
-                workItemCount: nil,
-                subtotal: .unavailable
             ),
         ]
 
@@ -45,8 +30,8 @@ struct HorseHistoryRulesTests {
             locale: Locale(identifier: "en_US")
         )
 
-        #expect(entries.map(\.workItemCount) == [2, nil])
-        #expect(entries.map(\.subtotal) == [.available(12_500), .unavailable])
+        #expect(entries.map(\.workItemCount) == [2])
+        #expect(entries.map(\.subtotal) == [.available(12_500)])
     }
 
     @Test
@@ -62,7 +47,9 @@ struct HorseHistoryRulesTests {
                 completedAt: Date(timeIntervalSinceReferenceDate: 500),
                 serviceLocationName: "Zeta Barn",
                 outcomeRawValue: VisitOutcome.serviced.rawValue,
-                workNotes: nil
+                workNotes: nil,
+                workItemCount: 1,
+                subtotal: .available(7_500)
             ),
             HorseHistoryRecord(
                 id: identifiers[3],
@@ -84,7 +71,9 @@ struct HorseHistoryRulesTests {
                 completedAt: Date(timeIntervalSinceReferenceDate: 400),
                 serviceLocationName: "Zeta Barn",
                 outcomeRawValue: VisitOutcome.serviced.rawValue,
-                workNotes: "Trimmed"
+                workNotes: "Trimmed",
+                workItemCount: 1,
+                subtotal: .available(7_500)
             ),
             HorseHistoryRecord(
                 id: identifiers[9],
@@ -106,7 +95,9 @@ struct HorseHistoryRulesTests {
                 completedAt: Date(timeIntervalSinceReferenceDate: 400),
                 serviceLocationName: "Alpha Barn",
                 outcomeRawValue: VisitOutcome.serviced.rawValue,
-                workNotes: nil
+                workNotes: nil,
+                workItemCount: 1,
+                subtotal: .available(7_500)
             ),
             HorseHistoryRecord(
                 id: identifiers[11],
@@ -149,7 +140,9 @@ struct HorseHistoryRulesTests {
                 completedAt: completedAt,
                 serviceLocationName: "North Field",
                 outcomeRawValue: VisitOutcome.serviced.rawValue,
-                workNotes: nil
+                workNotes: nil,
+                workItemCount: 1,
+                subtotal: .available(7_500)
             ),
             HorseHistoryRecord(
                 id: identifiers[0],
@@ -160,7 +153,9 @@ struct HorseHistoryRulesTests {
                 completedAt: completedAt,
                 serviceLocationName: "North Field",
                 outcomeRawValue: VisitOutcome.serviced.rawValue,
-                workNotes: nil
+                workNotes: nil,
+                workItemCount: 1,
+                subtotal: .available(7_500)
             ),
         ]
 
@@ -218,6 +213,18 @@ struct HorseHistoryRulesTests {
             )
             firstVisit.visitHorses[0].outcomeRawValue = VisitOutcome.serviced.rawValue
             secondVisit.visitHorses[0].outcomeRawValue = VisitOutcome.serviced.rawValue
+            let firstService = ModelFixtures.makeService(name: "Trim", in: context)
+            let secondService = ModelFixtures.makeService(name: "Front Shoes", in: context)
+            _ = ModelFixtures.makeWorkItem(
+                service: firstService,
+                visitHorse: firstVisit.visitHorses[0],
+                in: context
+            )
+            _ = ModelFixtures.makeWorkItem(
+                service: secondService,
+                visitHorse: secondVisit.visitHorses[0],
+                in: context
+            )
             try DomainGraphValidator.save(context)
 
             let verificationContext = ModelContext(container)
@@ -333,6 +340,12 @@ struct HorseHistoryRulesTests {
         )
         let visitHorse = try #require(visit.visitHorses.first)
         visitHorse.outcomeRawValue = VisitOutcome.serviced.rawValue
+        let service = ModelFixtures.makeService(in: fixture.context)
+        _ = ModelFixtures.makeWorkItem(
+            service: service,
+            visitHorse: visitHorse,
+            in: fixture.context
+        )
         try DomainGraphValidator.save(fixture.context)
 
         visit.barn = nil

@@ -1,15 +1,16 @@
 import SwiftData
 
-extension FarrierFlowSchemaV4 {
+extension FarrierFlowSchemaV1 {
     @Model
     final class WorkItem {
         var serviceNameSnapshot: String
         var amountMinorUnits: Int64
         var currencyCode: String
-
         var service: Service?
-
         var visitHorse: VisitHorse?
+
+        @Relationship(deleteRule: .deny, inverse: \InvoiceLineItem.sourceWorkItem)
+        var invoiceLineItem: InvoiceLineItem?
 
         init(
             serviceNameSnapshot: String,

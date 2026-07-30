@@ -3,7 +3,7 @@ import SwiftData
 import Testing
 @testable import FarrierFlow
 
-@Suite("Visit draft rules")
+@Suite("Visit draft rules", .serialized)
 @MainActor
 struct VisitRulesTests {
     @Test
@@ -89,11 +89,8 @@ struct VisitRulesTests {
     }
 
     @Test
-    func policyOneCompletionRequiresARecordedServiceForEachServicedHorse() throws {
-        let draft = try makeDraft(
-            outcomes: [(.serviced, "")],
-            policy: 1
-        )
+    func completionRequiresARecordedServiceForEachServicedHorse() throws {
+        let draft = try makeDraft(outcomes: [(.serviced, "")])
 
         #expect(VisitRules.completionViolation(in: draft) == nil)
 
@@ -101,16 +98,13 @@ struct VisitRulesTests {
         missingWorkItem.horses[0].workItems = []
         #expect(
             VisitRules.completionViolation(in: missingWorkItem)
-                == .policyOneServicedHorseRequiresWorkItem
+                == .servicedHorseRequiresWorkItem
         )
     }
 
     @Test
-    func progressRejectsWorkItemsForNotServicedHorseUnderEitherPolicy() throws {
-        var draft = try makeDraft(
-            outcomes: [(.serviced, "")],
-            policy: 1
-        )
+    func progressRejectsWorkItemsForNotServicedHorse() throws {
+        var draft = try makeDraft(outcomes: [(.serviced, "")])
         draft.horses[0].outcome = .notServiced
 
         #expect(VisitRules.progressViolation(in: draft) == .notServicedHorseHasWorkItems)
@@ -118,20 +112,10 @@ struct VisitRulesTests {
 
     @Test
     func progressAllowsPendingHorseWithDraftWorkItems() throws {
-        var draft = try makeDraft(
-            outcomes: [(.serviced, "")],
-            policy: 1
-        )
+        var draft = try makeDraft(outcomes: [(.serviced, "")])
         draft.horses[0].outcome = .pending
 
         #expect(VisitRules.progressViolation(in: draft) == nil)
-    }
-
-    @Test
-    func progressRejectsUnknownWorkItemPolicy() throws {
-        let draft = try makeDraft(outcomes: [(.pending, "")], policy: 2)
-
-        #expect(VisitRules.progressViolation(in: draft) == .invalidWorkItemPolicyVersion)
     }
 
     @Test
@@ -176,7 +160,7 @@ struct VisitRulesTests {
 
     @Test
     func leavingPendingOutcomeWithDraftWorkItemsRequiresConfirmationBeforeClearingThem() throws {
-        let draft = try makeDraft(outcomes: [(.serviced, "")], policy: 1)
+        let draft = try makeDraft(outcomes: [(.serviced, "")])
         var pendingHorse = draft.horses[0]
         pendingHorse.outcome = .pending
 
@@ -197,8 +181,7 @@ struct VisitRulesTests {
     }
 
     private func makeDraft(
-        outcomes: [(VisitOutcome, String)],
-        policy: Int = 0
+        outcomes: [(VisitOutcome, String)]
     ) throws -> VisitDraft {
         let container = try ModelContainerFactory.inMemoryTest()
         let context = container.mainContext
@@ -226,7 +209,6 @@ struct VisitRulesTests {
         let visit = Visit(
             startedAt: .now,
             serviceLocationNameSnapshot: barn.name,
-            workItemPolicyVersion: policy,
             appointment: appointment,
             barn: barn
         )
@@ -258,7 +240,6 @@ struct VisitRulesTests {
 
         return VisitDraft(
             visitID: visit.persistentModelID,
-            workItemPolicyVersion: policy,
             horses: zip(zip(visitHorses, horses), outcomes).enumerated().map { index, entry in
                 let (pair, item) = entry
                 let (visitHorse, horse) = pair
@@ -268,7 +249,7 @@ struct VisitRulesTests {
                     horseName: horse.name,
                     outcome: item.0,
                     workNotes: item.1,
-                    workItems: policy == 1 && item.0 == .serviced
+                    workItems: item.0 == .serviced
                         ? [
                             WorkItemDraft(
                                 serviceID: serviceIDs[index],

@@ -5,8 +5,8 @@ nonisolated enum VisitSaveError: Error, Equatable {
     case visitUnavailable
     case visitIsCompleted
     case correctionRequiresCompletedVisit
+    case correctionLockedByInvoice
     case completionPredatesStart
-    case workItemPolicyMismatch
 }
 
 @MainActor
@@ -68,7 +68,6 @@ enum VisitSaveUseCase {
         }
         return VisitDraft(
             visitID: visitID,
-            workItemPolicyVersion: visit.workItemPolicyVersion,
             horses: horses.sorted { lhs, rhs in
                 let comparison = lhs.horseName.localizedStandardCompare(rhs.horseName)
                 if comparison == .orderedSame {
@@ -182,6 +181,9 @@ enum VisitSaveUseCase {
             guard visit.completedAt != nil else {
                 throw VisitSaveError.correctionRequiresCompletedVisit
             }
+            guard !InvoiceDomainRules.isCorrectionLocked(visit) else {
+                throw VisitSaveError.correctionLockedByInvoice
+            }
             if let violation = VisitRules.correctionViolation(in: draft) {
                 throw violation
             }
@@ -209,9 +211,6 @@ enum VisitSaveUseCase {
             throw VisitSaveError.visitUnavailable
         }
         try DomainGraphValidator.validateAll(in: context)
-        guard draft.workItemPolicyVersion == visit.workItemPolicyVersion else {
-            throw VisitSaveError.workItemPolicyMismatch
-        }
         return visit
     }
 
@@ -315,7 +314,6 @@ private struct VisitImmutableState {
     let completedAt: Date?
     let serviceLocationNameSnapshot: String
     let serviceLocationAddressSnapshot: String?
-    let workItemPolicyVersion: Int
     let visitHorseIDs: Set<PersistentIdentifier>
 
     init(visit: Visit) {
@@ -325,7 +323,6 @@ private struct VisitImmutableState {
         completedAt = visit.completedAt
         serviceLocationNameSnapshot = visit.serviceLocationNameSnapshot
         serviceLocationAddressSnapshot = visit.serviceLocationAddressSnapshot
-        workItemPolicyVersion = visit.workItemPolicyVersion
         visitHorseIDs = Set(visit.visitHorses.map(\.persistentModelID))
     }
 
@@ -336,7 +333,6 @@ private struct VisitImmutableState {
             && completedAt == visit.completedAt
             && serviceLocationNameSnapshot == visit.serviceLocationNameSnapshot
             && serviceLocationAddressSnapshot == visit.serviceLocationAddressSnapshot
-            && workItemPolicyVersion == visit.workItemPolicyVersion
             && visitHorseIDs == Set(visit.visitHorses.map(\.persistentModelID))
     }
 }

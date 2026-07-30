@@ -131,10 +131,7 @@ final class HorseDetailModel {
                 serviceLocationName: detail.serviceLocationNameSnapshot,
                 outcomeRawValue: result.outcome.rawValue,
                 workNotes: result.workNotes,
-                workItemPolicyVersion: detail.workItemPolicyVersion,
-                workItemCount: result.outcome == .serviced
-                    ? (result.subtotal == .unavailable ? nil : result.workItems.count)
-                    : nil,
+                workItemCount: result.outcome == .serviced ? result.workItems.count : nil,
                 subtotal: result.subtotal
             )
         }

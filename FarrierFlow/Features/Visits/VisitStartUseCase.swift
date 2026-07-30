@@ -77,7 +77,6 @@ enum VisitStartUseCase {
                 startedAt: now,
                 serviceLocationNameSnapshot: serviceLocationNameSnapshot,
                 serviceLocationAddressSnapshot: serviceLocationAddressSnapshot,
-                workItemPolicyVersion: 1,
                 appointment: appointment,
                 barn: barn
             )

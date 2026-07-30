@@ -43,7 +43,6 @@ enum ModelFixtures {
     static func makeVisit(
         startedAt: Date = .now,
         completedAt: Date? = nil,
-        workItemPolicyVersion: Int = 0,
         appointment: Appointment,
         in context: ModelContext
     ) -> Visit {
@@ -57,7 +56,6 @@ enum ModelFixtures {
             completedAt: completedAt,
             serviceLocationNameSnapshot: barn.name,
             serviceLocationAddressSnapshot: barn.address,
-            workItemPolicyVersion: workItemPolicyVersion,
             appointment: appointment,
             barn: barn
         )
@@ -113,5 +111,98 @@ enum ModelFixtures {
         service.workItems.append(workItem)
         visitHorse.workItems.append(workItem)
         return workItem
+    }
+
+    static func makeBusinessProfile(
+        name: String = "Alex Carter Farrier",
+        phone: String? = "555-0100",
+        email: String? = "alex@example.com",
+        address: String? = "1 Main Street",
+        defaultInvoiceNote: String? = "Thank you.",
+        nextInvoiceNumber: Int64 = 1,
+        in context: ModelContext
+    ) -> BusinessProfile {
+        let profile = BusinessProfile(
+            name: name,
+            phone: phone,
+            email: email,
+            address: address,
+            defaultInvoiceNote: defaultInvoiceNote,
+            nextInvoiceNumber: nextInvoiceNumber
+        )
+        context.insert(profile)
+        return profile
+    }
+
+    static func makeInvoice(
+        number: Int64,
+        client: Client,
+        businessProfile: BusinessProfile,
+        invoiceDate: Date = Date(timeIntervalSinceReferenceDate: 500),
+        dueDate: Date? = Date(timeIntervalSinceReferenceDate: 600),
+        note: String? = "Thank you.",
+        status: InvoiceStatus = .unpaid,
+        paidAt: Date? = nil,
+        in context: ModelContext
+    ) -> Invoice {
+        let invoice = Invoice(
+            number: number,
+            invoiceDate: invoiceDate,
+            dueDate: dueDate,
+            note: note,
+            statusRawValue: status.rawValue,
+            paidAt: paidAt,
+            clientNameSnapshot: client.name,
+            clientPhoneSnapshot: client.phone,
+            clientEmailSnapshot: client.email,
+            businessNameSnapshot: businessProfile.name,
+            businessPhoneSnapshot: businessProfile.phone,
+            businessEmailSnapshot: businessProfile.email,
+            businessAddressSnapshot: businessProfile.address,
+            client: client
+        )
+        context.insert(invoice)
+        client.invoices.append(invoice)
+        return invoice
+    }
+
+    static func makeInvoiceVisit(
+        invoice: Invoice,
+        sourceVisit: Visit,
+        in context: ModelContext
+    ) -> InvoiceVisit {
+        let invoiceVisit = InvoiceVisit(
+            visitDateSnapshot: sourceVisit.startedAt,
+            serviceLocationNameSnapshot: sourceVisit.serviceLocationNameSnapshot,
+            serviceLocationAddressSnapshot: sourceVisit.serviceLocationAddressSnapshot,
+            invoice: invoice,
+            sourceVisit: sourceVisit
+        )
+        context.insert(invoiceVisit)
+        invoice.invoiceVisits.append(invoiceVisit)
+        sourceVisit.invoiceVisits.append(invoiceVisit)
+        return invoiceVisit
+    }
+
+    static func makeInvoiceLineItem(
+        invoiceVisit: InvoiceVisit,
+        sourceWorkItem: WorkItem,
+        in context: ModelContext
+    ) throws -> InvoiceLineItem {
+        guard let horse = sourceWorkItem.visitHorse?.horse else {
+            throw DomainGraphViolation.workItemMissingVisitHorse
+        }
+        let lineItem = InvoiceLineItem(
+            horseNameSnapshot: horse.name,
+            serviceNameSnapshot: sourceWorkItem.serviceNameSnapshot,
+            amountMinorUnits: sourceWorkItem.amountMinorUnits,
+            currencyCode: sourceWorkItem.currencyCode,
+            invoiceVisit: invoiceVisit,
+            sourceWorkItem: sourceWorkItem
+        )
+        context.insert(lineItem)
+        invoiceVisit.lineItems.append(lineItem)
+        sourceWorkItem.invoiceLineItem = lineItem
+        return lineItem
     }
 }
