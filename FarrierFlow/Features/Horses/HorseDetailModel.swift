@@ -3,6 +3,11 @@ import Observation
 import OSLog
 import SwiftData
 
+nonisolated struct HorseDefaultServiceDetail: Equatable {
+    let name: String
+    let formattedAmount: String
+}
+
 @MainActor
 @Observable
 final class HorseDetailModel {
@@ -19,6 +24,7 @@ final class HorseDetailModel {
     private(set) var horse: Horse?
     private(set) var history: [HorseHistoryEntry] = []
     private(set) var historyLoadState = HorseHistoryLoadState.loading
+    private(set) var defaultService: HorseDefaultServiceDetail?
     private var historyHorseID: PersistentIdentifier?
     private var historyLocale = Locale.current
     var alert: FeatureAlert?
@@ -37,10 +43,35 @@ final class HorseDetailModel {
         locale: Locale = .current
     ) {
         horse = context.model(for: id) as? Horse
+        defaultService = horse.flatMap { horse in
+            Self.defaultServiceDetail(for: horse, locale: locale)
+        }
         historyHorseID = id
         historyContext = context
         historyLocale = locale
         loadHistory()
+    }
+
+    private static func defaultServiceDetail(
+        for horse: Horse,
+        locale: Locale
+    ) -> HorseDefaultServiceDetail? {
+        guard
+            let service = horse.defaultService,
+            TextNormalization.required(service.name) == service.name,
+            service.defaultAmountMinorUnits >= 0,
+            service.currencyCode == "USD",
+            let formattedAmount = MoneyFormatter.usd(
+                minorUnits: service.defaultAmountMinorUnits,
+                locale: locale
+            )
+        else {
+            return nil
+        }
+        return HorseDefaultServiceDetail(
+            name: service.name,
+            formattedAmount: formattedAmount
+        )
     }
 
     func retryHistory() {
@@ -99,7 +130,12 @@ final class HorseDetailModel {
                 completedAt: detail.completedAt,
                 serviceLocationName: detail.serviceLocationNameSnapshot,
                 outcomeRawValue: result.outcome.rawValue,
-                workNotes: result.workNotes
+                workNotes: result.workNotes,
+                workItemPolicyVersion: detail.workItemPolicyVersion,
+                workItemCount: result.outcome == .serviced
+                    ? (result.subtotal == .unavailable ? nil : result.workItems.count)
+                    : nil,
+                subtotal: result.subtotal
             )
         }
         return try HorseHistoryRules.entries(from: records, locale: locale)

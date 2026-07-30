@@ -4,10 +4,13 @@ import SwiftUI
 struct VisitEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.locale) private var locale
     @Environment(PhotographLibrary.self) private var photographLibrary
     @State private var model: VisitEditorModel
     @State private var showsDismissConfirmation = false
     @State private var showsDiscardVisitConfirmation = false
+    @State private var addServiceHorse: VisitHorseDraft?
+    @State private var workItemEditorTarget: WorkItemEditorTarget?
     @FocusState private var focusedWorkNotesID: PersistentIdentifier?
 
     init(
@@ -125,7 +128,7 @@ struct VisitEditorView: View {
             Text("Your unsaved visit changes will be lost.")
         }
         .confirmationDialog(
-            "Clear Work Notes?",
+            "Clear Recorded Work?",
             isPresented: Binding(
                 get: { model.pendingOutcomeChange != nil },
                 set: { isPresented in
@@ -136,14 +139,14 @@ struct VisitEditorView: View {
             ),
             titleVisibility: .visible
         ) {
-            Button("Clear Work Notes", role: .destructive) {
+            Button("Clear Recorded Work", role: .destructive) {
                 model.confirmPendingOutcomeChange()
             }
             Button("Keep Editing", role: .cancel) {
                 model.cancelPendingOutcomeChange()
             }
         } message: {
-            Text("Changing this outcome will clear its Work Notes.")
+            Text("Changing this outcome will clear its recorded services and Work Notes.")
         }
         .confirmationDialog(
             "Discard Visit?",
@@ -208,6 +211,9 @@ struct VisitEditorView: View {
                                 )
                             }
                         )
+                        if horse.outcome != .notServiced {
+                            visitWorkItems(for: horse)
+                        }
                         NavigationLink {
                             PhotographCollectionView(
                                 visitHorseID: horse.id,
@@ -224,6 +230,21 @@ struct VisitEditorView: View {
                     }
                 }
             }
+            .sheet(item: $addServiceHorse) { horse in
+                NavigationStack {
+                    AddServicePickerView(
+                        model: model,
+                        visitHorseID: horse.id
+                    )
+                }
+            }
+            .sheet(item: $workItemEditorTarget) { target in
+                WorkItemEditorView(
+                    model: model,
+                    visitHorseID: target.visitHorseID,
+                    workItem: target.workItem
+                )
+            }
         } else {
             ContentUnavailableView("Visit Unavailable", systemImage: "exclamationmark.circle")
         }
@@ -235,6 +256,88 @@ struct VisitEditorView: View {
         } else {
             dismiss()
         }
+    }
+
+    @ViewBuilder
+    private func visitWorkItems(for horse: VisitHorseDraft) -> some View {
+        Text("Services")
+            .font(Typography.recordMetadata)
+            .foregroundStyle(.secondary)
+
+        if horse.workItems.isEmpty {
+            Text("No Recorded Services")
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("visit-work-items-empty-\(horse.horseName)")
+        } else {
+            ForEach(horse.workItems) { workItem in
+                Button {
+                    workItemEditorTarget = WorkItemEditorTarget(
+                        visitHorseID: horse.id,
+                        workItem: workItem
+                    )
+                } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: SpacingTokens.rowContent) {
+                        VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
+                            Text(workItem.serviceNameSnapshot)
+                                .font(Typography.recordTitle)
+                            if workItem.serviceIsArchived {
+                                Text("Archived")
+                                    .font(Typography.recordMetadata)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        Spacer(minLength: SpacingTokens.rowContent)
+                        Text(formattedAmount(for: workItem))
+                            .font(Typography.recordMetadata)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                            .accessibilityIdentifier(
+                                "visit-work-item-amount-\(horse.horseName)-\(workItem.serviceNameSnapshot)"
+                            )
+                    }
+                }
+                .accessibilityLabel(
+                    "\(workItem.serviceNameSnapshot), \(formattedAmount(for: workItem))"
+                )
+                .accessibilityHint("Edit Service")
+                .accessibilityIdentifier(
+                    "visit-work-item-\(horse.horseName)-\(workItem.serviceNameSnapshot)"
+                )
+            }
+        }
+
+        Button("Add Service", systemImage: "plus") {
+            addServiceHorse = horse
+        }
+        .accessibilityIdentifier("visit-add-service-\(horse.horseName)")
+
+        if let subtotal = try? WorkItemRules.subtotal(for: horse.workItems),
+           let formattedSubtotal = MoneyFormatter.usd(minorUnits: subtotal, locale: locale) {
+            LabeledContent("Subtotal", value: formattedSubtotal)
+                .font(Typography.recordMetadata)
+                .monospacedDigit()
+                .accessibilityLabel("Subtotal, \(formattedSubtotal)")
+                .accessibilityIdentifier("visit-work-item-subtotal-\(horse.horseName)")
+        } else {
+            Text("Subtotal Unavailable")
+                .font(Typography.recordMetadata)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("visit-work-item-subtotal-\(horse.horseName)")
+        }
+    }
+
+    private func formattedAmount(for workItem: WorkItemDraft) -> String {
+        MoneyFormatter.usd(minorUnits: workItem.amountMinorUnits, locale: locale)
+            ?? String(localized: "Unavailable", locale: locale)
+    }
+}
+
+private struct WorkItemEditorTarget: Identifiable {
+    let visitHorseID: PersistentIdentifier
+    let workItem: WorkItemDraft
+
+    var id: UUID {
+        workItem.id
     }
 }
 

@@ -38,6 +38,9 @@ struct ClientListView: View {
                         Button("Service Locations", systemImage: "building.2") {
                             path.append(BarnRoute.list)
                         }
+                        Button("Services", systemImage: "wrench.and.screwdriver") {
+                            path.append(ServiceRoute.list)
+                        }
                     } label: {
                         Label("More", systemImage: "ellipsis.circle")
                     }
@@ -59,6 +62,14 @@ struct ClientListView: View {
                     BarnListView()
                 case .detail(let id):
                     BarnDetailView(barnID: id)
+                }
+            }
+            .navigationDestination(for: ServiceRoute.self) { route in
+                switch route {
+                case .list:
+                    ServiceListView()
+                case .detail(let id):
+                    ServiceDetailView(serviceID: id)
                 }
             }
             .sheet(isPresented: $showsEditor, onDismiss: reload) {

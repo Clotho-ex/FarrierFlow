@@ -56,6 +56,22 @@ struct HorseEditorView: View {
                         Button("Create Service Location", systemImage: "plus") {
                             showsBarnEditor = true
                         }
+                        Picker("Default Service", selection: $model.draft.defaultServiceID) {
+                            Text("None").tag(PersistentIdentifier?.none)
+                            ForEach(model.activeServiceChoices) { service in
+                                Text("\(service.name) · \(formattedPrice(for: service))")
+                                    .tag(Optional(service.id))
+                            }
+                        }
+                        .accessibilityIdentifier("horse-default-service-picker")
+                        .accessibilityValue(defaultServiceAccessibilityValue)
+                        if model.activeServiceChoices.isEmpty {
+                            Text(
+                                "No active services are available. You can continue without a default or add one from Clients, More, Services."
+                            )
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        }
                     }
                 }
                 loadStateSection
@@ -102,6 +118,26 @@ struct HorseEditorView: View {
                 Alert(title: Text($0.title), message: Text($0.message))
             }
         }
+    }
+
+    private func formattedPrice(for service: ServiceChoice) -> String {
+        MoneyFormatter.usd(
+            minorUnits: service.defaultAmountMinorUnits,
+            locale: locale
+        ) ?? String(localized: "Unavailable", locale: locale)
+    }
+
+    private var defaultServiceAccessibilityValue: String {
+        guard
+            let id = model.draft.defaultServiceID,
+            let service = model.activeServiceChoices.first(where: { $0.id == id })
+        else {
+            return String(localized: "None", locale: locale)
+        }
+        return String(
+            localized: "\(service.name) · \(formattedPrice(for: service))",
+            locale: locale
+        )
     }
 
     @ViewBuilder

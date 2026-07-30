@@ -7,6 +7,49 @@ import Testing
 @MainActor
 struct HorseHistoryRulesTests {
     @Test
+    func completedHistoryKeepsRecordedWorkTotalsSeparateFromLegacyUnknownWork() throws {
+        let identifiers = try makeIdentifiers(count: 6)
+        let records = [
+            HorseHistoryRecord(
+                id: identifiers[0],
+                visitID: identifiers[1],
+                horseID: identifiers[2],
+                horseName: "Milo",
+                startedAt: Date(timeIntervalSinceReferenceDate: 300),
+                completedAt: Date(timeIntervalSinceReferenceDate: 400),
+                serviceLocationName: "North Field",
+                outcomeRawValue: VisitOutcome.serviced.rawValue,
+                workNotes: nil,
+                workItemPolicyVersion: 1,
+                workItemCount: 2,
+                subtotal: .available(12_500)
+            ),
+            HorseHistoryRecord(
+                id: identifiers[3],
+                visitID: identifiers[4],
+                horseID: identifiers[5],
+                horseName: "Milo",
+                startedAt: Date(timeIntervalSinceReferenceDate: 100),
+                completedAt: Date(timeIntervalSinceReferenceDate: 200),
+                serviceLocationName: "North Field",
+                outcomeRawValue: VisitOutcome.serviced.rawValue,
+                workNotes: nil,
+                workItemPolicyVersion: 0,
+                workItemCount: nil,
+                subtotal: .unavailable
+            ),
+        ]
+
+        let entries = try HorseHistoryRules.entries(
+            from: records,
+            locale: Locale(identifier: "en_US")
+        )
+
+        #expect(entries.map(\.workItemCount) == [2, nil])
+        #expect(entries.map(\.subtotal) == [.available(12_500), .unavailable])
+    }
+
+    @Test
     func completedHistoryUsesTheApprovedFourLevelOrderAndExcludesInProgressVisits() throws {
         let identifiers = try makeIdentifiers(count: 12)
         let sources = [
@@ -311,6 +354,9 @@ struct HorseHistoryRulesTests {
             horses: [fixture.horse],
             in: fixture.context
         )
+        let defaultService = ModelFixtures.makeService(in: fixture.context)
+        fixture.horse.defaultService = defaultService
+        defaultService.horsesUsingAsDefault.append(fixture.horse)
         try DomainGraphValidator.save(fixture.context)
 
         let staleContext = ModelContext(fixture.container)

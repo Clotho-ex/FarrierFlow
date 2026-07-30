@@ -1,3 +1,4 @@
+import Foundation
 import Observation
 import OSLog
 import SwiftData
@@ -164,6 +165,151 @@ final class VisitEditorModel {
         draft = updatedDraft
     }
 
+    func eligibleServices(
+        for visitHorseID: PersistentIdentifier,
+        replacing workItemID: UUID? = nil
+    ) -> [ServiceChoice] {
+        guard let horse = draft?.horses.first(where: { $0.id == visitHorseID }) else {
+            return []
+        }
+        do {
+            let services = try context.fetch(FetchDescriptor<Service>())
+            let usedServiceIDs = Set(
+                horse.workItems
+                    .filter { $0.id != workItemID }
+                    .map(\.serviceID)
+            )
+            return ServiceRules.activeChoices(services).filter { !usedServiceIDs.contains($0.id) }
+        } catch {
+            Self.logger.error("Failed to load Services: \(error, privacy: .public)")
+            return []
+        }
+    }
+
+    @discardableResult
+    func addService(
+        _ serviceID: PersistentIdentifier,
+        to visitHorseID: PersistentIdentifier
+    ) -> Bool {
+        guard
+            var updatedDraft = draft,
+            let horseIndex = updatedDraft.horses.firstIndex(where: { $0.id == visitHorseID }),
+            let service = eligibleServices(for: visitHorseID).first(where: { $0.id == serviceID })
+        else {
+            return false
+        }
+
+        updatedDraft.horses[horseIndex].workItems.append(
+            WorkItemDraft(
+                serviceID: service.id,
+                serviceNameSnapshot: service.name,
+                amountMinorUnits: service.defaultAmountMinorUnits,
+                currencyCode: service.currencyCode
+            )
+        )
+        updatedDraft.horses[horseIndex].workItems = WorkItemRules.sorted(
+            updatedDraft.horses[horseIndex].workItems
+        )
+        draft = updatedDraft
+        return true
+    }
+
+    @discardableResult
+    func removeWorkItem(
+        _ workItemID: UUID,
+        from visitHorseID: PersistentIdentifier
+    ) -> Bool {
+        guard
+            var updatedDraft = draft,
+            let horseIndex = updatedDraft.horses.firstIndex(where: { $0.id == visitHorseID }),
+            let workItemIndex = updatedDraft.horses[horseIndex].workItems.firstIndex(
+                where: { $0.id == workItemID }
+            )
+        else {
+            return false
+        }
+        updatedDraft.horses[horseIndex].workItems.remove(at: workItemIndex)
+        draft = updatedDraft
+        return true
+    }
+
+    @discardableResult
+    func replaceWorkItem(
+        _ workItemID: UUID,
+        with serviceID: PersistentIdentifier,
+        for visitHorseID: PersistentIdentifier
+    ) -> Bool {
+        guard
+            var updatedDraft = draft,
+            let horseIndex = updatedDraft.horses.firstIndex(where: { $0.id == visitHorseID }),
+            let workItemIndex = updatedDraft.horses[horseIndex].workItems.firstIndex(
+                where: { $0.id == workItemID }
+            ),
+            let service = eligibleServices(for: visitHorseID, replacing: workItemID)
+                .first(where: { $0.id == serviceID }),
+            updatedDraft.horses[horseIndex].workItems[workItemIndex].serviceID != serviceID
+        else {
+            return false
+        }
+
+        updatedDraft.horses[horseIndex].workItems[workItemIndex].serviceID = service.id
+        updatedDraft.horses[horseIndex].workItems[workItemIndex].serviceNameSnapshot = service.name
+        updatedDraft.horses[horseIndex].workItems[workItemIndex].amountMinorUnits = service.defaultAmountMinorUnits
+        updatedDraft.horses[horseIndex].workItems = WorkItemRules.sorted(
+            updatedDraft.horses[horseIndex].workItems
+        )
+        draft = updatedDraft
+        return true
+    }
+
+    func isValidPriceInput(_ input: String) -> Bool {
+        (try? USDPriceParser.parse(input)) != nil
+    }
+
+    @discardableResult
+    func updateWorkItem(
+        _ workItemID: UUID,
+        serviceID: PersistentIdentifier,
+        priceInput: String,
+        for visitHorseID: PersistentIdentifier
+    ) -> Bool {
+        guard let amountMinorUnits = try? USDPriceParser.parse(priceInput) else {
+            return false
+        }
+        guard
+            var updatedDraft = draft,
+            let horseIndex = updatedDraft.horses.firstIndex(where: { $0.id == visitHorseID }),
+            let workItemIndex = updatedDraft.horses[horseIndex].workItems.firstIndex(
+                where: { $0.id == workItemID }
+            )
+        else {
+            return false
+        }
+
+        let current = updatedDraft.horses[horseIndex].workItems[workItemIndex]
+        if current.serviceID != serviceID {
+            guard replaceWorkItem(workItemID, with: serviceID, for: visitHorseID) else {
+                return false
+            }
+            guard
+                var replacedDraft = draft,
+                let replacedHorseIndex = replacedDraft.horses.firstIndex(where: { $0.id == visitHorseID }),
+                let replacedWorkItemIndex = replacedDraft.horses[replacedHorseIndex].workItems.firstIndex(
+                    where: { $0.id == workItemID }
+                )
+            else {
+                return false
+            }
+            replacedDraft.horses[replacedHorseIndex].workItems[replacedWorkItemIndex].amountMinorUnits = amountMinorUnits
+            draft = replacedDraft
+            return true
+        }
+
+        updatedDraft.horses[horseIndex].workItems[workItemIndex].amountMinorUnits = amountMinorUnits
+        draft = updatedDraft
+        return true
+    }
+
     func discardUnsavedChanges() {
         draft = lastSavedDraft
         pendingOutcomeChange = nil
@@ -256,6 +402,9 @@ final class VisitEditorModel {
         updatedDraft.horses[index].outcome = outcome
         if outcome != .serviced {
             updatedDraft.horses[index].workNotes = ""
+        }
+        if outcome == .notServiced {
+            updatedDraft.horses[index].workItems = []
         }
         draft = updatedDraft
     }

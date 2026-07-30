@@ -9,7 +9,7 @@ import Foundation
 import SwiftData
 
 enum ModelContainerFactory {
-    private static let schema = Schema(versionedSchema: FarrierFlowSchemaV3.self)
+    private static let schema = Schema(versionedSchema: FarrierFlowSchemaV4.self)
 
     static func production() throws -> ModelContainer {
         let configuration = ModelConfiguration(
@@ -60,10 +60,6 @@ enum ModelContainerFactory {
     }
 
     private static func make(configuration: ModelConfiguration) throws -> ModelContainer {
-        try ModelContainer(
-            for: schema,
-            migrationPlan: FarrierFlowMigrationPlan.self,
-            configurations: [configuration]
-        )
+        try ModelContainer(for: schema, configurations: [configuration])
     }
 }

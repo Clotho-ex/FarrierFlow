@@ -205,6 +205,44 @@ struct SchemaContractTests {
         #expect(appointment.expectedDurationMinutes == nil)
     }
 
+    @Test
+    func v4SchemaRegistersExactlyTenModels() {
+        let schema = Schema(versionedSchema: FarrierFlowSchemaV4.self)
+
+        #expect(Set(schema.entities.map(\.name)) == [
+            "Client",
+            "Barn",
+            "Horse",
+            "Appointment",
+            "AppointmentHorse",
+            "Visit",
+            "VisitHorse",
+            "Photograph",
+            "Service",
+            "WorkItem",
+        ])
+    }
+
+    @Test
+    func v4VisitDefaultsToLegacyWorkItemPolicy() throws {
+        let schema = Schema(versionedSchema: FarrierFlowSchemaV4.self)
+        let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [configuration])
+        let context = ModelContext(container)
+        let barn = FarrierFlowSchemaV4.Barn(name: "North Field")
+        context.insert(barn)
+        let appointment = FarrierFlowSchemaV4.Appointment(startDate: .now, barn: barn)
+        context.insert(appointment)
+        let visit = FarrierFlowSchemaV4.Visit(
+            startedAt: .now,
+            serviceLocationNameSnapshot: barn.name,
+            appointment: appointment,
+            barn: barn
+        )
+
+        #expect(visit.workItemPolicyVersion == 0)
+    }
+
     private func relationship(
         in schema: Schema,
         _ entityName: String,

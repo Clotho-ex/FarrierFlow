@@ -9,22 +9,34 @@ nonisolated enum VisitDetailLoadState: Equatable {
     case failed
 }
 
+nonisolated struct VisitWorkItemResult: Equatable, Identifiable {
+    let id: PersistentIdentifier
+    let serviceID: PersistentIdentifier?
+    let serviceNameSnapshot: String
+    let amountMinorUnits: Int64
+    let serviceIsArchived: Bool?
+}
+
 nonisolated struct VisitHorseResult: Equatable, Identifiable {
     let id: PersistentIdentifier
     let horseID: PersistentIdentifier
     let horseName: String
     let outcome: VisitOutcome
     let workNotes: String?
+    let workItems: [VisitWorkItemResult]
+    let subtotal: MoneyAvailability
 }
 
 nonisolated struct VisitDetail: Equatable {
     let visitID: PersistentIdentifier
+    let workItemPolicyVersion: Int
     let startedAt: Date
     let completedAt: Date?
     let serviceLocationNameSnapshot: String
     let serviceLocationAddressSnapshot: String?
     let barnID: PersistentIdentifier?
     let horses: [VisitHorseResult]
+    let total: MoneyAvailability
 }
 
 nonisolated enum VisitDetailLoadError: Error, Equatable {
@@ -103,12 +115,20 @@ final class VisitDetailModel {
             else {
                 throw VisitDetailLoadError.invalidVisit
             }
+            let workItems = try workItemResults(for: visitHorse, locale: locale)
             return VisitHorseResult(
                 id: visitHorse.persistentModelID,
                 horseID: horse.persistentModelID,
                 horseName: horse.name,
                 outcome: outcome,
-                workNotes: TextNormalization.optional(visitHorse.workNotes ?? "")
+                workNotes: TextNormalization.optional(visitHorse.workNotes ?? ""),
+                workItems: workItems,
+                subtotal: try CheckedMoneyTotal.projectedSubtotal(
+                    workItems.map(\.amountMinorUnits),
+                    unavailableWhenEmpty: visit.completedAt != nil
+                        && visit.workItemPolicyVersion == 0
+                        && outcome == .serviced
+                )
             )
         }.sorted { lhs, rhs in
             let horseNameOrder = lhs.horseName.compare(
@@ -125,13 +145,68 @@ final class VisitDetailModel {
 
         return VisitDetail(
             visitID: visitID,
+            workItemPolicyVersion: visit.workItemPolicyVersion,
             startedAt: visit.startedAt,
             completedAt: visit.completedAt,
             serviceLocationNameSnapshot: visit.serviceLocationNameSnapshot,
             serviceLocationAddressSnapshot: visit.serviceLocationAddressSnapshot,
             barnID: visit.barn?.persistentModelID,
-            horses: horses
+            horses: horses,
+            total: try CheckedMoneyTotal.projectedTotal(horses.map(\.subtotal))
         )
+    }
+
+    private static func workItemResults(
+        for visitHorse: VisitHorse,
+        locale: Locale
+    ) throws -> [VisitWorkItemResult] {
+        let results = try visitHorse.workItems.map { workItem in
+            guard
+                workItem.visitHorse === visitHorse,
+                TextNormalization.required(workItem.serviceNameSnapshot)
+                    == workItem.serviceNameSnapshot,
+                workItem.amountMinorUnits >= 0,
+                workItem.currencyCode == "USD"
+            else {
+                throw VisitDetailLoadError.invalidVisit
+            }
+
+            if let service = workItem.service,
+               !service.workItems.contains(where: {
+                   $0.persistentModelID == workItem.persistentModelID
+               }) {
+                throw VisitDetailLoadError.invalidVisit
+            }
+
+            return VisitWorkItemResult(
+                id: workItem.persistentModelID,
+                serviceID: workItem.service?.persistentModelID,
+                serviceNameSnapshot: workItem.serviceNameSnapshot,
+                amountMinorUnits: workItem.amountMinorUnits,
+                serviceIsArchived: workItem.service?.isArchived
+            )
+        }
+
+        return results.sorted { lhs, rhs in
+            let nameOrder = lhs.serviceNameSnapshot.compare(
+                rhs.serviceNameSnapshot,
+                options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive, .numeric],
+                range: nil,
+                locale: locale
+            )
+            if nameOrder != .orderedSame {
+                return nameOrder == .orderedAscending
+            }
+            if lhs.amountMinorUnits != rhs.amountMinorUnits {
+                return lhs.amountMinorUnits < rhs.amountMinorUnits
+            }
+            let leftServiceID = lhs.serviceID.map(String.init(describing:)) ?? ""
+            let rightServiceID = rhs.serviceID.map(String.init(describing:)) ?? ""
+            if leftServiceID != rightServiceID {
+                return leftServiceID < rightServiceID
+            }
+            return lhs.id < rhs.id
+        }
     }
 
     // A missing persisted Visit.barn is the sole tolerated invalid relationship:
@@ -139,6 +214,7 @@ final class VisitDetailModel {
     // Visit invariants remain required before detail UI can present data.
     private static func validateForDetail(_ visit: Visit) throws {
         guard
+            visit.workItemPolicyVersion == 0 || visit.workItemPolicyVersion == 1,
             let appointment = visit.appointment,
             appointment.visit === visit,
             let appointmentBarn = appointment.barn,
@@ -183,6 +259,16 @@ final class VisitDetailModel {
             guard
                 TextNormalization.optional(visitHorse.workNotes ?? "") == nil
                     || outcome == .serviced
+            else {
+                throw VisitDetailLoadError.invalidVisit
+            }
+            guard outcome != .notServiced || visitHorse.workItems.isEmpty else {
+                throw VisitDetailLoadError.invalidVisit
+            }
+            guard visit.completedAt == nil
+                || visit.workItemPolicyVersion == 0
+                || outcome != .serviced
+                || !visitHorse.workItems.isEmpty
             else {
                 throw VisitDetailLoadError.invalidVisit
             }

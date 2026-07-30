@@ -21,16 +21,21 @@ final class HorseEditorModel {
     private let clientFetcher: (ModelContext) throws -> [Client]
     @ObservationIgnored
     private let barnFetcher: (ModelContext) throws -> [Barn]
+    @ObservationIgnored
+    private let serviceFetcher: (ModelContext) throws -> [Service]
 
     var draft: HorseDraft
     let horseID: PersistentIdentifier?
     private(set) var clients: [Client] = []
     private(set) var barns: [Barn] = []
+    private(set) var activeServiceChoices: [ServiceChoice] = []
     private(set) var choicesLoadState = HorseEditorChoicesLoadState.loading
     var alert: FeatureAlert?
 
     var canSave: Bool {
-        draft.isValid && choicesLoadState == .loaded
+        draft.isValid
+            && choicesLoadState == .loaded
+            && defaultServiceSelectionIsValid
     }
 
     init(
@@ -50,17 +55,22 @@ final class HorseEditorModel {
                     sortBy: [SortDescriptor(\.name, comparator: .localizedStandard)]
                 )
             )
+        },
+        serviceFetcher: @escaping (ModelContext) throws -> [Service] = {
+            try $0.fetch(FetchDescriptor<Service>())
         }
     ) {
         self.clientFetcher = clientFetcher
         self.barnFetcher = barnFetcher
+        self.serviceFetcher = serviceFetcher
         horseID = horse?.persistentModelID
         draft = HorseDraft(
             name: horse?.name ?? "",
             safetyNotes: horse?.safetyNotes ?? "",
             appointmentIntervalWeeks: horse?.appointmentIntervalWeeks ?? 6,
             clientID: horse?.client?.persistentModelID ?? preselectedClientID,
-            barnID: horse?.currentBarn?.persistentModelID ?? preselectedBarnID
+            barnID: horse?.currentBarn?.persistentModelID ?? preselectedBarnID,
+            defaultServiceID: horse?.defaultService?.persistentModelID
         )
     }
 
@@ -69,8 +79,10 @@ final class HorseEditorModel {
         do {
             let loadedClients = try clientFetcher(context)
             let loadedBarns = try barnFetcher(context)
+            let loadedServices = try serviceFetcher(context)
             clients = loadedClients
             barns = loadedBarns
+            activeServiceChoices = ServiceRules.activeChoices(loadedServices)
             choicesLoadState = .loaded
         } catch {
             choicesLoadState = .failed
@@ -89,6 +101,24 @@ final class HorseEditorModel {
             let client = context.model(for: clientID) as? Client,
             let barn = context.model(for: barnID) as? Barn
         else { return nil }
+
+        let defaultService: Service?
+        if let defaultServiceID = draft.defaultServiceID {
+            guard
+                activeServiceChoices.contains(where: { $0.id == defaultServiceID }),
+                let service = context.model(for: defaultServiceID) as? Service,
+                ServiceRules.activeChoices([service]).count == 1
+            else {
+                alert = FeatureAlert(
+                    title: "Default Service Unavailable",
+                    message: "Choose an active service or None before saving this horse."
+                )
+                return nil
+            }
+            defaultService = service
+        } else {
+            defaultService = nil
+        }
 
         let horse: Horse
         if let horseID {
@@ -130,6 +160,7 @@ final class HorseEditorModel {
         horse.appointmentIntervalWeeks = draft.appointmentIntervalWeeks
         horse.client = client
         horse.currentBarn = barn
+        horse.defaultService = defaultService
         if !client.horses.contains(where: { $0 === horse }) {
             client.horses.append(horse)
         }
@@ -149,4 +180,10 @@ final class HorseEditorModel {
             return nil
         }
     }
+
+    private var defaultServiceSelectionIsValid: Bool {
+        guard let defaultServiceID = draft.defaultServiceID else { return true }
+        return activeServiceChoices.contains { $0.id == defaultServiceID }
+    }
+
 }

@@ -22,6 +22,71 @@ struct VisitDetailModelTests {
         #expect(detail.barnID == graph.barnID)
         #expect(detail.horses.count == 2)
         #expect(detail.horses.contains { $0.workNotes == "Front shoes" })
+        let milo = try #require(detail.horses.first { $0.horseName == "Milo" })
+        #expect(milo.workItems.map(\.serviceNameSnapshot) == ["Basic Trim"])
+        #expect(milo.subtotal == .available(5_000))
+        #expect(detail.total == .available(5_000))
+    }
+
+    @Test
+    func completedDetailUsesWorkItemSnapshotsAndKeepsMissingServiceNavigationSafe() throws {
+        let graph = try makeCompletedGraph()
+        let context = ModelContext(graph.container)
+        let visit = try #require(context.model(for: graph.visitID) as? Visit)
+        let visitHorse = try #require(visit.visitHorses.first { $0.horse?.name == "Milo" })
+        let workItem = try #require(visitHorse.workItems.first)
+        let service = try #require(workItem.service)
+
+        service.name = "Renamed Trim"
+        service.defaultAmountMinorUnits = 9_999
+        service.isArchived = true
+        try context.save()
+
+        let archivedDetail = try VisitDetailModel.loadDetail(
+            visitID: graph.visitID,
+            in: context,
+            locale: Locale(identifier: "en_US")
+        )
+        let archivedWorkItem = try #require(
+            archivedDetail.horses.first { $0.horseName == "Milo" }?.workItems.first
+        )
+        #expect(archivedWorkItem.serviceNameSnapshot == "Basic Trim")
+        #expect(archivedWorkItem.amountMinorUnits == 5_000)
+        #expect(archivedWorkItem.serviceID == service.persistentModelID)
+        #expect(archivedWorkItem.serviceIsArchived == true)
+
+        workItem.service = nil
+        try context.save()
+
+        let missingServiceDetail = try VisitDetailModel.loadDetail(
+            visitID: graph.visitID,
+            in: context,
+            locale: Locale(identifier: "en_US")
+        )
+        let missingServiceWorkItem = try #require(
+            missingServiceDetail.horses.first { $0.horseName == "Milo" }?.workItems.first
+        )
+        #expect(missingServiceWorkItem.serviceNameSnapshot == "Basic Trim")
+        #expect(missingServiceWorkItem.amountMinorUnits == 5_000)
+        #expect(missingServiceWorkItem.serviceID == nil)
+        #expect(missingServiceWorkItem.serviceIsArchived == nil)
+    }
+
+    @Test
+    func legacyServicedHorseWithoutRecordedServicesKeepsTotalsUnavailable() throws {
+        let graph = try makeLegacyCompletedGraph()
+
+        let detail = try VisitDetailModel.loadDetail(
+            visitID: graph.visitID,
+            in: graph.container.mainContext,
+            locale: Locale(identifier: "en_US")
+        )
+
+        let horse = try #require(detail.horses.first)
+        #expect(horse.outcome == .serviced)
+        #expect(horse.workItems.isEmpty)
+        #expect(horse.subtotal == .unavailable)
+        #expect(detail.total == .unavailable)
     }
 
     @Test
@@ -279,6 +344,13 @@ struct VisitDetailModelTests {
         context.insert(secondHorse)
         client.horses.append(contentsOf: [firstHorse, secondHorse])
         barn.horses.append(contentsOf: [firstHorse, secondHorse])
+        let defaultService = ModelFixtures.makeService(
+            name: "Basic Trim",
+            defaultAmountMinorUnits: 5_000,
+            in: context
+        )
+        firstHorse.defaultService = defaultService
+        defaultService.horsesUsingAsDefault.append(firstHorse)
         let appointment = ModelFixtures.makeAppointment(
             barn: barn,
             horses: [firstHorse, secondHorse],
@@ -305,6 +377,38 @@ struct VisitDetailModelTests {
             )
         }
         return VisitDetailGraph(container: container, visitID: visitID, barnID: barn.persistentModelID)
+    }
+
+    private func makeLegacyCompletedGraph() throws -> VisitDetailGraph {
+        let container = try ModelContainerFactory.inMemoryTest()
+        let context = container.mainContext
+        let client = Client(name: "Alex")
+        let barn = Barn(name: "North Field")
+        let horse = Horse(name: "Milo", client: client, currentBarn: barn)
+        context.insert(client)
+        context.insert(barn)
+        context.insert(horse)
+        client.horses.append(horse)
+        barn.horses.append(horse)
+        let appointment = ModelFixtures.makeAppointment(
+            barn: barn,
+            horses: [horse],
+            in: context
+        )
+        let visit = ModelFixtures.makeVisit(
+            startedAt: Date(timeIntervalSinceReferenceDate: 100),
+            completedAt: Date(timeIntervalSinceReferenceDate: 200),
+            workItemPolicyVersion: 0,
+            appointment: appointment,
+            in: context
+        )
+        visit.visitHorses[0].outcomeRawValue = VisitOutcome.serviced.rawValue
+        try DomainGraphValidator.save(context)
+        return VisitDetailGraph(
+            container: container,
+            visitID: visit.persistentModelID,
+            barnID: barn.persistentModelID
+        )
     }
 
     private func horseIndex(named horseName: String, in draft: VisitDraft) throws -> Int {

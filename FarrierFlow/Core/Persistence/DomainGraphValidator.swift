@@ -29,6 +29,25 @@ nonisolated enum DomainGraphViolation: Error, Equatable {
     case invalidPhotographDimensions
     case invalidPhotographByteCount
     case duplicatePhotographID
+    case invalidWorkItemPolicyVersion
+    case serviceNameNotNormalized
+    case serviceAmountNegative
+    case serviceCurrencyInvalid
+    case serviceHorseDefaultInverseMismatch
+    case serviceWorkItemInverseMismatch
+    case horseDefaultServiceArchived
+    case horseDefaultServiceInverseMismatch
+    case workItemMissingService
+    case workItemMissingVisitHorse
+    case workItemServiceInverseMismatch
+    case workItemVisitHorseInverseMismatch
+    case workItemServiceNameSnapshotNotNormalized
+    case workItemAmountNegative
+    case workItemCurrencyInvalid
+    case duplicateWorkItemService
+    case notServicedVisitHorseHasWorkItems
+    case completedServicedVisitHorseHasNoWorkItems
+    case workItemTotalOverflow
 }
 
 @MainActor
@@ -45,9 +64,19 @@ enum DomainGraphValidator {
         let visits = try context.fetch(FetchDescriptor<Visit>())
         let visitHorses = try context.fetch(FetchDescriptor<VisitHorse>())
         let photographs = try context.fetch(FetchDescriptor<Photograph>())
+        let services = try context.fetch(FetchDescriptor<Service>())
+        let workItems = try context.fetch(FetchDescriptor<WorkItem>())
+
+        for service in services {
+            try validate(service)
+        }
 
         for horse in horses {
             try validate(horse)
+        }
+
+        for workItem in workItems {
+            try validate(workItem)
         }
 
         var appointmentMemberships = [PersistentIdentifier: [AppointmentHorse]]()
@@ -109,6 +138,32 @@ enum DomainGraphValidator {
         guard horse.currentBarn != nil else {
             throw DomainGraphViolation.horseMissingCurrentBarn
         }
+        if let service = horse.defaultService {
+            guard !service.isArchived else {
+                throw DomainGraphViolation.horseDefaultServiceArchived
+            }
+            guard service.horsesUsingAsDefault.contains(where: { $0 === horse }) else {
+                throw DomainGraphViolation.horseDefaultServiceInverseMismatch
+            }
+        }
+    }
+
+    private static func validate(_ service: Service) throws {
+        guard TextNormalization.required(service.name) == service.name else {
+            throw DomainGraphViolation.serviceNameNotNormalized
+        }
+        guard service.defaultAmountMinorUnits >= 0 else {
+            throw DomainGraphViolation.serviceAmountNegative
+        }
+        guard service.currencyCode == "USD" else {
+            throw DomainGraphViolation.serviceCurrencyInvalid
+        }
+        guard service.horsesUsingAsDefault.allSatisfy({ $0.defaultService === service }) else {
+            throw DomainGraphViolation.serviceHorseDefaultInverseMismatch
+        }
+        guard service.workItems.allSatisfy({ $0.service === service }) else {
+            throw DomainGraphViolation.serviceWorkItemInverseMismatch
+        }
     }
 
     private static func validate(_ appointmentHorse: AppointmentHorse) throws {
@@ -126,6 +181,30 @@ enum DomainGraphValidator {
         }
         guard visitHorse.horse != nil else {
             throw DomainGraphViolation.visitHorseMissingHorse
+        }
+    }
+
+    private static func validate(_ workItem: WorkItem) throws {
+        guard let service = workItem.service else {
+            throw DomainGraphViolation.workItemMissingService
+        }
+        guard let visitHorse = workItem.visitHorse else {
+            throw DomainGraphViolation.workItemMissingVisitHorse
+        }
+        guard service.workItems.contains(where: { $0 === workItem }) else {
+            throw DomainGraphViolation.workItemServiceInverseMismatch
+        }
+        guard visitHorse.workItems.contains(where: { $0 === workItem }) else {
+            throw DomainGraphViolation.workItemVisitHorseInverseMismatch
+        }
+        guard TextNormalization.required(workItem.serviceNameSnapshot) == workItem.serviceNameSnapshot else {
+            throw DomainGraphViolation.workItemServiceNameSnapshotNotNormalized
+        }
+        guard workItem.amountMinorUnits >= 0 else {
+            throw DomainGraphViolation.workItemAmountNegative
+        }
+        guard workItem.currencyCode == "USD" else {
+            throw DomainGraphViolation.workItemCurrencyInvalid
         }
     }
 
@@ -191,6 +270,9 @@ enum DomainGraphValidator {
         memberships: [VisitHorse],
         appointmentMemberships: inout [PersistentIdentifier: [AppointmentHorse]]
     ) throws {
+        guard visit.workItemPolicyVersion == 0 || visit.workItemPolicyVersion == 1 else {
+            throw DomainGraphViolation.invalidWorkItemPolicyVersion
+        }
         guard let appointment = visit.appointment else {
             throw DomainGraphViolation.visitMissingAppointment
         }
@@ -219,6 +301,7 @@ enum DomainGraphValidator {
         var visitHorseIDs = Set<PersistentIdentifier>()
         var hasPendingHorse = false
         var hasServicedHorse = false
+        var subtotals = [MoneyAvailability]()
         for membership in memberships {
             guard let horse = membership.horse else {
                 throw DomainGraphViolation.visitHorseMissingHorse
@@ -234,8 +317,41 @@ enum DomainGraphValidator {
                outcome != .serviced {
                 throw DomainGraphViolation.workNotesRequireServicedOutcome
             }
+            let workItems = membership.workItems
+            if outcome == .notServiced, !workItems.isEmpty {
+                throw DomainGraphViolation.notServicedVisitHorseHasWorkItems
+            }
+            var serviceIDs = Set<PersistentIdentifier>()
+            for workItem in workItems {
+                guard let service = workItem.service else {
+                    throw DomainGraphViolation.workItemMissingService
+                }
+                guard serviceIDs.insert(service.persistentModelID).inserted else {
+                    throw DomainGraphViolation.duplicateWorkItemService
+                }
+            }
+            do {
+                let unavailableWhenEmpty = visit.completedAt != nil
+                    && visit.workItemPolicyVersion == 0
+                    && outcome == .serviced
+                subtotals.append(
+                    try CheckedMoneyTotal.projectedSubtotal(
+                        workItems.map(\.amountMinorUnits),
+                        unavailableWhenEmpty: unavailableWhenEmpty
+                    )
+                )
+            } catch {
+                throw DomainGraphViolation.workItemTotalOverflow
+            }
             hasPendingHorse = hasPendingHorse || outcome == .pending
             hasServicedHorse = hasServicedHorse || outcome == .serviced
+
+            if visit.completedAt != nil,
+               visit.workItemPolicyVersion == 1,
+               outcome == .serviced,
+               workItems.isEmpty {
+                throw DomainGraphViolation.completedServicedVisitHorseHasNoWorkItems
+            }
         }
 
         guard visitHorseIDs == appointmentHorseIDs else {
@@ -252,6 +368,12 @@ enum DomainGraphValidator {
             guard hasServicedHorse else {
                 throw DomainGraphViolation.completedVisitHasNoServicedHorse
             }
+        }
+
+        do {
+            _ = try CheckedMoneyTotal.projectedTotal(subtotals)
+        } catch {
+            throw DomainGraphViolation.workItemTotalOverflow
         }
     }
 }

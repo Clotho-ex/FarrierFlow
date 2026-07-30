@@ -77,6 +77,7 @@ enum VisitStartUseCase {
                 startedAt: now,
                 serviceLocationNameSnapshot: serviceLocationNameSnapshot,
                 serviceLocationAddressSnapshot: serviceLocationAddressSnapshot,
+                workItemPolicyVersion: 1,
                 appointment: appointment,
                 barn: barn
             )
@@ -93,6 +94,26 @@ enum VisitStartUseCase {
                 context.insert(visitHorse)
                 visit.visitHorses.append(visitHorse)
                 horse.visitHorses.append(visitHorse)
+
+                if let service = horse.defaultService {
+                    guard
+                        let serviceNameSnapshot = TextNormalization.required(service.name),
+                        !visitHorse.workItems.contains(where: { $0.service === service })
+                    else {
+                        throw DomainGraphViolation.duplicateWorkItemService
+                    }
+
+                    let workItem = WorkItem(
+                        serviceNameSnapshot: serviceNameSnapshot,
+                        amountMinorUnits: service.defaultAmountMinorUnits,
+                        currencyCode: "USD",
+                        service: service,
+                        visitHorse: visitHorse
+                    )
+                    context.insert(workItem)
+                    service.workItems.append(workItem)
+                    visitHorse.workItems.append(workItem)
+                }
             }
 
             try saving(context)

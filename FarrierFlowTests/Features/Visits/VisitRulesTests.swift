@@ -89,6 +89,52 @@ struct VisitRulesTests {
     }
 
     @Test
+    func policyOneCompletionRequiresARecordedServiceForEachServicedHorse() throws {
+        let draft = try makeDraft(
+            outcomes: [(.serviced, "")],
+            policy: 1
+        )
+
+        #expect(VisitRules.completionViolation(in: draft) == nil)
+
+        var missingWorkItem = draft
+        missingWorkItem.horses[0].workItems = []
+        #expect(
+            VisitRules.completionViolation(in: missingWorkItem)
+                == .policyOneServicedHorseRequiresWorkItem
+        )
+    }
+
+    @Test
+    func progressRejectsWorkItemsForNotServicedHorseUnderEitherPolicy() throws {
+        var draft = try makeDraft(
+            outcomes: [(.serviced, "")],
+            policy: 1
+        )
+        draft.horses[0].outcome = .notServiced
+
+        #expect(VisitRules.progressViolation(in: draft) == .notServicedHorseHasWorkItems)
+    }
+
+    @Test
+    func progressAllowsPendingHorseWithDraftWorkItems() throws {
+        var draft = try makeDraft(
+            outcomes: [(.serviced, "")],
+            policy: 1
+        )
+        draft.horses[0].outcome = .pending
+
+        #expect(VisitRules.progressViolation(in: draft) == nil)
+    }
+
+    @Test
+    func progressRejectsUnknownWorkItemPolicy() throws {
+        let draft = try makeDraft(outcomes: [(.pending, "")], policy: 2)
+
+        #expect(VisitRules.progressViolation(in: draft) == .invalidWorkItemPolicyVersion)
+    }
+
+    @Test
     func correctionRejectsPendingOutcomes() throws {
         let draft = try makeDraft(outcomes: [(.serviced, ""), (.pending, "")])
 
@@ -129,6 +175,18 @@ struct VisitRulesTests {
     }
 
     @Test
+    func leavingPendingOutcomeWithDraftWorkItemsRequiresConfirmationBeforeClearingThem() throws {
+        let draft = try makeDraft(outcomes: [(.serviced, "")], policy: 1)
+        var pendingHorse = draft.horses[0]
+        pendingHorse.outcome = .pending
+
+        #expect(VisitRules.requiresWorkNotesClearConfirmation(
+            from: pendingHorse,
+            to: .notServiced
+        ))
+    }
+
+    @Test
     func dirtyStateIsExactInequalityFromLastSavedDraft() throws {
         let saved = try makeDraft(outcomes: [(.serviced, "Trimmed front hooves")])
         var edited = saved
@@ -139,7 +197,8 @@ struct VisitRulesTests {
     }
 
     private func makeDraft(
-        outcomes: [(VisitOutcome, String)]
+        outcomes: [(VisitOutcome, String)],
+        policy: Int = 0
     ) throws -> VisitDraft {
         let container = try ModelContainerFactory.inMemoryTest()
         let context = container.mainContext
@@ -167,6 +226,7 @@ struct VisitRulesTests {
         let visit = Visit(
             startedAt: .now,
             serviceLocationNameSnapshot: barn.name,
+            workItemPolicyVersion: policy,
             appointment: appointment,
             barn: barn
         )
@@ -186,18 +246,37 @@ struct VisitRulesTests {
             horse.visitHorses.append(visitHorse)
             return visitHorse
         }
+        let serviceIDs = horses.enumerated().map { index, _ in
+            let service = Service(
+                name: "Service \(index + 1)",
+                defaultAmountMinorUnits: 7_500
+            )
+            context.insert(service)
+            return service.persistentModelID
+        }
         try context.save()
 
         return VisitDraft(
             visitID: visit.persistentModelID,
-            horses: zip(zip(visitHorses, horses), outcomes).map { pair, item in
+            workItemPolicyVersion: policy,
+            horses: zip(zip(visitHorses, horses), outcomes).enumerated().map { index, entry in
+                let (pair, item) = entry
                 let (visitHorse, horse) = pair
                 return VisitHorseDraft(
                     id: visitHorse.persistentModelID,
                     horseID: horse.persistentModelID,
                     horseName: horse.name,
                     outcome: item.0,
-                    workNotes: item.1
+                    workNotes: item.1,
+                    workItems: policy == 1 && item.0 == .serviced
+                        ? [
+                            WorkItemDraft(
+                                serviceID: serviceIDs[index],
+                                serviceNameSnapshot: "Service \(index + 1)",
+                                amountMinorUnits: 7_500
+                            ),
+                        ]
+                        : []
                 )
             }
         )

@@ -183,6 +183,87 @@ struct RecordDeletionRulesTests {
         #expect(try context.fetchCount(FetchDescriptor<Barn>()) == 0)
     }
 
+    @Test
+    func archiveRejectsServiceUsedAsHorseDefault() throws {
+        let graph = try makeGraph()
+        let service = ModelFixtures.makeService(in: graph.context)
+        graph.horse.defaultService = service
+        service.horsesUsingAsDefault.append(graph.horse)
+
+        #expect(throws: RecordDeletionBlock.serviceHasHorseDefaults) {
+            try RecordDeletionRules.archive(service, in: graph.context)
+        }
+        #expect(!service.isArchived)
+    }
+
+    @Test
+    func archiveAllowsServiceAfterDefaultsAreClearedAndPreservesRecordedWork() throws {
+        let graph = try makeGraph()
+        let visit = ModelFixtures.makeVisit(appointment: graph.appointment, in: graph.context)
+        let visitHorse = try #require(visit.visitHorses.first)
+        let service = ModelFixtures.makeService(in: graph.context)
+        _ = ModelFixtures.makeWorkItem(
+            service: service,
+            visitHorse: visitHorse,
+            in: graph.context
+        )
+
+        try RecordDeletionRules.archive(service, in: graph.context)
+
+        #expect(service.isArchived)
+        #expect(try graph.context.fetchCount(FetchDescriptor<WorkItem>()) == 1)
+    }
+
+    @Test
+    func deletingServiceRejectsDefaultAndWorkItemReferences() throws {
+        let graph = try makeGraph()
+        let visit = ModelFixtures.makeVisit(appointment: graph.appointment, in: graph.context)
+        let visitHorse = try #require(visit.visitHorses.first)
+        let service = ModelFixtures.makeService(in: graph.context)
+        graph.horse.defaultService = service
+        service.horsesUsingAsDefault.append(graph.horse)
+        _ = ModelFixtures.makeWorkItem(
+            service: service,
+            visitHorse: visitHorse,
+            in: graph.context
+        )
+
+        #expect(throws: RecordDeletionBlock.serviceHasHorseDefaultsAndWorkItems) {
+            try RecordDeletionRules.delete(service, in: graph.context)
+        }
+        #expect(try graph.context.fetchCount(FetchDescriptor<Service>()) == 1)
+    }
+
+    @Test
+    func deletingWorkItemPreservesServiceAndVisitHorse() throws {
+        let graph = try makeGraph()
+        let visit = ModelFixtures.makeVisit(appointment: graph.appointment, in: graph.context)
+        let visitHorse = try #require(visit.visitHorses.first)
+        let service = ModelFixtures.makeService(in: graph.context)
+        let workItem = ModelFixtures.makeWorkItem(
+            service: service,
+            visitHorse: visitHorse,
+            in: graph.context
+        )
+
+        try RecordDeletionRules.delete(workItem, in: graph.context)
+
+        #expect(try graph.context.fetchCount(FetchDescriptor<WorkItem>()) == 0)
+        #expect(try graph.context.fetchCount(FetchDescriptor<Service>()) == 1)
+        #expect(try graph.context.fetchCount(FetchDescriptor<VisitHorse>()) == 1)
+    }
+
+    @Test
+    func deletingUnreferencedServiceRemovesOnlyTheService() throws {
+        let graph = try makeGraph()
+        let service = ModelFixtures.makeService(in: graph.context)
+
+        try RecordDeletionRules.delete(service, in: graph.context)
+
+        #expect(try graph.context.fetchCount(FetchDescriptor<Service>()) == 0)
+        #expect(try graph.context.fetchCount(FetchDescriptor<Horse>()) == 1)
+    }
+
     private func makeGraph() throws -> (
         container: ModelContainer,
         context: ModelContext,
