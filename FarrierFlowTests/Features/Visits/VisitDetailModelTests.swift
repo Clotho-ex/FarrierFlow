@@ -164,6 +164,48 @@ struct VisitDetailModelTests {
     }
 
     @Test
+    func invoicedCompletedVisitRemainsReadableButPublishesAReadOnlyReason() throws {
+        let graph = try makeCompletedGraph()
+        let context = ModelContext(graph.container)
+        let visit = try #require(context.model(for: graph.visitID) as? Visit)
+        let servicedVisitHorse = try #require(
+            visit.visitHorses.first(where: { $0.horse?.name == "Milo" })
+        )
+        let client = try #require(servicedVisitHorse.horse?.client)
+        let workItem = try #require(servicedVisitHorse.workItems.first)
+        let profile = ModelFixtures.makeBusinessProfile(
+            nextInvoiceNumber: 2,
+            in: context
+        )
+        let invoice = ModelFixtures.makeInvoice(
+            number: 1,
+            client: client,
+            businessProfile: profile,
+            in: context
+        )
+        let invoiceVisit = ModelFixtures.makeInvoiceVisit(
+            invoice: invoice,
+            sourceVisit: visit,
+            in: context
+        )
+        _ = try ModelFixtures.makeInvoiceLineItem(
+            invoiceVisit: invoiceVisit,
+            sourceWorkItem: workItem,
+            in: context
+        )
+        try DomainGraphValidator.save(context)
+
+        let model = VisitDetailModel(visitID: graph.visitID, in: graph.container)
+        model.load()
+
+        #expect(model.loadState == .loaded)
+        #expect(model.detail != nil)
+        #expect(model.editorMode == .correction)
+        #expect(model.isCorrectionLocked)
+        #expect(model.detail?.isCorrectionLocked == true)
+    }
+
+    @Test
     func completedDetailRejectsCorruptedVisitInvariantsExceptMissingBarnFallback() throws {
         try assertUnavailableAfterDirectSave { visit, _ in
             visit.visitHorses[0].outcomeRawValue = VisitOutcome.pending.rawValue

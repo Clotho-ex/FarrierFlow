@@ -5,7 +5,7 @@ nonisolated enum VisitSaveError: Error, Equatable {
     case visitUnavailable
     case visitIsCompleted
     case correctionRequiresCompletedVisit
-    case correctionLockedByInvoice
+    case invoicedVisitCannotBeCorrected
     case completionPredatesStart
 }
 
@@ -18,6 +18,9 @@ enum VisitSaveUseCase {
         guard let visit = try context.existingModel(Visit.self, for: visitID) else {
             throw VisitSaveError.visitUnavailable
         }
+        if visit.completedAt != nil, InvoiceDomainRules.isCorrectionLocked(visit) {
+            throw VisitSaveError.invoicedVisitCannotBeCorrected
+        }
         return visit.completedAt == nil ? .inProgress : .correction
     }
 
@@ -27,6 +30,9 @@ enum VisitSaveUseCase {
     ) throws -> VisitDraft {
         guard let visit = try context.existingModel(Visit.self, for: visitID) else {
             throw VisitSaveError.visitUnavailable
+        }
+        if visit.completedAt != nil, InvoiceDomainRules.isCorrectionLocked(visit) {
+            throw VisitSaveError.invoicedVisitCannotBeCorrected
         }
         try DomainGraphValidator.validateAll(in: context)
 
@@ -182,7 +188,7 @@ enum VisitSaveUseCase {
                 throw VisitSaveError.correctionRequiresCompletedVisit
             }
             guard !InvoiceDomainRules.isCorrectionLocked(visit) else {
-                throw VisitSaveError.correctionLockedByInvoice
+                throw VisitSaveError.invoicedVisitCannotBeCorrected
             }
             if let violation = VisitRules.correctionViolation(in: draft) {
                 throw violation

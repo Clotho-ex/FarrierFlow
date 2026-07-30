@@ -96,11 +96,11 @@ final class VisitEditorModel {
     func load() {
         loadState = .loading
         do {
-            let loadedDraft = try loading(visitID, context)
             let storedMode = try VisitSaveUseCase.editorMode(visitID: visitID, in: context)
             guard storedMode == mode else {
                 throw VisitSaveError.visitUnavailable
             }
+            let loadedDraft = try loading(visitID, context)
             draft = loadedDraft
             lastSavedDraft = loadedDraft
             alert = nil

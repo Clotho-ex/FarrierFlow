@@ -549,6 +549,66 @@ struct VisitEditorModelTests {
     }
 
     @Test
+    func invoicedWorkLocksCompletedVisitCorrectionBeforeLoadingItsDraft() throws {
+        let graph = try makeVisitGraph()
+        try completeVisit(
+            graph: graph,
+            completedAt: Date(timeIntervalSinceReferenceDate: 200)
+        )
+        let context = ModelContext(graph.container)
+        let visit = try #require(context.model(for: graph.visitID) as? Visit)
+        let servicedVisitHorse = try #require(
+            visit.visitHorses.first(where: { $0.horse?.name == "Milo" })
+        )
+        let client = try #require(servicedVisitHorse.horse?.client)
+        let workItem = try #require(servicedVisitHorse.workItems.first)
+        let profile = ModelFixtures.makeBusinessProfile(
+            nextInvoiceNumber: 2,
+            in: context
+        )
+        let invoice = ModelFixtures.makeInvoice(
+            number: 1,
+            client: client,
+            businessProfile: profile,
+            in: context
+        )
+        let invoiceVisit = ModelFixtures.makeInvoiceVisit(
+            invoice: invoice,
+            sourceVisit: visit,
+            in: context
+        )
+        _ = try ModelFixtures.makeInvoiceLineItem(
+            invoiceVisit: invoiceVisit,
+            sourceWorkItem: workItem,
+            in: context
+        )
+        try DomainGraphValidator.save(context)
+
+        #expect(throws: VisitSaveError.invoicedVisitCannotBeCorrected) {
+            _ = try VisitSaveUseCase.editorMode(
+                visitID: graph.visitID,
+                in: ModelContext(graph.container)
+            )
+        }
+        #expect(throws: VisitSaveError.invoicedVisitCannotBeCorrected) {
+            _ = try VisitSaveUseCase.loadDraft(
+                visitID: graph.visitID,
+                in: ModelContext(graph.container)
+            )
+        }
+
+        let model = VisitEditorModel(
+            visitID: graph.visitID,
+            in: graph.container,
+            mode: .correction
+        )
+        model.load()
+
+        #expect(model.loadState == .failed)
+        #expect(model.draft == nil)
+    }
+
+    @Test
     func backgroundFailureDefersItsErrorUntilTheSameProcessBecomesActive() throws {
         let graph = try makeVisitGraph()
         let model = VisitEditorModel(

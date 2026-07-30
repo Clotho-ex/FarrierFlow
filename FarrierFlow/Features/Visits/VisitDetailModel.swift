@@ -36,6 +36,7 @@ nonisolated struct VisitDetail: Equatable {
     let barnID: PersistentIdentifier?
     let horses: [VisitHorseResult]
     let total: MoneyAvailability
+    let isCorrectionLocked: Bool
 }
 
 nonisolated enum VisitDetailLoadError: Error, Equatable {
@@ -59,6 +60,7 @@ final class VisitDetailModel {
     private(set) var loadState: VisitDetailLoadState = .loading
     private(set) var detail: VisitDetail?
     private(set) var editorMode: VisitEditorMode = .inProgress
+    private(set) var isCorrectionLocked = false
     var alert: FeatureAlert?
 
     let visitID: PersistentIdentifier
@@ -81,11 +83,13 @@ final class VisitDetailModel {
             let loadedDetail = try loading(visitID, context, locale)
             detail = loadedDetail
             editorMode = loadedDetail.completedAt == nil ? .inProgress : .correction
+            isCorrectionLocked = loadedDetail.isCorrectionLocked
             alert = nil
             loadState = .loaded
         } catch {
             loadState = .failed
             detail = nil
+            isCorrectionLocked = false
             Self.logger.error("Failed to load visit detail: \(error, privacy: .public)")
             alert = FeatureAlert(
                 title: "Visit Unavailable",
@@ -148,7 +152,8 @@ final class VisitDetailModel {
             serviceLocationAddressSnapshot: visit.serviceLocationAddressSnapshot,
             barnID: visit.barn?.persistentModelID,
             horses: horses,
-            total: try CheckedMoneyTotal.projectedTotal(horses.map(\.subtotal))
+            total: try CheckedMoneyTotal.projectedTotal(horses.map(\.subtotal)),
+            isCorrectionLocked: InvoiceDomainRules.isCorrectionLocked(visit)
         )
     }
 

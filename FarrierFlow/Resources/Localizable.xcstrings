@@ -1003,6 +1003,24 @@
     },
     "Used on future invoices." : {
       "comment" : "VoiceOver hint for reusable Business Profile information."
+    },
+    "Couldn’t Generate Invoice" : {
+      "comment" : "Alert title when invoice generation could not be persisted."
+    },
+    "FarrierFlow couldn’t load this invoice. Try again." : {
+      "comment" : "Recovery guidance when client-specific invoice creation cannot load."
+    },
+    "Invoice Unavailable" : {
+      "comment" : "Title shown when client-specific invoice creation cannot load."
+    },
+    "Invoiced Work" : {
+      "comment" : "Visit detail section explaining why completed work is read-only."
+    },
+    "This visit has invoiced work and can no longer be corrected." : {
+      "comment" : "Completed Visit correction lock explanation after any source WorkItem is invoiced."
+    },
+    "Your visit selection is unchanged. Try again." : {
+      "comment" : "Recovery guidance when atomic invoice generation fails."
     }
   },
   "version" : "1.1"

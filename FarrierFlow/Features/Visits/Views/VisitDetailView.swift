@@ -61,7 +61,8 @@ struct VisitDetailView: View {
                     .accessibilityIdentifier("visit-detail-done")
                 }
             }
-            if model.loadState == .loaded {
+            if model.loadState == .loaded,
+               (model.editorMode == .inProgress || !model.isCorrectionLocked) {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(model.editorMode == .inProgress ? "Resume Visit" : "Edit") {
                         showsEditor = true
@@ -110,6 +111,12 @@ struct VisitDetailView: View {
                     LabeledContent("Status") {
                         Text(detail.completedAt == nil ? "In Progress" : "Completed")
                             .accessibilityIdentifier("visit-detail-status")
+                    }
+                }
+                if detail.isCorrectionLocked {
+                    Section("Invoiced Work") {
+                        Text("This visit has invoiced work and can no longer be corrected.")
+                            .foregroundStyle(.secondary)
                     }
                 }
                 Section("Service Location") {
