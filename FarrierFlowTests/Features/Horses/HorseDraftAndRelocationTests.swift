@@ -258,6 +258,16 @@ struct HorseDraftAndRelocationTests {
                 in: container
             )
             let visitContext = ModelContext(container)
+            let completedVisit = try #require(
+                visitContext.model(for: completedVisitID) as? Visit
+            )
+            let completedVisitHorse = try #require(completedVisit.visitHorses.first)
+            let completedService = ModelFixtures.makeService(in: visitContext)
+            _ = ModelFixtures.makeWorkItem(
+                service: completedService,
+                visitHorse: completedVisitHorse,
+                in: visitContext
+            )
             var completedDraft = try VisitSaveUseCase.loadDraft(
                 visitID: completedVisitID,
                 in: visitContext
@@ -454,6 +464,14 @@ struct HorseDraftAndRelocationTests {
             in: container
         )
         let completionContext = ModelContext(container)
+        let visit = try #require(completionContext.model(for: visitID) as? Visit)
+        let visitHorse = try #require(visit.visitHorses.first)
+        let service = ModelFixtures.makeService(in: completionContext)
+        _ = ModelFixtures.makeWorkItem(
+            service: service,
+            visitHorse: visitHorse,
+            in: completionContext
+        )
         var draft = try VisitSaveUseCase.loadDraft(visitID: visitID, in: completionContext)
         let miloIndex = try #require(draft.horses.firstIndex(where: { $0.horseName == "Milo" }))
         draft.horses[miloIndex].outcome = .serviced
