@@ -26,26 +26,28 @@ additional payment-status behavior is implied.
 ## Product Boundary
 
 - One Invoice belongs to exactly one Client.
-- One Invoice contains one or more completed Visits.
-- One Visit belongs to at most one Invoice.
-- Every recorded WorkItem from each selected Visit becomes one InvoiceLineItem.
+- One Invoice contains one or more InvoiceVisits for completed source Visits.
+- A completed Visit may appear on separate Invoices for different represented
+  Clients.
+- Each source WorkItem appears on at most one InvoiceLineItem.
+- Selecting a Visit includes every eligible WorkItem for the Invoice's Client
+  in that Visit. There is no per-Service or partial line-item selection.
 - Invoice content is a snapshot. Later edits to Client, Business Profile,
   Horse, Service, or current service-location records never rewrite it.
-- Invoice generation, numbering, Visit assignment, and snapshot insertion are
-  one atomic persistence action.
+- Invoice generation, numbering, source WorkItem billing links, and snapshot
+  insertion are one atomic persistence action.
 - FarrierFlow remains local-first and fully usable offline.
 
 An eligible Visit must:
 
 - Be completed.
-- Have no existing Invoice.
-- Contain at least one valid recorded WorkItem.
-- Contain only Horses owned by the Client receiving the Invoice.
+- Contain at least one valid, uninvoiced WorkItem owned by a VisitHorse whose
+  Horse belongs to the Client receiving the Invoice.
 
-Appointments may contain Horses from multiple Clients. Such a mixed-client
-Visit is not eligible in Slice 5 because the approved model permits neither a
-multi-client Invoice nor the same Visit on multiple Invoices. The selection
-screen explains this rather than silently omitting another Client's work.
+Mixed-client Visits are eligible independently for every represented Client
+with at least one eligible WorkItem. WorkItems belonging to other Clients are
+not included, marked invoiced, or changed. A Visit may remain eligible for
+another Client after one Client's portion has been invoiced.
 
 ## Navigation and Workflow
 
@@ -62,8 +64,11 @@ Create Invoice uses a native form:
 1. If no valid Business Profile exists, require the farrier to complete it,
    then return to invoice creation.
 2. Show the selected Client as read-only.
-3. List eligible completed Visits by Visit date and service location.
-4. Support individual selection and **Select All**.
+3. List eligible completed Visits by Visit date and service location. Each row
+   represents all currently eligible WorkItems for this Client in that Visit.
+4. Support individual Visit selection and **Select All**. Select All selects
+   every eligible Visit for the Client; neither action exposes individual
+   Service or line-item selection.
 5. Set Invoice Date to the current date.
 6. Preselect an optional Due Date 14 calendar days after Invoice Date; the
    farrier may clear it before generation.
@@ -137,18 +142,27 @@ Create one InvoiceVisit for each selected Visit. Persist:
 - Actual Visit date snapshot from `Visit.startedAt`.
 - Service-location name and optional address snapshots.
 
-The source Visit relationship enforces at-most-one-Invoice membership.
-InvoiceVisit owns its InvoiceLineItems.
+One Invoice contains at most one InvoiceVisit for a given source Visit. The
+source Visit relationship is not globally unique: the same Visit may have one
+InvoiceVisit on separate Invoices for different Clients. InvoiceVisit groups
+and snapshots the source Visit inside one Invoice; it does not enforce
+whole-Visit billing ownership. InvoiceVisit owns its InvoiceLineItems.
 
 ### InvoiceLineItem
 
-Create one InvoiceLineItem for every recorded WorkItem in its InvoiceVisit.
-Persist:
+Create one InvoiceLineItem for every eligible, uninvoiced source WorkItem owned
+by the Invoice's Client in the selected Visit. Persist:
 
+- Source WorkItem relationship.
 - Horse name snapshot.
 - Service name snapshot.
 - Nonnegative amount in `Int64` minor units.
 - Explicit `USD` currency code.
+
+The source WorkItem relationship is globally unique across InvoiceLineItems
+and is the duplicate-billing boundary. At generation, its VisitHorse's Horse
+must belong to the Invoice's Client. Creating an InvoiceLineItem does not
+change or move the source WorkItem.
 
 Quantity, unit price, tax, discount, and mutable descriptions are not added.
 Line order is deterministic by horse name, service name, amount, and stable
@@ -161,19 +175,27 @@ currency, uniqueness rule, or total is invalid.
 
 ## Locking and Historical Integrity
 
-Once a Visit belongs to an Invoice:
+Once any InvoiceLineItem references a WorkItem from a Visit:
 
 - Completed Visit correction is unavailable.
 - Outcomes, Work Notes, WorkItems, WorkItem Services, and WorkItem amounts
   cannot change.
+- Invoice generation remains available for another Client's eligible,
+  uninvoiced WorkItems from the same Visit while correction is locked.
 - Client, Horse, Service, Business Profile, and service-location edits remain
   allowed because the Invoice uses snapshots.
 - Read-only Visit Detail and existing Photo behavior remain available.
 
 Deleting an Unpaid Invoice deletes only its InvoiceVisit and InvoiceLineItem
-snapshots, clears the source Visits' Invoice membership, and makes those Visits
-eligible for correction and reinvoicing. It never deletes Visits, WorkItems,
-Horses, Services, Clients, or Photos.
+snapshots and clears only those InvoiceLineItems' source WorkItem billing
+links. It never deletes Visits, WorkItems, Horses, Services, Clients, or
+Photos.
+
+After deletion, a Visit becomes correctable again only when no remaining
+InvoiceLineItem references any of its WorkItems. Remaining InvoiceLineItems on
+another Unpaid Invoice keep correction locked. Any remaining InvoiceLineItem
+owned by a Paid Invoice keeps the affected Visit permanently locked because
+the Paid Invoice cannot be deleted.
 
 Paid Invoices cannot be edited or deleted. They remain permanent historical
 records.
@@ -233,7 +255,8 @@ Apple PDF drawing frameworks.
   shrinking below readable text sizes.
 - The PDF uses a restrained black-and-white layout, system typography, clear
   hierarchy, and no logo or theme selection.
-- The filename is `Invoice-<number>.pdf` and contains no Client name.
+- The filename uses the formatted number, for example `Invoice-0001.pdf`, and
+  contains no Client name.
 - Regeneration from the same Invoice snapshot produces the same financial
   content.
 - PDF generation failure leaves the Invoice unchanged and offers Retry.
@@ -287,12 +310,13 @@ must register the same shipping schema.
 ## Failure Behavior
 
 - Missing or invalid source relationships fail closed.
-- Concurrent or repeated generation cannot place one Visit on two Invoices or
-  issue the same Invoice number twice.
-- A failed generation rolls back the Invoice, snapshots, Visit assignments,
-  and sequence change.
+- Concurrent or repeated generation cannot place one source WorkItem on two
+  InvoiceLineItems or issue the same Invoice number twice.
+- A failed generation rolls back the Invoice, snapshots, source WorkItem
+  billing links, and sequence change.
 - A failed Mark Paid action leaves the Invoice Unpaid with no payment date.
-- A failed delete leaves the Invoice and Visit assignments intact.
+- A failed delete leaves the Invoice, snapshots, and source WorkItem billing
+  links intact.
 - Invalid or overflowing persisted totals are shown as unavailable; they are
   never wrapped, approximated, or presented as valid.
 - Errors use native alerts and preserve recoverable user selection where safe.
@@ -303,13 +327,18 @@ Implementation must prove:
 
 - Business Profile validation and snapshot isolation.
 - Atomic sequential numbering, including deletion without reuse.
-- Visit eligibility, Select All, mixed-client exclusion, and one-Invoice
-  uniqueness.
-- Complete WorkItem-to-InvoiceLineItem snapshots and checked totals.
-- Invoiced Visit locking, Unpaid deletion/reinvoicing, and permanent Paid
-  history.
-- Persistent-store reopening of Business Profile, Invoices, Visit membership,
-  status, payment date, and snapshots.
+- Per-Client Visit eligibility, Select All, automatic inclusion of every
+  eligible Client WorkItem, and absence of per-line selection.
+- Mixed-client Visits on separate Client Invoices while every source WorkItem
+  remains globally unique across InvoiceLineItems.
+- Complete WorkItem-to-InvoiceLineItem relationships, snapshots, and checked
+  totals.
+- Whole-Visit correction locking after any invoiced WorkItem while another
+  Client's uninvoiced portion remains available for generation.
+- Unpaid deletion releases only its WorkItem billing links; correction remains
+  locked until no references remain, and Paid references lock permanently.
+- Persistent-store reopening of Business Profile, Invoices, source
+  relationships, status, payment date, and snapshots.
 - Multi-page US Letter PDF generation and native sharing entry.
 - The primary Client Detail → Generate → Share → Mark Paid flow on iOS 18 and
   iOS 26.
