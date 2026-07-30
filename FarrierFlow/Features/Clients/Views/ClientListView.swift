@@ -41,6 +41,9 @@ struct ClientListView: View {
                         Button("Services", systemImage: "wrench.and.screwdriver") {
                             path.append(ServiceRoute.list)
                         }
+                        Button("Invoices", systemImage: "doc.text") {
+                            path.append(InvoiceRoute.list)
+                        }
                         Button(
                             "Business Profile",
                             systemImage: "person.text.rectangle"
@@ -82,6 +85,19 @@ struct ClientListView: View {
                 switch route {
                 case .editor:
                     BusinessProfileEditorView()
+                }
+            }
+            .navigationDestination(for: InvoiceRoute.self) { route in
+                switch route {
+                case .list:
+                    InvoiceListView()
+                case .detail(let id):
+                    InvoiceDetailView(invoiceID: id)
+                case .create(let clientID):
+                    InvoiceCreationView(clientID: clientID) { invoiceID in
+                        path.removeLast()
+                        path.append(InvoiceRoute.detail(invoiceID))
+                    }
                 }
             }
             .sheet(isPresented: $showsEditor, onDismiss: reload) {

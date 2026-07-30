@@ -1021,6 +1021,45 @@
     },
     "Your visit selection is unchanged. Try again." : {
       "comment" : "Recovery guidance when atomic invoice generation fails."
+    },
+    "Add Due Date" : {
+      "comment" : "Toggle label for the optional Invoice due date."
+    },
+    "Create Invoice" : {
+      "comment" : "Action to create a Client invoice."
+    },
+    "Delete Invoice?" : {
+      "comment" : "Destructive confirmation title for an unpaid Invoice."
+    },
+    "Invoices" : {
+      "comment" : "Navigation title for invoice history."
+    },
+    "Invoices Unavailable" : {
+      "comment" : "Title shown when local invoice history cannot load."
+    },
+    "Loading Invoice…" : {
+      "comment" : "Progress label while a local Invoice loads."
+    },
+    "Loading Invoices…" : {
+      "comment" : "Progress label while local invoice history loads."
+    },
+    "Mark Invoice Paid?" : {
+      "comment" : "Confirmation title before recording an Invoice payment."
+    },
+    "No Invoices" : {
+      "comment" : "Empty state title for invoice history."
+    },
+    "Unpaid" : {
+      "comment" : "Textual Invoice payment status."
+    },
+    "Paid" : {
+      "comment" : "Textual Invoice payment status."
+    },
+    "Couldn’t Delete Invoice" : {
+      "comment" : "Alert title when an unpaid Invoice could not be deleted."
+    },
+    "Couldn’t Mark Invoice Paid" : {
+      "comment" : "Alert title when Invoice payment status could not be saved."
     }
   },
   "version" : "1.1"

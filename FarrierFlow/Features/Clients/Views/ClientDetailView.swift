@@ -15,6 +15,12 @@ struct ClientDetailView: View {
         Group {
             if let client = model.client {
                 List {
+                    Section {
+                        NavigationLink(value: InvoiceRoute.create(clientID)) {
+                            Label("Create Invoice", systemImage: "doc.badge.plus")
+                        }
+                        .accessibilityIdentifier("client-create-invoice-action")
+                    }
                     Section("Client") {
                         if let phone = client.phone {
                             LabeledContent("Phone", value: phone)
