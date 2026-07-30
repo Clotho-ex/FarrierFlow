@@ -41,6 +41,12 @@ struct ClientListView: View {
                         Button("Services", systemImage: "wrench.and.screwdriver") {
                             path.append(ServiceRoute.list)
                         }
+                        Button(
+                            "Business Profile",
+                            systemImage: "person.text.rectangle"
+                        ) {
+                            path.append(BusinessProfileRoute.editor)
+                        }
                     } label: {
                         Label("More", systemImage: "ellipsis.circle")
                     }
@@ -70,6 +76,12 @@ struct ClientListView: View {
                     ServiceListView()
                 case .detail(let id):
                     ServiceDetailView(serviceID: id)
+                }
+            }
+            .navigationDestination(for: BusinessProfileRoute.self) { route in
+                switch route {
+                case .editor:
+                    BusinessProfileEditorView()
                 }
             }
             .sheet(isPresented: $showsEditor, onDismiss: reload) {

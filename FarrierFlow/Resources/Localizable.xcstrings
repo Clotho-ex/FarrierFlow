@@ -958,6 +958,51 @@
     },
     "Your unsaved visit changes will be lost." : {
       "comment" : "Explanation shown before dismissing a dirty Visit editor."
+    },
+    "A business or farrier name is required." : {
+      "comment" : "Business Profile editor guidance for the required name field."
+    },
+    "Business" : {
+      "comment" : "Business Profile editor section containing the required business or farrier name."
+    },
+    "Business or Farrier Name" : {
+      "comment" : "Required name field used on future invoice snapshots."
+    },
+    "Business Profile" : {
+      "comment" : "Navigation destination for reusable business information used on future invoices."
+    },
+    "Business Profile Unavailable" : {
+      "comment" : "Title shown when the locally stored Business Profile cannot be loaded."
+    },
+    "Contact Information" : {
+      "comment" : "Business Profile editor section containing optional contact details."
+    },
+    "Couldn’t Save Business Profile" : {
+      "comment" : "Alert title when Business Profile changes could not be persisted."
+    },
+    "Default Invoice Note" : {
+      "comment" : "Optional reusable note copied into future invoice snapshots."
+    },
+    "Enter a business or farrier name." : {
+      "comment" : "Inline validation for a Business Profile name containing only whitespace."
+    },
+    "FarrierFlow couldn’t load your business profile. Try again." : {
+      "comment" : "Business Profile load failure explanation and recovery guidance."
+    },
+    "Loading Business Profile…" : {
+      "comment" : "Progress label while the local Business Profile loads."
+    },
+    "Phone, email, and address are optional." : {
+      "comment" : "Business Profile contact information guidance."
+    },
+    "Required. Used on future invoices." : {
+      "comment" : "VoiceOver hint for the required Business Profile name."
+    },
+    "This optional note is added to future invoices." : {
+      "comment" : "Business Profile default invoice note guidance."
+    },
+    "Used on future invoices." : {
+      "comment" : "VoiceOver hint for reusable Business Profile information."
     }
   },
   "version" : "1.1"
