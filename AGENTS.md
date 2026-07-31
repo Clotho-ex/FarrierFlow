@@ -197,3 +197,12 @@ If memory pressure is already elevated or swap is increasing:
 
 A full verification suite must not be repeated unless source code changed after
 the previous successful run.
+
+## Slice Driver Skill
+
+- Invoke `$farrierflow-slice-driver` when implementing or continuing one
+  explicitly approved FarrierFlow Slice task or smaller implementation unit.
+- `.agents/workflow/CURRENT_UNIT.md` is untracked local workflow state. Keep it
+  current while the skill drives the approved unit, and never commit it.
+- Obtain explicit user approval before pushing the committed unit or starting
+  the next unit.
