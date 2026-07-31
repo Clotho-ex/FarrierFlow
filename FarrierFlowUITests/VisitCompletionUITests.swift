@@ -146,6 +146,63 @@ final class VisitCompletionUITests: XCTestCase {
     }
 
     @MainActor
+    func testVisitEditorCreatesFirstServiceAndAddsSoleServiceDirectly() throws {
+        let graph = makeGraph(prefix: "Candidate Aware")
+        let serviceName = "Candidate Aware Trim"
+        let app = launch(storeName: "VisitCandidateAware-\(UUID().uuidString)")
+        createConnectedGraph(
+            graph,
+            in: app,
+            includesSecondaryBarn: false
+        )
+
+        openAppointment(at: graph.primaryBarnName, in: app)
+        app.buttons["visit-start-action"].tap()
+
+        app.buttons["visit-add-service-\(graph.servicedHorseName)"].tap()
+        XCTAssertTrue(app.navigationBars["Add Service"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["No Services Available"].exists)
+        let createService = app.buttons["visit-create-service-action"]
+        XCTAssertTrue(createService.waitForExistence(timeout: 3))
+
+        createService.tap()
+        XCTAssertTrue(app.navigationBars["New Service"].waitForExistence(timeout: 3))
+        app.navigationBars["New Service"].buttons["Cancel"].tap()
+        XCTAssertTrue(app.navigationBars["Add Service"].waitForExistence(timeout: 3))
+        XCTAssertFalse(
+            app.buttons["visit-work-item-\(graph.servicedHorseName)-\(serviceName)"].exists
+        )
+
+        createService.tap()
+        focusAndType(serviceName, in: app.textFields["service-name-field"])
+        focusAndType("64.50", in: app.textFields["service-price-field"])
+        app.buttons["Save"].tap()
+
+        let firstWorkItem = app.buttons[
+            "visit-work-item-\(graph.servicedHorseName)-\(serviceName)"
+        ]
+        XCTAssertTrue(firstWorkItem.waitForExistence(timeout: 3))
+        XCTAssertEqual(accessibilityText(of: firstWorkItem).filter(\.isNumber), "6450")
+
+        app.buttons["visit-add-service-\(graph.notServicedHorseName)"].tap()
+        let secondWorkItem = app.buttons[
+            "visit-work-item-\(graph.notServicedHorseName)-\(serviceName)"
+        ]
+        XCTAssertTrue(secondWorkItem.waitForExistence(timeout: 3))
+        XCTAssertEqual(accessibilityText(of: secondWorkItem).filter(\.isNumber), "6450")
+        XCTAssertFalse(app.navigationBars["Add Service"].exists)
+
+        app.buttons["visit-save-progress"].tap()
+        app.terminate()
+        app.launch()
+
+        openAppointment(at: graph.primaryBarnName, in: app)
+        app.buttons["visit-resume-action"].tap()
+        XCTAssertTrue(firstWorkItem.waitForExistence(timeout: 3))
+        XCTAssertTrue(secondWorkItem.waitForExistence(timeout: 3))
+    }
+
+    @MainActor
     func testPendingAndAllNotServicedOutcomesBlockCompletionAndDirtyCancelKeepsEditor() throws {
         let graph = makeGraph(prefix: "Draft")
         let app = launch(
@@ -324,7 +381,7 @@ final class VisitCompletionUITests: XCTestCase {
             XCTAssertTrue(service.waitForExistence(timeout: 3))
             service.tap()
         }
-        app.buttons["Save"].tap()
+        app.navigationBars["New Horse"].buttons["Save"].tap()
         XCTAssertTrue(app.staticTexts["horse-row-\(name)"].waitForExistence(timeout: 3))
     }
 

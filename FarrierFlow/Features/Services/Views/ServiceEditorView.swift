@@ -6,9 +6,14 @@ struct ServiceEditorView: View {
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
     @State private var model: ServiceEditorModel
+    private let createdServiceID: Binding<PersistentIdentifier?>?
 
-    init(service: Service? = nil) {
+    init(
+        service: Service? = nil,
+        createdServiceID: Binding<PersistentIdentifier?>? = nil
+    ) {
         _model = State(initialValue: ServiceEditorModel(service: service))
+        self.createdServiceID = createdServiceID
     }
 
     var body: some View {
@@ -35,7 +40,8 @@ struct ServiceEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        if model.save(in: context) != nil {
+                        if let id = model.save(in: context) {
+                            createdServiceID?.wrappedValue = id
                             dismiss()
                         }
                     }

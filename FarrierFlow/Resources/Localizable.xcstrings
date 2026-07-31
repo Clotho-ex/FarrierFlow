@@ -271,6 +271,9 @@
     "Couldn’t Start Visit" : {
       "comment" : "Error title when a Visit could not be created from an Appointment."
     },
+    "Create Service" : {
+      "comment" : "Action that opens the Service editor when a Visit has no active eligible Services."
+    },
     "Create Service Location" : {
 
     },

@@ -12,6 +12,8 @@ struct AddServicePickerView: View {
     let onSuccessfulReplacement: (() -> Void)?
 
     @State private var showsSelectionError = false
+    @State private var showsServiceEditor = false
+    @State private var createdServiceID: PersistentIdentifier?
 
     init(
         model: VisitEditorModel,
@@ -34,6 +36,13 @@ struct AddServicePickerView: View {
                     Label("No Services Available", systemImage: "wrench.and.screwdriver")
                 } description: {
                     Text("Add or reactivate a Service before recording work.")
+                } actions: {
+                    if replacingWorkItemID == nil {
+                        Button("Create Service", systemImage: "plus") {
+                            showsServiceEditor = true
+                        }
+                        .accessibilityIdentifier("visit-create-service-action")
+                    }
                 }
             } else {
                 List(services) { service in
@@ -58,6 +67,9 @@ struct AddServicePickerView: View {
         }
         .navigationTitle(replacingWorkItemID == nil ? "Add Service" : "Replace Service")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showsServiceEditor, onDismiss: addCreatedServiceIfNeeded) {
+            ServiceEditorView(createdServiceID: $createdServiceID)
+        }
         .alert("Couldn’t Update Work Item", isPresented: $showsSelectionError) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -102,5 +114,17 @@ struct AddServicePickerView: View {
         } else {
             dismiss()
         }
+    }
+
+    private func addCreatedServiceIfNeeded() {
+        guard let createdServiceID else { return }
+        self.createdServiceID = nil
+
+        guard model.addService(createdServiceID, to: visitHorseID) else {
+            showsSelectionError = true
+            return
+        }
+
+        dismiss()
     }
 }

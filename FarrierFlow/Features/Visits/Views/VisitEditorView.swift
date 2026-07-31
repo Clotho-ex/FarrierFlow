@@ -307,7 +307,12 @@ struct VisitEditorView: View {
         }
 
         Button("Add Service", systemImage: "plus") {
-            addServiceHorse = horse
+            switch model.requestAddService(to: horse.id) {
+            case .createService, .chooseService:
+                addServiceHorse = horse
+            case .serviceAdded:
+                break
+            }
         }
         .accessibilityIdentifier("visit-add-service-\(horse.horseName)")
 

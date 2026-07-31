@@ -165,6 +165,81 @@ struct VisitEditorModelTests {
     }
 
     @Test
+    func addServiceRequestOffersCreationWhenNoEligibleServiceExists() throws {
+        let graph = try makeVisitGraph()
+        let model = VisitEditorModel(visitID: graph.visitID, in: graph.container)
+        model.load()
+        let milo = try #require(
+            model.draft?.horses.first(where: { $0.horseName == "Milo" })
+        )
+
+        #expect(model.requestAddService(to: milo.id) == .createService)
+        #expect(milo.workItems.count == 1)
+    }
+
+    @Test
+    func addServiceRequestAddsTheSoleEligibleServiceAtItsDefaultPrice() throws {
+        let graph = try makeVisitGraph()
+        let model = VisitEditorModel(visitID: graph.visitID, in: graph.container)
+        model.load()
+        let scout = try #require(
+            model.draft?.horses.first(where: { $0.horseName == "Scout" })
+        )
+
+        #expect(model.requestAddService(to: scout.id) == .serviceAdded)
+        let workItem = try #require(
+            model.draft?.horses.first(where: { $0.id == scout.id })?.workItems.first
+        )
+        #expect(workItem.serviceNameSnapshot == "Front Shoes")
+        #expect(workItem.amountMinorUnits == 12_500)
+        #expect(!model.addService(workItem.serviceID, to: scout.id))
+    }
+
+    @Test
+    func addServiceRequestRequiresSelectionWhenMultipleServicesAreEligible() throws {
+        let graph = try makeVisitGraph()
+        let context = ModelContext(graph.container)
+        _ = ModelFixtures.makeService(
+            name: "Trim",
+            defaultAmountMinorUnits: 8_000,
+            in: context
+        )
+        try DomainGraphValidator.save(context)
+        let model = VisitEditorModel(visitID: graph.visitID, in: graph.container)
+        model.load()
+        let scout = try #require(
+            model.draft?.horses.first(where: { $0.horseName == "Scout" })
+        )
+
+        #expect(model.requestAddService(to: scout.id) == .chooseService)
+        #expect(
+            model.draft?.horses.first(where: { $0.id == scout.id })?.workItems.isEmpty
+                == true
+        )
+    }
+
+    @Test
+    func addServiceRequestExcludesArchivedServices() throws {
+        let graph = try makeVisitGraph(includesDefaultService: false)
+        let context = ModelContext(graph.container)
+        _ = ModelFixtures.makeService(
+            name: "Archived Trim",
+            defaultAmountMinorUnits: 8_000,
+            isArchived: true,
+            in: context
+        )
+        try DomainGraphValidator.save(context)
+        let model = VisitEditorModel(visitID: graph.visitID, in: graph.container)
+        model.load()
+        let milo = try #require(
+            model.draft?.horses.first(where: { $0.horseName == "Milo" })
+        )
+
+        #expect(model.requestAddService(to: milo.id) == .createService)
+        #expect(model.eligibleServices(for: milo.id).isEmpty)
+    }
+
+    @Test
     func failedWorkItemSaveKeepsDraftAndRollsBackAllWorkItemMutations() throws {
         let graph = try makeVisitGraph()
         let setupContext = ModelContext(graph.container)
@@ -717,14 +792,21 @@ struct VisitEditorModelTests {
         }
     }
 
-    private func makeVisitGraph() throws -> VisitEditorGraph {
+    private func makeVisitGraph(
+        includesDefaultService: Bool = true
+    ) throws -> VisitEditorGraph {
         let container = try ModelContainerFactory.inMemoryTest()
-        return try makeVisitGraph(in: container.mainContext, container: container)
+        return try makeVisitGraph(
+            in: container.mainContext,
+            container: container,
+            includesDefaultService: includesDefaultService
+        )
     }
 
     private func makeVisitGraph(
         in context: ModelContext,
-        container: ModelContainer
+        container: ModelContainer,
+        includesDefaultService: Bool = true
     ) throws -> VisitEditorGraph {
         let client = Client(name: "Alex")
         let barn = Barn(name: "North Field")
@@ -743,13 +825,15 @@ struct VisitEditorModelTests {
             horses: [firstHorse, secondHorse],
             in: context
         )
-        let defaultService = ModelFixtures.makeService(
-            name: "Front Shoes",
-            defaultAmountMinorUnits: 12_500,
-            in: context
-        )
-        firstHorse.defaultService = defaultService
-        defaultService.horsesUsingAsDefault.append(firstHorse)
+        if includesDefaultService {
+            let defaultService = ModelFixtures.makeService(
+                name: "Front Shoes",
+                defaultAmountMinorUnits: 12_500,
+                in: context
+            )
+            firstHorse.defaultService = defaultService
+            defaultService.horsesUsingAsDefault.append(firstHorse)
+        }
         try DomainGraphValidator.save(context)
         let visitID = try VisitStartUseCase.start(
             appointmentID: appointment.persistentModelID,

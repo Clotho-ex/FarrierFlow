@@ -19,6 +19,12 @@ nonisolated enum VisitEditorMode: Equatable {
     case correction
 }
 
+nonisolated enum VisitAddServiceRequest: Equatable {
+    case createService
+    case chooseService
+    case serviceAdded
+}
+
 @MainActor
 @Observable
 final class VisitEditorModel {
@@ -186,15 +192,43 @@ final class VisitEditorModel {
         }
     }
 
+    func requestAddService(
+        to visitHorseID: PersistentIdentifier
+    ) -> VisitAddServiceRequest {
+        let services = eligibleServices(for: visitHorseID)
+        switch services.count {
+        case 0:
+            return .createService
+        case 1:
+            return addService(services[0], to: visitHorseID)
+                ? .serviceAdded
+                : .chooseService
+        default:
+            return .chooseService
+        }
+    }
+
     @discardableResult
     func addService(
         _ serviceID: PersistentIdentifier,
         to visitHorseID: PersistentIdentifier
     ) -> Bool {
         guard
-            var updatedDraft = draft,
-            let horseIndex = updatedDraft.horses.firstIndex(where: { $0.id == visitHorseID }),
             let service = eligibleServices(for: visitHorseID).first(where: { $0.id == serviceID })
+        else {
+            return false
+        }
+
+        return addService(service, to: visitHorseID)
+    }
+
+    private func addService(
+        _ service: ServiceChoice,
+        to visitHorseID: PersistentIdentifier
+    ) -> Bool {
+        guard
+            var updatedDraft = draft,
+            let horseIndex = updatedDraft.horses.firstIndex(where: { $0.id == visitHorseID })
         else {
             return false
         }
