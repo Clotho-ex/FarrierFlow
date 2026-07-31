@@ -186,6 +186,14 @@ struct VisitEditorView: View {
                             .accessibilityIdentifier("visit-unsaved-state")
                     }
                 }
+                if model.mode == .inProgress,
+                   let completionBlocker = model.completionBlocker {
+                    Section("Complete Visit") {
+                        Text(completionGuidance(for: completionBlocker))
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("visit-completion-requirement")
+                    }
+                }
                 ForEach(draft.horses) { horse in
                     Section(horse.horseName) {
                         VisitHorseOutcomeRow(
@@ -334,6 +342,25 @@ struct VisitEditorView: View {
     private func formattedAmount(for workItem: WorkItemDraft) -> String {
         MoneyFormatter.usd(minorUnits: workItem.amountMinorUnits, locale: locale)
             ?? String(localized: "Unavailable", locale: locale)
+    }
+
+    private func completionGuidance(
+        for blocker: VisitDraftViolation
+    ) -> LocalizedStringKey {
+        switch blocker {
+        case .pendingOutcomePreventsCompletion:
+            "Choose an outcome for every horse."
+        case .completionRequiresServicedHorse:
+            "Mark at least one horse as Serviced."
+        case .servicedHorseRequiresWorkItem:
+            "Add a recorded Service for every serviced horse."
+        case .unknownOutcome,
+             .duplicateHorse,
+             .workNotesRequireServicedOutcome,
+             .notServicedHorseHasWorkItems,
+             .invalidWorkItem:
+            "Review the Visit details before completing it."
+        }
     }
 }
 

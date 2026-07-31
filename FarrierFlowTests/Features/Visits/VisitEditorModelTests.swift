@@ -486,6 +486,34 @@ struct VisitEditorModelTests {
     }
 
     @Test
+    func completionBlockerTracksTheFirstCurrentRequirement() throws {
+        let graph = try makeVisitGraph()
+        let model = VisitEditorModel(visitID: graph.visitID, in: graph.container)
+        model.load()
+
+        let milo = try #require(
+            model.draft?.horses.first(where: { $0.horseName == "Milo" })
+        )
+        let scout = try #require(
+            model.draft?.horses.first(where: { $0.horseName == "Scout" })
+        )
+
+        #expect(model.completionBlocker == .pendingOutcomePreventsCompletion)
+
+        #expect(model.requestOutcomeChange(for: milo.id, to: .notServiced))
+        model.confirmPendingOutcomeChange()
+        #expect(!model.requestOutcomeChange(for: scout.id, to: .notServiced))
+        #expect(model.completionBlocker == .completionRequiresServicedHorse)
+
+        #expect(!model.requestOutcomeChange(for: scout.id, to: .serviced))
+        #expect(model.completionBlocker == .servicedHorseRequiresWorkItem)
+
+        #expect(model.requestAddService(to: scout.id) == .serviceAdded)
+        #expect(model.completionBlocker == nil)
+        #expect(model.canComplete)
+    }
+
+    @Test
     func failedCompletionPreservesDirtyDraftAndRollsBackPersistedValues() throws {
         let graph = try makeVisitGraph()
         let model = VisitEditorModel(

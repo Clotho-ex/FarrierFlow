@@ -1090,6 +1090,18 @@
     },
     "Couldn’t Mark Invoice Paid" : {
       "comment" : "Alert title when Invoice payment status could not be saved."
+    },
+    "Add a recorded Service for every serviced horse." : {
+      "comment" : "Inline Visit guidance when a serviced horse has no recorded WorkItem."
+    },
+    "Choose an outcome for every horse." : {
+      "comment" : "Inline Visit guidance while one or more horse outcomes remain Pending."
+    },
+    "Mark at least one horse as Serviced." : {
+      "comment" : "Inline Visit guidance when every horse is marked Not Serviced."
+    },
+    "Review the Visit details before completing it." : {
+      "comment" : "Inline Visit guidance for a defensive completion-validation failure."
     }
   },
   "version" : "1.1"

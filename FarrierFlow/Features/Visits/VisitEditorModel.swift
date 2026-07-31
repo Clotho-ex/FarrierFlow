@@ -64,8 +64,13 @@ final class VisitEditorModel {
     }
 
     var canComplete: Bool {
-        guard mode == .inProgress, loadState == .loaded, let draft else { return false }
-        return VisitRules.completionViolation(in: draft) == nil
+        guard mode == .inProgress, loadState == .loaded, draft != nil else { return false }
+        return completionBlocker == nil
+    }
+
+    var completionBlocker: VisitDraftViolation? {
+        guard mode == .inProgress, loadState == .loaded, let draft else { return nil }
+        return VisitRules.completionViolation(in: draft)
     }
 
     var canSaveCorrection: Bool {

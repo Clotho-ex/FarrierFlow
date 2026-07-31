@@ -75,6 +75,59 @@ final class VisitCompletionUITests: XCTestCase {
     }
 
     @MainActor
+    func testVisitCompletionRequirementTracksCurrentBlocker() throws {
+        let graph = makeGraph(prefix: "Requirements")
+        let serviceName = "Requirements Trim"
+        let app = launch(storeName: "VisitRequirements-\(UUID().uuidString)")
+        createConnectedGraph(
+            graph,
+            in: app,
+            includesSecondaryBarn: false
+        )
+
+        openAppointment(at: graph.primaryBarnName, in: app)
+        app.buttons["visit-start-action"].tap()
+
+        assertCompletionRequirement(
+            "Choose an outcome for every horse.",
+            in: app
+        )
+
+        select(.notServiced, for: graph.servicedHorseName, in: app)
+        select(.notServiced, for: graph.notServicedHorseName, in: app)
+        assertCompletionRequirement(
+            "Mark at least one horse as Serviced.",
+            in: app
+        )
+
+        select(.serviced, for: graph.servicedHorseName, in: app)
+        assertCompletionRequirement(
+            "Add a recorded Service for every serviced horse.",
+            in: app
+        )
+
+        let addService = app.buttons["visit-add-service-\(graph.servicedHorseName)"]
+        app.swipeUp()
+        XCTAssertTrue(addService.isHittable)
+        addService.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertTrue(app.navigationBars["Add Service"].waitForExistence(timeout: 3))
+        app.buttons["visit-create-service-action"].tap()
+        XCTAssertTrue(app.navigationBars["New Service"].waitForExistence(timeout: 3))
+        focusAndType(serviceName, in: app.textFields["service-name-field"])
+        focusAndType("50.00", in: app.textFields["service-price-field"])
+        app.buttons["Save"].tap()
+        XCTAssertTrue(
+            app.buttons["visit-work-item-\(graph.servicedHorseName)-\(serviceName)"]
+                .waitForExistence(timeout: 3)
+        )
+        XCTAssertTrue(
+            app.staticTexts["visit-completion-requirement"]
+                .waitForNonExistence(timeout: 3)
+        )
+        XCTAssertTrue(app.buttons["visit-complete"].isEnabled)
+    }
+
+    @MainActor
     func testVisitEditorManagesWorkItemsAndConfirmsClearingRecordedWork() throws {
         let graph = makeGraph(prefix: "Work Items")
         let trimServiceName = "Work Items Trim"
@@ -579,6 +632,27 @@ final class VisitCompletionUITests: XCTestCase {
         [element.label, element.value as? String]
             .compactMap { $0 }
             .joined(separator: " ")
+    }
+
+    @MainActor
+    private func assertCompletionRequirement(
+        _ expected: String,
+        in app: XCUIApplication
+    ) {
+        let requirement = app.staticTexts["visit-completion-requirement"]
+        XCTAssertTrue(requirement.waitForExistence(timeout: 3))
+        let predicate = NSPredicate { evaluated, _ in
+            guard let element = evaluated as? XCUIElement else { return false }
+            return self.accessibilityText(of: element).contains(expected)
+        }
+        let textExpectation = XCTNSPredicateExpectation(
+            predicate: predicate,
+            object: requirement
+        )
+        XCTAssertEqual(
+            XCTWaiter().wait(for: [textExpectation], timeout: 3),
+            .completed
+        )
     }
 }
 
