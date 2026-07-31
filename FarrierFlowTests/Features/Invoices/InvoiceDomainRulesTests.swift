@@ -145,6 +145,80 @@ struct InvoiceDomainRulesTests {
         )
     }
 
+    @Test
+    func lineItemTieBreakUsesInvoiceSnapshotRecordIdentifier() throws {
+        let graph = try makeMixedClientInvoiceGraph()
+        let visitHorse = try #require(graph.workItem.visitHorse)
+        let firstService = ModelFixtures.makeService(
+            name: "Tie Break Service",
+            defaultAmountMinorUnits: graph.workItem.amountMinorUnits,
+            in: graph.context
+        )
+        let secondService = ModelFixtures.makeService(
+            name: "Tie Break Service",
+            defaultAmountMinorUnits: graph.workItem.amountMinorUnits,
+            in: graph.context
+        )
+        let firstSource = WorkItem(
+            serviceNameSnapshot: graph.workItem.serviceNameSnapshot,
+            amountMinorUnits: graph.workItem.amountMinorUnits,
+            currencyCode: graph.workItem.currencyCode,
+            service: firstService,
+            visitHorse: visitHorse
+        )
+        let secondSource = WorkItem(
+            serviceNameSnapshot: graph.workItem.serviceNameSnapshot,
+            amountMinorUnits: graph.workItem.amountMinorUnits,
+            currencyCode: graph.workItem.currencyCode,
+            service: secondService,
+            visitHorse: visitHorse
+        )
+        graph.context.insert(firstSource)
+        graph.context.insert(secondSource)
+        firstService.workItems.append(firstSource)
+        secondService.workItems.append(secondSource)
+        visitHorse.workItems.append(contentsOf: [firstSource, secondSource])
+        let firstInsertedLine = InvoiceLineItem(
+            horseNameSnapshot: graph.lineItem.horseNameSnapshot,
+            serviceNameSnapshot: graph.lineItem.serviceNameSnapshot,
+            amountMinorUnits: graph.lineItem.amountMinorUnits,
+            invoiceVisit: graph.invoiceVisit,
+            sourceWorkItem: secondSource
+        )
+        let secondInsertedLine = InvoiceLineItem(
+            horseNameSnapshot: graph.lineItem.horseNameSnapshot,
+            serviceNameSnapshot: graph.lineItem.serviceNameSnapshot,
+            amountMinorUnits: graph.lineItem.amountMinorUnits,
+            invoiceVisit: graph.invoiceVisit,
+            sourceWorkItem: firstSource
+        )
+        graph.context.insert(firstInsertedLine)
+        graph.context.insert(secondInsertedLine)
+        graph.invoiceVisit.lineItems.append(contentsOf: [
+            firstInsertedLine,
+            secondInsertedLine,
+        ])
+        firstSource.invoiceLineItem = secondInsertedLine
+        secondSource.invoiceLineItem = firstInsertedLine
+        try #require(
+            graph.context.fetch(FetchDescriptor<BusinessProfile>()).first
+        ).nextInvoiceNumber = 2
+        try DomainGraphValidator.save(graph.context)
+
+        let lines = [firstInsertedLine, secondInsertedLine]
+        let snapshotRecordOrder = lines.sorted {
+            String(describing: $0.persistentModelID)
+                < String(describing: $1.persistentModelID)
+        }
+        let ordered = InvoiceDomainRules.orderedLineItems(
+            lines,
+            locale: Locale(identifier: "en_US")
+        )
+
+        #expect(ordered.map(\.persistentModelID)
+            == snapshotRecordOrder.map(\.persistentModelID))
+    }
+
     private func makeMixedClientInvoiceGraph() throws -> (
         container: ModelContainer,
         context: ModelContext,

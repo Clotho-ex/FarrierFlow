@@ -1055,6 +1055,33 @@
     "Paid" : {
       "comment" : "Textual Invoice payment status."
     },
+    "Invoice" : {
+      "comment" : "Invoice title rendered in a shared PDF."
+    },
+    "Invoice Date" : {
+      "comment" : "Label for the Invoice date rendered in a shared PDF."
+    },
+    "Due Date" : {
+      "comment" : "Label for the optional Invoice due date rendered in a shared PDF."
+    },
+    "Payment Date" : {
+      "comment" : "Label for the payment date rendered in a paid Invoice PDF."
+    },
+    "Note" : {
+      "comment" : "Label for the optional note rendered in a shared Invoice PDF."
+    },
+    "Continued" : {
+      "comment" : "Continuation label rendered on later pages of an Invoice PDF."
+    },
+    "Share PDF" : {
+      "comment" : "Action that prepares an Invoice PDF and opens the system share sheet."
+    },
+    "Couldn’t Create PDF" : {
+      "comment" : "Alert title when Invoice PDF preparation fails."
+    },
+    "The invoice is unchanged. Try again." : {
+      "comment" : "Retry guidance after Invoice PDF preparation fails without changing the saved Invoice."
+    },
     "Couldn’t Delete Invoice" : {
       "comment" : "Alert title when an unpaid Invoice could not be deleted."
     },

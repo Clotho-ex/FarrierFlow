@@ -85,11 +85,8 @@ enum InvoiceDomainRules {
             if left.amountMinorUnits != right.amountMinorUnits {
                 return left.amountMinorUnits < right.amountMinorUnits
             }
-            let leftID = left.sourceWorkItem?.persistentModelID
-                ?? left.persistentModelID
-            let rightID = right.sourceWorkItem?.persistentModelID
-                ?? right.persistentModelID
-            return String(describing: leftID) < String(describing: rightID)
+            return String(describing: left.persistentModelID)
+                < String(describing: right.persistentModelID)
         }
     }
 

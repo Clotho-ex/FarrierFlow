@@ -8,6 +8,7 @@ struct InvoiceDetailView: View {
     @State private var model: InvoiceDetailModel
     @State private var showsPaidConfirmation = false
     @State private var showsDeleteConfirmation = false
+    @State private var shareModel = InvoicePDFShareModel()
 
     let invoiceID: PersistentIdentifier
 
@@ -38,6 +39,13 @@ struct InvoiceDetailView: View {
         .navigationTitle(model.detail.map { "Invoice \($0.number)" } ?? "Invoice")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Share PDF", systemImage: "square.and.arrow.up") {
+                    shareModel.prepare(invoiceID: invoiceID, in: context)
+                }
+                .disabled(shareModel.isPreparing)
+                .accessibilityIdentifier("invoice-share-pdf-action")
+            }
             if model.canMarkPaid {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Mark Paid", systemImage: "checkmark.circle") {
@@ -72,6 +80,24 @@ struct InvoiceDetailView: View {
         }
         .alert(item: $model.alert) {
             Alert(title: Text($0.title), message: Text($0.message))
+        }
+        .alert(item: $shareModel.alert) {
+            Alert(
+                title: Text($0.title),
+                message: Text($0.message),
+                primaryButton: .default(Text("Retry")) {
+                    shareModel.retry(invoiceID: invoiceID, in: context)
+                },
+                secondaryButton: .cancel(Text("Cancel"))
+            )
+        }
+        .sheet(isPresented: Binding(
+            get: { shareModel.shareURL != nil },
+            set: { if !$0 { shareModel.sharingCompleted() } }
+        )) {
+            if let url = shareModel.shareURL {
+                InvoiceShareSheet(url: url) { shareModel.sharingCompleted() }
+            }
         }
         .task(id: invoiceID, reload)
     }
