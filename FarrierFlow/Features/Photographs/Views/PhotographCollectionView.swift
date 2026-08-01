@@ -89,7 +89,11 @@ struct PhotographCollectionView: View {
             .sheet(item: $selectedPhotograph) { item in
                 PhotographFullImageView(
                     item: item,
-                    url: library.canonicalURL(for: item.id)
+                    url: library.canonicalURL(for: item.id),
+                    horseName: model.horseName,
+                    position: model.items.firstIndex(where: { $0.id == item.id })
+                        .map { $0 + 1 } ?? 1,
+                    total: model.items.count
                 )
             }
             .confirmationDialog(

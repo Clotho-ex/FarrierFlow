@@ -82,6 +82,21 @@ struct InvoiceCreationView: View {
             } footer: {
                 Text("Selecting a visit includes all eligible recorded work for this client.")
             }
+            Section("Selection Summary") {
+                LabeledContent("Visits") {
+                    Text(model.selectionSummary?.visitCount ?? 0, format: .number)
+                }
+                .accessibilityIdentifier("invoice-selection-visit-count")
+                LabeledContent("Recorded Services") {
+                    Text(model.selectionSummary?.recordedServiceCount ?? 0, format: .number)
+                }
+                .accessibilityIdentifier("invoice-selection-service-count")
+                LabeledContent("Total") {
+                    Text(selectionTotal)
+                        .fontWeight(.semibold)
+                }
+                .accessibilityIdentifier("invoice-selection-total")
+            }
             if !model.hasValidBusinessProfile {
                 Section("Business Profile Required") {
                     NavigationLink {
@@ -93,16 +108,24 @@ struct InvoiceCreationView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            if let draftBinding = draftBinding {
+            if let draft = model.draft {
                 Section("Invoice") {
-                    DatePicker("Invoice Date", selection: draftBinding.invoiceDate, displayedComponents: .date)
+                    DatePicker(
+                        "Invoice Date",
+                        selection: draftBinding(\.invoiceDate, fallback: draft.invoiceDate),
+                        displayedComponents: .date
+                    )
                     Toggle("Add Due Date", isOn: dueDateEnabled)
                     if model.draft?.dueDate != nil {
                         DatePicker("Due Date", selection: dueDateBinding, displayedComponents: .date)
                     }
                 }
                 Section("Note") {
-                    TextField("Invoice Note", text: draftBinding.note, axis: .vertical)
+                    TextField(
+                        "Invoice Note",
+                        text: draftBinding(\.note, fallback: draft.note),
+                        axis: .vertical
+                    )
                         .lineLimit(3...6)
                         .focused($isNoteFocused)
                 }
@@ -111,11 +134,17 @@ struct InvoiceCreationView: View {
         .scrollDismissesKeyboard(.interactively)
     }
 
-    private var draftBinding: Binding<InvoiceCreationDraft>? {
-        guard model.draft != nil else { return nil }
+    private func draftBinding<Value>(
+        _ keyPath: WritableKeyPath<InvoiceCreationDraft, Value>,
+        fallback: Value
+    ) -> Binding<Value> {
         return Binding(
-            get: { model.draft! },
-            set: { model.draft = $0 }
+            get: { model.draft?[keyPath: keyPath] ?? fallback },
+            set: { value in
+                guard var draft = model.draft else { return }
+                draft[keyPath: keyPath] = value
+                model.draft = draft
+            }
         )
     }
 
@@ -146,6 +175,14 @@ struct InvoiceCreationView: View {
     private func generate() {
         guard let invoiceID = model.generate(in: context) else { return }
         onGenerated(invoiceID)
+    }
+
+    private var selectionTotal: String {
+        guard let total = model.selectionSummary?.totalMinorUnits else {
+            return String(localized: "No selection", locale: locale)
+        }
+        return MoneyFormatter.usd(minorUnits: total, locale: locale)
+            ?? String(localized: "Unavailable", locale: locale)
     }
 
     private func reload() {

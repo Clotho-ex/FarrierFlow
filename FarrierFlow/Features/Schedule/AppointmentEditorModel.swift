@@ -40,7 +40,15 @@ final class AppointmentEditorModel {
     var alert: FeatureAlert?
 
     var canSave: Bool {
-        draft.isValid && loadState == .loaded && lockedDraftMatchesPersistedMembership
+        loadState == .loaded && saveRequirement == nil
+    }
+
+    var saveRequirement: AppointmentSaveRequirement? {
+        guard loadState == .loaded else { return nil }
+        guard lockedDraftMatchesPersistedMembership else {
+            return .lockedMembership
+        }
+        return draft.saveRequirement
     }
 
     init(
@@ -116,6 +124,39 @@ final class AppointmentEditorModel {
         guard !hasVisit else { return }
         draft.barnID = id
         loadEligibleHorses(in: context)
+    }
+
+    func selectCreatedBarn(_ id: PersistentIdentifier, in context: ModelContext) {
+        guard !hasVisit else { return }
+        loadState = .loading
+        do {
+            let loadedBarns = try barnFetcher(context)
+            guard loadedBarns.contains(where: { $0.persistentModelID == id }) else {
+                throw AppointmentEditorLoadError.appointmentUnavailable
+            }
+            barns = loadedBarns
+            draft.barnID = id
+            eligibleHorses = try eligibleHorses(at: id, in: context)
+            retainEligibleSelections()
+            loadState = .loaded
+        } catch {
+            loadState = .failed
+            Self.logger.error(
+                "Failed to select the created service location: \(error, privacy: .public)"
+            )
+        }
+    }
+
+    func selectCreatedHorse(_ id: PersistentIdentifier, in context: ModelContext) {
+        guard !hasVisit, draft.barnID != nil else { return }
+        loadEligibleHorses(in: context)
+        guard
+            loadState == .loaded,
+            eligibleHorses.contains(where: { $0.persistentModelID == id })
+        else {
+            return
+        }
+        draft.selectedHorseIDs.insert(id)
     }
 
     func toggleHorse(_ id: PersistentIdentifier) {

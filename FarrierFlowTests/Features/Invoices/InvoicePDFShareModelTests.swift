@@ -6,7 +6,81 @@ import Testing
 @Suite("Invoice PDF share model", .serialized)
 @MainActor
 struct InvoicePDFShareModelTests {
-    @Test func failureClearsStatePreservesInvoiceAndAllowsRetry() throws {
+    @Test func preparationSuspendsTheMainActorWhileRenderingOffMain() async throws {
+        let graph = try makeGraph()
+        let directory = try TemporaryStoreFixtures.makeDirectory(
+            prefix: "FarrierFlow-PDF-Async-"
+        )
+        let renderCanFinish = DispatchSemaphore(value: 0)
+        let (renderEvents, renderEventContinuation) = AsyncStream<Bool>.makeStream()
+        let writer = InvoicePDFDocumentWriter { content in
+            renderEventContinuation.yield(Thread.isMainThread)
+            renderCanFinish.wait()
+            return try InvoicePDFRenderer().render(content)
+        }
+        let model = InvoicePDFShareModel(
+            store: InvoicePDFTemporaryFileStore(directory: directory),
+            writer: writer
+        )
+
+        let preparation = Task {
+            await model.prepare(
+                invoiceID: graph.invoice.persistentModelID,
+                in: graph.context
+            )
+        }
+        var eventIterator = renderEvents.makeAsyncIterator()
+        let renderedOnMainThread = await eventIterator.next()
+
+        #expect(renderedOnMainThread == false)
+        #expect(model.isPreparing)
+
+        renderCanFinish.signal()
+        await preparation.value
+
+        #expect(!model.isPreparing)
+        #expect(model.shareURL?.lastPathComponent == "Invoice-0001.pdf")
+    }
+
+    @Test func cancelledPreparationLeavesNoShareStateOrTemporaryFile() async throws {
+        let graph = try makeGraph()
+        let directory = try TemporaryStoreFixtures.makeDirectory(
+            prefix: "FarrierFlow-PDF-Cancelled-"
+        )
+        let renderCanFinish = DispatchSemaphore(value: 0)
+        let (renderEvents, renderEventContinuation) = AsyncStream<Void>.makeStream()
+        let writer = InvoicePDFDocumentWriter { content in
+            renderEventContinuation.yield()
+            renderCanFinish.wait()
+            return try InvoicePDFRenderer().render(content)
+        }
+        let model = InvoicePDFShareModel(
+            store: InvoicePDFTemporaryFileStore(directory: directory),
+            writer: writer
+        )
+
+        let preparation = Task {
+            await model.prepare(
+                invoiceID: graph.invoice.persistentModelID,
+                in: graph.context
+            )
+        }
+        var eventIterator = renderEvents.makeAsyncIterator()
+        _ = await eventIterator.next()
+
+        preparation.cancel()
+        renderCanFinish.signal()
+        await preparation.value
+
+        #expect(!model.isPreparing)
+        #expect(model.shareURL == nil)
+        #expect(model.alert == nil)
+        #expect(!FileManager.default.fileExists(
+            atPath: directory.appending(path: "Invoice-0001.pdf").path
+        ))
+    }
+
+    @Test func failureClearsStatePreservesInvoiceAndAllowsRetry() async throws {
         let graph = try makeGraph()
         let parent = try TemporaryStoreFixtures.makeDirectory(
             prefix: "FarrierFlow-PDF-Share-"
@@ -21,7 +95,7 @@ struct InvoicePDFShareModelTests {
             in: graph.context
         )
 
-        model.prepare(
+        await model.prepare(
             invoiceID: graph.invoice.persistentModelID,
             in: graph.context
         )
@@ -40,7 +114,7 @@ struct InvoicePDFShareModelTests {
             at: outputDirectory,
             withIntermediateDirectories: true
         )
-        model.retry(
+        await model.retry(
             invoiceID: graph.invoice.persistentModelID,
             in: graph.context
         )
@@ -52,7 +126,7 @@ struct InvoicePDFShareModelTests {
         #expect(FileManager.default.fileExists(atPath: retryURL.path))
     }
 
-    @Test func failureDoesNotRetainStaleShareURL() throws {
+    @Test func failureDoesNotRetainStaleShareURL() async throws {
         let graph = try makeGraph()
         let parent = try TemporaryStoreFixtures.makeDirectory(
             prefix: "FarrierFlow-PDF-Stale-"
@@ -65,7 +139,7 @@ struct InvoicePDFShareModelTests {
         let model = InvoicePDFShareModel(
             store: InvoicePDFTemporaryFileStore(directory: outputDirectory)
         )
-        model.prepare(
+        await model.prepare(
             invoiceID: graph.invoice.persistentModelID,
             in: graph.context
         )
@@ -74,7 +148,7 @@ struct InvoicePDFShareModelTests {
         try FileManager.default.removeItem(at: firstURL)
         try FileManager.default.removeItem(at: outputDirectory)
         try Data("not a directory".utf8).write(to: outputDirectory)
-        model.prepare(
+        await model.prepare(
             invoiceID: graph.invoice.persistentModelID,
             in: graph.context
         )
@@ -84,7 +158,7 @@ struct InvoicePDFShareModelTests {
         #expect(!model.isPreparing)
     }
 
-    @Test func duplicateCleanupIsHarmlessAndSecondShareSucceeds() throws {
+    @Test func duplicateCleanupIsHarmlessAndSecondShareSucceeds() async throws {
         let graph = try makeGraph()
         let directory = try TemporaryStoreFixtures.makeDirectory(
             prefix: "FarrierFlow-PDF-Second-Share-"
@@ -92,7 +166,7 @@ struct InvoicePDFShareModelTests {
         let model = InvoicePDFShareModel(
             store: InvoicePDFTemporaryFileStore(directory: directory)
         )
-        model.prepare(
+        await model.prepare(
             invoiceID: graph.invoice.persistentModelID,
             in: graph.context
         )
@@ -104,7 +178,7 @@ struct InvoicePDFShareModelTests {
         #expect(model.shareURL == nil)
         #expect(!FileManager.default.fileExists(atPath: firstURL.path))
 
-        model.prepare(
+        await model.prepare(
             invoiceID: graph.invoice.persistentModelID,
             in: graph.context
         )

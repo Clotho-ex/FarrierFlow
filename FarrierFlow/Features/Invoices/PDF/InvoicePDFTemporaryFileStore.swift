@@ -1,6 +1,6 @@
 import Foundation
 
-struct InvoicePDFTemporaryFileStore {
+nonisolated struct InvoicePDFTemporaryFileStore: Sendable {
     let directory: URL
     init(directory: URL = FileManager.default.temporaryDirectory) { self.directory = directory }
     func write(_ data: Data, number: String) throws -> URL {

@@ -11,6 +11,24 @@ struct AppointmentEditorModelTests {
     }
 
     @Test
+    func saveRequirementTracksTheFirstMissingAppointmentValue() throws {
+        let fixture = try makeTwoHorseFixture()
+        let editor = AppointmentEditorModel()
+
+        editor.load(in: fixture.context)
+        #expect(editor.saveRequirement == .serviceLocation)
+
+        editor.selectBarn(fixture.barn.persistentModelID, in: fixture.context)
+        #expect(editor.saveRequirement == .horse)
+
+        editor.toggleHorse(fixture.horses[0].persistentModelID)
+        #expect(editor.saveRequirement == nil)
+
+        editor.draft.expectedDurationText = "0"
+        #expect(editor.saveRequirement == .expectedDuration)
+    }
+
+    @Test
     func createsOneBarnStopForHorsesFromMultipleClients() throws {
         let fixture = try makeTwoHorseFixture()
         let editor = AppointmentEditorModel()
@@ -66,6 +84,54 @@ struct AppointmentEditorModelTests {
         #expect(editor.loadState == .loaded)
         #expect(editor.barns.isEmpty)
         #expect(editor.eligibleHorses.isEmpty)
+    }
+
+    @Test
+    func selectingCreatedServiceLocationPreservesDraftAndSelectsIt() throws {
+        let container = try ModelContainerFactory.inMemoryTest()
+        let context = container.mainContext
+        let editor = AppointmentEditorModel()
+        editor.load(in: context)
+        editor.draft.notes = "Keep this appointment note"
+        editor.draft.expectedDurationText = "45"
+        let barn = Barn(name: "New Service Location")
+        context.insert(barn)
+        try context.save()
+
+        editor.selectCreatedBarn(barn.persistentModelID, in: context)
+
+        #expect(editor.loadState == .loaded)
+        #expect(editor.draft.barnID == barn.persistentModelID)
+        #expect(editor.draft.notes == "Keep this appointment note")
+        #expect(editor.draft.expectedDurationText == "45")
+        #expect(editor.saveRequirement == .horse)
+    }
+
+    @Test
+    func selectingCreatedHorsePreservesDraftAndSelectsEligibleHorse() throws {
+        let fixture = try makeTwoHorseFixture()
+        let editor = AppointmentEditorModel()
+        editor.load(in: fixture.context)
+        editor.selectBarn(fixture.barn.persistentModelID, in: fixture.context)
+        editor.draft.notes = "Keep this appointment note"
+        let client = Client(name: "Casey")
+        fixture.context.insert(client)
+        let horse = Horse(
+            name: "River",
+            client: client,
+            currentBarn: fixture.barn
+        )
+        fixture.context.insert(horse)
+        client.horses.append(horse)
+        fixture.barn.horses.append(horse)
+        try fixture.context.save()
+
+        editor.selectCreatedHorse(horse.persistentModelID, in: fixture.context)
+
+        #expect(editor.loadState == .loaded)
+        #expect(editor.draft.selectedHorseIDs == [horse.persistentModelID])
+        #expect(editor.draft.notes == "Keep this appointment note")
+        #expect(editor.saveRequirement == nil)
     }
 
     @Test

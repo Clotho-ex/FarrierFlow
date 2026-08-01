@@ -28,14 +28,26 @@ struct InvoiceCreationModelTests {
         #expect(loadedDraft.dueDate == expectedDueDate)
         #expect(loadedDraft.note == "Thank you.")
         #expect(loadedDraft.selectedVisitIDs.isEmpty)
+        #expect(model.selectionSummary == nil)
         #expect(!model.canGenerate)
 
         model.selectAll()
 
         #expect(model.draft?.selectedVisitIDs == Set(model.visitChoices.map(\.id)))
+        #expect(
+            model.selectionSummary == InvoiceSelectionSummary(
+                visitCount: 2,
+                recordedServiceCount: 2,
+                totalMinorUnits: try InvoiceDomainRules.checkedTotal(
+                    model.visitChoices.map(\.subtotalMinorUnits)
+                )
+            )
+        )
         #expect(model.canGenerate)
         model.toggleVisit(graph.firstVisitID)
         #expect(model.draft?.selectedVisitIDs == [graph.secondVisitID])
+        #expect(model.selectionSummary?.visitCount == 1)
+        #expect(model.selectionSummary?.recordedServiceCount == 1)
     }
 
     @Test

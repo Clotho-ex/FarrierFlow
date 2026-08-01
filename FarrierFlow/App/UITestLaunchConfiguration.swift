@@ -44,8 +44,17 @@ struct UITestLaunchConfiguration {
 
     @MainActor
     func prepare(_ container: ModelContainer) throws {
-        guard let scenario else { return }
-        try UITestFixtures.seed(scenario, in: container)
+        guard let scenario, let storeURL else { return }
+        try UITestFixtures.seed(
+            scenario,
+            in: container,
+            photographRootURL: storeURL
+                .deletingPathExtension()
+                .appending(
+                    path: PhotographConstants.rootDirectoryName,
+                    directoryHint: .isDirectory
+                )
+        )
     }
 }
 

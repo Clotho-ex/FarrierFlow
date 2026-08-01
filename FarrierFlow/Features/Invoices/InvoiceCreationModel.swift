@@ -8,6 +8,12 @@ nonisolated enum InvoiceCreationLoadState: Equatable {
     case failed
 }
 
+nonisolated struct InvoiceSelectionSummary: Equatable {
+    let visitCount: Int
+    let recordedServiceCount: Int
+    let totalMinorUnits: Int64
+}
+
 @MainActor
 @Observable
 final class InvoiceCreationModel {
@@ -26,11 +32,34 @@ final class InvoiceCreationModel {
             hasValidBusinessProfile,
             !isGenerating,
             let draft,
-            !draft.selectedVisitIDs.isEmpty
+            selectionSummary != nil
         else {
             return false
         }
         return draft.selectedVisitIDs.isSubset(of: Set(visitChoices.map(\.id)))
+    }
+
+    var selectionSummary: InvoiceSelectionSummary? {
+        guard let draft else {
+            return nil
+        }
+        let selectedChoices = visitChoices.filter {
+            draft.selectedVisitIDs.contains($0.id)
+        }
+        guard !selectedChoices.isEmpty,
+              let total = try? InvoiceDomainRules.checkedTotal(
+                  selectedChoices.map(\.subtotalMinorUnits)
+              )
+        else {
+            return nil
+        }
+        return InvoiceSelectionSummary(
+            visitCount: selectedChoices.count,
+            recordedServiceCount: selectedChoices.reduce(0) {
+                $0 + $1.eligibleWorkItemCount
+            },
+            totalMinorUnits: total
+        )
     }
 
     init(clientID: PersistentIdentifier) {

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct AppointmentRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let appointment: Appointment
 
     private var horseNames: String {
@@ -18,13 +19,17 @@ struct AppointmentRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
-            HStack {
-                Text(appointment.startDate, format: .dateTime.hour().minute())
-                    .font(Typography.recordTitle)
-                Spacer()
-                Text(barnName)
-                    .font(Typography.recordMetadata)
-                    .foregroundStyle(.secondary)
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
+                    appointmentTime
+                    serviceLocation
+                }
+            } else {
+                HStack {
+                    appointmentTime
+                    Spacer()
+                    serviceLocation
+                }
             }
             Text(horseNames)
                 .font(Typography.recordMetadata)
@@ -42,5 +47,16 @@ struct AppointmentRow: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("appointment-row-\(barnName)")
+    }
+
+    private var appointmentTime: some View {
+        Text(appointment.startDate, format: .dateTime.hour().minute())
+            .font(Typography.recordTitle)
+    }
+
+    private var serviceLocation: some View {
+        Text(barnName)
+            .font(Typography.recordMetadata)
+            .foregroundStyle(.secondary)
     }
 }

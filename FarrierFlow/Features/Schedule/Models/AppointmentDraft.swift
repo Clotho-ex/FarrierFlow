@@ -1,6 +1,13 @@
 import Foundation
 import SwiftData
 
+nonisolated enum AppointmentSaveRequirement: Equatable {
+    case serviceLocation
+    case horse
+    case expectedDuration
+    case lockedMembership
+}
+
 nonisolated struct AppointmentDraft: Equatable {
     var barnID: PersistentIdentifier?
     var startDate: Date
@@ -29,10 +36,17 @@ nonisolated struct AppointmentDraft: Equatable {
         return value
     }
 
-    var isValid: Bool {
+    var saveRequirement: AppointmentSaveRequirement? {
+        guard barnID != nil else { return .serviceLocation }
+        guard !selectedHorseIDs.isEmpty else { return .horse }
         let duration = expectedDurationText.trimmingCharacters(in: .whitespacesAndNewlines)
-        return barnID != nil
-            && !selectedHorseIDs.isEmpty
-            && (duration.isEmpty || expectedDurationMinutes != nil)
+        guard duration.isEmpty || expectedDurationMinutes != nil else {
+            return .expectedDuration
+        }
+        return nil
+    }
+
+    var isValid: Bool {
+        saveRequirement == nil
     }
 }

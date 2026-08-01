@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import UIKit
 
 enum PreviewFixtures {
     enum VisitPreviewState: Equatable {
@@ -163,16 +164,31 @@ enum PreviewFixtures {
 #if DEBUG
 @MainActor
 enum UITestFixtures {
+    private enum SeedError: Error {
+        case imageEncodingFailed
+        case visitHorseUnavailable
+    }
+
     private static let invoiceClientName = "Invoice Client"
 
-    static func seed(_ scenario: UITestScenario, in container: ModelContainer) throws {
+    static func seed(
+        _ scenario: UITestScenario,
+        in container: ModelContainer,
+        photographRootURL: URL
+    ) throws {
         switch scenario {
         case .invoiceReady:
-            try seedInvoiceReady(in: container)
+            try seedInvoiceReady(
+                in: container,
+                photographRootURL: photographRootURL
+            )
         }
     }
 
-    private static func seedInvoiceReady(in container: ModelContainer) throws {
+    private static func seedInvoiceReady(
+        in container: ModelContainer,
+        photographRootURL: URL
+    ) throws {
         let context = container.mainContext
         let existingClients = try context.fetch(FetchDescriptor<Client>())
         guard !existingClients.contains(where: { $0.name == invoiceClientName }) else {
@@ -233,14 +249,20 @@ enum UITestFixtures {
         )
         try DomainGraphValidator.save(context)
 
-        try completeVisit(
+        _ = try completeVisit(
             for: firstAppointment.persistentModelID,
             startedAt: firstStart,
             in: container
         )
-        try completeVisit(
+        let latestVisitID = try completeVisit(
             for: mixedAppointment.persistentModelID,
             startedAt: secondStart,
+            in: container
+        )
+        try seedPhotograph(
+            visitID: latestVisitID,
+            horseName: invoiceHorse.name,
+            rootURL: photographRootURL,
             in: container
         )
     }
@@ -267,7 +289,7 @@ enum UITestFixtures {
         for appointmentID: PersistentIdentifier,
         startedAt: Date,
         in container: ModelContainer
-    ) throws {
+    ) throws -> PersistentIdentifier {
         let visitID = try VisitStartUseCase.start(
             appointmentID: appointmentID,
             now: startedAt,
@@ -284,6 +306,50 @@ enum UITestFixtures {
             completedAt: completedAt,
             in: context
         )
+        return visitID
+    }
+
+    private static func seedPhotograph(
+        visitID: PersistentIdentifier,
+        horseName: String,
+        rootURL: URL,
+        in container: ModelContainer
+    ) throws {
+        let context = ModelContext(container)
+        guard
+            let visit = try context.existingModel(Visit.self, for: visitID),
+            let visitHorse = visit.visitHorses.first(where: { $0.horse?.name == horseName })
+        else {
+            throw SeedError.visitHorseUnavailable
+        }
+
+        let size = CGSize(width: 64, height: 64)
+        let image = UIGraphicsImageRenderer(size: size).image { rendererContext in
+            rendererContext.cgContext.setFillColor(UIColor.systemGray.cgColor)
+            rendererContext.cgContext.fill(CGRect(origin: .zero, size: size))
+        }
+        guard let data = image.jpegData(compressionQuality: 0.8) else {
+            throw SeedError.imageEncodingFailed
+        }
+
+        let photographID = UUID()
+        let fileStore = PhotographFileStore(rootURL: rootURL)
+        try fileStore.prepareDirectories()
+        let url = fileStore.canonicalURL(for: photographID)
+        try data.write(to: url, options: .atomic)
+        try fileStore.applyCompleteProtection(to: url)
+
+        let photograph = Photograph(
+            id: photographID,
+            createdAt: visit.completedAt ?? visit.startedAt,
+            pixelWidth: Int(size.width),
+            pixelHeight: Int(size.height),
+            byteCount: Int64(data.count),
+            visitHorse: visitHorse
+        )
+        context.insert(photograph)
+        visitHorse.photographs.append(photograph)
+        try DomainGraphValidator.save(context)
     }
 }
 #endif

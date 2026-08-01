@@ -5,6 +5,10 @@ struct AppointmentEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @State private var model: AppointmentEditorModel
+    @State private var showsBarnEditor = false
+    @State private var createdBarnID: PersistentIdentifier?
+    @State private var showsHorseEditor = false
+    @State private var createdHorseID: PersistentIdentifier?
 
     init(appointment: Appointment? = nil) {
         _model = State(initialValue: AppointmentEditorModel(appointment: appointment))
@@ -24,8 +28,12 @@ struct AppointmentEditorView: View {
                             .foregroundStyle(.secondary)
                     } else if model.loadState == .loaded {
                         if model.barns.isEmpty {
-                            Text("No service locations available")
+                            Text("Add a service location before scheduling an appointment.")
                                 .foregroundStyle(.secondary)
+                            Button("Add Service Location", systemImage: "plus") {
+                                showsBarnEditor = true
+                            }
+                            .accessibilityIdentifier("appointment-add-service-location")
                         } else {
                             Picker(
                                 "Service Location",
@@ -40,6 +48,11 @@ struct AppointmentEditorView: View {
                                 }
                             }
                             .accessibilityIdentifier("appointment-barn-picker")
+                            .accessibilityValue(
+                                model.barns.first {
+                                    $0.persistentModelID == model.draft.barnID
+                                }?.name ?? String(localized: "Select Service Location")
+                            )
                         }
                     }
                     DatePicker(
@@ -52,6 +65,7 @@ struct AppointmentEditorView: View {
                         text: $model.draft.expectedDurationText
                     )
                     .keyboardType(.numberPad)
+                    appointmentRequirementGuidance
                 }
                 loadStateSection
                 if model.loadState == .loaded {
@@ -62,8 +76,14 @@ struct AppointmentEditorView: View {
                             Text("Select a service location to choose horses.")
                                 .foregroundStyle(.secondary)
                         } else if model.eligibleHorses.isEmpty {
-                            Text("No eligible horses")
+                            Text(
+                                "Add or move a horse to this service location before scheduling an appointment."
+                            )
                                 .foregroundStyle(.secondary)
+                            Button("Add Horse", systemImage: "plus") {
+                                showsHorseEditor = true
+                            }
+                            .accessibilityIdentifier("appointment-add-horse")
                         } else {
                             ForEach(model.eligibleHorses, id: \.persistentModelID) { horse in
                                 HorseSelectionRow(
@@ -77,6 +97,10 @@ struct AppointmentEditorView: View {
                                 .accessibilityIdentifier(
                                     "appointment-horse-\(horse.name)"
                                 )
+                            }
+                            if model.saveRequirement == .horse {
+                                Text("Select at least one horse.")
+                                    .font(.footnote.weight(.semibold))
                             }
                         }
                     }
@@ -102,9 +126,41 @@ struct AppointmentEditorView: View {
                 }
             }
             .onAppear { model.load(in: context) }
+            .sheet(isPresented: $showsBarnEditor, onDismiss: selectCreatedBarn) {
+                BarnEditorView(createdBarnID: $createdBarnID)
+            }
+            .sheet(isPresented: $showsHorseEditor, onDismiss: selectCreatedHorse) {
+                HorseEditorView(
+                    preselectedBarnID: model.draft.barnID,
+                    createdHorseID: $createdHorseID
+                )
+            }
             .alert(item: $model.alert) {
                 Alert(title: Text($0.title), message: Text($0.message))
             }
+        }
+    }
+
+    private func selectCreatedBarn() {
+        guard let createdBarnID else { return }
+        self.createdBarnID = nil
+        model.selectCreatedBarn(createdBarnID, in: context)
+    }
+
+    private func selectCreatedHorse() {
+        guard let createdHorseID else { return }
+        self.createdHorseID = nil
+        model.selectCreatedHorse(createdHorseID, in: context)
+    }
+
+    @ViewBuilder
+    private var appointmentRequirementGuidance: some View {
+        switch model.saveRequirement {
+        case .expectedDuration:
+            Text("Enter a duration greater than zero, or leave it blank.")
+                .font(.footnote.weight(.semibold))
+        default:
+            EmptyView()
         }
     }
 

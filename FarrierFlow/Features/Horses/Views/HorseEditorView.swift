@@ -7,11 +7,13 @@ struct HorseEditorView: View {
     @Environment(\.modelContext) private var context
     @State private var model: HorseEditorModel
     @State private var showsBarnEditor = false
+    private let createdHorseID: Binding<PersistentIdentifier?>?
 
     init(
         horse: Horse? = nil,
         preselectedClientID: PersistentIdentifier? = nil,
-        preselectedBarnID: PersistentIdentifier? = nil
+        preselectedBarnID: PersistentIdentifier? = nil,
+        createdHorseID: Binding<PersistentIdentifier?>? = nil
     ) {
         _model = State(
             initialValue: HorseEditorModel(
@@ -20,6 +22,7 @@ struct HorseEditorView: View {
                 preselectedBarnID: preselectedBarnID
             )
         )
+        self.createdHorseID = createdHorseID
     }
 
     var body: some View {
@@ -101,7 +104,8 @@ struct HorseEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        if model.save(in: context) != nil {
+                        if let id = model.save(in: context) {
+                            createdHorseID?.wrappedValue = id
                             dismiss()
                         }
                     }

@@ -3,8 +3,12 @@ import UIKit
 
 struct PhotographFullImageView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.locale) private var locale
     let item: PhotographItem
     let url: URL
+    let horseName: String
+    let position: Int
+    let total: Int
 
     @State private var image: UIImage?
     @State private var loadFinished = false
@@ -20,6 +24,7 @@ struct PhotographFullImageView: View {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFit()
+                        .accessibilityLabel(photographAccessibilityLabel)
                 } else if item.availability == .unavailable
                     || (loadFinished && protectedDataIsAvailable) {
                     ContentUnavailableView(
@@ -33,7 +38,7 @@ struct PhotographFullImageView: View {
                         .tint(.white)
                 }
             }
-            .navigationTitle("Photograph")
+            .navigationTitle("\(horseName) · \(position) of \(total)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -72,5 +77,16 @@ struct PhotographFullImageView: View {
             protectedDataIsAvailable = true
             reloadToken += 1
         }
+    }
+
+    private var photographAccessibilityLabel: String {
+        let date = item.createdAt.formatted(
+            .dateTime.month(.abbreviated).day().year()
+                .hour().minute().locale(locale)
+        )
+        return String(
+            localized: "Hoof photograph for \(horseName), \(position) of \(total), created \(date)",
+            locale: locale
+        )
     }
 }

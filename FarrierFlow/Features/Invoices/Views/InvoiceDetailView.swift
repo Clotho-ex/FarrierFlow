@@ -9,6 +9,7 @@ struct InvoiceDetailView: View {
     @State private var showsPaidConfirmation = false
     @State private var showsDeleteConfirmation = false
     @State private var shareModel = InvoicePDFShareModel()
+    @State private var pdfPreparationTask: Task<Void, Never>?
 
     let invoiceID: PersistentIdentifier
 
@@ -38,14 +39,21 @@ struct InvoiceDetailView: View {
         }
         .navigationTitle(model.detail.map { "Invoice \($0.number)" } ?? "Invoice")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Share PDF", systemImage: "square.and.arrow.up") {
-                    shareModel.prepare(invoiceID: invoiceID, in: context)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if shareModel.isPreparing {
+                HStack(spacing: SpacingTokens.rowContent) {
+                    ProgressView()
+                    Text("Preparing PDF…")
+                        .font(.callout.weight(.semibold))
                 }
-                .disabled(shareModel.isPreparing)
-                .accessibilityIdentifier("invoice-share-pdf-action")
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(.bar)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("invoice-pdf-preparing-status")
             }
+        }
+        .toolbar {
             if model.canMarkPaid {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Mark Paid", systemImage: "checkmark.circle") {
@@ -54,12 +62,29 @@ struct InvoiceDetailView: View {
                     .accessibilityIdentifier("invoice-mark-paid-action")
                 }
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    preparePDF()
+                } label: {
+                    if shareModel.isPreparing {
+                        ProgressView()
+                            .accessibilityLabel("Preparing PDF…")
+                    } else {
+                        Label("Share PDF", systemImage: "square.and.arrow.up")
+                    }
+                }
+                .disabled(shareModel.isPreparing)
+                .accessibilityIdentifier("invoice-share-pdf-action")
+            }
             if model.canDelete {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Delete", systemImage: "trash", role: .destructive) {
-                        showsDeleteConfirmation = true
+                    Menu("More", systemImage: "ellipsis.circle") {
+                        Button("Delete Invoice", systemImage: "trash", role: .destructive) {
+                            showsDeleteConfirmation = true
+                        }
+                        .accessibilityIdentifier("invoice-delete-action")
                     }
-                    .accessibilityIdentifier("invoice-delete-action")
+                    .accessibilityIdentifier("invoice-more-actions")
                 }
             }
         }
@@ -78,7 +103,7 @@ struct InvoiceDetailView: View {
             }
             .accessibilityIdentifier("invoice-delete-confirmation")
         } message: {
-            Text("This deletes the unpaid invoice and releases its recorded-work links.")
+            Text("Recorded work stays in FarrierFlow and can be added to another invoice.")
         }
         .alert(item: $model.alert) {
             Alert(title: Text($0.title), message: Text($0.message))
@@ -88,7 +113,7 @@ struct InvoiceDetailView: View {
                 title: Text($0.title),
                 message: Text($0.message),
                 primaryButton: .default(Text("Retry")) {
-                    shareModel.retry(invoiceID: invoiceID, in: context)
+                    preparePDF(isRetry: true)
                 },
                 secondaryButton: .cancel(Text("Cancel"))
             )
@@ -102,26 +127,24 @@ struct InvoiceDetailView: View {
             }
         }
         .task(id: invoiceID, reload)
+        .onDisappear(perform: cancelPDFPreparation)
     }
 
     private func detailList(_ detail: InvoiceDetail) -> some View {
         List {
-            Section("Business") {
-                snapshotContact(name: detail.businessName, phone: detail.businessPhone, email: detail.businessEmail, address: detail.businessAddress)
-            }
-            Section("Client") {
-                snapshotContact(name: detail.clientName, phone: detail.clientPhone, email: detail.clientEmail, address: nil)
-            }
             Section("Invoice") {
                 LabeledContent("Invoice Number", value: detail.number)
-                LabeledContent("Invoice Date", value: detail.invoiceDate.formatted(date: .abbreviated, time: .omitted))
-                if let dueDate = detail.dueDate {
-                    LabeledContent("Due Date", value: dueDate.formatted(date: .abbreviated, time: .omitted))
-                }
                 LabeledContent("Status", value: detail.status == .paid ? "Paid" : "Unpaid")
-                if let paidAt = detail.paidAt {
-                    LabeledContent("Payment Date", value: paidAt.formatted(date: .abbreviated, time: .omitted))
+                LabeledContent("Invoice Date", value: formattedDate(detail.invoiceDate))
+                if let dueDate = detail.dueDate {
+                    LabeledContent("Due Date", value: formattedDate(dueDate))
                 }
+                if let paidAt = detail.paidAt {
+                    LabeledContent("Payment Date", value: formattedDate(paidAt))
+                }
+                LabeledContent("Total", value: formattedTotal(detail.total))
+                    .fontWeight(.semibold)
+                    .accessibilityIdentifier("invoice-detail-total")
             }
             ForEach(detail.visits) { visit in
                 Section {
@@ -135,12 +158,14 @@ struct InvoiceDetailView: View {
                     }
                 }
             }
-            Section("Total") {
-                LabeledContent("Total", value: formattedTotal(detail.total))
-                    .accessibilityIdentifier("invoice-detail-total")
-            }
             if let note = detail.note {
                 Section("Note") { Text(note) }
+            }
+            Section("Business") {
+                snapshotContact(name: detail.businessName, phone: detail.businessPhone, email: detail.businessEmail, address: detail.businessAddress)
+            }
+            Section("Client") {
+                snapshotContact(name: detail.clientName, phone: detail.clientPhone, email: detail.clientEmail, address: nil)
             }
         }
         .accessibilityIdentifier("invoice-detail-\(detail.number)")
@@ -164,7 +189,31 @@ struct InvoiceDetailView: View {
         }
     }
 
+    private func formattedDate(_ date: Date) -> String {
+        date.formatted(
+            .dateTime.month(.abbreviated).day().year().locale(locale)
+        )
+    }
+
     private func reload() {
         model.load(in: context, locale: locale)
+    }
+
+    private func preparePDF(isRetry: Bool = false) {
+        pdfPreparationTask?.cancel()
+        pdfPreparationTask = Task {
+            if isRetry {
+                await shareModel.retry(invoiceID: invoiceID, in: context)
+            } else {
+                await shareModel.prepare(invoiceID: invoiceID, in: context)
+            }
+            pdfPreparationTask = nil
+        }
+    }
+
+    private func cancelPDFPreparation() {
+        pdfPreparationTask?.cancel()
+        pdfPreparationTask = nil
+        shareModel.sharingCompleted()
     }
 }
