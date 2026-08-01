@@ -94,6 +94,15 @@ struct VisitEditorView: View {
                         .disabled(!model.canSaveCorrection)
                     }
                 }
+                if model.loadState == .loaded {
+                    ToolbarItemGroup(placement: .keyboard) {
+                        Spacer()
+                        Button("Done") {
+                            focusedWorkNotesID = nil
+                        }
+                        .accessibilityIdentifier("visit-dismiss-keyboard")
+                    }
+                }
             }
         }
         .interactiveDismissDisabled(model.isDirty)
@@ -238,6 +247,7 @@ struct VisitEditorView: View {
                     }
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .sheet(item: $addServiceHorse) { horse in
                 NavigationStack {
                     AddServicePickerView(

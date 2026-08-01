@@ -97,6 +97,25 @@ struct InvoiceCreationModelTests {
         #expect(!model.canGenerate)
     }
 
+    @Test
+    func reloadPrefillsDefaultNoteAfterMissingProfileIsCreated() throws {
+        let graph = try makeCreationGraph(hasBusinessProfile: false)
+        let model = InvoiceCreationModel(clientID: graph.clientID)
+        model.load(in: graph.context, now: Date(timeIntervalSinceReferenceDate: 1_000))
+        #expect(model.draft?.note == "")
+
+        _ = ModelFixtures.makeBusinessProfile(
+            defaultInvoiceNote: "Thank you.",
+            in: graph.context
+        )
+        try DomainGraphValidator.save(graph.context)
+
+        model.load(in: graph.context, now: Date(timeIntervalSinceReferenceDate: 2_000))
+
+        #expect(model.hasValidBusinessProfile)
+        #expect(model.draft?.note == "Thank you.")
+    }
+
     private func makeCreationGraph(
         hasBusinessProfile: Bool
     ) throws -> InvoiceCreationGraph {

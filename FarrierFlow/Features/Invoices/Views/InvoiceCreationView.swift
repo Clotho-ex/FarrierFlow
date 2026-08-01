@@ -64,13 +64,14 @@ struct InvoiceCreationView: View {
                 Button("Select All", action: model.selectAll)
                     .disabled(model.visitChoices.isEmpty)
                     .accessibilityIdentifier("invoice-select-all-action")
-                ForEach(model.visitChoices) { choice in
+                ForEach(Array(model.visitChoices.enumerated()), id: \.element.id) { index, choice in
                     InvoiceVisitSelectionRow(
                         choice: choice,
                         isSelected: model.draft?.selectedVisitIDs.contains(choice.id) == true
                     ) {
                         model.toggleVisit(choice.id)
                     }
+                    .accessibilityIdentifier("invoice-visit-choice-\(index)")
                 }
                 if model.visitChoices.isEmpty {
                     Text("No completed, uninvoiced work is available for this client.")

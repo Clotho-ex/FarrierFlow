@@ -2,11 +2,11 @@
 
 ## Architectural Goals
 
-FarrierFlow is a local-first, iPhone-only SwiftUI application. Slice 1 proved
-connected persistence, Slice 2 added Visit completion and Horse History, and
-Slice 3 adds VisitHorse-owned photographs, bounded image normalization,
-coordinated file-and-database mutations, and a tested V1-to-V2-to-V3 migration.
-It adds no networking, CloudKit, or third-party dependency.
+FarrierFlow is a local-first, iPhone-only SwiftUI application. Slices 1 through
+5 provide connected records, Visit completion and Horse History,
+VisitHorse-owned photographs, structured Services and WorkItems, immutable
+Invoices, payment status, and native PDF sharing. The app adds no networking,
+CloudKit, or third-party dependency.
 
 The dependency direction is:
 
@@ -26,7 +26,7 @@ local source of truth.
 
 ## Source Organization
 
-Active ownership through Slice 3 uses the approved feature-first structure:
+Active ownership through Slice 5 uses the approved feature-first structure:
 
 ```text
 FarrierFlow/
@@ -54,16 +54,19 @@ FarrierFlow/
 │   ├── Barns/
 │   ├── Horses/
 │   ├── Visits/
-│   └── Photographs/
+│   ├── Photographs/
+│   ├── Services/
+│   ├── BusinessProfile/
+│   └── Invoices/
 └── Resources/
     ├── Assets.xcassets
     └── Localizable.xcstrings
 ```
 
-This tree contains only active ownership through Slice 3. `Core/Utilities`
+This tree contains only active ownership through Slice 5. `Core/Utilities`
 contains only utilities genuinely shared by active features with no clearer
-domain owner. Later features such as services, invoices, payments,
-export, subscriptions, backup, and Settings receive their own feature
+domain owner. Later features such as next-appointment assistance, export,
+subscriptions, backup, and Settings receive their own feature
 ownership only after each capability is shaped. No empty directory or
 destination is created for deferred work.
 
@@ -110,15 +113,22 @@ does not discard navigation state or combine unrelated routes.
   correction, detail presentation, and Visit-specific validation.
 - Photographs owns camera and picker ingestion, normalization, file storage,
   VisitHorse collections, deletion, and reconciliation.
+- Services owns the catalog, default prices, active availability, Horse default
+  selection, and recorded WorkItem editing inside Visits.
+- BusinessProfile owns the single reusable invoice identity and contact editor.
+- Invoices owns Client-specific eligibility, atomic generation, immutable
+  projections, list/detail state, payment status, deletion, native PDF rendering,
+  temporary-file lifetime, and sharing.
 - Clients owns client list, client detail, and client creation.
 - Horses owns horse list/detail/editor behavior reached from client or
   service-location context.
 - Barns owns the Service Locations list, service-location detail, and
   service-location editor.
-- The Clients toolbar menu exposes only Service Locations through Slice 3.
-  Service Locations is pushed within the Clients navigation stack.
+- The Clients toolbar menu exposes Service Locations, Services, Invoices, and
+  Business Profile. Each destination remains inside the Clients navigation
+  stack.
 - No Settings route, screen, folder, toolbar item, or empty destination exists
-  through Slice 3. Settings may be introduced later only when concrete
+  through Slice 5. Settings may be introduced later only when concrete
   settings require a destination.
 
 Appointment Detail owns the entry into Visits: Start Visit when none exists,
@@ -126,6 +136,10 @@ Resume Visit while in progress, and View Visit after completion. Visit Detail
 is shared by Appointment Detail and Horse History. Horse Detail owns its
 completed-history projection and routes to Visit Detail. No Visit tab or global
 history destination is added.
+
+Client Detail owns Create Invoice. Successful generation replaces the creation
+route with Invoice Detail. Invoice list and Business Profile are also reachable
+from Clients > More; no Invoice tab or custom document browser is added.
 
 The presenting feature owns sheet presentation state and any transient context,
 such as a preselected client. The presented editor owns its draft, validation,
@@ -174,11 +188,11 @@ The app must fail visibly if the production container cannot be created. It
 must not silently replace a failed durable store with an in-memory store.
 Preview and test fixtures never enter production startup code.
 
-The schema and migration plan live under `Core/Persistence`. V1 remains the
-five-model connected-record snapshot, V2 the seven-model Visit snapshot, and V3
-the current eight-model Photograph snapshot. The migration plan contains
-lightweight V1-to-V2 and V2-to-V3 stages. Production keeps the existing store
-identity and URL; a schema change must never create a replacement empty store.
+The first shipping store uses `FarrierFlowSchemaV1`, which registers the complete
+14-model graph through Slice 5. FarrierFlow has not shipped, so pre-release
+V1-to-V4 stores receive no migration path. Future shipping schema changes must
+preserve the production store identity and require an explicitly designed and
+tested migration.
 
 ## Domain and Persistence Boundaries
 
@@ -205,7 +219,7 @@ safely during deletion. The domain contract remains required: a Horse must have
 a Client and current Barn, an Appointment must have a Barn and at least one
 valid join, and every AppointmentHorse must have both an Appointment and Horse.
 
-V2 applies the same storage rule to `Visit.appointment`, `Visit.barn`,
+The shipping schema applies the same storage rule to `Visit.appointment`, `Visit.barn`,
 `VisitHorse.visit`, and `VisitHorse.horse`. These relationships are optional in
 SwiftData storage for iOS 18 deletion compatibility and required by the domain
 contract. `Visit.startedAt` and its service-location name snapshot remain
@@ -218,10 +232,17 @@ before every save. It rejects missing relationships, a Horse outside the
 Appointment Barn, and duplicate Horse membership. SwiftData optionality and
 `minimumModelCount` are not relied on as domain validation.
 
-V3 applies the same representation rule to `Photograph.visitHorse`.
+It applies the same representation rule to `Photograph.visitHorse`.
 Photograph ownership remains domain-required and inverse-validated. Production
 supports only Photograph creation and deletion; no update or reassignment path
 exists after insertion.
+
+The shipping schema applies the same optional-storage/domain-required rule to
+Service, WorkItem, BusinessProfile, Invoice, InvoiceVisit, and InvoiceLineItem
+relationships. `Invoice.client`, `InvoiceVisit.invoice/sourceVisit`, and
+`InvoiceLineItem.invoiceVisit/sourceWorkItem` are required by domain validation.
+Each WorkItem may have at most one inverse InvoiceLineItem, while one source
+Visit may appear in separate InvoiceVisits for different Clients.
 
 ### Photograph File Transactions
 
@@ -244,6 +265,26 @@ strictly named managed temporary, quarantine, or canonical orphans. Ambiguous,
 unknown, malformed, directory, and symbolic-link entries fail safe or remain
 untouched. The filesystem state is the idempotent crash-recovery record; there
 is no journal or background task.
+
+### Invoice Transactions and PDF Boundary
+
+Invoice eligibility derives Client-owned WorkItems from completed Visits. A
+selected Visit contributes all and only that Client's uninvoiced WorkItems; the
+same mixed-client Visit may therefore be snapshotted in different Invoices.
+Generation uses an isolated action context and one validated save for the next
+number, Invoice, InvoiceVisits, InvoiceLineItems, and WorkItem billing inverses.
+A failed save rolls back the complete graph and does not consume the number.
+
+Generated financial content is immutable. Detail projection and PDF content use
+only Invoice snapshot models. The native renderer creates US Letter pages on
+demand, and a feature model owns the temporary file until the system share sheet
+finishes. Cleanup is best-effort and idempotent; PDF failure never saves or
+mutates the Invoice.
+
+Mark Paid records status and payment date atomically. Unpaid deletion removes
+only invoice snapshots and their WorkItem billing links. Visit correction is
+available again only when no remaining InvoiceLineItem references any WorkItem
+from that Visit; a Paid reference remains permanent.
 
 Reads never force-unwrap stored relationships. If corrupted or externally
 invalid persisted data is encountered, views render an unavailable value or
@@ -336,6 +377,12 @@ explicit feature-model drafts. Completion requires every outcome to be
 resolved, at least one serviced Horse, exact Visit-to-Appointment membership,
 and valid relationships.
 
+Invoice generation similarly validates Business Profile, Client-specific
+eligibility, one-time WorkItem billing, sequence monotonicity, snapshot
+normalization, currency consistency, and checked integer totals before one save.
+Status change and unpaid deletion use focused atomic use cases. Every failure
+surfaces human error copy without success-shaped navigation or partial state.
+
 Dirty Visit drafts are not persisted per keystroke. Backgrounding makes a
 best-effort call to the same Save Progress boundary. A failure can be surfaced
 on activation only if the same process resumes. Process termination loses the
@@ -362,23 +409,19 @@ The current test layers are:
 - UI smoke coverage for the connected creation flow and native navigation where
   reliable automation adds value.
 
-Slice 2 adds:
+Visit coverage includes:
 
 - Unit tests for Visit state, outcomes, dirty drafts, completion, correction,
   Visit-aware relocation, Appointment locking, and exact Horse History
   ordering.
-- In-memory SwiftData tests for the seven-model V2 graph, optional relationship
+- In-memory SwiftData tests for the Visit graph, optional relationship
   storage, inverses, ownership, and delete rules.
-- Real-store migration tests that create V1, release it, migrate the same store
-  to V2, and verify that no Visit is fabricated.
 - Reopening tests for pending, saved in-progress, completed, corrected,
   discarded, and post-completion-relocation graphs.
 - UI acceptance coverage from Start Visit through Horse History and relaunch.
 
-Slice 3 adds:
+Photograph coverage includes:
 
-- V2-to-V3 and chained V1-to-V2-to-V3 migration coverage with no fabricated
-  Photograph data.
 - Image orientation, bounded resizing, sRGB conversion, metadata stripping,
   collision, file-protection, and backup-eligibility tests.
 - Add, delete, rollback, missing-file, quarantine, orphan, protected-data, and
@@ -386,6 +429,12 @@ Slice 3 adds:
 - Deterministic suspension-point tests proving exclusive serialization and the
   16-available-photograph limit under concurrent adds.
 - Persistent reopening and camera/photo-picker entry coverage.
+
+Service and Invoice coverage includes catalog and WorkItem rules, mixed-client
+eligibility, duplicate billing rejection, checked totals, sequence rollback,
+immutable snapshots, status/deletion locking, persistent reopening, PDF content
+and pagination, temporary-file lifetime, native sharing, and the full UI flow
+from Client Detail through Paid history after relaunch.
 
 Production, preview, and test container creation use the same schema
 registration so tests cannot accidentally validate a different model graph.
@@ -401,7 +450,7 @@ validation, and accessibility behavior must work on both platform generations.
 Standard controls, rather than simulated platform effects, provide the
 appropriate appearance on each OS.
 
-## Explicit Non-Goals Through Slice 3
+## Explicit Non-Goals Through Slice 5
 
 - Networking or server-backed repositories.
 - CloudKit synchronization or backup.
@@ -409,8 +458,9 @@ appropriate appearance on each OS.
 - Third-party packages or a third-party design system.
 - A generalized repository, global coordinator, or event bus.
 - Unscheduled Visit horses, cancellation, no-show, or rescheduling state.
-- Structured services, PDFs, invoices, payments, StoreKit, or
-  notifications.
+- Taxes, discounts, partial payments, payment processing, overdue automation,
+  recurring billing, statements, custom numbering, invoice theming, accounting
+  integrations, StoreKit, or notifications.
 - Background tasks, external draft files, or per-change autosave.
 - Completed Visit deletion or historical-date correction.
 - Settings until concrete settings exist.

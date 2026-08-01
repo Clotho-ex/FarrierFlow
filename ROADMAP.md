@@ -10,6 +10,11 @@ Later capabilities remain high-level until their product decisions, data
 ownership, and migration behavior are shaped. They must not influence the
 current schema or interface.
 
+FarrierFlow has not shipped. Slice 5 supersedes the historical pre-release
+schema stages described in Slices 1 through 3 with one complete first-shipping
+`FarrierFlowSchemaV1`; the app implements no migration from those pre-release
+stores.
+
 ## Slice 0 — Foundation
 
 **Status:** Complete.
@@ -308,26 +313,49 @@ The complete durability, reconciliation, image-processing, privacy, and testing
 contract is recorded in
 `docs/superpowers/specs/2026-07-28-slice-3-hoof-photographs-design.md`.
 
+## Slice 4 — Services and Pricing
+
+**Status:** Complete.
+
+### Outcome
+
+Maintain an active Service catalog, record priced WorkItems per serviced Horse,
+and preserve service and price snapshots in Visit history.
+
+Money uses integer minor units and explicit USD currency codes. A Horse may use
+one active default Service, and Visit completion requires recorded work for each
+serviced Horse.
+
+## Slice 5 — Invoicing
+
+**Status:** Complete.
+
+### Outcome
+
+Create one Client invoice from selected completed Visits, preserve immutable
+business, Client, Visit, Horse, Service, date, and price snapshots, track Unpaid
+or Paid status, and share a native multi-page US Letter PDF entirely offline.
+
+Mixed-client Visits are independently eligible per represented Client. Each
+source WorkItem can appear on at most one InvoiceLineItem. Unpaid deletion
+releases only those billing links; any remaining invoice reference keeps Visit
+correction locked, and Paid history is permanent.
+
+The complete contract and implementation sequence are recorded in:
+
+- `docs/superpowers/specs/2026-07-30-slice-5-invoicing-design.md`
+- `docs/superpowers/plans/2026-07-30-slice-5-invoicing.md`
+
 ## Later Slices
 
 The order below expresses product sequence, not an approved implementation
 design. Each slice requires shaping before implementation.
 
-### Slice 4 — Services and Pricing
+### Slice 6 — Payment Processing
 
-Design the service catalog, work items, pricing rules, and horse default-service
-behavior together. Money uses integer minor units and an explicit currency code,
-never `Double`.
-
-### Slice 5 — Invoicing
-
-Create invoices from completed work and generate a professional shareable
-document.
-
-### Slice 6 — Payment Status
-
-Track invoice payment status. Payment processing remains separate and requires
-its own product decision.
+Unpaid/Paid status and payment date shipped in Slice 5. Any future payment
+collection or processing requires a separate product, privacy, failure, and App
+Store decision and remains deferred.
 
 ### Slice 7 — Next Appointment
 
@@ -351,10 +379,12 @@ Evaluate an opt-in backup or synchronization design only after privacy,
 conflict, account, recovery, migration, and operational requirements are
 defined. CloudKit is not assumed.
 
-## Deferred Beyond Slice 3
+## Deferred Beyond Slice 5
 
-- Service catalog, default service, pricing, and service presets.
-- Invoices, PDFs, payment status, and payment processing.
+- Taxes, discounts, partial payments, payment processing, overdue automation,
+  Draft or Sent states, recurring invoices, monthly statements, multi-client
+  invoices, custom numbering, logos, themes, accounting integrations, and
+  third-party PDF dependencies.
 - Automatic next-appointment creation.
 - Export.
 - StoreKit and subscriptions.
@@ -367,5 +397,5 @@ defined. CloudKit is not assumed.
 - Completed Visit deletion and historical-date correction.
 - Background tasks, external Visit draft files, and per-change autosave.
 
-Slice 3 must not add fields, routes, empty screens, services, or abstractions
+Slice 5 must not add fields, routes, empty screens, services, or abstractions
 for these deferred capabilities.

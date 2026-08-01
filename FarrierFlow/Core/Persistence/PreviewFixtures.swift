@@ -159,3 +159,131 @@ enum PreviewFixtures {
         )
     }
 }
+
+#if DEBUG
+@MainActor
+enum UITestFixtures {
+    private static let invoiceClientName = "Invoice Client"
+
+    static func seed(_ scenario: UITestScenario, in container: ModelContainer) throws {
+        switch scenario {
+        case .invoiceReady:
+            try seedInvoiceReady(in: container)
+        }
+    }
+
+    private static func seedInvoiceReady(in container: ModelContainer) throws {
+        let context = container.mainContext
+        let existingClients = try context.fetch(FetchDescriptor<Client>())
+        guard !existingClients.contains(where: { $0.name == invoiceClientName }) else {
+            return
+        }
+
+        let invoiceClient = Client(
+            name: invoiceClientName,
+            phone: "555-0100",
+            email: "client@example.com"
+        )
+        let mixedClient = Client(name: "Mixed Client")
+        let barn = Barn(
+            name: "Invoice Service Location",
+            address: "100 Main Street"
+        )
+        let service = Service(
+            name: "Trim",
+            defaultAmountMinorUnits: 5_000
+        )
+        let invoiceHorse = Horse(
+            name: "Milo",
+            client: invoiceClient,
+            currentBarn: barn,
+            defaultService: service
+        )
+        let mixedHorse = Horse(
+            name: "Scout",
+            client: mixedClient,
+            currentBarn: barn,
+            defaultService: service
+        )
+
+        [invoiceClient, mixedClient].forEach(context.insert)
+        context.insert(barn)
+        context.insert(service)
+        [invoiceHorse, mixedHorse].forEach(context.insert)
+        invoiceClient.horses.append(invoiceHorse)
+        mixedClient.horses.append(mixedHorse)
+        barn.horses.append(contentsOf: [invoiceHorse, mixedHorse])
+        service.horsesUsingAsDefault.append(contentsOf: [invoiceHorse, mixedHorse])
+
+        let calendar = Calendar(identifier: .gregorian)
+        let day = calendar.startOfDay(for: .now)
+        let firstStart = calendar.date(byAdding: .hour, value: 9, to: day) ?? day
+        let secondStart = calendar.date(byAdding: .hour, value: 10, to: day) ?? day
+        let firstAppointment = makeAppointment(
+            startDate: firstStart,
+            barn: barn,
+            horses: [invoiceHorse],
+            in: context
+        )
+        let mixedAppointment = makeAppointment(
+            startDate: secondStart,
+            barn: barn,
+            horses: [invoiceHorse, mixedHorse],
+            in: context
+        )
+        try DomainGraphValidator.save(context)
+
+        try completeVisit(
+            for: firstAppointment.persistentModelID,
+            startedAt: firstStart,
+            in: container
+        )
+        try completeVisit(
+            for: mixedAppointment.persistentModelID,
+            startedAt: secondStart,
+            in: container
+        )
+    }
+
+    private static func makeAppointment(
+        startDate: Date,
+        barn: Barn,
+        horses: [Horse],
+        in context: ModelContext
+    ) -> Appointment {
+        let appointment = Appointment(startDate: startDate, barn: barn)
+        context.insert(appointment)
+        barn.appointments.append(appointment)
+        for horse in horses {
+            let membership = AppointmentHorse(appointment: appointment, horse: horse)
+            context.insert(membership)
+            appointment.appointmentHorses.append(membership)
+            horse.appointmentHorses.append(membership)
+        }
+        return appointment
+    }
+
+    private static func completeVisit(
+        for appointmentID: PersistentIdentifier,
+        startedAt: Date,
+        in container: ModelContainer
+    ) throws {
+        let visitID = try VisitStartUseCase.start(
+            appointmentID: appointmentID,
+            now: startedAt,
+            in: container
+        )
+        let context = ModelContext(container)
+        var draft = try VisitSaveUseCase.loadDraft(visitID: visitID, in: context)
+        for index in draft.horses.indices {
+            draft.horses[index].outcome = .serviced
+        }
+        let completedAt = startedAt.addingTimeInterval(30 * 60)
+        _ = try VisitSaveUseCase.complete(
+            draft: draft,
+            completedAt: completedAt,
+            in: context
+        )
+    }
+}
+#endif

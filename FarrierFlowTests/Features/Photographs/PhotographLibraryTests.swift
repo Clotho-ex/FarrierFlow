@@ -373,8 +373,16 @@ struct PhotographLibraryTests {
             in: correctionContext
         )
         let index = try #require(draft.horses.firstIndex { $0.id == ownerID })
+        let existingWorkItem = try #require(draft.horses.flatMap(\.workItems).first)
         draft.horses[index].outcome = .serviced
         draft.horses[index].workNotes = "Completed work"
+        draft.horses[index].workItems = [
+            WorkItemDraft(
+                serviceID: existingWorkItem.serviceID,
+                serviceNameSnapshot: existingWorkItem.serviceNameSnapshot,
+                amountMinorUnits: existingWorkItem.amountMinorUnits
+            ),
+        ]
 
         _ = try VisitSaveUseCase.saveCorrection(
             draft: draft,

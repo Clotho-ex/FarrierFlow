@@ -67,6 +67,7 @@ struct InvoiceDetailView: View {
             Button("Mark Paid") {
                 model.markPaid(in: context)
             }
+            .accessibilityIdentifier("invoice-mark-paid-confirmation")
         } message: {
             Text("This records today’s payment date and cannot be undone.")
         }
@@ -75,6 +76,7 @@ struct InvoiceDetailView: View {
                 model.delete(in: context)
                 if model.didDelete { dismiss() }
             }
+            .accessibilityIdentifier("invoice-delete-confirmation")
         } message: {
             Text("This deletes the unpaid invoice and releases its recorded-work links.")
         }
@@ -135,11 +137,13 @@ struct InvoiceDetailView: View {
             }
             Section("Total") {
                 LabeledContent("Total", value: formattedTotal(detail.total))
+                    .accessibilityIdentifier("invoice-detail-total")
             }
             if let note = detail.note {
                 Section("Note") { Text(note) }
             }
         }
+        .accessibilityIdentifier("invoice-detail-\(detail.number)")
     }
 
     @ViewBuilder

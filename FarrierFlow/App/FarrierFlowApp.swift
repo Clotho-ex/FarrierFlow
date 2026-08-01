@@ -15,12 +15,14 @@ struct FarrierFlowApp: App {
     init() {
         dependenciesResult = Result {
             #if DEBUG
-            if let storeURL = UITestLaunchConfiguration().storeURL {
+            let uiTestConfiguration = UITestLaunchConfiguration()
+            if let storeURL = uiTestConfiguration.storeURL {
                 try FileManager.default.createDirectory(
                     at: storeURL.deletingLastPathComponent(),
                     withIntermediateDirectories: true
                 )
                 let container = try ModelContainerFactory.persistentStoreTest(at: storeURL)
+                try uiTestConfiguration.prepare(container)
                 return AppDependencies(
                     container: container,
                     photographLibrary: PhotographLibrary(

@@ -55,6 +55,12 @@ one continuous field workflow rather than separate generic business modules.
   Appointment. Every scheduled horse receives a serviced or not-serviced
   outcome before completion, and serviced horses may include free-text Work
   Notes.
+- Slice 4 records performed work as priced Services and WorkItems. Prices use
+  integer USD minor units, and a Horse may carry one active default Service.
+- Slice 5 creates one Client invoice from selected completed Visits, includes
+  every still-uninvoiced WorkItem belonging to that Client, snapshots all
+  financial and display content, and generates a native US Letter PDF for the
+  system share sheet.
 - An in-progress Visit can be saved and resumed. A completed Visit remains
   available from its Appointment and from Horse History.
 - Visit history preserves the actual Visit start time and immutable
@@ -64,8 +70,8 @@ one continuous field workflow rather than separate generic business modules.
   network connection. Standard operating-system device backup is permitted;
   FarrierFlow provides no app-managed backup, synchronization, accounts, or
   multi-device behavior.
-- Payment status is in scope. Payment processing and external integrations are
-  not yet confirmed.
+- Invoices have Unpaid or Paid status. Marking an invoice Paid records the
+  payment date; payment processing and external integrations are excluded.
 - The application must remain efficient under field conditions and must not
   depend on invented interaction patterns.
 
@@ -85,16 +91,19 @@ one continuous field workflow rather than separate generic business modules.
 ## Evidence on Hand
 
 - The repository contains the iPhone-only SwiftUI and SwiftData implementation
-  through Slice 3 in `FarrierFlow/`.
+  through Slice 5 in `FarrierFlow/`.
 - The Xcode project declares iOS 18.0 for the app, unit-test, and UI-test
   targets and includes iPhone device support.
 - The approved Slice 2 design is recorded in
   `docs/superpowers/specs/2026-07-27-slice-2-visit-completion-design.md`.
 - The approved Slice 3 design is recorded in
   `docs/superpowers/specs/2026-07-28-slice-3-hoof-photographs-design.md`.
-- No bundled customer imagery, logo, customer evidence, testimonials, pricing,
-  integrations, or operational sample data is currently present in the
-  repository. Future work must not fabricate these.
+- The approved Slice 5 design is recorded in
+  `docs/superpowers/specs/2026-07-30-slice-5-invoicing-design.md`.
+- No bundled production customer imagery, logo, customer evidence, testimonials,
+  integrations, or operational sample data is present. Preview and UI-test
+  fixtures are deterministic development data only. Future product work must
+  not fabricate customer evidence.
 
 ## Product Principles
 

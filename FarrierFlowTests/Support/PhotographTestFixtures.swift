@@ -52,7 +52,14 @@ enum PhotographTestFixtures {
             in: context
         )
         if completedAt != nil {
-            visit.visitHorses[0].outcomeRawValue = VisitOutcome.serviced.rawValue
+            let servicedVisitHorse = visit.visitHorses[0]
+            servicedVisitHorse.outcomeRawValue = VisitOutcome.serviced.rawValue
+            let service = ModelFixtures.makeService(in: context)
+            _ = ModelFixtures.makeWorkItem(
+                service: service,
+                visitHorse: servicedVisitHorse,
+                in: context
+            )
             for visitHorse in visit.visitHorses.dropFirst() {
                 visitHorse.outcomeRawValue = VisitOutcome.notServiced.rawValue
             }

@@ -133,6 +133,7 @@ struct VisitDetailView: View {
                 Section("Horses") {
                     ForEach(detail.horses) { horse in
                         VisitHorseResultRow(horse: horse)
+                            .accessibilityIdentifier("visit-result-\(horse.horseName)")
                         recordedServices(for: horse)
                         hoofPhotographsLink(for: horse)
                     }
@@ -253,7 +254,6 @@ struct VisitDetailView: View {
                 )
             }
         }
-        .accessibilityIdentifier("visit-result-\(horse.horseName)")
     }
 
     private func subtotalText(for subtotal: MoneyAvailability) -> String {

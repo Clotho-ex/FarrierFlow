@@ -52,12 +52,19 @@ final class InvoiceCreationModel {
                 in: context
             )
             let profile = try currentBusinessProfile(in: context)
+            let previouslyHadValidBusinessProfile = hasValidBusinessProfile
+            let hasValidBusinessProfile = profile.map { isValid($0) } ?? false
             clientName = client.name
             visitChoices = choices
-            hasValidBusinessProfile = profile.map { isValid($0) } ?? false
+            self.hasValidBusinessProfile = hasValidBusinessProfile
 
             if var draft {
                 draft.selectedVisitIDs.formIntersection(Set(choices.map(\.id)))
+                if !previouslyHadValidBusinessProfile,
+                   hasValidBusinessProfile,
+                   TextNormalization.optional(draft.note) == nil {
+                    draft.note = profile?.defaultInvoiceNote ?? ""
+                }
                 self.draft = draft
             } else {
                 self.draft = InvoiceCreationDraft(

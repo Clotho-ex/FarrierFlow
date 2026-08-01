@@ -7,11 +7,12 @@ the United States. The interface should feel durable, calm, professional,
 efficient, and specific to farrier work. It should help a farrier act quickly
 while standing at a barn, often outdoors and with one hand available.
 
-The completed workflow through Slice 3 covers clients, independent service
-locations, horses, appointments, Visit completion, Horse History, and
-VisitHorse-owned hoof photographs without introducing a new tab. It does not
-visually imply later capabilities such as services, invoicing, payments, or
-subscriptions.
+The completed workflow through Slice 5 covers clients, independent service
+locations, horses, appointments, Visit completion, Horse History,
+VisitHorse-owned hoof photographs, priced recorded Services, invoices, native
+PDF sharing, and payment status without introducing a new tab. It does not
+visually imply later capabilities such as payment processing, statements,
+accounting integrations, subscriptions, or synchronization.
 
 ## Platform Character
 
@@ -58,8 +59,9 @@ The app opens on Today and uses three native tabs:
 3. Clients
 
 Today and Schedule expose an appointment-creation action. Clients exposes a
-client-creation action and a toolbar menu containing Service Locations. Through
-Slice 3 there is no Settings route, screen, folder, or toolbar item. Settings
+client-creation action and a toolbar menu containing Service Locations,
+Services, Invoices, and Business Profile. Through Slice 5 there is no Settings
+route, screen, folder, or toolbar item. Settings
 may be introduced later only when concrete settings exist.
 
 Creation remains contextual:
@@ -68,7 +70,12 @@ Creation remains contextual:
 - Schedule: the toolbar plus button creates an appointment.
 - Clients: the toolbar plus button creates a client.
 - Client detail: Add Horse opens a horse form with that client preselected.
+- Client detail: Create Invoice opens Client-specific eligible Visit selection.
 - Service Locations: the toolbar plus button creates an independent location.
+- Services: the toolbar plus button creates an active Service with a required
+  name and default USD price.
+- Business Profile: Save persists the reusable name and optional invoice
+  contact information and default note.
 - Horse creation: the user selects an existing service location or creates one
   in a nested sheet and returns with it selected.
 - Service-location detail: Add Horse supports creating a horse for that
@@ -89,6 +96,13 @@ Visit creation is contextual to Appointment Detail:
   destination.
 - Each VisitHorse row in an in-progress editor or completed Visit Detail opens
   its Hoof Photographs collection.
+
+Invoice creation is contextual to Client Detail. It lists only completed Visits
+with uninvoiced WorkItems for that Client. Selecting a Visit includes every
+eligible WorkItem for that Client, including only that Client's portion of a
+mixed-client Visit. Successful generation replaces creation with Invoice Detail.
+The Clients More menu also provides the complete Invoice list and reusable
+Business Profile editor.
 
 Once a Visit exists, Appointment service location and horse membership are
 read-only. Scheduled start, Appointment Notes, and expected duration remain
@@ -117,6 +131,11 @@ Rows prioritize the information needed for the next decision:
 - Horse History: completed Visits ordered newest first, showing work date,
   immutable service-location name, serviced or not-serviced outcome, and a
   Work Notes indication when present.
+- Service: name, visible default price, and active or inactive availability.
+- Invoice: formatted number, Client snapshot name, invoice date, checked total,
+  and explicit Unpaid or Paid text, ordered by number descending.
+- Invoice Detail: business and Client snapshots, dates, status, Visit-grouped
+  line items, checked total, optional note, and payment date when Paid.
 
 Use standard disclosure indicators when a row navigates. Avoid turning every
 row into a card. Secondary metadata may wrap under Dynamic Type; names and
@@ -161,6 +180,12 @@ Work Notes are optional and available only for serviced horses. Changing a
 serviced horse with notes to another outcome requires confirmation before the
 notes are cleared.
 
+Business Profile requires a normalized business or farrier name. Phone, email,
+address, and default invoice note are optional. Invoice creation requires one
+valid Business Profile and at least one selected eligible Visit. Invoice and due
+dates default to today and 14 calendar days later, remain editable, and the note
+prefills from the profile. There is no per-Service or partial line selection.
+
 The Visit editor visibly indicates unsaved changes. Dismissing with a dirty
 draft requires confirmation. Discard Unsaved Changes restores the last saved
 progress, while Discard Visit is a separate destructive action available only
@@ -182,6 +207,11 @@ Empty states explain why the screen is empty and offer one relevant next step:
   explain that a horse must first be assigned there.
 - Horse History: no completed visits; explain that completed work will appear
   after a Visit is completed.
+- Services: no active candidates while recording work; offer Create Service
+  instead of an empty picker.
+- Invoices: no invoices; explain that invoices are created from Client Detail.
+- Invoice creation: explain when no completed uninvoiced work is available, and
+  link directly to Business Profile when its required name is missing.
 - Visit or VisitHorse unavailable: explain that the record cannot be loaded and
   disable unsafe actions.
 
@@ -211,6 +241,10 @@ Save Progress and Complete Visit are distinct, plainly labeled actions.
 Destructive Visit discard remains in a menu or confirmation flow rather than
 competing visually with completion.
 
+Invoice Detail keeps Share PDF, Mark Paid, and eligible Delete actions in the
+native toolbar. Mark Paid and unpaid deletion require native confirmation.
+Paid invoices expose neither deletion nor reversal.
+
 ## Status and Feedback
 
 Visit state and per-horse outcome remain:
@@ -231,6 +265,11 @@ Photograph feedback distinguishes:
   denial, and the 16-available-photograph limit.
 - Protected-data access deferral, which must not be presented as a missing
   photograph.
+
+Invoice status is always visible as Unpaid or Paid text. PDF preparation failure
+leaves the saved Invoice unchanged and offers Retry and Cancel. Generated PDFs
+use persisted snapshots only and remain available for the lifetime of the
+native share sheet.
 
 Other feedback remains limited to facts the app currently knows:
 
@@ -264,6 +303,8 @@ animation.
 - Keep Save Progress, Complete Visit, and destructive discard distinguishable
   in the accessibility hierarchy.
 - Keep essential actions usable with one hand and without precision gestures.
+- Announce Invoice Visit selection state, line-item amount, checked total, and
+  payment status without relying on color.
 
 ## Explicitly Excluded Patterns
 

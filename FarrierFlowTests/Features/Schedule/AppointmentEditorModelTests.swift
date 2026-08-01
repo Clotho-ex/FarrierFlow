@@ -348,8 +348,14 @@ struct AppointmentEditorModelTests {
             appointment: appointment,
             in: fixture.context
         )
+        let service = ModelFixtures.makeService(in: fixture.context)
         for visitHorse in visit.visitHorses {
             visitHorse.outcomeRawValue = VisitOutcome.serviced.rawValue
+            _ = ModelFixtures.makeWorkItem(
+                service: service,
+                visitHorse: visitHorse,
+                in: fixture.context
+            )
         }
         try DomainGraphValidator.save(fixture.context)
 

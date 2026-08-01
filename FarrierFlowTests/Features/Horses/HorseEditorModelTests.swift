@@ -106,6 +106,11 @@ struct HorseEditorModelTests {
         )
         let visitHorse = try #require(visit.visitHorses.first)
         visitHorse.outcomeRawValue = VisitOutcome.serviced.rawValue
+        let workItem = ModelFixtures.makeWorkItem(
+            service: service,
+            visitHorse: visitHorse,
+            in: graph.context
+        )
         try DomainGraphValidator.save(graph.context)
         let appointmentID = appointment.persistentModelID
         let visitID = visit.persistentModelID
@@ -122,7 +127,7 @@ struct HorseEditorModelTests {
         #expect(visit.startedAt == startedAt)
         #expect(visit.completedAt == completedAt)
         #expect(visit.visitHorses.count == 1)
-        #expect(visitHorse.workItems.isEmpty)
+        #expect(visitHorse.workItems.map(\.persistentModelID) == [workItem.persistentModelID])
     }
 
     private func makeHorseGraph() throws -> (

@@ -44,6 +44,7 @@ struct BusinessProfileEditorView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save", action: save)
                         .disabled(!model.canSave)
+                        .accessibilityIdentifier("business-profile-save-action")
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
