@@ -5,9 +5,16 @@ struct ClientEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @State private var model: ClientEditorModel
+    @State private var showsMoreDetails: Bool
+    private let createdClientID: Binding<PersistentIdentifier?>?
 
-    init(client: Client? = nil) {
+    init(
+        client: Client? = nil,
+        createdClientID: Binding<PersistentIdentifier?>? = nil
+    ) {
         _model = State(initialValue: ClientEditorModel(client: client))
+        _showsMoreDetails = State(initialValue: client != nil)
+        self.createdClientID = createdClientID
     }
 
     var body: some View {
@@ -17,17 +24,22 @@ struct ClientEditorView: View {
                     TextField("Name", text: $model.draft.name)
                         .textContentType(.name)
                         .accessibilityIdentifier("client-name-field")
-                    TextField("Phone", text: $model.draft.phone)
-                        .textContentType(.telephoneNumber)
-                        .keyboardType(.phonePad)
-                    TextField("Email", text: $model.draft.email)
-                        .textContentType(.emailAddress)
-                        .keyboardType(.emailAddress)
-                        .textInputAutocapitalization(.never)
-                }
-                Section("Client Notes") {
-                    TextEditor(text: $model.draft.notes)
-                        .accessibilityLabel("Client Notes")
+                    DisclosureGroup(
+                        "More Details",
+                        isExpanded: $showsMoreDetails
+                    ) {
+                        TextField("Phone", text: $model.draft.phone)
+                            .textContentType(.telephoneNumber)
+                            .keyboardType(.phonePad)
+                        TextField("Email", text: $model.draft.email)
+                            .textContentType(.emailAddress)
+                            .keyboardType(.emailAddress)
+                            .textInputAutocapitalization(.never)
+                        TextEditor(text: $model.draft.notes)
+                            .frame(minHeight: 88)
+                            .accessibilityLabel("Client Notes")
+                    }
+                    .accessibilityIdentifier("client-more-details")
                 }
             }
             .navigationTitle(model.clientID == nil ? "New Client" : "Edit Client")
@@ -38,7 +50,8 @@ struct ClientEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        if model.save(in: context) != nil {
+                        if let id = model.save(in: context) {
+                            createdClientID?.wrappedValue = id
                             dismiss()
                         }
                     }

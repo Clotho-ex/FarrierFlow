@@ -50,4 +50,47 @@ struct BusinessProfileRulesTests {
         #expect(values.address == nil)
         #expect(values.defaultInvoiceNote == nil)
     }
+
+    @Test
+    func acceptsPositiveOrNilOwnerDefaults() throws {
+        let configured = try BusinessProfileRules.validated(
+            BusinessProfileDraft(
+                name: "Carter Farrier Service",
+                defaultAppointmentDurationMinutes: 45,
+                defaultInvoiceDueDays: 30
+            )
+        )
+        let askEveryTime = try BusinessProfileRules.validated(
+            BusinessProfileDraft(
+                name: "Carter Farrier Service",
+                defaultAppointmentDurationMinutes: nil,
+                defaultInvoiceDueDays: nil
+            )
+        )
+
+        #expect(configured.defaultAppointmentDurationMinutes == 45)
+        #expect(configured.defaultInvoiceDueDays == 30)
+        #expect(askEveryTime.defaultAppointmentDurationMinutes == nil)
+        #expect(askEveryTime.defaultInvoiceDueDays == nil)
+    }
+
+    @Test
+    func rejectsNonpositiveOwnerDefaults() {
+        #expect(throws: BusinessProfileRulesError.defaultAppointmentDurationInvalid) {
+            _ = try BusinessProfileRules.validated(
+                BusinessProfileDraft(
+                    name: "Carter Farrier Service",
+                    defaultAppointmentDurationMinutes: 0
+                )
+            )
+        }
+        #expect(throws: BusinessProfileRulesError.defaultInvoiceDueDaysInvalid) {
+            _ = try BusinessProfileRules.validated(
+                BusinessProfileDraft(
+                    name: "Carter Farrier Service",
+                    defaultInvoiceDueDays: -1
+                )
+            )
+        }
+    }
 }

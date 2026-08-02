@@ -44,21 +44,26 @@ struct UITestLaunchConfiguration {
 
     @MainActor
     func prepare(_ container: ModelContainer) throws {
-        guard let scenario, let storeURL else { return }
-        try UITestFixtures.seed(
-            scenario,
-            in: container,
-            photographRootURL: storeURL
-                .deletingPathExtension()
-                .appending(
-                    path: PhotographConstants.rootDirectoryName,
-                    directoryHint: .isDirectory
-                )
-        )
+        guard let storeURL else { return }
+        if let scenario {
+            try UITestFixtures.seed(
+                scenario,
+                in: container,
+                photographRootURL: storeURL
+                    .deletingPathExtension()
+                    .appending(
+                        path: PhotographConstants.rootDirectoryName,
+                        directoryHint: .isDirectory
+                    )
+            )
+        } else {
+            try UITestFixtures.seedOwnerIdentity(in: container)
+        }
     }
 }
 
 enum UITestScenario: String {
     case invoiceReady = "invoice-ready"
+    case ownerSetup = "owner-setup"
 }
 #endif

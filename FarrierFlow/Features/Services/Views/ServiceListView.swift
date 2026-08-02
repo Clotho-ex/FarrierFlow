@@ -39,7 +39,7 @@ struct ServiceListView: View {
             ContentUnavailableView {
                 Label("No Services", systemImage: "wrench.and.screwdriver")
             } description: {
-                Text("Add a service to use its name and default price on future visits.")
+                Text("Add the work you charge for, such as a trim or full set.")
             } actions: {
                 Button("Add Service", systemImage: "plus") {
                     showsEditor = true

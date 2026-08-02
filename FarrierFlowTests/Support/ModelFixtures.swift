@@ -119,6 +119,8 @@ enum ModelFixtures {
         email: String? = "alex@example.com",
         address: String? = "1 Main Street",
         defaultInvoiceNote: String? = "Thank you.",
+        defaultAppointmentDurationMinutes: Int? = nil,
+        defaultInvoiceDueDays: Int? = 14,
         nextInvoiceNumber: Int64 = 1,
         in context: ModelContext
     ) -> BusinessProfile {
@@ -128,6 +130,8 @@ enum ModelFixtures {
             email: email,
             address: address,
             defaultInvoiceNote: defaultInvoiceNote,
+            defaultAppointmentDurationMinutes: defaultAppointmentDurationMinutes,
+            defaultInvoiceDueDays: defaultInvoiceDueDays,
             nextInvoiceNumber: nextInvoiceNumber
         )
         context.insert(profile)

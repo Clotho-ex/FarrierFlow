@@ -7,15 +7,23 @@ nonisolated enum InvoiceDateRulesError: Error, Equatable {
 nonisolated enum InvoiceDateRules {
     static func defaultDueDate(
         for invoiceDate: Date,
+        days: Int,
         calendar: Calendar
     ) throws -> Date {
-        guard let dueDate = calendar.date(
+        guard days > 0, let dueDate = calendar.date(
             byAdding: .day,
-            value: 14,
+            value: days,
             to: invoiceDate
         ) else {
             throw InvoiceDateRulesError.unableToCalculateDueDate
         }
         return dueDate
+    }
+
+    static func defaultDueDate(
+        for invoiceDate: Date,
+        calendar: Calendar
+    ) throws -> Date {
+        try defaultDueDate(for: invoiceDate, days: 14, calendar: calendar)
     }
 }

@@ -36,7 +36,7 @@ struct PhotographThumbnailView: View {
         .compositingGroup()
         .clipShape(.rect(cornerRadius: 8))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Photograph \(position) of \(total)")
+        .accessibilityLabel("Photo \(position) of \(total)")
         .accessibilityValue(
             item.availability == .available
                 ? "Created \(item.createdAt.formatted(date: .abbreviated, time: .shortened))"

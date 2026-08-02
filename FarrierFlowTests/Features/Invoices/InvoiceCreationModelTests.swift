@@ -110,7 +110,7 @@ struct InvoiceCreationModelTests {
     }
 
     @Test
-    func reloadPrefillsDefaultNoteAfterMissingProfileIsCreated() throws {
+    func reloadDoesNotRewriteOpenDraftAfterProfileIsCreated() throws {
         let graph = try makeCreationGraph(hasBusinessProfile: false)
         let model = InvoiceCreationModel(clientID: graph.clientID)
         model.load(in: graph.context, now: Date(timeIntervalSinceReferenceDate: 1_000))
@@ -125,7 +125,42 @@ struct InvoiceCreationModelTests {
         model.load(in: graph.context, now: Date(timeIntervalSinceReferenceDate: 2_000))
 
         #expect(model.hasValidBusinessProfile)
-        #expect(model.draft?.note == "Thank you.")
+        #expect(model.draft?.note == "")
+        #expect(model.draft?.dueDate == nil)
+    }
+
+    @Test
+    func ownerDueDefaultTracksInvoiceDateUntilUserOverridesOrClearsIt() throws {
+        let graph = try makeCreationGraph(hasBusinessProfile: true)
+        let profile = try #require(
+            graph.context.fetch(FetchDescriptor<BusinessProfile>()).first
+        )
+        profile.defaultInvoiceDueDays = 30
+        try DomainGraphValidator.save(graph.context)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: "UTC"))
+        let originalDate = Date(timeIntervalSinceReferenceDate: 1_000)
+        let changedDate = Date(timeIntervalSinceReferenceDate: 90_000)
+        let model = InvoiceCreationModel(clientID: graph.clientID)
+
+        model.load(in: graph.context, now: originalDate, calendar: calendar)
+        model.updateInvoiceDate(changedDate, calendar: calendar)
+
+        let expectedDueDate = try InvoiceDateRules.defaultDueDate(
+            for: changedDate,
+            days: 30,
+            calendar: calendar
+        )
+        #expect(model.draft?.dueDate == expectedDueDate)
+
+        let override = Date(timeIntervalSinceReferenceDate: 200_000)
+        model.updateDueDate(override)
+        model.updateInvoiceDate(Date(timeIntervalSinceReferenceDate: 300_000), calendar: calendar)
+        #expect(model.draft?.dueDate == override)
+
+        model.setDueDateEnabled(false, calendar: calendar)
+        model.updateInvoiceDate(Date(timeIntervalSinceReferenceDate: 400_000), calendar: calendar)
+        #expect(model.draft?.dueDate == nil)
     }
 
     private func makeCreationGraph(

@@ -48,6 +48,7 @@ FarrierFlow/
 │       ├── FeatureAlert.swift
 │       └── TextNormalization.swift
 ├── Features/
+│   ├── Onboarding/
 │   ├── Today/
 │   ├── Schedule/
 │   ├── Clients/
@@ -63,12 +64,14 @@ FarrierFlow/
     └── Localizable.xcstrings
 ```
 
-This tree contains only active ownership through Slice 5. `Core/Utilities`
-contains only utilities genuinely shared by active features with no clearer
-domain owner. Later features such as next-appointment assistance, export,
-subscriptions, backup, and Settings receive their own feature
-ownership only after each capability is shaped. No empty directory or
-destination is created for deferred work.
+This tree shows implemented ownership through Slice 5A.
+`Features/Onboarding/` owns derived setup readiness and sequencing.
+`Core/Utilities` contains
+only utilities genuinely shared by active features with no clearer domain
+owner. Later features such as next-appointment assistance, export,
+subscriptions, backup, and Settings receive their own feature ownership only
+after each capability is shaped. No empty directory or destination is created
+for deferred work.
 
 Within a feature, organize by responsibility:
 
@@ -93,8 +96,10 @@ directory.
 small composition value owns the concrete Photograph file store and serial
 coordinator; it is neither a mutable global singleton nor a service locator.
 
-`RootView` owns the root `TabView` and the selected tab. It opens on Today and
-contains three tabs:
+`RootView` owns first-run routing, the root `TabView`, and the selected tab.
+When no valid BusinessProfile exists, it presents owner setup before exposing
+the operational tabs. After the required identity step succeeds, it opens on
+Today and contains three tabs:
 
 1. Today
 2. Schedule
@@ -103,10 +108,22 @@ contains three tabs:
 Each tab owns a separate `NavigationStack` and path. Switching tabs therefore
 does not discard navigation state or combine unrelated routes.
 
+Owner setup is resumable from persisted truth and derives solely from the
+single BusinessProfile. First run asks for its required name, then opens Today.
+Service, Service Location, customer-record, contact, and owner-default setup
+remain owned by their contextual features and never block identity completion.
+
 ## Route and Presentation Ownership
 
-- Today owns its list and Today-specific routes. Its add action presents the
-  appointment editor owned by Schedule.
+- Onboarding owns only first-run identity gating. It calls the existing
+  BusinessProfile validation and persistence boundary; it does not retain
+  Services or Barns feature models or duplicate their domain rules.
+- Today owns the action-led Run Sheet hub, ranked next-action projection,
+  chronological appointment workline, setup-readiness projection, and
+  Today-specific routes. Its promoted Appointment or Visit summary replaces
+  that record's immediate list row instead of duplicating it. Appointment
+  creation remains owned by Schedule; invoice and owner-setup recovery continue
+  through their owning features.
 - Schedule owns appointment lists, appointment detail, appointment creation,
   and appointment editing.
 - Visits owns Visit start, in-progress editing, progress saving, completion,
@@ -125,14 +142,17 @@ does not discard navigation state or combine unrelated routes.
 - Barns owns the Service Locations list, service-location detail, and
   service-location editor.
 - The Clients toolbar menu exposes Service Locations, Services, Invoices, and
-  Business Profile. Each destination remains inside the Clients navigation
+  My Business. Each destination remains inside the Clients navigation
   stack.
-- No Settings route, screen, folder, toolbar item, or empty destination exists
-  through Slice 5. Settings may be introduced later only when concrete
+- No generalized Settings route, screen, folder, toolbar item, or empty
+  destination exists through Slice 5A. Business Profile remains the concrete
+  owner-configuration destination. Settings may be introduced later only when concrete
   settings require a destination.
 
 Appointment Detail owns the entry into Visits: Start Visit when none exists,
-Resume Visit while in progress, and View Visit after completion. Visit Detail
+Resume Visit while in progress, and View Visit after completion. Today may
+resume the same Visit editor directly; completion dismisses back to Today so
+the projection can surface eligible invoice work. Visit Detail
 is shared by Appointment Detail and Horse History. Horse Detail owns its
 completed-history projection and routes to Visit Detail. No Visit tab or global
 history destination is added.
@@ -145,7 +165,8 @@ The presenting feature owns sheet presentation state and any transient context,
 such as a preselected client. The presented editor owns its draft, validation,
 Save, and Cancel behavior. A nested service-location sheet returns the newly
 created location to the horse editor without creating a persisted Client–Barn
-relationship.
+relationship. When no Client exists, the horse editor may present Client
+creation and select the saved Client without discarding its existing draft.
 
 Navigation routes carry SwiftData persistent identifiers or small immutable
 route values, not live `ModelContext` instances. A destination resolves the
@@ -169,6 +190,16 @@ Do not mark actor-neutral values `@MainActor` merely because a view consumes
 them. Do not move `ModelContext` across actors. Persistence mutations initiated
 by a feature model occur on the feature model's main-actor context.
 
+The Today hub model fetches and converts cross-feature records into immutable
+summary values before rendering. SwiftUI views never traverse the complete
+SwiftData graph to rank actions. Ranking is deterministic: an in-progress Visit
+comes before the next scheduled Appointment, first-Client activation,
+uninvoiced completed work, unpaid Invoice attention, and general appointment
+creation. Missing Services and Service Locations recover inside Visit work
+recording and Appointment creation instead of competing for attention on Today.
+When two candidates have equal rank, stable date and persistent-identity
+ordering resolves the tie.
+
 Image normalization and display downsampling use bounded ImageIO work away from
 SwiftUI rendering. SwiftData contexts stay on the main actor. One feature-owned
 actor holds an explicit permit across every await in Photograph add, delete,
@@ -189,10 +220,11 @@ must not silently replace a failed durable store with an in-memory store.
 Preview and test fixtures never enter production startup code.
 
 The first shipping store uses `FarrierFlowSchemaV1`, which registers the complete
-14-model graph through Slice 5. FarrierFlow has not shipped, so pre-release
-V1-to-V4 stores receive no migration path. Future shipping schema changes must
-preserve the production store identity and require an explicitly designed and
-tested migration.
+14-model graph through Slice 5A. Slice 5A adds only optional
+owner-default scalars to BusinessProfile and no new model. FarrierFlow has not
+shipped, so pre-release V1-to-V4 stores receive no migration path. Future
+shipping schema changes must preserve the production store identity and require
+an explicitly designed and tested migration.
 
 ## Domain and Persistence Boundaries
 
@@ -389,6 +421,12 @@ on activation only if the same process resumes. Process termination loses the
 unsaved draft and any in-memory error; relaunch restores the last successful
 save.
 
+New Appointment drafts may read `defaultAppointmentDurationMinutes` from the
+BusinessProfile once during draft creation. New Invoice drafts may read
+`defaultInvoiceDueDays` and `defaultInvoiceNote` once. Later profile edits never
+rewrite an open draft, existing Appointment, generated Invoice, or snapshot.
+Every prefilled value remains visible and editable before save.
+
 ## Testing Architecture
 
 Tests use fixture builders scoped to the test target. Fixtures create valid
@@ -439,6 +477,12 @@ from Client Detail through Paid history after relaunch.
 Production, preview, and test container creation use the same schema
 registration so tests cannot accidentally validate a different model graph.
 
+Slice 5A coverage adds single-field owner-setup persistence, existing-user bypass, default
+application and override behavior, deterministic Today action ranking,
+scheduled and active-Visit Run Sheet projections, promoted-record
+deduplication, accessibility progress semantics, and persistent reopening of
+the revised BusinessProfile fields.
+
 ## Platform Policy
 
 The product minimum is iOS 18.0 and the app is built with the latest stable iOS
@@ -450,7 +494,7 @@ validation, and accessibility behavior must work on both platform generations.
 Standard controls, rather than simulated platform effects, provide the
 appropriate appearance on each OS.
 
-## Explicit Non-Goals Through Slice 5
+## Explicit Non-Goals Through Slice 5A
 
 - Networking or server-backed repositories.
 - CloudKit synchronization or backup.
@@ -463,5 +507,6 @@ appropriate appearance on each OS.
   integrations, StoreKit, or notifications.
 - Background tasks, external draft files, or per-change autosave.
 - Completed Visit deletion or historical-date correction.
-- Settings until concrete settings exist.
+- A generalized Settings destination beyond the concrete Business Profile and
+  approved owner defaults.
 - Custom navigation, custom tabs, or custom iOS 26 visual effects.

@@ -15,11 +15,11 @@ struct PhotographCountLabel: View {
     }
 
     var body: some View {
-        LabeledContent("Hoof Photographs") {
+        LabeledContent("Hoof Photos") {
             switch model.state {
             case .loading:
                 ProgressView()
-                    .accessibilityLabel("Loading Photographs…")
+                    .accessibilityLabel("Loading Photos…")
             case .loaded(let count):
                 Text("\(count)")
             case .unavailable:
@@ -42,11 +42,11 @@ struct PhotographCountLabel: View {
     private var accessibilityValue: String {
         switch model.state {
         case .loading:
-            "Loading photographs"
+            "Loading photos"
         case .loaded(let count):
-            "\(count) photographs"
+            "\(count) photos"
         case .unavailable:
-            "Photographs unavailable"
+            "Photos unavailable"
         }
     }
 }

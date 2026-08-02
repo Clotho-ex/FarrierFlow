@@ -5,6 +5,7 @@ struct BarnEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @State private var model: BarnEditorModel
+    @State private var showsMoreDetails: Bool
     private let createdBarnID: Binding<PersistentIdentifier?>?
 
     init(
@@ -12,20 +13,33 @@ struct BarnEditorView: View {
         createdBarnID: Binding<PersistentIdentifier?>? = nil
     ) {
         _model = State(initialValue: BarnEditorModel(barn: barn))
+        _showsMoreDetails = State(initialValue: barn != nil)
         self.createdBarnID = createdBarnID
     }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Service Location") {
+                Section("Barn or Service Location") {
                     TextField("Name", text: $model.draft.name)
                         .accessibilityIdentifier("barn-name-field")
-                    TextField("Address", text: $model.draft.address, axis: .vertical)
-                }
-                Section("Contact Notes") {
-                    TextEditor(text: $model.draft.contactNotes)
-                        .accessibilityLabel("Contact Notes")
+                    DisclosureGroup(
+                        "Arrival Details",
+                        isExpanded: $showsMoreDetails
+                    ) {
+                        TextField(
+                            "Address",
+                            text: $model.draft.address,
+                            axis: .vertical
+                        )
+                        TextEditor(text: $model.draft.contactNotes)
+                            .frame(minHeight: 88)
+                            .accessibilityLabel("Contact Notes")
+                        Text("Gate codes, parking, or arrival instructions.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    .accessibilityIdentifier("barn-more-details")
                 }
             }
             .navigationTitle(model.barnID == nil ? "New Service Location" : "Edit Service Location")

@@ -6,7 +6,9 @@ struct HorseEditorView: View {
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
     @State private var model: HorseEditorModel
-    @State private var showsBarnEditor = false
+    @State private var presentedSheet: HorseEditorSheet?
+    @State private var createdClientID: PersistentIdentifier?
+    @State private var showsMoreDetails: Bool
     private let createdHorseID: Binding<PersistentIdentifier?>?
 
     init(
@@ -22,6 +24,7 @@ struct HorseEditorView: View {
                 preselectedBarnID: preselectedBarnID
             )
         )
+        _showsMoreDetails = State(initialValue: horse != nil)
         self.createdHorseID = createdHorseID
     }
 
@@ -33,8 +36,12 @@ struct HorseEditorView: View {
                         .accessibilityIdentifier("horse-name-field")
                     if model.choicesLoadState == .loaded {
                         if model.clients.isEmpty {
-                            Text("No clients available")
+                            Text("Add the horse’s owner before saving this horse.")
                                 .foregroundStyle(.secondary)
+                            Button("Add Client", systemImage: "person.badge.plus") {
+                                presentedSheet = .client
+                            }
+                            .accessibilityIdentifier("horse-add-client")
                         } else {
                             Picker("Client", selection: $model.draft.clientID) {
                                 Text("Select Client").tag(PersistentIdentifier?.none)
@@ -57,44 +64,50 @@ struct HorseEditorView: View {
                             .accessibilityIdentifier("horse-barn-picker")
                         }
                         Button("Create Service Location", systemImage: "plus") {
-                            showsBarnEditor = true
+                            presentedSheet = .serviceLocation
                         }
-                        Picker("Default Service", selection: $model.draft.defaultServiceID) {
-                            Text("None").tag(PersistentIdentifier?.none)
-                            ForEach(model.activeServiceChoices) { service in
-                                Text("\(service.name) · \(formattedPrice(for: service))")
-                                    .tag(Optional(service.id))
+                        DisclosureGroup(
+                            "More Details",
+                            isExpanded: $showsMoreDetails
+                        ) {
+                            Picker(
+                                "Default Service",
+                                selection: $model.draft.defaultServiceID
+                            ) {
+                                Text("None").tag(PersistentIdentifier?.none)
+                                ForEach(model.activeServiceChoices) { service in
+                                    Text("\(service.name) · \(formattedPrice(for: service))")
+                                        .tag(Optional(service.id))
+                                }
+                            }
+                            .accessibilityIdentifier("horse-default-service-picker")
+                            .accessibilityValue(defaultServiceAccessibilityValue)
+                            if model.activeServiceChoices.isEmpty {
+                                Text(
+                                    "No active services are available. You can continue without a default."
+                                )
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                            }
+                            TextEditor(text: $model.draft.safetyNotes)
+                                .frame(minHeight: 88)
+                                .accessibilityLabel("Safety Notes")
+                            Stepper(
+                                value: $model.draft.appointmentIntervalWeeks,
+                                in: 1...52
+                            ) {
+                                Text(
+                                    verbatim: AppointmentIntervalFormatter.string(
+                                        weeks: model.draft.appointmentIntervalWeeks,
+                                        locale: locale
+                                    )
+                                )
                             }
                         }
-                        .accessibilityIdentifier("horse-default-service-picker")
-                        .accessibilityValue(defaultServiceAccessibilityValue)
-                        if model.activeServiceChoices.isEmpty {
-                            Text(
-                                "No active services are available. You can continue without a default or add one from Clients, More, Services."
-                            )
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                        }
+                        .accessibilityIdentifier("horse-more-details")
                     }
                 }
                 loadStateSection
-                Section("Safety Notes") {
-                    TextEditor(text: $model.draft.safetyNotes)
-                        .accessibilityLabel("Safety Notes")
-                }
-                Section("Appointment Interval") {
-                    Stepper(
-                        value: $model.draft.appointmentIntervalWeeks,
-                        in: 1...52
-                    ) {
-                        Text(
-                            verbatim: AppointmentIntervalFormatter.string(
-                                weeks: model.draft.appointmentIntervalWeeks,
-                                locale: locale
-                            )
-                        )
-                    }
-                }
             }
             .navigationTitle(model.horseID == nil ? "New Horse" : "Edit Horse")
             .navigationBarTitleDisplayMode(.inline)
@@ -113,14 +126,26 @@ struct HorseEditorView: View {
                 }
             }
             .onAppear { model.loadChoices(in: context) }
-            .sheet(isPresented: $showsBarnEditor, onDismiss: {
-                model.loadChoices(in: context)
-            }) {
-                BarnEditorView(createdBarnID: $model.draft.barnID)
+            .sheet(item: $presentedSheet, onDismiss: reloadCreatedRecord) { sheet in
+                switch sheet {
+                case .client:
+                    ClientEditorView(createdClientID: $createdClientID)
+                case .serviceLocation:
+                    BarnEditorView(createdBarnID: $model.draft.barnID)
+                }
             }
             .alert(item: $model.alert) {
                 Alert(title: Text($0.title), message: Text($0.message))
             }
+        }
+    }
+
+    private func reloadCreatedRecord() {
+        if let createdClientID {
+            self.createdClientID = nil
+            model.selectCreatedClient(createdClientID, in: context)
+        } else {
+            model.loadChoices(in: context)
         }
     }
 
@@ -170,4 +195,11 @@ struct HorseEditorView: View {
             EmptyView()
         }
     }
+}
+
+private enum HorseEditorSheet: String, Identifiable {
+    case client
+    case serviceLocation
+
+    var id: String { rawValue }
 }

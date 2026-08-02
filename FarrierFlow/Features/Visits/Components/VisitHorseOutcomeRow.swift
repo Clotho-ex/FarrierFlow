@@ -14,7 +14,7 @@ struct VisitHorseOutcomeRow: View {
         Group {
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
-                    Text("Outcome")
+                    Text("Work Status")
                         .font(Typography.recordMetadata)
                         .foregroundStyle(.secondary)
                     outcomePicker
@@ -26,7 +26,7 @@ struct VisitHorseOutcomeRow: View {
                 outcomePicker
             }
         }
-        .accessibilityLabel("\(horse.horseName) Outcome")
+        .accessibilityLabel("\(horse.horseName) Work Status")
         .accessibilityValue(Text(horse.outcome.localizedTitle))
         .accessibilityIdentifier("visit-outcome-\(horse.horseName)")
 
@@ -46,7 +46,7 @@ struct VisitHorseOutcomeRow: View {
 
     private var outcomePicker: some View {
         Picker(
-            "Outcome",
+            "Work Status",
             selection: Binding(
                 get: { horse.outcome },
                 set: { onOutcomeSelected($0) }

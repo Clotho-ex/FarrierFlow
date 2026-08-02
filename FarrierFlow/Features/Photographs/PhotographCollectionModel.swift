@@ -71,8 +71,8 @@ final class PhotographCollectionModel {
         guard canAdd else {
             if availableCount >= PhotographConstants.maximumPhotographsPerVisitHorse {
                 alert = FeatureAlert(
-                    title: "Photograph Limit Reached",
-                    message: "This horse already has 16 photographs. Delete one before adding another."
+                    title: "Photo Limit Reached",
+                    message: "This horse already has 16 photos. Delete one before adding another."
                 )
             }
             return
@@ -100,8 +100,8 @@ final class PhotographCollectionModel {
         } catch {
             Self.logger.error("Failed to delete photograph: \(error, privacy: .public)")
             alert = FeatureAlert(
-                title: "Couldn’t Delete Photograph",
-                message: "The photograph was kept. Try deleting it again."
+                title: "Couldn’t Delete Photo",
+                message: "The photo was kept. Try deleting it again."
             )
         }
     }
@@ -109,18 +109,18 @@ final class PhotographCollectionModel {
     private func addErrorAlert(for error: any Error) -> FeatureAlert {
         if error as? PhotographLibraryError == .photographLimitReached {
             return FeatureAlert(
-                title: "Photograph Limit Reached",
-                message: "This horse already has 16 photographs. Delete one before adding another."
+                title: "Photo Limit Reached",
+                message: "This horse already has 16 photos. Delete one before adding another."
             )
         }
         if error as? PhotographLibraryError == .insufficientStorage {
             return FeatureAlert(
                 title: "Not Enough Storage",
-                message: "Free some device storage, then try adding the photograph again."
+                message: "Free some device storage, then try adding the photo again."
             )
         }
         return FeatureAlert(
-            title: "Couldn’t Add Photograph",
+            title: "Couldn’t Add Photo",
             message: "The image couldn’t be processed or saved. Try again."
         )
     }
@@ -128,13 +128,13 @@ final class PhotographCollectionModel {
     private func loadErrorAlert(for error: any Error) -> FeatureAlert {
         if error as? PhotographLibraryError == .protectedDataUnavailable {
             return FeatureAlert(
-                title: "Photographs Unavailable",
+                title: "Photos Unavailable",
                 message: "Unlock your device, then try again."
             )
         }
         return FeatureAlert(
-            title: "Photographs Unavailable",
-            message: "The photographs couldn’t be loaded. Try again."
+            title: "Photos Unavailable",
+            message: "The photos couldn’t be loaded. Try again."
         )
     }
 }

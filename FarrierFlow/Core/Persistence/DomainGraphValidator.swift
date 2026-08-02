@@ -51,6 +51,7 @@ nonisolated enum DomainGraphViolation: Error, Equatable {
     case businessProfileMissing
     case businessProfileNameNotNormalized
     case businessProfileOptionalTextNotNormalized
+    case businessProfileDefaultInvalid
     case businessProfileSequenceInvalid
     case invoiceNumberInvalid
     case duplicateInvoiceNumber
@@ -324,6 +325,12 @@ enum DomainGraphValidator {
         }
         guard businessProfile.nextInvoiceNumber > 0 else {
             throw DomainGraphViolation.businessProfileSequenceInvalid
+        }
+        guard
+            businessProfile.defaultAppointmentDurationMinutes.map({ $0 > 0 }) ?? true,
+            businessProfile.defaultInvoiceDueDays.map({ $0 > 0 }) ?? true
+        else {
+            throw DomainGraphViolation.businessProfileDefaultInvalid
         }
     }
 

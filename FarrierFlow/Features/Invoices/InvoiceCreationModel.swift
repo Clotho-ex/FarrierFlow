@@ -24,6 +24,8 @@ final class InvoiceCreationModel {
     private(set) var hasValidBusinessProfile = false
     private(set) var loadState: InvoiceCreationLoadState = .loading
     private(set) var isGenerating = false
+    private var capturedDefaultDueDays: Int?
+    private var derivedDueDate: Date?
     var alert: FeatureAlert?
 
     var canGenerate: Bool {
@@ -81,7 +83,6 @@ final class InvoiceCreationModel {
                 in: context
             )
             let profile = try currentBusinessProfile(in: context)
-            let previouslyHadValidBusinessProfile = hasValidBusinessProfile
             let hasValidBusinessProfile = profile.map { isValid($0) } ?? false
             clientName = client.name
             visitChoices = choices
@@ -89,21 +90,23 @@ final class InvoiceCreationModel {
 
             if var draft {
                 draft.selectedVisitIDs.formIntersection(Set(choices.map(\.id)))
-                if !previouslyHadValidBusinessProfile,
-                   hasValidBusinessProfile,
-                   TextNormalization.optional(draft.note) == nil {
-                    draft.note = profile?.defaultInvoiceNote ?? ""
-                }
                 self.draft = draft
             } else {
+                capturedDefaultDueDays = hasValidBusinessProfile
+                    ? profile?.defaultInvoiceDueDays
+                    : nil
+                derivedDueDate = try capturedDefaultDueDays.map {
+                    try InvoiceDateRules.defaultDueDate(
+                        for: now,
+                        days: $0,
+                        calendar: calendar
+                    )
+                }
                 self.draft = InvoiceCreationDraft(
                     clientID: clientID,
                     selectedVisitIDs: [],
                     invoiceDate: now,
-                    dueDate: try InvoiceDateRules.defaultDueDate(
-                        for: now,
-                        calendar: calendar
-                    ),
+                    dueDate: derivedDueDate,
                     note: hasValidBusinessProfile
                         ? profile?.defaultInvoiceNote ?? ""
                         : ""
@@ -143,6 +146,46 @@ final class InvoiceCreationModel {
             return
         }
         draft.selectedVisitIDs = Set(visitChoices.map(\.id))
+        self.draft = draft
+    }
+
+    func updateInvoiceDate(_ date: Date, calendar: Calendar = .current) {
+        guard var draft else { return }
+        let wasAutomaticallyDerived = draft.dueDate == derivedDueDate
+            && derivedDueDate != nil
+        draft.invoiceDate = date
+        if wasAutomaticallyDerived, let days = capturedDefaultDueDays {
+            derivedDueDate = try? InvoiceDateRules.defaultDueDate(
+                for: date,
+                days: days,
+                calendar: calendar
+            )
+            draft.dueDate = derivedDueDate
+        }
+        self.draft = draft
+    }
+
+    func setDueDateEnabled(_ enabled: Bool, calendar: Calendar = .current) {
+        guard var draft else { return }
+        if enabled {
+            let days = capturedDefaultDueDays ?? 14
+            derivedDueDate = try? InvoiceDateRules.defaultDueDate(
+                for: draft.invoiceDate,
+                days: days,
+                calendar: calendar
+            )
+            draft.dueDate = derivedDueDate
+        } else {
+            draft.dueDate = nil
+            derivedDueDate = nil
+        }
+        self.draft = draft
+    }
+
+    func updateDueDate(_ date: Date) {
+        guard var draft else { return }
+        draft.dueDate = date
+        derivedDueDate = nil
         self.draft = draft
     }
 
@@ -186,7 +229,9 @@ final class InvoiceCreationModel {
                 phone: profile.phone ?? "",
                 email: profile.email ?? "",
                 address: profile.address ?? "",
-                defaultInvoiceNote: profile.defaultInvoiceNote ?? ""
+                defaultInvoiceNote: profile.defaultInvoiceNote ?? "",
+                defaultAppointmentDurationMinutes: profile.defaultAppointmentDurationMinutes,
+                defaultInvoiceDueDays: profile.defaultInvoiceDueDays
             )
         ) else {
             return false
@@ -196,5 +241,8 @@ final class InvoiceCreationModel {
             && values.email == profile.email
             && values.address == profile.address
             && values.defaultInvoiceNote == profile.defaultInvoiceNote
+            && values.defaultAppointmentDurationMinutes
+                == profile.defaultAppointmentDurationMinutes
+            && values.defaultInvoiceDueDays == profile.defaultInvoiceDueDays
     }
 }

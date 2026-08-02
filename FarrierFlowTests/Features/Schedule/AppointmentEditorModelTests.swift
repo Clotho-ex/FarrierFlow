@@ -11,6 +11,80 @@ struct AppointmentEditorModelTests {
     }
 
     @Test
+    func newDraftStartsAtTheNextHalfHour() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: "UTC"))
+        let now = try #require(calendar.date(
+            from: DateComponents(
+                year: 2026,
+                month: 8,
+                day: 2,
+                hour: 10,
+                minute: 7,
+                second: 42
+            )
+        ))
+
+        let editor = AppointmentEditorModel(now: now, calendar: calendar)
+        let expected = try #require(calendar.date(
+            from: DateComponents(
+                year: 2026,
+                month: 8,
+                day: 2,
+                hour: 10,
+                minute: 30
+            )
+        ))
+
+        #expect(editor.draft.startDate == expected)
+    }
+
+    @Test
+    func newDraftAppliesOwnerDurationOnceAndPreservesTheUserOverride() throws {
+        let fixture = try makeTwoHorseFixture()
+        let profile = ModelFixtures.makeBusinessProfile(
+            defaultAppointmentDurationMinutes: 45,
+            in: fixture.context
+        )
+        try DomainGraphValidator.save(fixture.context)
+        let editor = AppointmentEditorModel()
+
+        editor.load(in: fixture.context)
+
+        #expect(editor.draft.expectedDurationText == "45")
+        #expect(editor.appliedOwnerDurationDefault)
+        editor.draft.expectedDurationText = "60"
+        profile.defaultAppointmentDurationMinutes = 90
+        try DomainGraphValidator.save(fixture.context)
+
+        editor.load(in: fixture.context)
+
+        #expect(editor.draft.expectedDurationText == "60")
+    }
+
+    @Test
+    func existingAppointmentIgnoresCurrentOwnerDurationDefault() throws {
+        let fixture = try makeTwoHorseFixture()
+        _ = ModelFixtures.makeBusinessProfile(
+            defaultAppointmentDurationMinutes: 90,
+            in: fixture.context
+        )
+        let appointment = ModelFixtures.makeAppointment(
+            barn: fixture.barn,
+            horses: fixture.horses,
+            in: fixture.context
+        )
+        appointment.expectedDurationMinutes = 30
+        try DomainGraphValidator.save(fixture.context)
+        let editor = AppointmentEditorModel(appointment: appointment)
+
+        editor.load(in: fixture.context)
+
+        #expect(editor.draft.expectedDurationText == "30")
+        #expect(!editor.appliedOwnerDurationDefault)
+    }
+
+    @Test
     func saveRequirementTracksTheFirstMissingAppointmentValue() throws {
         let fixture = try makeTwoHorseFixture()
         let editor = AppointmentEditorModel()

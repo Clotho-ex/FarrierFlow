@@ -8,8 +8,18 @@ struct AppointmentDetailView: View {
     @State private var model = AppointmentDetailModel()
     @State private var showsEditor = false
     @State private var showsDeleteConfirmation = false
+    @State private var completedVisitFromEditor = false
 
     let appointmentID: PersistentIdentifier
+    private let onVisitCompleted: (() -> Void)?
+
+    init(
+        appointmentID: PersistentIdentifier,
+        onVisitCompleted: (() -> Void)? = nil
+    ) {
+        self.appointmentID = appointmentID
+        self.onVisitCompleted = onVisitCompleted
+    }
 
     var body: some View {
         Group {
@@ -28,6 +38,16 @@ struct AppointmentDetailView: View {
                             value: appointment.barn?.name
                                 ?? String(localized: "Unavailable", locale: locale)
                         )
+                        if let address = appointment.barn?.address {
+                            LabeledContent("Address", value: address)
+                                .accessibilityIdentifier("appointment-detail-address")
+                        }
+                        if let arrivalNotes = appointment.barn?.contactNotes {
+                            LabeledContent("Arrival Notes", value: arrivalNotes)
+                                .accessibilityIdentifier(
+                                    "appointment-detail-arrival-notes"
+                                )
+                        }
                         if let duration = appointment.expectedDurationMinutes {
                             LabeledContent(
                                 "Expected Duration",
@@ -62,11 +82,32 @@ struct AppointmentDetailView: View {
                                     )
                                         .font(Typography.recordMetadata)
                                         .foregroundStyle(.secondary)
+                                    if let phone = horse.client?.phone {
+                                        Text(phone)
+                                            .font(Typography.recordMetadata)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    if let safetyNotes = horse.safetyNotes {
+                                        Label(safetyNotes, systemImage: "exclamationmark.triangle")
+                                            .font(Typography.recordMetadata)
+                                            .foregroundStyle(.orange)
+                                    }
                                 }
                             } else {
                                 Text("Horse unavailable")
                                     .foregroundStyle(.secondary)
                             }
+                        }
+                    }
+                    if appointment.visit == nil {
+                        Section {
+                            Button("Start Visit") {
+                                model.startVisit(in: context.container)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.large)
+                            .frame(maxWidth: .infinity)
+                            .accessibilityIdentifier("visit-start-action")
                         }
                     }
                 }
@@ -87,11 +128,6 @@ struct AppointmentDetailView: View {
                                     ? "visit-resume-action"
                                     : "visit-view-action"
                             )
-                        } else {
-                            Button("Start Visit") {
-                                model.startVisit(in: context.container)
-                            }
-                            .accessibilityIdentifier("visit-start-action")
                         }
                         Button("Edit", systemImage: "pencil") { showsEditor = true }
                         Button("Delete", systemImage: "trash", role: .destructive) {
@@ -121,9 +157,14 @@ struct AppointmentDetailView: View {
             }
         }
         .onAppear(perform: reload)
-        .sheet(item: editorPresentation, onDismiss: reload) { presentation in
+        .sheet(item: editorPresentation, onDismiss: handleVisitEditorDismissal) { presentation in
             if case let .editor(visitID) = presentation {
-                VisitEditorView(visitID: visitID, container: context.container)
+                VisitEditorView(
+                    visitID: visitID,
+                    container: context.container
+                ) {
+                    completedVisitFromEditor = true
+                }
             }
         }
         .sheet(item: detailPresentation, onDismiss: reload) { presentation in
@@ -145,6 +186,13 @@ struct AppointmentDetailView: View {
         // Appointment in a fresh context after a sheet closes so stale state
         // cannot leave a Start Visit action visible.
         model.load(id: appointmentID, in: ModelContext(context.container))
+    }
+
+    private func handleVisitEditorDismissal() {
+        reload()
+        guard completedVisitFromEditor else { return }
+        completedVisitFromEditor = false
+        onVisitCompleted?()
     }
 
     private var editorPresentation: Binding<VisitPresentation?> {

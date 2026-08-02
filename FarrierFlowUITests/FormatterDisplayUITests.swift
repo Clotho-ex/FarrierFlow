@@ -56,6 +56,7 @@ final class FormatterDisplayUITests: XCTestCase {
         app.buttons["appointment-barn-picker"].tap()
         app.buttons[barnName].tap()
         app.buttons["appointment-horse-\(horseName)"].tap()
+        app.buttons["appointment-more-details"].tap()
         let durationField = app.textFields["Expected Duration (minutes)"]
         durationField.tap()
         durationField.typeText(String(Int.max))

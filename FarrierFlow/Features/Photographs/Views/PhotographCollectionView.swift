@@ -32,12 +32,12 @@ struct PhotographCollectionView: View {
         content
             .overlay {
                 if model.isProcessing {
-                    ProgressView("Processing Photograph…")
+                    ProgressView("Processing Photo…")
                         .padding()
                         .background(.regularMaterial, in: .rect(cornerRadius: 12))
                 }
             }
-            .navigationTitle("Hoof Photographs")
+            .navigationTitle("Hoof Photos")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -62,7 +62,7 @@ struct PhotographCollectionView: View {
                         await model.add(sourceData: data)
                     } else {
                         model.alert = FeatureAlert(
-                            title: "Couldn’t Import Photograph",
+                            title: "Couldn’t Import Photo",
                             message: "The selected image couldn’t be read. Choose another image."
                         )
                     }
@@ -75,8 +75,8 @@ struct PhotographCollectionView: View {
                     }
                 } onFailure: {
                     model.alert = FeatureAlert(
-                        title: "Couldn’t Capture Photograph",
-                        message: "The captured image couldn’t be read. Try taking another photograph."
+                        title: "Couldn’t Capture Photo",
+                        message: "The captured image couldn’t be read. Try taking another photo."
                     )
                 }
                 .ignoresSafeArea()
@@ -97,7 +97,7 @@ struct PhotographCollectionView: View {
                 )
             }
             .confirmationDialog(
-                "Delete Photograph?",
+                "Delete Photo?",
                 isPresented: Binding(
                     get: { pendingDeletion != nil },
                     set: { if !$0 { pendingDeletion = nil } }
@@ -105,7 +105,7 @@ struct PhotographCollectionView: View {
                 titleVisibility: .visible,
                 presenting: pendingDeletion
             ) { item in
-                Button("Delete Photograph", role: .destructive) {
+                Button("Delete Photo", role: .destructive) {
                     Task {
                         await model.delete(id: item.id)
                     }
@@ -114,8 +114,8 @@ struct PhotographCollectionView: View {
             } message: { item in
                 Text(
                     item.availability == .available
-                        ? "This removes the photograph from this horse’s visit."
-                        : "This removes the unavailable photograph record."
+                        ? "This removes the photo from this horse’s visit."
+                        : "This removes the unavailable photo record."
                 )
             }
             .alert(item: $model.alert) {
@@ -126,14 +126,14 @@ struct PhotographCollectionView: View {
     @ViewBuilder
     private var content: some View {
         if model.isLoading, model.items.isEmpty {
-            ProgressView("Loading Photographs…")
+            ProgressView("Loading Photos…")
         } else if model.hasInitialLoadFailure {
             unavailableContent
         } else if model.items.isEmpty {
             ContentUnavailableView(
-                "No Photographs",
+                "No Photos",
                 systemImage: "photo.on.rectangle",
-                description: Text("Add a hoof photograph with the camera or photo library.")
+                description: Text("Add a hoof photo with the camera or photo library.")
             )
         } else {
             VStack(spacing: 0) {
@@ -163,7 +163,7 @@ struct PhotographCollectionView: View {
 
                     if !model.canAdd,
                        model.availableCount >= PhotographConstants.maximumPhotographsPerVisitHorse {
-                        Text("This horse has 16 photographs. Delete one before adding another.")
+                        Text("This horse has 16 photos. Delete one before adding another.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                             .padding(.horizontal)
@@ -176,7 +176,7 @@ struct PhotographCollectionView: View {
 
     private var unavailableContent: some View {
         ContentUnavailableView {
-            Label("Photographs Unavailable", systemImage: "exclamationmark.triangle")
+            Label("Photos Unavailable", systemImage: "exclamationmark.triangle")
         } description: {
             loadFailureMessage
         } actions: {
@@ -189,7 +189,7 @@ struct PhotographCollectionView: View {
     private var refreshFailure: some View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Photographs Unavailable")
+                Text("Photos Unavailable")
                     .font(.subheadline.weight(.semibold))
                 loadFailureMessage
                     .font(.footnote)
@@ -209,7 +209,7 @@ struct PhotographCollectionView: View {
         if let loadFailure = model.loadFailure {
             Text(loadFailure.message)
         } else {
-            Text("The photographs couldn’t be loaded. Try again.")
+            Text("The photos couldn’t be loaded. Try again.")
         }
     }
 
@@ -227,7 +227,7 @@ struct PhotographCollectionView: View {
                 Label("Photo Library", systemImage: "photo.on.rectangle")
             }
         } label: {
-            Label("Add Photograph", systemImage: "plus")
+            Label("Add Photo", systemImage: "plus")
         }
         .disabled(!model.canAdd)
         .accessibilityIdentifier("photograph-add-menu")
@@ -237,11 +237,11 @@ struct PhotographCollectionView: View {
     private var addMenuAccessibilityValue: String {
         switch model.loadState {
         case .loading:
-            "Loading photographs"
+            "Loading photos"
         case .loaded:
             "\(model.availableCount) of \(PhotographConstants.maximumPhotographsPerVisitHorse)"
         case .failed:
-            "Photographs unavailable"
+            "Photos unavailable"
         }
     }
 
@@ -249,7 +249,7 @@ struct PhotographCollectionView: View {
         guard cameraIsAvailable else {
             model.alert = FeatureAlert(
                 title: "Camera Unavailable",
-                message: "Use the photo library to add a photograph on this device."
+                message: "Use the photo library to add a photo on this device."
             )
             return
         }

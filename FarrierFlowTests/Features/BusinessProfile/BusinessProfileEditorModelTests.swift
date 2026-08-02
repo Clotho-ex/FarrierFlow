@@ -23,7 +23,9 @@ struct BusinessProfileEditorModelTests {
             phone: " 555-0100 ",
             email: " alex@example.com ",
             address: " 1 Main Street ",
-            defaultInvoiceNote: " Thank you. "
+            defaultInvoiceNote: " Thank you. ",
+            defaultAppointmentDurationMinutes: 45,
+            defaultInvoiceDueDays: 30
         )
 
         #expect(model.canSave)
@@ -37,6 +39,8 @@ struct BusinessProfileEditorModelTests {
         #expect(profile.email == "alex@example.com")
         #expect(profile.address == "1 Main Street")
         #expect(profile.defaultInvoiceNote == "Thank you.")
+        #expect(profile.defaultAppointmentDurationMinutes == 45)
+        #expect(profile.defaultInvoiceDueDays == 30)
         #expect(profile.nextInvoiceNumber == 1)
     }
 
@@ -61,6 +65,8 @@ struct BusinessProfileEditorModelTests {
         model.draft.email = "office@example.com"
         model.draft.address = ""
         model.draft.defaultInvoiceNote = ""
+        model.draft.defaultAppointmentDurationMinutes = 60
+        model.draft.defaultInvoiceDueDays = nil
 
         #expect(model.save(in: context))
         #expect(profile.name == "Carter and Son Farriers")
@@ -68,6 +74,8 @@ struct BusinessProfileEditorModelTests {
         #expect(profile.email == "office@example.com")
         #expect(profile.address == nil)
         #expect(profile.defaultInvoiceNote == nil)
+        #expect(profile.defaultAppointmentDurationMinutes == 60)
+        #expect(profile.defaultInvoiceDueDays == nil)
         #expect(profile.nextInvoiceNumber == 42)
         #expect(try context.fetchCount(FetchDescriptor<BusinessProfile>()) == 1)
     }

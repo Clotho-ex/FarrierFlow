@@ -300,7 +300,7 @@ final class VisitCompletionUITests: XCTestCase {
         XCTAssertFalse(complete.isEnabled)
 
         app.buttons["visit-photographs-\(graph.servicedHorseName)"].tap()
-        XCTAssertTrue(app.navigationBars["Hoof Photographs"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.navigationBars["Hoof Photos"].waitForExistence(timeout: 3))
         app.buttons["photograph-add-menu"].tap()
         app.buttons["Camera"].tap()
         XCTAssertTrue(app.alerts["Camera Unavailable"].waitForExistence(timeout: 3))
@@ -312,7 +312,7 @@ final class VisitCompletionUITests: XCTestCase {
         XCTAssertTrue(photosNavigation.waitForExistence(timeout: 5))
         photosNavigation.buttons["Cancel"].tap()
         XCTAssertTrue(photosNavigation.waitForNonExistence(timeout: 5))
-        let visitBackButton = app.navigationBars["Hoof Photographs"].buttons["Visit"]
+        let visitBackButton = app.navigationBars["Hoof Photos"].buttons["Visit"]
         XCTAssertTrue(visitBackButton.waitForExistence(timeout: 3))
         XCTAssertTrue(visitBackButton.isHittable)
         visitBackButton.tap()
@@ -559,6 +559,7 @@ final class VisitCompletionUITests: XCTestCase {
         guard barnOptions.count > 0 else { return }
         barnOptions.element(boundBy: barnOptions.count - 1).tap()
         if let defaultServiceName {
+            app.buttons["horse-more-details"].tap()
             tapAfterBringingIntoView(
                 app.buttons["horse-default-service-picker"],
                 in: app
@@ -826,7 +827,7 @@ private enum VisitOutcome {
     var title: String {
         switch self {
         case .pending:
-            "Pending"
+            "Not Started"
         case .serviced:
             "Serviced"
         case .notServiced:

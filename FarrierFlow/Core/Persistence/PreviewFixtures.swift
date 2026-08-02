@@ -182,7 +182,18 @@ enum UITestFixtures {
                 in: container,
                 photographRootURL: photographRootURL
             )
+        case .ownerSetup:
+            break
         }
+    }
+
+    static func seedOwnerIdentity(in container: ModelContainer) throws {
+        let context = container.mainContext
+        guard try context.fetchCount(FetchDescriptor<BusinessProfile>()) == 0 else {
+            return
+        }
+        context.insert(BusinessProfile(name: "UI Test Farrier"))
+        try DomainGraphValidator.save(context)
     }
 
     private static func seedInvoiceReady(
@@ -194,6 +205,7 @@ enum UITestFixtures {
         guard !existingClients.contains(where: { $0.name == invoiceClientName }) else {
             return
         }
+        context.insert(BusinessProfile(name: "UI Test Farrier"))
 
         let invoiceClient = Client(
             name: invoiceClientName,

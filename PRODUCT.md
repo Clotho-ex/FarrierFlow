@@ -61,6 +61,15 @@ one continuous field workflow rather than separate generic business modules.
   every still-uninvoiced WorkItem belonging to that Client, snapshots all
   financial and display content, and generates a native US Letter PDF for the
   system share sheet.
+- Slice 5A introduces first-run owner setup and replaces the passive Today list
+  with an action-led hub. First run asks only for a business or farrier name,
+  then opens Today. Contact information, operating defaults, Services, and
+  Service Locations stay available in their contextual features; new
+  Appointment and Invoice drafts reuse saved defaults without hiding
+  record-specific truth.
+- Owner setup remains distinct from customer records. Client, Horse, Service
+  Location, Appointment, Visit, WorkItem, Photograph, and Invoice data continue
+  to describe the farrier's customers and work, not a customer-facing app mode.
 - An in-progress Visit can be saved and resumed. A completed Visit remains
   available from its Appointment and from Horse History.
 - Visit history preserves the actual Visit start time and immutable
@@ -79,11 +88,17 @@ one continuous field workflow rather than separate generic business modules.
 
 - The product name is FarrierFlow.
 - Its character is durable, calm, professional, efficient, and field-ready.
+- Its visual north star is **The Field Book**: precise, chronological,
+  high-contrast, and action-led without imitating paper, vintage equipment, or
+  a generic dashboard.
+- Today expresses that system as a state-adaptive **Run Sheet**: one truthful
+  Next Stop or active-Visit action field followed by remaining chronological
+  work.
 - It must not feel western-themed, rustic, veterinary, cartoonish, or like a
   generic SaaS dashboard.
 - Distinction should come from a restrained accent palette, field-specific copy,
-  excellent hierarchy, horse photography, careful spacing, strong empty states,
-  and subtle haptics.
+  excellent hierarchy, a continuous workline, horse photography, careful
+  spacing, strong activation and empty states, and subtle haptics.
 - Preserve native platform behavior. Avoid custom navigation, custom tab bars,
   glass cards, gradients, excessive corner radii, card-on-card layouts,
   decorative icons, oversized headings, and invented interaction patterns.
@@ -100,6 +115,8 @@ one continuous field workflow rather than separate generic business modules.
   `docs/superpowers/specs/2026-07-28-slice-3-hoof-photographs-design.md`.
 - The approved Slice 5 design is recorded in
   `docs/superpowers/specs/2026-07-30-slice-5-invoicing-design.md`.
+- The approved Slice 5A owner-setup and Run Sheet hub design is recorded in
+  `docs/superpowers/specs/2026-08-02-slice-5a-owner-setup-field-book-design.md`.
 - No bundled production customer imagery, logo, customer evidence, testimonials,
   integrations, or operational sample data is present. Preview and UI-test
   fixtures are deterministic development data only. Future product work must
@@ -116,6 +133,11 @@ one continuous field workflow rather than separate generic business modules.
    efficient capture while standing.
 5. Keep the product professional and specific to farrier work without resorting
    to themed decoration or generic business-software patterns.
+6. Ask for reusable owner information once, then prefill it transparently while
+   keeping each customer and work record explicit.
+7. Use behavioral principles only with truthful product state: real progress,
+   real unsaved work, real defaults, and real consequences. Never fabricate
+   urgency, scarcity, rewards, or loss.
 
 ## Accessibility & Inclusion
 

@@ -8,6 +8,8 @@ extension FarrierFlowSchemaV1 {
         var email: String?
         var address: String?
         var defaultInvoiceNote: String?
+        var defaultAppointmentDurationMinutes: Int?
+        var defaultInvoiceDueDays: Int?
         var nextInvoiceNumber: Int64
 
         init(
@@ -16,6 +18,8 @@ extension FarrierFlowSchemaV1 {
             email: String? = nil,
             address: String? = nil,
             defaultInvoiceNote: String? = nil,
+            defaultAppointmentDurationMinutes: Int? = nil,
+            defaultInvoiceDueDays: Int? = 14,
             nextInvoiceNumber: Int64 = 1
         ) {
             self.name = name
@@ -23,6 +27,8 @@ extension FarrierFlowSchemaV1 {
             self.email = email
             self.address = address
             self.defaultInvoiceNote = defaultInvoiceNote
+            self.defaultAppointmentDurationMinutes = defaultAppointmentDurationMinutes
+            self.defaultInvoiceDueDays = defaultInvoiceDueDays
             self.nextInvoiceNumber = nextInvoiceNumber
         }
     }

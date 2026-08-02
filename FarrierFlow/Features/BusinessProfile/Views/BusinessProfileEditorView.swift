@@ -2,14 +2,21 @@ import SwiftData
 import SwiftUI
 
 struct BusinessProfileEditorView: View {
+    enum Mode {
+        case full
+        case identity
+    }
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @State private var model = BusinessProfileEditorModel()
     @FocusState private var focusedField: Field?
 
     private let onSaved: (() -> Void)?
+    private let mode: Mode
 
-    init(onSaved: (() -> Void)? = nil) {
+    init(mode: Mode = .full, onSaved: (() -> Void)? = nil) {
+        self.mode = mode
         self.onSaved = onSaved
     }
 
@@ -17,13 +24,13 @@ struct BusinessProfileEditorView: View {
         Group {
             switch model.loadState {
             case .loading:
-                ProgressView("Loading Business Profile…")
+                ProgressView("Loading My Business…")
             case .loaded:
                 form
             case .failed:
                 ContentUnavailableView {
                     Label(
-                        "Business Profile Unavailable",
+                        "My Business Unavailable",
                         systemImage: "exclamationmark.circle"
                     )
                 } description: {
@@ -37,12 +44,12 @@ struct BusinessProfileEditorView: View {
                 }
             }
         }
-        .navigationTitle("Business Profile")
+        .navigationTitle(mode == .identity ? "Your Business" : "My Business")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if model.loadState == .loaded {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", action: save)
+                    Button(mode == .identity ? "Continue" : "Save", action: save)
                         .disabled(!model.canSave)
                         .accessibilityIdentifier("business-profile-save-action")
                 }
@@ -71,13 +78,21 @@ struct BusinessProfileEditorView: View {
                 )
                 .textContentType(.organizationName)
                 .textInputAutocapitalization(.words)
-                .submitLabel(.next)
+                .submitLabel(mode == .identity ? .go : .next)
                 .focused($focusedField, equals: .name)
                 .onSubmit {
-                    focusedField = .phone
+                    if mode == .identity {
+                        save()
+                    } else {
+                        focusedField = .phone
+                    }
                 }
                 .accessibilityIdentifier("business-profile-name-field")
-                .accessibilityHint("Required. Used on future invoices.")
+                .accessibilityHint(
+                    mode == .identity
+                        ? "Required. You can add other business details later."
+                        : "Required. Used on future invoices."
+                )
 
                 if !model.draft.name.isEmpty,
                    TextNormalization.required(model.draft.name) == nil {
@@ -88,10 +103,15 @@ struct BusinessProfileEditorView: View {
             } header: {
                 Text("Business")
             } footer: {
-                Text("A business or farrier name is required.")
+                if mode == .identity {
+                    Text("This name appears on Today and future invoices. Add contact information and defaults later from My Business.")
+                } else {
+                    Text("A business or farrier name is required.")
+                }
             }
 
-            Section {
+            if mode == .full {
+                Section {
                 TextField("Phone", text: $model.draft.phone)
                     .textContentType(.telephoneNumber)
                     .keyboardType(.phonePad)
@@ -119,28 +139,49 @@ struct BusinessProfileEditorView: View {
                 .lineLimit(2...4)
                 .focused($focusedField, equals: .address)
                 .accessibilityIdentifier("business-profile-address-field")
-            } header: {
-                Text("Contact Information")
-            } footer: {
-                Text("Phone, email, and address are optional.")
-            }
+                } header: {
+                    Text("Contact Information")
+                } footer: {
+                    Text("Phone, email, and address are optional.")
+                }
 
-            Section {
-                TextField(
-                    "Default Invoice Note",
-                    text: $model.draft.defaultInvoiceNote,
-                    axis: .vertical
-                )
-                .lineLimit(3...6)
-                .focused($focusedField, equals: .defaultInvoiceNote)
-                .accessibilityHint("Used on future invoices.")
-                .accessibilityIdentifier(
-                    "business-profile-default-invoice-note-field"
-                )
-            } header: {
-                Text("Default Invoice Note")
-            } footer: {
-                Text("This optional note is added to future invoices.")
+                Section {
+                    Picker(
+                        "Usual Appointment",
+                        selection: $model.draft.defaultAppointmentDurationMinutes
+                    ) {
+                        Text("Ask Every Time").tag(Int?.none)
+                        ForEach([30, 45, 60, 90, 120], id: \.self) { minutes in
+                            Text("\(minutes) minutes").tag(Int?.some(minutes))
+                        }
+                    }
+
+                    Picker(
+                        "Invoice Due",
+                        selection: $model.draft.defaultInvoiceDueDays
+                    ) {
+                        Text("No Due Date").tag(Int?.none)
+                        ForEach([7, 14, 30], id: \.self) { days in
+                            Text("\(days) days").tag(Int?.some(days))
+                        }
+                    }
+
+                    TextField(
+                        "Default Invoice Note",
+                        text: $model.draft.defaultInvoiceNote,
+                        axis: .vertical
+                    )
+                    .lineLimit(3...6)
+                    .focused($focusedField, equals: .defaultInvoiceNote)
+                    .accessibilityHint("Used on future invoices.")
+                    .accessibilityIdentifier(
+                        "business-profile-default-invoice-note-field"
+                    )
+                } header: {
+                    Text("Usual Settings")
+                } footer: {
+                    Text("Defaults prefill new drafts. You can change or clear them before saving.")
+                }
             }
         }
         .scrollDismissesKeyboard(.interactively)

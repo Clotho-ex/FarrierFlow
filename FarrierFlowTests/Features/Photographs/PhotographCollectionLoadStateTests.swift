@@ -38,7 +38,7 @@ struct PhotographCollectionLoadStateTests {
         #expect(model.loadState == .failed)
         #expect(model.items.isEmpty)
         #expect(model.hasInitialLoadFailure)
-        #expect(model.loadFailure?.title == "Photographs Unavailable")
+        #expect(model.loadFailure?.title == "Photos Unavailable")
     }
 
     @Test

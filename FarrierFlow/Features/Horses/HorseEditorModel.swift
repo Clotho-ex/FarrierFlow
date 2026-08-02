@@ -92,6 +92,20 @@ final class HorseEditorModel {
         }
     }
 
+    func selectCreatedClient(
+        _ id: PersistentIdentifier,
+        in context: ModelContext
+    ) {
+        loadChoices(in: context)
+        guard
+            choicesLoadState == .loaded,
+            clients.contains(where: { $0.persistentModelID == id })
+        else {
+            return
+        }
+        draft.clientID = id
+    }
+
     func save(in context: ModelContext) -> PersistentIdentifier? {
         guard
             let name = TextNormalization.required(draft.name),

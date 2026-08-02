@@ -8,7 +8,7 @@ nonisolated enum VisitOutcome: String, CaseIterable, Codable, Hashable, Sendable
     var localizedTitle: LocalizedStringResource {
         switch self {
         case .pending:
-            "Pending"
+            "Not Started"
         case .serviced:
             "Serviced"
         case .notServiced:

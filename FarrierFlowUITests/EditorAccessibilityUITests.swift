@@ -13,6 +13,7 @@ final class EditorAccessibilityUITests: XCTestCase {
         let addClient = app.buttons["Add Client"].firstMatch
         XCTAssertTrue(addClient.waitForExistence(timeout: 10))
         addClient.tap()
+        app.buttons["client-more-details"].tap()
         XCTAssertTrue(app.textViews["Client Notes"].waitForExistence(timeout: 3))
         app.textFields["client-name-field"].tap()
         app.textFields["client-name-field"].typeText("Accessible Client")
@@ -23,12 +24,14 @@ final class EditorAccessibilityUITests: XCTestCase {
         XCTAssertTrue(addAppointment.waitForExistence(timeout: 10))
         addAppointment.tap()
         let appointmentNotes = app.textViews["Appointment Notes"]
+        app.buttons["appointment-more-details"].tap()
         XCTAssertTrue(appointmentNotes.waitForExistence(timeout: 3))
         appointmentNotes.tap()
         appointmentNotes.typeText("Keep this draft")
         let addServiceLocation = app.buttons["appointment-add-service-location"]
         XCTAssertTrue(addServiceLocation.waitForExistence(timeout: 3))
         addServiceLocation.tap()
+        app.buttons["barn-more-details"].tap()
         XCTAssertTrue(app.textViews["Contact Notes"].waitForExistence(timeout: 3))
         app.textFields["barn-name-field"].tap()
         app.textFields["barn-name-field"].typeText("Accessible Barn")
@@ -43,6 +46,7 @@ final class EditorAccessibilityUITests: XCTestCase {
             ].waitForExistence(timeout: 3)
         )
         app.buttons["appointment-add-horse"].tap()
+        app.buttons["horse-more-details"].tap()
         XCTAssertTrue(app.textViews["Safety Notes"].waitForExistence(timeout: 3))
         let horseName = app.textFields["horse-name-field"]
         XCTAssertTrue(horseName.waitForExistence(timeout: 3))

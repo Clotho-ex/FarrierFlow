@@ -14,6 +14,25 @@ nonisolated enum AppointmentEditorLoadError: Error, Equatable {
     case invalidLockedGraph
 }
 
+nonisolated enum AppointmentStartDateRules {
+    static func nextHalfHour(after now: Date, calendar: Calendar) -> Date {
+        let components = calendar.dateComponents(
+            [.era, .year, .month, .day, .hour, .minute],
+            from: now
+        )
+        guard let minuteStart = calendar.date(from: components) else {
+            return now
+        }
+        let minute = calendar.component(.minute, from: minuteStart)
+        let minutesToAdd = 30 - (minute % 30)
+        return calendar.date(
+            byAdding: .minute,
+            value: minutesToAdd,
+            to: minuteStart
+        ) ?? now
+    }
+}
+
 @MainActor
 @Observable
 final class AppointmentEditorModel {
@@ -36,6 +55,8 @@ final class AppointmentEditorModel {
     private(set) var lockedHorseNames: [String] = []
     private var lockedBarnID: PersistentIdentifier?
     private var lockedHorseIDs = Set<PersistentIdentifier>()
+    private var hasAppliedOwnerDefault = false
+    private(set) var appliedOwnerDurationDefault = false
     let appointmentID: PersistentIdentifier?
     var alert: FeatureAlert?
 
@@ -53,6 +74,8 @@ final class AppointmentEditorModel {
 
     init(
         appointment: Appointment? = nil,
+        now: Date = .now,
+        calendar: Calendar = .autoupdatingCurrent,
         barnFetcher: @escaping (ModelContext) throws -> [Barn] = {
             try $0.fetch(
                 FetchDescriptor<Barn>(
@@ -73,7 +96,11 @@ final class AppointmentEditorModel {
         appointmentID = appointment?.persistentModelID
         draft = AppointmentDraft(
             barnID: appointment?.barn?.persistentModelID,
-            startDate: appointment?.startDate ?? .now,
+            startDate: appointment?.startDate
+                ?? AppointmentStartDateRules.nextHalfHour(
+                    after: now,
+                    calendar: calendar
+                ),
             selectedHorseIDs: Set(
                 appointment?.appointmentHorses.compactMap(\.horse?.persistentModelID) ?? []
             ),
@@ -102,6 +129,8 @@ final class AppointmentEditorModel {
                     return
                 }
                 updateVisitLock(from: appointment)
+            } else {
+                try applyOwnerDefaultIfNeeded(in: context)
             }
             let loadedBarns = try barnFetcher(context)
             let loadedHorses = try eligibleHorses(
@@ -296,6 +325,23 @@ final class AppointmentEditorModel {
                 "Failed to load eligible appointment horses: \(error, privacy: .public)"
             )
         }
+    }
+
+    private func applyOwnerDefaultIfNeeded(in context: ModelContext) throws {
+        guard !hasAppliedOwnerDefault else { return }
+        var descriptor = FetchDescriptor<BusinessProfile>()
+        descriptor.fetchLimit = 2
+        let profiles = try context.fetch(descriptor)
+        if
+            profiles.count == 1,
+            draft.expectedDurationText.isEmpty,
+            let duration = profiles[0].defaultAppointmentDurationMinutes,
+            duration > 0
+        {
+            draft.expectedDurationText = String(duration)
+            appliedOwnerDurationDefault = true
+        }
+        hasAppliedOwnerDefault = true
     }
 
     private func eligibleHorses(

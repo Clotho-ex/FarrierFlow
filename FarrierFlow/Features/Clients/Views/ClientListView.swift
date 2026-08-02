@@ -35,7 +35,7 @@ struct ClientListView: View {
                         showsEditor = true
                     }
                     Menu {
-                        Button("Service Locations", systemImage: "building.2") {
+                        Button("Service Locations", systemImage: "mappin.and.ellipse") {
                             path.append(BarnRoute.list)
                         }
                         Button("Services", systemImage: "wrench.and.screwdriver") {
@@ -45,7 +45,7 @@ struct ClientListView: View {
                             path.append(InvoiceRoute.list)
                         }
                         Button(
-                            "Business Profile",
+                            "My Business",
                             systemImage: "person.text.rectangle"
                         ) {
                             path.append(BusinessProfileRoute.editor)

@@ -152,6 +152,8 @@ struct SchemaContractTests {
 
         #expect(horse.appointmentIntervalWeeks == 6)
         #expect(appointment.expectedDurationMinutes == nil)
+        #expect(profile.defaultAppointmentDurationMinutes == nil)
+        #expect(profile.defaultInvoiceDueDays == 14)
         #expect(profile.nextInvoiceNumber == 1)
     }
 

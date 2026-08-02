@@ -98,11 +98,11 @@ struct InvoiceCreationView: View {
                 .accessibilityIdentifier("invoice-selection-total")
             }
             if !model.hasValidBusinessProfile {
-                Section("Business Profile Required") {
+                Section("Finish Business Setup") {
                     NavigationLink {
                         BusinessProfileEditorView(onSaved: reload)
                     } label: {
-                        Label("Add Business Profile", systemImage: "person.text.rectangle")
+                        Label("Set Up My Business", systemImage: "person.text.rectangle")
                     }
                     Text("Add a business or farrier name before generating an invoice.")
                         .foregroundStyle(.secondary)
@@ -112,7 +112,10 @@ struct InvoiceCreationView: View {
                 Section("Invoice") {
                     DatePicker(
                         "Invoice Date",
-                        selection: draftBinding(\.invoiceDate, fallback: draft.invoiceDate),
+                        selection: Binding(
+                            get: { model.draft?.invoiceDate ?? draft.invoiceDate },
+                            set: { model.updateInvoiceDate($0) }
+                        ),
                         displayedComponents: .date
                     )
                     Toggle("Add Due Date", isOn: dueDateEnabled)
@@ -151,24 +154,14 @@ struct InvoiceCreationView: View {
     private var dueDateEnabled: Binding<Bool> {
         Binding(
             get: { model.draft?.dueDate != nil },
-            set: { enabled in
-                guard var draft = model.draft else { return }
-                draft.dueDate = enabled
-                    ? (try? InvoiceDateRules.defaultDueDate(for: draft.invoiceDate, calendar: .current))
-                    : nil
-                model.draft = draft
-            }
+            set: { model.setDueDateEnabled($0) }
         )
     }
 
     private var dueDateBinding: Binding<Date> {
         Binding(
             get: { model.draft?.dueDate ?? model.draft?.invoiceDate ?? .now },
-            set: { value in
-                guard var draft = model.draft else { return }
-                draft.dueDate = value
-                model.draft = draft
-            }
+            set: { model.updateDueDate($0) }
         )
     }
 

@@ -2,13 +2,15 @@
 
 ## Scope
 
-This document defines the complete first-shipping SwiftData contract through
-Slice 5. The graph supports independent clients and service locations, horses owned by
+This document defines the implemented first-shipping SwiftData contract through
+Slice 5A. The graph supports independent
+clients and service locations, horses owned by
 clients and currently located at one service location, barn-centric
 appointments containing one or more horses, Visit records that preserve
 performed-work outcomes and Horse History, Photograph metadata owned by
 individual VisitHorse records, structured Services and WorkItems, and immutable
-Client Invoices.
+Client Invoices. The BusinessProfile also owns optional reusable
+Appointment-duration and Invoice-due defaults introduced by Slice 5A.
 
 SwiftData is the local metadata source of truth. Canonical Photograph JPEGs are
 stored in Application Support and resolved only from their UUID. Invoice PDFs
@@ -239,9 +241,11 @@ schema.
 - Scheduled start, notes, and expected duration remain editable only when their
   mutation leaves the Visit graph unchanged and valid.
 
-Expected duration is not derived from horse count and is not populated
-automatically. When it is absent, Today and Schedule display only the start
-time.
+Expected duration is not derived from horse count. A new Appointment draft may
+prefill it from the current BusinessProfile's optional owner default. The value
+remains editable and is copied into the Appointment only when that draft is
+saved. Existing Appointments never change when the owner default changes. When
+duration is absent, Today and Schedule display only the start time.
 
 ### Deletion
 
@@ -432,9 +436,28 @@ any WorkItem from that Visit has an InvoiceLineItem reference.
 ## BusinessProfile
 
 Exactly zero or one BusinessProfile may exist. It requires a normalized business
-or farrier name and optionally stores phone, email, address, and default invoice
-note. `nextInvoiceNumber` begins at 1, is never user-editable, advances only with
-a successful Invoice save, and must remain greater than every issued number.
+or farrier name.
+
+| Field | Type | Requirement |
+| --- | --- | --- |
+| `name` | `String` | Required, normalized nonempty text |
+| `phone` | `String?` | Optional normalized text |
+| `email` | `String?` | Optional normalized text |
+| `address` | `String?` | Optional normalized text |
+| `defaultAppointmentDurationMinutes` | `Int?` | Optional; positive when present |
+| `defaultInvoiceDueDays` | `Int?` | Optional; positive when present; begins at 14 |
+| `defaultInvoiceNote` | `String?` | Optional normalized text |
+| `nextInvoiceNumber` | `Int64` | Required positive sequence value; begins at 1 |
+
+`nil` duration means Ask Every Time. `nil` due days means No Due Date. These are
+owner preferences for new transient drafts, not persisted links to Appointments
+or Invoices. A new Appointment draft copies the duration default once. A new
+Invoice draft derives its due date by adding the due-day default to its Invoice
+Date and copies the note once. Clearing or editing either draft never edits the
+BusinessProfile.
+
+`nextInvoiceNumber` is never user-editable, advances only with a successful
+Invoice save, and must remain greater than every issued number.
 
 ## Invoice
 
@@ -547,7 +570,8 @@ Domain rules validate relationships that span models:
 - Serviced VisitHorses have recorded WorkItems, with no duplicate Service;
   not-serviced VisitHorses have none.
 - Business Profile count is at most one and its sequence remains ahead of every
-  issued Invoice number.
+  issued Invoice number. Optional duration and due-day defaults are positive
+  when present.
 - Invoice snapshots are normalized, status/payment date agree, currencies are
   consistent, every line belongs to the Invoice Client, checked totals do not
   overflow, and no WorkItem is billed twice.
@@ -582,7 +606,8 @@ Immediately before every controlled save, complete-graph validation rejects:
   or byte count, or with a duplicate UUID.
 - A WorkItem without inverse-matching VisitHorse and Service, with an invalid
   snapshot or amount, or duplicated for one Service within a VisitHorse.
-- Multiple Business Profiles or an invalid next-number sequence.
+- Multiple Business Profiles, an invalid next-number sequence, or a nonpositive
+  owner default.
 - An Invoice without one Client, at least one InvoiceVisit and InvoiceLineItem,
   immutable valid snapshots, a valid status/payment pair, consistent USD
   currency, or one-to-one inverse-matching source WorkItems.
@@ -633,6 +658,8 @@ The first-shipping schema does not include:
   Draft or Sent invoice states, recurring invoices, statements, custom invoice
   numbering, logos, themes, or accounting integrations.
 - Next-appointment records generated from an interval.
+- A global default Client, Horse, Service Location, or Horse Service; these
+  remain contextual record truth.
 - Archive or generalized soft-delete fields.
 - Synchronization, server identifiers, user accounts, or CloudKit metadata.
 - Unscheduled Visit horses.

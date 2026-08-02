@@ -10,9 +10,9 @@ struct BarnListView: View {
         Group {
             if model.barns.isEmpty {
                 ContentUnavailableView {
-                    Label("No service locations", systemImage: "building.2")
+                    Label("No Service Locations", systemImage: "mappin.and.ellipse")
                 } description: {
-                    Text("Add a service location before assigning horses.")
+                    Text("Add a barn, stable, or customer stop before assigning horses.")
                 } actions: {
                     Button("Add Service Location", systemImage: "plus") {
                         showsEditor = true

@@ -24,13 +24,13 @@ struct PhotographFullImageView: View {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFit()
-                        .accessibilityLabel(photographAccessibilityLabel)
+                        .accessibilityLabel(photoAccessibilityLabel)
                 } else if item.availability == .unavailable
                     || (loadFinished && protectedDataIsAvailable) {
                     ContentUnavailableView(
-                        "Photograph Unavailable",
+                        "Photo Unavailable",
                         systemImage: "photo.badge.exclamationmark",
-                        description: Text("The stored photograph file is missing.")
+                        description: Text("The stored photo file is missing.")
                     )
                     .foregroundStyle(.white)
                 } else {
@@ -79,13 +79,13 @@ struct PhotographFullImageView: View {
         }
     }
 
-    private var photographAccessibilityLabel: String {
+    private var photoAccessibilityLabel: String {
         let date = item.createdAt.formatted(
             .dateTime.month(.abbreviated).day().year()
                 .hour().minute().locale(locale)
         )
         return String(
-            localized: "Hoof photograph for \(horseName), \(position) of \(total), created \(date)",
+            localized: "Hoof photo for \(horseName), \(position) of \(total), created \(date)",
             locale: locale
         )
     }

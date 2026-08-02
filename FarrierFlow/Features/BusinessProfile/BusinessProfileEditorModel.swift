@@ -35,7 +35,9 @@ final class BusinessProfileEditorModel {
                     phone: profile.phone ?? "",
                     email: profile.email ?? "",
                     address: profile.address ?? "",
-                    defaultInvoiceNote: profile.defaultInvoiceNote ?? ""
+                    defaultInvoiceNote: profile.defaultInvoiceNote ?? "",
+                    defaultAppointmentDurationMinutes: profile.defaultAppointmentDurationMinutes,
+                    defaultInvoiceDueDays: profile.defaultInvoiceDueDays
                 )
             } else {
                 draft = BusinessProfileDraft()
@@ -77,6 +79,8 @@ final class BusinessProfileEditorModel {
             profile.email = values.email
             profile.address = values.address
             profile.defaultInvoiceNote = values.defaultInvoiceNote
+            profile.defaultAppointmentDurationMinutes = values.defaultAppointmentDurationMinutes
+            profile.defaultInvoiceDueDays = values.defaultInvoiceDueDays
 
             try DomainGraphValidator.save(context)
             alert = nil
@@ -84,7 +88,7 @@ final class BusinessProfileEditorModel {
         } catch {
             context.rollback()
             alert = FeatureAlert(
-                title: "Couldn’t Save Business Profile",
+                title: "Couldn’t Save My Business",
                 message: "Your changes are still in the form. Try saving again."
             )
             return false

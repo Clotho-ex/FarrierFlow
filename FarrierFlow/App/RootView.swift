@@ -17,9 +17,53 @@ struct RootView: View {
     )
 
     @Environment(PhotographLibrary.self) private var photographLibrary
+    @Environment(\.modelContext) private var context
     @State private var selectedTab = AppTab.today
+    @State private var setupModel = OwnerSetupReadinessModel()
+    @State private var presentsInitialSetup = false
+    @State private var resolvedInitialSetup = false
 
     var body: some View {
+        Group {
+            switch setupModel.loadState {
+            case .loading where !resolvedInitialSetup:
+                ProgressView("Loading FarrierFlow…")
+            case .failed where !resolvedInitialSetup:
+                ContentUnavailableView {
+                    Label("FarrierFlow Unavailable", systemImage: "exclamationmark.circle")
+                } description: {
+                    Text("FarrierFlow couldn’t load your business setup.")
+                } actions: {
+                    Button("Retry", action: resolveInitialSetup)
+                }
+            default:
+                if presentsInitialSetup {
+                    OwnerSetupView(model: setupModel) {
+                        presentsInitialSetup = false
+                    }
+                } else {
+                    appTabs
+                }
+            }
+        }
+        .task {
+            if !resolvedInitialSetup {
+                resolveInitialSetup()
+            }
+            await reconcilePhotographs()
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: UIApplication.protectedDataDidBecomeAvailableNotification
+            )
+        ) { _ in
+            Task {
+                await reconcilePhotographs()
+            }
+        }
+    }
+
+    private var appTabs: some View {
         TabView(selection: $selectedTab) {
             Tab("Today", systemImage: "sun.max", value: .today) {
                 TodayView()
@@ -33,17 +77,13 @@ struct RootView: View {
                 ClientListView()
             }
         }
-        .task {
-            await reconcilePhotographs()
-        }
-        .onReceive(
-            NotificationCenter.default.publisher(
-                for: UIApplication.protectedDataDidBecomeAvailableNotification
-            )
-        ) { _ in
-            Task {
-                await reconcilePhotographs()
-            }
+    }
+
+    private func resolveInitialSetup() {
+        setupModel.load(in: context)
+        if setupModel.loadState == .loaded {
+            presentsInitialSetup = !setupModel.hasValidIdentity
+            resolvedInitialSetup = true
         }
     }
 

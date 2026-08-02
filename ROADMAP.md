@@ -346,6 +346,78 @@ The complete contract and implementation sequence are recorded in:
 - `docs/superpowers/specs/2026-07-30-slice-5-invoicing-design.md`
 - `docs/superpowers/plans/2026-07-30-slice-5-invoicing.md`
 
+## Slice 5A — Owner Setup and Run Sheet Hub
+
+**Status:** Complete. Focused unit and persistent-reopening verification passed;
+the final UI smoke was deferred under the resource-stop policy after swap rose.
+
+### Outcome
+
+Set up reusable owner information once, then open an action-led Today hub that
+shows the farrier's next truthful step across setup, scheduled work, Visit
+progress, invoicing, and payment status without adding a tab or customer-facing
+mode.
+
+### Scope
+
+- Add a resumable first-run owner setup flow containing only the required
+  Business Profile name. Saving it opens Today directly.
+- Keep contact information, optional operating defaults, reusable Services,
+  and Service Locations in My Business or their contextual feature flows;
+  never present them as a first-run questionnaire or setup checklist.
+- Add optional BusinessProfile defaults for new Appointment duration and new
+  Invoice due days. Keep the existing default invoice note and Service catalog.
+- Apply defaults once when a new draft is created. Keep every prefilled value
+  visible and editable; never rewrite existing records when defaults change.
+- Replace Today's passive empty/list presentation with a personalized Run
+  Sheet hub: saved business identity, date, one state-adaptive ranked action,
+  remaining chronological appointments, and truthful setup or billing
+  attention.
+- Make the first operating loop continuous: Today can add the first Client,
+  Horse creation can add a missing Client without losing draft state, scheduled
+  stops expose saved arrival context, and completing a Visit returns to Today's
+  invoice-ready action.
+- Preserve native Today, Schedule, and Clients tabs, independent navigation
+  stacks, standard controls, local-first behavior, and the established data
+  graph.
+- Adopt the approved Field Book visual direction in `DESIGN.md`, including the
+  restrained Survey Ink palette, Run Sheet action field, vertical workline,
+  flat native depth, and outdoor/accessibility rules.
+
+### Exclusions
+
+- No customer account, customer-facing mode, networking, synchronization, or
+  new user/account model.
+- No automatic next appointment, notification, payment processing, export,
+  subscription, generalized Settings destination, or new tab.
+- No global default Client, Horse, Service Location, or Horse Service.
+- No fabricated sample Services, prices, customers, appointments, photographs,
+  rewards, urgency, or progress.
+- No custom navigation, custom tab bar, simulated Liquid Glass, generic card
+  dashboard, or western/rustic visual theme.
+
+### Exit Criteria
+
+- New and interrupted users resume the single required identity field from
+  persisted truth; existing users with valid identity reach the hub without
+  being forced through onboarding.
+- Owner defaults prefill only new drafts, remain editable, and survive relaunch.
+- Today selects one deterministic next action and preserves access to every
+  current Appointment.
+- Scheduled and active-Visit Run Sheet states show the correct action and real
+  Visit progress without duplicating the promoted record below.
+- Empty, active-work, uninvoiced-work, and unpaid-Invoice states each provide
+  one relevant continuation action. Missing Service Locations recover while
+  scheduling; missing Services recover while recording Visit work.
+- A fresh owner can complete Client → Horse → Appointment without abandoning an
+  open form, and Resume Visit always returns to editable in-progress work.
+- VoiceOver, Dynamic Type, Light Mode, Dark Mode, Increased Contrast, Reduce
+  Motion, iOS 18, iOS 26, and persistent reopening gates pass.
+- The app contains no deferred capability or invented operational data.
+
+The complete product and architecture contract is recorded in
+`docs/superpowers/specs/2026-08-02-slice-5a-owner-setup-field-book-design.md`.
+
 ## Later Slices
 
 The order below expresses product sequence, not an approved implementation
@@ -379,7 +451,7 @@ Evaluate an opt-in backup or synchronization design only after privacy,
 conflict, account, recovery, migration, and operational requirements are
 defined. CloudKit is not assumed.
 
-## Deferred Beyond Slice 5
+## Deferred Beyond Slice 5A
 
 - Taxes, discounts, partial payments, payment processing, overdue automation,
   Draft or Sent states, recurring invoices, monthly statements, multi-client
@@ -392,7 +464,8 @@ defined. CloudKit is not assumed.
 - Notifications.
 - Archive or generalized soft deletion.
 - Custom navigation, custom tab bars, or custom iOS 26 visual effects.
-- Settings until concrete settings exist.
+- A generalized Settings destination beyond Business Profile and approved owner
+  defaults.
 - Cancellation, no-show, rescheduling, and time-based Appointment resolution.
 - Completed Visit deletion and historical-date correction.
 - Background tasks, external Visit draft files, and per-change autosave.

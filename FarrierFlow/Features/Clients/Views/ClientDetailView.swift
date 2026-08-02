@@ -15,12 +15,6 @@ struct ClientDetailView: View {
         Group {
             if let client = model.client {
                 List {
-                    Section {
-                        NavigationLink(value: InvoiceRoute.create(clientID)) {
-                            Label("Create Invoice", systemImage: "doc.badge.plus")
-                        }
-                        .accessibilityIdentifier("client-create-invoice-action")
-                    }
                     Section("Client") {
                         if let phone = client.phone {
                             LabeledContent("Phone", value: phone)
@@ -34,10 +28,16 @@ struct ClientDetailView: View {
                     }
                     Section("Horses") {
                         if client.horses.isEmpty {
-                            ContentUnavailableView(
-                                "No horses",
-                                systemImage: "figure.equestrian.sports"
-                            )
+                            ContentUnavailableView {
+                                Label("No Horses", systemImage: "figure.equestrian.sports")
+                            } description: {
+                                Text("Add this client’s first horse to start scheduling work.")
+                            } actions: {
+                                Button("Add Horse") {
+                                    showsHorseEditor = true
+                                }
+                                .buttonStyle(.borderedProminent)
+                            }
                         } else {
                             ForEach(
                                 client.horses.sorted {
@@ -49,6 +49,14 @@ struct ClientDetailView: View {
                                     HorseRow(horse: horse)
                                 }
                             }
+                        }
+                    }
+                    if model.hasInvoiceableWork {
+                        Section("Ready to Invoice") {
+                            NavigationLink(value: InvoiceRoute.create(clientID)) {
+                                Label("Create Invoice", systemImage: "doc.badge.plus")
+                            }
+                            .accessibilityIdentifier("client-create-invoice-action")
                         }
                     }
                 }

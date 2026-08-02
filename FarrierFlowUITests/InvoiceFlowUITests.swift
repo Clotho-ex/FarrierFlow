@@ -31,14 +31,6 @@ final class InvoiceFlowUITests: XCTestCase {
         XCTAssertTrue(accessibilityText(of: createInvoice).contains("Create Invoice"))
         createInvoice.tap()
 
-        let addBusinessProfile = app.buttons["Add Business Profile"]
-        XCTAssertTrue(addBusinessProfile.waitForExistence(timeout: 3))
-        XCTAssertTrue(addBusinessProfile.isHittable)
-        let profileName = app.textFields["business-profile-name-field"]
-        openBusinessProfile(profileNameField: profileName, in: app)
-        focusAndType("Accessible Farrier", in: profileName)
-        app.buttons["business-profile-save-action"].tap()
-
         let firstVisit = app.buttons["invoice-visit-choice-0"]
         XCTAssertTrue(firstVisit.waitForExistence(timeout: 3))
         XCTAssertTrue(firstVisit.isHittable)
@@ -84,19 +76,13 @@ final class InvoiceFlowUITests: XCTestCase {
         openClients(in: app)
         app.buttons["More"].tap()
         XCTAssertTrue(app.buttons["Invoices"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.buttons["Business Profile"].exists)
+        XCTAssertTrue(app.buttons["My Business"].exists)
         openInvoices(in: app)
         XCTAssertTrue(app.staticTexts["No Invoices"].waitForExistence(timeout: 3))
         app.navigationBars.buttons["Clients"].tap()
 
         app.staticTexts["client-row-Invoice Client"].tap()
         app.buttons["client-create-invoice-action"].tap()
-        let profileName = app.textFields["business-profile-name-field"]
-        XCTAssertTrue(app.buttons["Add Business Profile"].waitForExistence(timeout: 3))
-        openBusinessProfile(profileNameField: profileName, in: app)
-        focusAndType("Test Farrier", in: profileName)
-        app.buttons["business-profile-save-action"].tap()
-
         let firstVisit = app.buttons["invoice-visit-choice-0"]
         let secondVisit = app.buttons["invoice-visit-choice-1"]
         XCTAssertTrue(firstVisit.waitForExistence(timeout: 3))
@@ -137,7 +123,7 @@ final class InvoiceFlowUITests: XCTestCase {
         for _ in 0..<3 where !app.staticTexts["Test Farrier"].exists {
             detail.swipeUp()
         }
-        XCTAssertTrue(app.staticTexts["Test Farrier"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["UI Test Farrier"].waitForExistence(timeout: 3))
         for _ in 0..<3 where !app.staticTexts["Invoice Client"].exists {
             detail.swipeUp()
         }
@@ -221,18 +207,18 @@ final class InvoiceFlowUITests: XCTestCase {
         history.tap()
 
         let photographs = app.buttons.matching(
-            NSPredicate(format: "label CONTAINS %@", "Hoof Photographs")
+            NSPredicate(format: "label CONTAINS %@", "Hoof Photos")
         ).firstMatch
         XCTAssertTrue(photographs.waitForExistence(timeout: 3))
         photographs.tap()
-        let thumbnail = app.buttons["Photograph 1 of 1"]
+        let thumbnail = app.buttons["Photo 1 of 1"]
         XCTAssertTrue(thumbnail.waitForExistence(timeout: 3))
         thumbnail.tap()
 
         let fullImage = app.images.matching(
             NSPredicate(
                 format: "label BEGINSWITH %@",
-                "Hoof photograph for Milo, 1 of 1, created "
+                "Hoof photo for Milo, 1 of 1, created "
             )
         ).firstMatch
         XCTAssertTrue(fullImage.waitForExistence(timeout: 3))
@@ -256,30 +242,6 @@ final class InvoiceFlowUITests: XCTestCase {
         }
         app.launch()
         return app
-    }
-
-    @MainActor
-    private func focusAndType(_ text: String, in element: XCUIElement) {
-        guard element.waitForExistence(timeout: 3) else {
-            XCTFail("Expected text field to exist before typing")
-            return
-        }
-        element.tap()
-        element.typeText(text)
-    }
-
-    @MainActor
-    private func openBusinessProfile(
-        profileNameField: XCUIElement,
-        in app: XCUIApplication
-    ) {
-        for _ in 0..<2 {
-            app.buttons["Add Business Profile"].tap()
-            if profileNameField.waitForExistence(timeout: 2) {
-                return
-            }
-        }
-        XCTFail("Business Profile editor did not open")
     }
 
     @MainActor

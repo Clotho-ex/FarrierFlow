@@ -12,15 +12,18 @@ struct VisitEditorView: View {
     @State private var addServiceHorse: VisitHorseDraft?
     @State private var workItemEditorTarget: WorkItemEditorTarget?
     @FocusState private var focusedWorkNotesID: PersistentIdentifier?
+    private let onCompleted: (() -> Void)?
 
     init(
         visitID: PersistentIdentifier,
         container: ModelContainer,
-        mode: VisitEditorMode = .inProgress
+        mode: VisitEditorMode = .inProgress,
+        onCompleted: (() -> Void)? = nil
     ) {
         _model = State(
             initialValue: VisitEditorModel(visitID: visitID, in: container, mode: mode)
         )
+        self.onCompleted = onCompleted
     }
 
     var body: some View {
@@ -64,21 +67,22 @@ struct VisitEditorView: View {
                     }
                 }
                 if model.mode == .inProgress {
-                    ToolbarItem(placement: .bottomBar) {
+                    ToolbarItemGroup(placement: .bottomBar) {
                         Button("Save Progress") {
                             focusedWorkNotesID = nil
                             model.saveProgress()
                         }
                         .accessibilityIdentifier("visit-save-progress")
                         .disabled(!model.canSaveProgress)
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
+                        Spacer()
                         Button("Complete Visit") {
                             focusedWorkNotesID = nil
                             if model.completeVisit() {
+                                onCompleted?()
                                 dismiss()
                             }
                         }
+                        .buttonStyle(.borderedProminent)
                         .accessibilityIdentifier("visit-complete")
                         .disabled(!model.canComplete)
                     }
@@ -170,7 +174,7 @@ struct VisitEditorView: View {
                     } catch {
                         model.alert = FeatureAlert(
                             title: "Couldn’t Discard Visit",
-                            message: "The visit and its photographs were kept. Try again."
+                            message: "The visit and its photos were kept. Try again."
                         )
                     }
                 }

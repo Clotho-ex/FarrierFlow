@@ -9,9 +9,11 @@ struct AppointmentEditorView: View {
     @State private var createdBarnID: PersistentIdentifier?
     @State private var showsHorseEditor = false
     @State private var createdHorseID: PersistentIdentifier?
+    @State private var showsMoreDetails: Bool
 
     init(appointment: Appointment? = nil) {
         _model = State(initialValue: AppointmentEditorModel(appointment: appointment))
+        _showsMoreDetails = State(initialValue: appointment != nil)
     }
 
     var body: some View {
@@ -60,12 +62,26 @@ struct AppointmentEditorView: View {
                         selection: $model.draft.startDate,
                         displayedComponents: [.date, .hourAndMinute]
                     )
-                    TextField(
-                        "Expected Duration (minutes)",
-                        text: $model.draft.expectedDurationText
-                    )
-                    .keyboardType(.numberPad)
-                    appointmentRequirementGuidance
+                    DisclosureGroup(
+                        "More Details",
+                        isExpanded: $showsMoreDetails
+                    ) {
+                        TextField(
+                            "Expected Duration (minutes)",
+                            text: $model.draft.expectedDurationText
+                        )
+                        .keyboardType(.numberPad)
+                        if model.appliedOwnerDurationDefault {
+                            Text("Your typical appointment duration was prefilled. You can change or clear it.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                        appointmentRequirementGuidance
+                        TextEditor(text: $model.draft.notes)
+                            .frame(minHeight: 88)
+                            .accessibilityLabel("Appointment Notes")
+                    }
+                    .accessibilityIdentifier("appointment-more-details")
                 }
                 loadStateSection
                 if model.loadState == .loaded {
@@ -105,10 +121,6 @@ struct AppointmentEditorView: View {
                         }
                     }
                 }
-                Section("Appointment Notes") {
-                    TextEditor(text: $model.draft.notes)
-                        .accessibilityLabel("Appointment Notes")
-                }
             }
             .navigationTitle(model.appointmentID == nil ? "New Appointment" : "Edit Appointment")
             .navigationBarTitleDisplayMode(.inline)
@@ -125,7 +137,12 @@ struct AppointmentEditorView: View {
                     .disabled(!model.canSave)
                 }
             }
-            .onAppear { model.load(in: context) }
+            .onAppear {
+                model.load(in: context)
+                if model.appliedOwnerDurationDefault {
+                    showsMoreDetails = true
+                }
+            }
             .sheet(isPresented: $showsBarnEditor, onDismiss: selectCreatedBarn) {
                 BarnEditorView(createdBarnID: $createdBarnID)
             }
