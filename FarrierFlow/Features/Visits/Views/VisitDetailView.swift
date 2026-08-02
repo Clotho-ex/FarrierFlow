@@ -239,10 +239,9 @@ struct VisitDetailView: View {
 
     private func hoofPhotographsLink(for horse: VisitHorseResult) -> some View {
         NavigationLink {
-            PhotographCollectionView(
+            PhotographCollectionDestination(
                 visitHorseID: horse.id,
-                horseName: horse.horseName,
-                library: photographLibrary
+                horseName: horse.horseName
             )
         } label: {
             HStack {
@@ -286,6 +285,20 @@ struct VisitDetailView: View {
         ]
         .compactMap { $0 }
         .formatted(.list(type: .and).locale(locale))
+    }
+}
+
+private struct PhotographCollectionDestination: View {
+    @Environment(PhotographLibrary.self) private var photographLibrary
+    let visitHorseID: PersistentIdentifier
+    let horseName: String
+
+    var body: some View {
+        PhotographCollectionView(
+            visitHorseID: visitHorseID,
+            horseName: horseName,
+            library: photographLibrary
+        )
     }
 }
 
