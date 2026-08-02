@@ -16,8 +16,7 @@ final class ConnectedRecordsUITests: XCTestCase {
         addClient.tap()
         let clientNameField = app.textFields["client-name-field"]
         XCTAssertTrue(clientNameField.waitForExistence(timeout: 3))
-        clientNameField.tap()
-        clientNameField.typeText(clientName)
+        focusAndType(clientName, in: clientNameField)
         app.buttons["Save"].tap()
         XCTAssertTrue(app.staticTexts["client-row-\(clientName)"].waitForExistence(timeout: 3))
 
@@ -33,8 +32,7 @@ final class ConnectedRecordsUITests: XCTestCase {
         addServiceLocation.tap()
         let barnNameField = app.textFields["barn-name-field"]
         XCTAssertTrue(barnNameField.waitForExistence(timeout: 3))
-        barnNameField.tap()
-        barnNameField.typeText(barnName)
+        focusAndType(barnName, in: barnNameField)
         app.buttons["Save"].tap()
         XCTAssertTrue(app.staticTexts["barn-row-\(barnName)"].waitForExistence(timeout: 3))
         app.navigationBars.buttons["Clients"].tap()
@@ -45,8 +43,7 @@ final class ConnectedRecordsUITests: XCTestCase {
         addHorse.tap()
         let horseNameField = app.textFields["horse-name-field"]
         XCTAssertTrue(horseNameField.waitForExistence(timeout: 3))
-        horseNameField.tap()
-        horseNameField.typeText(horseName)
+        focusAndType(horseName, in: horseNameField)
         app.buttons["horse-barn-picker"].tap()
         app.buttons[barnName].tap()
         app.buttons["Save"].tap()
@@ -91,5 +88,16 @@ final class ConnectedRecordsUITests: XCTestCase {
         app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] = storeName
         app.launch()
         return app
+    }
+
+    @MainActor
+    private func focusAndType(_ text: String, in element: XCUIElement) {
+        element.tap()
+        let focused = expectation(
+            for: NSPredicate(format: "hasKeyboardFocus == true"),
+            evaluatedWith: element
+        )
+        wait(for: [focused], timeout: 3)
+        element.typeText(text)
     }
 }

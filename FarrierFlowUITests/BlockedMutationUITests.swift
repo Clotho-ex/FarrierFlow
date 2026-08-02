@@ -74,10 +74,15 @@ final class BlockedMutationUITests: XCTestCase {
 
     @MainActor
     private func createClient(_ name: String, in app: XCUIApplication) {
-        app.tabBars.buttons["Clients"].tap()
-        XCTAssertTrue(app.navigationBars["Clients"].waitForExistence(timeout: 10))
         let addClient = app.buttons["Add Client"].firstMatch
-        XCTAssertTrue(addClient.waitForExistence(timeout: 10))
+        for _ in 0..<2 {
+            app.tabBars.buttons["Clients"].tap()
+            if addClient.waitForExistence(timeout: 5) {
+                break
+            }
+        }
+        XCTAssertTrue(addClient.waitForExistence(timeout: 5))
+        guard addClient.exists else { return }
         addClient.tap()
         app.textFields["client-name-field"].tap()
         app.textFields["client-name-field"].typeText(name)

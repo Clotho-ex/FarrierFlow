@@ -35,7 +35,8 @@ struct ServiceEditorModelTests {
         barn.horses.append(horse)
         let appointment = ModelFixtures.makeAppointment(barn: barn, horses: [horse], in: context)
         let visit = ModelFixtures.makeVisit(
-            completedAt: .now,
+            startedAt: Date(timeIntervalSinceReferenceDate: 100),
+            completedAt: Date(timeIntervalSinceReferenceDate: 200),
             appointment: appointment,
             in: context
         )

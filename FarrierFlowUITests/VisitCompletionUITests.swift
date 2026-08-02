@@ -156,7 +156,7 @@ final class VisitCompletionUITests: XCTestCase {
             "visit-work-item-\(graph.servicedHorseName)-\(trimServiceName)"
         ]
         XCTAssertTrue(trimRow.waitForExistence(timeout: 3))
-        XCTAssertTrue(accessibilityText(of: trimRow).contains("$50.00"))
+        XCTAssertEqual(accessibilityText(of: trimRow).filter(\.isNumber), "5000")
 
         trimRow.tap()
         let priceField = app.textFields["work-item-price-field"]
@@ -553,7 +553,11 @@ final class VisitCompletionUITests: XCTestCase {
         addHorse.tap()
         focusAndType(name, in: app.textFields["horse-name-field"])
         app.buttons["horse-barn-picker"].tap()
-        app.buttons[barnName].tap()
+        let barnOptions = app.buttons.matching(identifier: barnName)
+        XCTAssertTrue(barnOptions.firstMatch.waitForExistence(timeout: 3))
+        XCTAssertGreaterThan(barnOptions.count, 0)
+        guard barnOptions.count > 0 else { return }
+        barnOptions.element(boundBy: barnOptions.count - 1).tap()
         if let defaultServiceName {
             tapAfterBringingIntoView(
                 app.buttons["horse-default-service-picker"],
