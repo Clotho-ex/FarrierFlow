@@ -10,10 +10,21 @@ struct AppointmentEditorView: View {
     @State private var showsHorseEditor = false
     @State private var createdHorseID: PersistentIdentifier?
     @State private var showsMoreDetails: Bool
+    private let onSaved: ((PersistentIdentifier) -> Void)?
 
-    init(appointment: Appointment? = nil) {
-        _model = State(initialValue: AppointmentEditorModel(appointment: appointment))
+    init(
+        appointment: Appointment? = nil,
+        seed: NextAppointmentSeed? = nil,
+        onSaved: ((PersistentIdentifier) -> Void)? = nil
+    ) {
+        _model = State(
+            initialValue: AppointmentEditorModel(
+                appointment: appointment,
+                seed: seed
+            )
+        )
         _showsMoreDetails = State(initialValue: appointment != nil)
+        self.onSaved = onSaved
     }
 
     var body: some View {
@@ -62,6 +73,13 @@ struct AppointmentEditorView: View {
                         selection: $model.draft.startDate,
                         displayedComponents: [.date, .hourAndMinute]
                     )
+                    if model.hasFollowUpSuggestion {
+                        Text(
+                            "Suggested start based on the horses’ appointment intervals. You can change it."
+                        )
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                     DisclosureGroup(
                         "More Details",
                         isExpanded: $showsMoreDetails
@@ -130,7 +148,8 @@ struct AppointmentEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        if model.save(in: context) != nil {
+                        if let appointmentID = model.save(in: context) {
+                            onSaved?(appointmentID)
                             dismiss()
                         }
                     }

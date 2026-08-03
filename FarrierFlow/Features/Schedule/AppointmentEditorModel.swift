@@ -58,6 +58,7 @@ final class AppointmentEditorModel {
     private var hasAppliedOwnerDefault = false
     private(set) var appliedOwnerDurationDefault = false
     let appointmentID: PersistentIdentifier?
+    let hasFollowUpSuggestion: Bool
     var alert: FeatureAlert?
 
     var canSave: Bool {
@@ -74,6 +75,7 @@ final class AppointmentEditorModel {
 
     init(
         appointment: Appointment? = nil,
+        seed: NextAppointmentSeed? = nil,
         now: Date = .now,
         calendar: Calendar = .autoupdatingCurrent,
         barnFetcher: @escaping (ModelContext) throws -> [Barn] = {
@@ -93,17 +95,20 @@ final class AppointmentEditorModel {
     ) {
         self.barnFetcher = barnFetcher
         self.horseFetcher = horseFetcher
+        let seed = appointment == nil ? seed : nil
         appointmentID = appointment?.persistentModelID
+        hasFollowUpSuggestion = seed?.hasFollowUpSuggestion ?? false
         draft = AppointmentDraft(
-            barnID: appointment?.barn?.persistentModelID,
+            barnID: appointment?.barn?.persistentModelID ?? seed?.barnID,
             startDate: appointment?.startDate
+                ?? seed?.startDate
                 ?? AppointmentStartDateRules.nextHalfHour(
                     after: now,
                     calendar: calendar
                 ),
             selectedHorseIDs: Set(
                 appointment?.appointmentHorses.compactMap(\.horse?.persistentModelID) ?? []
-            ),
+            ).union(seed?.horseIDs ?? []),
             notes: appointment?.notes ?? "",
             expectedDurationText: appointment?.expectedDurationMinutes.map(String.init) ?? ""
         )
@@ -133,6 +138,12 @@ final class AppointmentEditorModel {
                 try applyOwnerDefaultIfNeeded(in: context)
             }
             let loadedBarns = try barnFetcher(context)
+            if
+                let barnID = draft.barnID,
+                !loadedBarns.contains(where: { $0.persistentModelID == barnID })
+            {
+                draft.barnID = nil
+            }
             let loadedHorses = try eligibleHorses(
                 at: draft.barnID,
                 in: context

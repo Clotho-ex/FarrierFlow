@@ -40,6 +40,208 @@ struct AppointmentEditorModelTests {
     }
 
     @Test
+    func newDraftAppliesNextAppointmentSeedWithoutCopyingNotes() throws {
+        let fixture = try makeTwoHorseFixture()
+        let suggestedStart = Date(timeIntervalSinceReferenceDate: 2_000)
+        let seed = NextAppointmentSeed(
+            barnID: fixture.barn.persistentModelID,
+            horseIDs: Set(fixture.horses.map(\.persistentModelID)),
+            startDate: suggestedStart,
+            hasFollowUpSuggestion: true
+        )
+        let editor = AppointmentEditorModel(seed: seed)
+
+        editor.load(in: fixture.context)
+
+        #expect(editor.loadState == .loaded)
+        #expect(editor.draft.barnID == fixture.barn.persistentModelID)
+        #expect(editor.draft.selectedHorseIDs == Set(fixture.horses.map(\.persistentModelID)))
+        #expect(editor.draft.startDate == suggestedStart)
+        #expect(editor.draft.notes.isEmpty)
+        #expect(editor.hasFollowUpSuggestion)
+        #expect(editor.canSave)
+    }
+
+    @Test
+    func seededDraftAppliesOwnerDurationOnceAndPreservesUserEditsOnReload() throws {
+        let fixture = try makeTwoHorseFixture()
+        let profile = ModelFixtures.makeBusinessProfile(
+            defaultAppointmentDurationMinutes: 45,
+            in: fixture.context
+        )
+        try DomainGraphValidator.save(fixture.context)
+        let seed = NextAppointmentSeed(
+            barnID: fixture.barn.persistentModelID,
+            horseIDs: Set(fixture.horses.map(\.persistentModelID)),
+            startDate: Date(timeIntervalSinceReferenceDate: 2_000),
+            hasFollowUpSuggestion: true
+        )
+        let editor = AppointmentEditorModel(seed: seed)
+
+        editor.load(in: fixture.context)
+
+        #expect(editor.draft.expectedDurationText == "45")
+        #expect(editor.appliedOwnerDurationDefault)
+        let editedStart = Date(timeIntervalSinceReferenceDate: 3_000)
+        editor.draft.startDate = editedStart
+        editor.draft.selectedHorseIDs = [fixture.horses[0].persistentModelID]
+        editor.draft.notes = "Keep the gate open"
+        editor.draft.expectedDurationText = "60"
+        profile.defaultAppointmentDurationMinutes = 90
+        try DomainGraphValidator.save(fixture.context)
+
+        editor.load(in: fixture.context)
+
+        #expect(editor.draft.startDate == editedStart)
+        #expect(editor.draft.selectedHorseIDs == [fixture.horses[0].persistentModelID])
+        #expect(editor.draft.notes == "Keep the gate open")
+        #expect(editor.draft.expectedDurationText == "60")
+    }
+
+    @Test
+    func existingAppointmentIgnoresSuppliedNextAppointmentSeed() throws {
+        let fixture = try makeTwoHorseFixture()
+        let otherBarn = Barn(name: "South Field")
+        fixture.context.insert(otherBarn)
+        let appointment = ModelFixtures.makeAppointment(
+            startDate: Date(timeIntervalSinceReferenceDate: 100),
+            barn: fixture.barn,
+            horses: [fixture.horses[0]],
+            in: fixture.context
+        )
+        appointment.notes = "Existing note"
+        appointment.expectedDurationMinutes = 30
+        try DomainGraphValidator.save(fixture.context)
+        let seed = NextAppointmentSeed(
+            barnID: otherBarn.persistentModelID,
+            horseIDs: [fixture.horses[1].persistentModelID],
+            startDate: Date(timeIntervalSinceReferenceDate: 2_000),
+            hasFollowUpSuggestion: true
+        )
+        let editor = AppointmentEditorModel(appointment: appointment, seed: seed)
+
+        editor.load(in: fixture.context)
+
+        #expect(editor.draft.barnID == fixture.barn.persistentModelID)
+        #expect(editor.draft.selectedHorseIDs == [fixture.horses[0].persistentModelID])
+        #expect(editor.draft.startDate == Date(timeIntervalSinceReferenceDate: 100))
+        #expect(editor.draft.notes == "Existing note")
+        #expect(editor.draft.expectedDurationText == "30")
+        #expect(!editor.hasFollowUpSuggestion)
+    }
+
+    @Test
+    func loadPrunesMovedAndDeletedSeededHorsesAndRequiresASelection() throws {
+        let fixture = try makeTwoHorseFixture()
+        let otherBarn = Barn(name: "South Field")
+        fixture.context.insert(otherBarn)
+        let seed = NextAppointmentSeed(
+            barnID: fixture.barn.persistentModelID,
+            horseIDs: Set(fixture.horses.map(\.persistentModelID)),
+            startDate: Date(timeIntervalSinceReferenceDate: 2_000),
+            hasFollowUpSuggestion: true
+        )
+        let editor = AppointmentEditorModel(seed: seed)
+        fixture.horses[0].currentBarn = otherBarn
+        otherBarn.horses.append(fixture.horses[0])
+        fixture.context.delete(fixture.horses[1])
+        try fixture.context.save()
+
+        editor.load(in: fixture.context)
+
+        #expect(editor.loadState == .loaded)
+        #expect(editor.draft.barnID == fixture.barn.persistentModelID)
+        #expect(editor.draft.selectedHorseIDs.isEmpty)
+        #expect(editor.eligibleHorses.isEmpty)
+        #expect(editor.saveRequirement == .horse)
+        #expect(editor.save(in: fixture.context) == nil)
+        #expect(try fixture.context.fetchCount(FetchDescriptor<Appointment>()) == 0)
+    }
+
+    @Test
+    func loadClearsAnUnavailableSeededServiceLocation() throws {
+        let container = try ModelContainerFactory.inMemoryTest()
+        let context = container.mainContext
+        let barn = Barn(name: "Temporary Field")
+        context.insert(barn)
+        try context.save()
+        let seededStart = Date(timeIntervalSinceReferenceDate: 2_000)
+        let seed = NextAppointmentSeed(
+            barnID: barn.persistentModelID,
+            horseIDs: [],
+            startDate: seededStart,
+            hasFollowUpSuggestion: false
+        )
+        let editor = AppointmentEditorModel(seed: seed)
+        context.delete(barn)
+        try context.save()
+
+        editor.load(in: context)
+
+        #expect(editor.loadState == .loaded)
+        #expect(editor.draft.barnID == nil)
+        #expect(editor.draft.startDate == seededStart)
+        #expect(editor.saveRequirement == .serviceLocation)
+    }
+
+    @Test
+    func seededDraftSaveReturnsTheCreatedAppointmentIdentifier() throws {
+        let fixture = try makeTwoHorseFixture()
+        let seededStart = Date(timeIntervalSinceReferenceDate: 2_000)
+        let seed = NextAppointmentSeed(
+            barnID: fixture.barn.persistentModelID,
+            horseIDs: Set(fixture.horses.map(\.persistentModelID)),
+            startDate: seededStart,
+            hasFollowUpSuggestion: true
+        )
+        let editor = AppointmentEditorModel(seed: seed)
+        editor.load(in: fixture.context)
+
+        let savedID = try #require(editor.save(in: fixture.context))
+
+        let appointments = try fixture.context.fetch(FetchDescriptor<Appointment>())
+        let appointment = try #require(appointments.first)
+        #expect(appointments.count == 1)
+        #expect(savedID == appointment.persistentModelID)
+        #expect(appointment.barn?.persistentModelID == fixture.barn.persistentModelID)
+        #expect(
+            Set(appointment.appointmentHorses.compactMap(\.horse?.persistentModelID))
+                == Set(fixture.horses.map(\.persistentModelID))
+        )
+        #expect(appointment.startDate == seededStart)
+        #expect(appointment.notes == nil)
+    }
+
+    @Test
+    func failedSeededDraftSavePreservesTheDraftAndCreatesNoAppointment() throws {
+        let fixture = try makeTwoHorseFixture()
+        fixture.context.insert(BusinessProfile(name: "First Profile"))
+        fixture.context.insert(BusinessProfile(name: "Second Profile"))
+        try fixture.context.save()
+        let seededStart = Date(timeIntervalSinceReferenceDate: 2_000)
+        let seed = NextAppointmentSeed(
+            barnID: fixture.barn.persistentModelID,
+            horseIDs: [fixture.horses[0].persistentModelID],
+            startDate: seededStart,
+            hasFollowUpSuggestion: true
+        )
+        let editor = AppointmentEditorModel(seed: seed)
+        editor.load(in: fixture.context)
+        editor.draft.notes = "Keep this draft"
+        editor.draft.expectedDurationText = "55"
+
+        #expect(editor.save(in: fixture.context) == nil)
+
+        #expect(editor.alert?.title == "Couldn’t Save Appointment")
+        #expect(editor.draft.barnID == fixture.barn.persistentModelID)
+        #expect(editor.draft.selectedHorseIDs == [fixture.horses[0].persistentModelID])
+        #expect(editor.draft.startDate == seededStart)
+        #expect(editor.draft.notes == "Keep this draft")
+        #expect(editor.draft.expectedDurationText == "55")
+        #expect(try fixture.context.fetchCount(FetchDescriptor<Appointment>()) == 0)
+    }
+
+    @Test
     func newDraftAppliesOwnerDurationOnceAndPreservesTheUserOverride() throws {
         let fixture = try makeTwoHorseFixture()
         let profile = ModelFixtures.makeBusinessProfile(
