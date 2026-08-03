@@ -1400,6 +1400,75 @@
     "Unavailable" : {
       "comment" : "Fallback value for a missing required relationship."
     },
+    "Already Scheduled" : {
+      "comment" : "Next-Appointment state when a Horse already belongs to a future Appointment."
+    },
+    "Appointment interval unavailable" : {
+      "comment" : "Next-Appointment reason when a Horse has no valid scheduling interval."
+    },
+    "Available" : {
+      "comment" : "Next-Appointment state when a Horse can be selected."
+    },
+    "Horse details unavailable" : {
+      "comment" : "Next-Appointment reason when a Horse's current graph cannot be verified."
+    },
+    "Interval: %@" : {
+      "comment" : "Saved Horse appointment interval shown in the next-Appointment assistant. The argument is the localized interval."
+    },
+    "Loading Next Appointment…" : {
+      "comment" : "Loading state for the next-Appointment assistant."
+    },
+    "Loading schedule…" : {
+      "comment" : "Loading state for next-Appointment recovery on completed Visit detail."
+    },
+    "Moved to %@" : {
+      "comment" : "Next-Appointment reason when a Horse moved. The argument is its current Service Location."
+    },
+    "Moved to another Service Location" : {
+      "comment" : "Next-Appointment reason when a Horse moved and the current location name is unavailable."
+    },
+    "Newer serviced Visit recorded" : {
+      "comment" : "Next-Appointment reason when newer completed work supersedes the source Visit."
+    },
+    "Next Appointment" : {
+      "comment" : "Title for next-Appointment assistance and recovery."
+    },
+    "Next Appointment Unavailable" : {
+      "comment" : "Unavailable state for next-Appointment assistance."
+    },
+    "No selected Horse has a follow-up suggestion. Choose any available start." : {
+      "comment" : "Guidance when selected Horses provide no calculated follow-up date."
+    },
+    "Not Now" : {
+      "comment" : "Dismisses the next-Appointment assistant without creating an Appointment."
+    },
+    "Not selected" : {
+      "comment" : "VoiceOver selection state for an available Horse in the next-Appointment assistant."
+    },
+    "Proposed Start" : {
+      "comment" : "Editable group start date in the next-Appointment assistant."
+    },
+    "Schedule Next Appointment" : {
+      "comment" : "Completed Visit recovery action that opens the next-Appointment assistant."
+    },
+    "Suggested" : {
+      "comment" : "Label for a Horse's calculated next-Appointment date."
+    },
+    "Suggested %@" : {
+      "comment" : "VoiceOver value for a Horse's calculated next-Appointment date. The argument is a localized date and time."
+    },
+    "Suggestion unavailable" : {
+      "comment" : "Next-Appointment state when Calendar calculation cannot produce a suggestion."
+    },
+    "The current visit and schedule couldn’t be loaded." : {
+      "comment" : "Recovery guidance when the next-Appointment projection fails."
+    },
+    "Visit outcome unavailable" : {
+      "comment" : "Next-Appointment reason when a source Horse has no valid Visit outcome."
+    },
+    "another Service Location" : {
+      "comment" : "Fallback current location used in a next-Appointment moved-Horse explanation."
+    },
     "Unlock your device, then try again." : {
       "comment" : "Recovery guidance when protected Photograph data cannot be accessed."
     },

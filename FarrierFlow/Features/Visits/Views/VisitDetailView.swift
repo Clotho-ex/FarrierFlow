@@ -2,11 +2,14 @@ import SwiftData
 import SwiftUI
 
 struct VisitDetailView: View {
+    @Environment(\.calendar) private var calendar
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
     @Environment(PhotographLibrary.self) private var photographLibrary
     @State private var model: VisitDetailModel
+    @State private var nextAppointmentModel: NextAppointmentAssistantModel
     @State private var showsEditor = false
+    @State private var showsNextAppointmentAssistant = false
     private let showsDismissAction: Bool
 
     init(
@@ -17,6 +20,9 @@ struct VisitDetailView: View {
         self.showsDismissAction = showsDismissAction
         _model = State(
             initialValue: VisitDetailModel(visitID: visitID, in: container)
+        )
+        _nextAppointmentModel = State(
+            initialValue: NextAppointmentAssistantModel(visitID: visitID)
         )
     }
 
@@ -43,7 +49,7 @@ struct VisitDetailView: View {
                     Text("The visit couldn’t be loaded.")
                 } actions: {
                     Button("Retry") {
-                        model.retry(locale: locale)
+                        loadVisitDetail()
                     }
                 }
             case .loaded:
@@ -76,16 +82,22 @@ struct VisitDetailView: View {
             }
         }
         .onAppear {
-            model.load(locale: locale)
+            loadVisitDetail()
         }
         .sheet(isPresented: $showsEditor, onDismiss: {
-            model.load(locale: locale)
+            loadVisitDetail()
         }) {
             VisitEditorView(
                 visitID: model.visitID,
                 container: modelContainer,
                 mode: model.editorMode
             )
+        }
+        .sheet(
+            isPresented: $showsNextAppointmentAssistant,
+            onDismiss: reloadNextAppointmentProjection
+        ) {
+            NextAppointmentAssistantView(visitID: model.visitID)
         }
         .alert(item: $model.alert) {
             Alert(title: Text($0.title), message: Text($0.message))
@@ -143,10 +155,105 @@ struct VisitDetailView: View {
                         LabeledContent("Total", value: totalText(for: detail.total))
                             .accessibilityIdentifier("visit-detail-total")
                     }
+                    nextAppointmentSection
                 }
             }
         } else {
             ContentUnavailableView("Visit Unavailable", systemImage: "exclamationmark.circle")
+        }
+    }
+
+    @ViewBuilder
+    private var nextAppointmentSection: some View {
+        Section("Next Appointment") {
+            switch nextAppointmentModel.loadState {
+            case .loading:
+                HStack {
+                    ProgressView()
+                    Text("Loading schedule…")
+                }
+            case .failed:
+                Text("Next Appointment Unavailable")
+                    .foregroundStyle(.secondary)
+                Button("Retry") {
+                    reloadNextAppointmentProjection()
+                }
+            case .loaded:
+                if let projection = nextAppointmentModel.projection {
+                    if projection.options.contains(where: {
+                        $0.unavailabilityReason == nil
+                    }) {
+                        Button("Schedule Next Appointment") {
+                            showsNextAppointmentAssistant = true
+                        }
+                        .accessibilityIdentifier("schedule-next-appointment")
+                    } else {
+                        ForEach(projection.options) { option in
+                            LabeledContent(
+                                option.horseName,
+                                value: nextAppointmentStatus(for: option)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func loadVisitDetail() {
+        model.load(locale: locale)
+        if model.detail?.completedAt != nil {
+            reloadNextAppointmentProjection()
+        }
+    }
+
+    private func reloadNextAppointmentProjection() {
+        let projectionNow = Date.now
+        nextAppointmentModel.load(
+            in: context,
+            now: projectionNow,
+            calendar: calendar,
+            locale: locale
+        )
+    }
+
+    private func nextAppointmentStatus(for option: NextAppointmentHorseOption) -> String {
+        guard let reason = option.unavailabilityReason else {
+            return String(localized: "Available", locale: locale)
+        }
+        switch reason {
+        case .alreadyScheduled:
+            let date = option.scheduledAppointmentStart?.formatted(
+                .dateTime
+                    .month(.abbreviated)
+                    .day()
+                    .year()
+                    .hour()
+                    .minute()
+                    .locale(locale)
+            )
+            return [
+                String(localized: "Already Scheduled", locale: locale),
+                date,
+                option.scheduledServiceLocationName,
+            ]
+            .compactMap { $0 }
+            .formatted(.list(type: .and).locale(locale))
+        case .newerServicedVisit:
+            return String(localized: "Newer serviced Visit recorded", locale: locale)
+        case .moved:
+            if let currentLocation = option.currentServiceLocationName {
+                return String(localized: "Moved to \(currentLocation)", locale: locale)
+            }
+            return String(localized: "Moved to another Service Location", locale: locale)
+        case .clientUnavailable:
+            return String(localized: "Client unavailable", locale: locale)
+        case .invalidAppointmentInterval:
+            return String(localized: "Appointment interval unavailable", locale: locale)
+        case .invalidOutcome:
+            return String(localized: "Visit outcome unavailable", locale: locale)
+        case .invalidCurrentGraph:
+            return String(localized: "Horse details unavailable", locale: locale)
         }
     }
 

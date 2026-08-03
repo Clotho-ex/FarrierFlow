@@ -165,6 +165,82 @@ struct NextAppointmentAssistantModelTests {
 
         #expect(secondLoad.projection?.options.map(\.isSelected) == [true, true, false])
     }
+
+    @Test
+    func continueRequiresASelectedHorseAndTheAssistantAcceptsAVisitIdentifier() throws {
+        let graph = try makeSourceGraph()
+        let model = NextAppointmentAssistantModel(visitID: graph.visitID)
+
+        model.load(
+            in: graph.context,
+            now: graph.now,
+            calendar: graph.calendar,
+            locale: Locale(identifier: "en_US")
+        )
+        let option = try #require(model.projection?.options.first)
+        model.toggleHorse(option.id)
+
+        #expect(model.makeSeed() == nil)
+        _ = NextAppointmentAssistantView(visitID: graph.visitID)
+    }
+
+    @Test
+    func deselectingTheEarliestSuggestionUsesTheRemainingSelectedSuggestion() throws {
+        let graph = try makeSourceGraph(
+            intervals: [4, 6],
+            outcomes: [.serviced, .serviced]
+        )
+        let model = NextAppointmentAssistantModel(visitID: graph.visitID)
+
+        model.load(
+            in: graph.context,
+            now: graph.now,
+            calendar: graph.calendar,
+            locale: Locale(identifier: "en_US")
+        )
+
+        let projection = try #require(model.projection)
+        let earliest = try #require(projection.options[0].suggestedStart)
+        let remaining = try #require(projection.options[1].suggestedStart)
+        #expect(earliest < remaining)
+        #expect(projection.proposedStart == earliest)
+
+        model.toggleHorse(projection.options[0].id)
+
+        #expect(model.projection?.options.map(\.isSelected) == [false, true])
+        #expect(model.projection?.proposedStart == remaining)
+    }
+
+    @Test
+    func calendarCalculationFailureUsesTheOrdinaryDraftFallback() throws {
+        let graph = try makeSourceGraph(
+            intervals: [calendarFailureInterval()],
+            outcomes: [.serviced]
+        )
+        let model = NextAppointmentAssistantModel(visitID: graph.visitID)
+
+        model.load(
+            in: graph.context,
+            now: graph.now,
+            calendar: graph.calendar,
+            locale: Locale(identifier: "en_US")
+        )
+
+        let projection = try #require(model.projection)
+        let option = try #require(projection.options.first)
+        let ordinaryDraftStart = AppointmentStartDateRules.nextHalfHour(
+            after: graph.now,
+            calendar: graph.calendar
+        )
+        #expect(option.isSelected)
+        #expect(option.suggestedStart == nil)
+        #expect(projection.proposedStart == ordinaryDraftStart)
+        #expect(!projection.hasFollowUpSuggestion)
+
+        let seed = try #require(model.makeSeed())
+        #expect(seed.startDate == ordinaryDraftStart)
+        #expect(!seed.hasFollowUpSuggestion)
+    }
 }
 
 fileprivate enum SourceInvalidation: CaseIterable {
@@ -274,4 +350,8 @@ private func date(
         hour: hour,
         minute: minute
     ))!
+}
+
+private func calendarFailureInterval() -> Int {
+    Int.max
 }

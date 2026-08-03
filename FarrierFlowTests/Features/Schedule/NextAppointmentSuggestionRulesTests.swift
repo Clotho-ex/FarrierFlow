@@ -77,6 +77,19 @@ struct NextAppointmentSuggestionRulesTests {
     }
 
     @Test
+    func doesNotWrapAnIntervalThatCannotBeRepresentedByTheCalendar() throws {
+        let calendar = makeCalendar()
+        let workDate = try date(2026, 1, 5, 9, 0, calendar: calendar)
+
+        #expect(NextAppointmentSuggestionRules.suggestedStart(
+            visitStartedAt: workDate,
+            intervalWeeks: Int.max,
+            sourceAppointmentStart: workDate,
+            calendar: calendar
+        ) == nil)
+    }
+
+    @Test
     func usesTheEarliestSelectedSuggestionForTheGroup() throws {
         let calendar = makeCalendar()
         let earliest = try date(2026, 2, 2, 9, 0, calendar: calendar)

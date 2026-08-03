@@ -53,7 +53,7 @@ nonisolated enum NextAppointmentSuggestionRules {
             byAdding: .weekOfYear,
             value: intervalWeeks,
             to: workDay
-        ) else {
+        ), suggestedDay > workDay else {
             return nil
         }
 
