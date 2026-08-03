@@ -348,8 +348,8 @@ The complete contract and implementation sequence are recorded in:
 
 ## Slice 5A — Owner Setup and Run Sheet Hub
 
-**Status:** Complete. Focused unit and persistent-reopening verification passed;
-the final UI smoke was deferred under the resource-stop policy after swap rose.
+**Status:** Complete. Focused unit, persistent-reopening, first-run identity,
+and complete first-customer UI verification passed.
 
 ### Outcome
 
