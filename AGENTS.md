@@ -183,6 +183,14 @@ For test commands:
 - do not retry timed-out tests until surviving processes are inspected and
   terminated
 
+### Simulator cleanup
+
+After every simulator build, test, launch, or manual check, terminate all
+task-owned simulator work: stop the app or test runner, shut down the simulator
+used for the task, quit the Simulator application, and confirm no task-owned
+`xcodebuild`, `xctest`, or `XCTRunner` process remains. Do this before reporting
+a verification result or ending the task.
+
 ### Resource-stop condition
 
 Before starting a command, check for an existing `xcodebuild`, `xctest`, or
