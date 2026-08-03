@@ -420,20 +420,34 @@ The complete product and architecture contract is recorded in
 
 ## Later Slices
 
-The order below expresses product sequence, not an approved implementation
-design. Each slice requires shaping before implementation.
+Slice numbering records the capability sequence, not a required implementation
+order. Slice 7 is the recommended next implementation candidate. Every slice
+still requires explicit implementation approval.
 
 ### Slice 6 — Payment Processing
 
 Unpaid/Paid status and payment date shipped in Slice 5. Any future payment
 collection or processing requires a separate product, privacy, failure, and App
-Store decision and remains deferred.
+Store decision and remains deferred. It is not the next implementation
+candidate.
 
-### Slice 7 — Next Appointment
+### Slice 7 — Next Appointment Assistance
 
-Use approved service presets or visit history to assist follow-up scheduling.
-Do not infer first-slice duration or automatically schedule from the horse
-interval without a later product decision.
+**Status:** Shaped; implementation not approved.
+
+After successful Visit completion, offer a dismissible assistant that uses each
+Horse's interval to prepare one editable Appointment draft. Preselect eligible
+Serviced Horses, show every individual suggested date, use the earliest date at
+the source Appointment's local time, and protect against already-scheduled or
+superseded work. Keep the same action recoverable from completed Visit detail
+through Horse History.
+
+The farrier must review and save the normal Appointment. Add no automatic
+creation, recurring series, reminder queue, Today ranking change, model, or
+migration.
+
+The complete shaped contract is recorded in
+`docs/superpowers/specs/2026-08-03-slice-7-next-appointment-assistance-design.md`.
 
 ### Slice 8 — Export
 
@@ -470,5 +484,6 @@ defined. CloudKit is not assumed.
 - Completed Visit deletion and historical-date correction.
 - Background tasks, external Visit draft files, and per-change autosave.
 
-Slice 5 must not add fields, routes, empty screens, services, or abstractions
-for these deferred capabilities.
+Later slice work must not add fields, routes, empty screens, services, or
+abstractions for deferred capabilities before their scope is shaped and
+explicitly approved.
