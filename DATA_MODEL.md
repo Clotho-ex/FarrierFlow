@@ -12,6 +12,12 @@ individual VisitHorse records, structured Services and WorkItems, and immutable
 Client Invoices. The BusinessProfile also owns optional reusable
 Appointment-duration and Invoice-due defaults introduced by Slice 5A.
 
+This contract remains current during Slice 7. Next-appointment assistance is a
+transient projection over the existing Visit, Horse, Appointment, and
+AppointmentHorse graph; only the ordinary Appointment save boundary persists a
+reviewed result. Slice 7 adds no model, field, relationship, schema version, or
+migration stage.
+
 SwiftData is the local metadata source of truth. Canonical Photograph JPEGs are
 stored in Application Support and resolved only from their UUID. Invoice PDFs
 are generated on demand from persisted snapshots and are not canonical records.

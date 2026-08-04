@@ -5,7 +5,8 @@
 > `superpowers:executing-plans` to implement this plan task-by-task. Use
 > `superpowers:test-driven-development` for each behavior change and
 > `superpowers:verification-before-completion` before reporting the slice
-> complete. Steps use checkbox (`- [ ]`) syntax for tracking.
+> complete. Steps use checkbox syntax to define each unit's required gates;
+> the execution-status lines record the live implementation state.
 
 **Goal:** Help a farrier turn one completed Visit into one reviewed, ordinary
 future Appointment without automatic creation, persisted follow-up state, or
@@ -21,6 +22,9 @@ repository, source-Visit link, or follow-up flag is introduced.
 **Tech Stack:** Swift 6 strict concurrency, SwiftUI, Observation, SwiftData,
 Foundation Calendar, Swift Testing/XCTest, iOS 18.0 minimum, latest stable iOS
 26 SDK.
+
+**Execution status (2026-08-04):** Units 1 through 5 are complete. Unit 6 has
+not started. No final Slice 7 acceptance or completion claim has been made.
 
 ## Global Constraints
 
@@ -99,6 +103,8 @@ Foundation Calendar, Swift Testing/XCTest, iOS 18.0 minimum, latest stable iOS
 **Goal:** Establish the temporal and ordering contract before SwiftData or UI
 work.
 
+**Execution status:** Committed as `4d33c8b`.
+
 **Files likely affected**
 
 - Create `FarrierFlow/Features/Schedule/NextAppointmentSuggestionRules.swift`.
@@ -156,6 +162,8 @@ unit tests are its complete verification.
 
 **Goal:** Project every source Visit Horse into a truthful transient state using
 current SwiftData records and the resolved contract.
+
+**Execution status:** Committed as `02c994d`.
 
 **Files likely affected**
 
@@ -265,6 +273,8 @@ exact fixture addition. Commit
 **Goal:** Prefill the ordinary Appointment draft without bypassing its current
 validation, owner defaults, editability, or save transaction.
 
+**Execution status:** Committed as `ce2778d`.
+
 **Files likely affected**
 
 - Modify `FarrierFlow/Features/Schedule/AppointmentEditorModel.swift`.
@@ -335,6 +345,8 @@ catalog entries. Commit `feat(schedule): seed follow-up appointment drafts`.
 recoverable from a completed Visit without adding navigation or persisted task
 state.
 
+**Execution status:** Committed as `8195830`.
+
 **Files likely affected**
 
 - Create
@@ -399,6 +411,9 @@ test additions, and exact localization entries. Commit
 
 **Goal:** Open the assistant only after successful Visit completion, from both
 Today and Appointment Detail, with safe sheet sequencing.
+
+**Execution status:** Complete. The focused UI suite and both required
+post-completion simulator flows passed.
 
 **Files likely affected**
 
@@ -466,6 +481,8 @@ Commit `feat(visits): offer next appointment after completion`.
 **Goal:** Prove the complete three-Horse flow, subset-save reopening, ordinary
 Appointment persistence, accessibility, and platform compatibility without
 adding product behavior.
+
+**Execution status:** Not started.
 
 **Files likely affected**
 
@@ -560,8 +577,7 @@ scenario, acceptance/reopen tests, and truthful roadmap/spec updates. Commit
 
 **Model and effort recommendation:** `gpt-5.6-sol`, high.
 
-## First Implementation Unit to Execute
+## Execution Handoff
 
-After explicit Slice 7 authorization, execute only **Unit 1 — Actor-Neutral
-Suggestion and Recency Rules**. It locks the four temporal and ordering rules
-without touching SwiftData, UI, routing, or persistence.
+Unit 5 is complete. Do not begin **Unit 6 — Acceptance, Relaunch, and Slice
+Closure** without explicit user approval.

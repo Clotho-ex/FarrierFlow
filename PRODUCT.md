@@ -67,6 +67,12 @@ one continuous field workflow rather than separate generic business modules.
   Service Locations stay available in their contextual features; new
   Appointment and Invoice drafts reuse saved defaults without hiding
   record-specific truth.
+- Slice 7 next-appointment assistance is in progress. Units 1 through 5
+  calculate suggestions from current Visit and Horse truth, present a
+  dismissible assistant from completed Visit detail, and seed the ordinary Appointment
+  editor without adding persisted follow-up state. The verified post-completion
+  handoff opens that assistant only after successful Visit persistence and
+  editor dismissal. Final acceptance and relaunch closure remain pending.
 - Owner setup remains distinct from customer records. Client, Horse, Service
   Location, Appointment, Visit, WorkItem, Photograph, and Invoice data continue
   to describe the farrier's customers and work, not a customer-facing app mode.
@@ -106,7 +112,7 @@ one continuous field workflow rather than separate generic business modules.
 ## Evidence on Hand
 
 - The repository contains the iPhone-only SwiftUI and SwiftData implementation
-  through Slice 5 in `FarrierFlow/`.
+  through Slice 5A plus Slice 7 Units 1 through 5 in `FarrierFlow/`.
 - The Xcode project declares iOS 18.0 for the app, unit-test, and UI-test
   targets and includes iPhone device support.
 - The approved Slice 2 design is recorded in
@@ -117,6 +123,9 @@ one continuous field workflow rather than separate generic business modules.
   `docs/superpowers/specs/2026-07-30-slice-5-invoicing-design.md`.
 - The approved Slice 5A owner-setup and Run Sheet hub design is recorded in
   `docs/superpowers/specs/2026-08-02-slice-5a-owner-setup-field-book-design.md`.
+- The approved, in-progress Slice 7 next-appointment-assistance design is
+  recorded in
+  `docs/superpowers/specs/2026-08-03-slice-7-next-appointment-assistance-design.md`.
 - No bundled production customer imagery, logo, customer evidence, testimonials,
   integrations, or operational sample data is present. Preview and UI-test
   fixtures are deterministic development data only. Future product work must

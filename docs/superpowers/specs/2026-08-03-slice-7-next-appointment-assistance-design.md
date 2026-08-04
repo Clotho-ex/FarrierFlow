@@ -1,8 +1,12 @@
 # Slice 7 — Next Appointment Assistance Design
 
-**Status:** Shaped; implementation not approved
+**Status:** Approved; implementation in progress
 
 **Date:** 2026-08-03
+
+**Execution status (2026-08-04):** Units 1 through 5 are complete. Unit 6
+acceptance, relaunch, accessibility, and platform-closure work has not started.
+Slice 7 is not complete until those remaining gates pass.
 
 ## Purpose
 

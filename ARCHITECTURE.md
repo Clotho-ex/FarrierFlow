@@ -3,10 +3,12 @@
 ## Architectural Goals
 
 FarrierFlow is a local-first, iPhone-only SwiftUI application. Slices 1 through
-5 provide connected records, Visit completion and Horse History,
+5A provide connected records, Visit completion and Horse History,
 VisitHorse-owned photographs, structured Services and WorkItems, immutable
-Invoices, payment status, and native PDF sharing. The app adds no networking,
-CloudKit, or third-party dependency.
+Invoices, payment status, native PDF sharing, owner setup, and the Run Sheet
+hub. In-progress Slice 7 adds transient next-appointment assistance through the
+existing Schedule and Visit boundaries. The app adds no networking, CloudKit,
+or third-party dependency.
 
 The dependency direction is:
 
@@ -26,7 +28,8 @@ local source of truth.
 
 ## Source Organization
 
-Active ownership through Slice 5 uses the approved feature-first structure:
+Active ownership through in-progress Slice 7 uses the approved feature-first
+structure:
 
 ```text
 FarrierFlow/
@@ -64,14 +67,16 @@ FarrierFlow/
     └── Localizable.xcstrings
 ```
 
-This tree shows implemented ownership through Slice 5A.
+This tree shows implemented ownership through Slice 5A and the committed Slice
+7 assistant units.
 `Features/Onboarding/` owns derived setup readiness and sequencing.
 `Core/Utilities` contains
 only utilities genuinely shared by active features with no clearer domain
-owner. Later features such as next-appointment assistance, export,
-subscriptions, backup, and Settings receive their own feature ownership only
-after each capability is shaped. No empty directory or destination is created
-for deferred work.
+owner. Next-appointment assistance remains Schedule-owned and reuses Visit and
+Appointment routes rather than adding a feature directory. Later features such
+as export, subscriptions, backup, and Settings receive their own feature
+ownership only after each capability is shaped. No empty directory or
+destination is created for deferred work.
 
 Within a feature, organize by responsibility:
 
@@ -125,7 +130,8 @@ remain owned by their contextual features and never block identity completion.
   creation remains owned by Schedule; invoice and owner-setup recovery continue
   through their owning features.
 - Schedule owns appointment lists, appointment detail, appointment creation,
-  and appointment editing.
+  appointment editing, next-appointment suggestion rules, current-graph
+  projection, the transient assistant, and its immutable editor seed.
 - Visits owns Visit start, in-progress editing, progress saving, completion,
   correction, detail presentation, and Visit-specific validation.
 - Photographs owns camera and picker ingestion, normalization, file storage,
@@ -145,17 +151,20 @@ remain owned by their contextual features and never block identity completion.
   My Business. Each destination remains inside the Clients navigation
   stack.
 - No generalized Settings route, screen, folder, toolbar item, or empty
-  destination exists through Slice 5A. Business Profile remains the concrete
-  owner-configuration destination. Settings may be introduced later only when concrete
-  settings require a destination.
+  destination exists through active Slice 7. Business Profile remains the
+  concrete owner-configuration destination. Settings may be introduced later
+  only when concrete settings require a destination.
 
 Appointment Detail owns the entry into Visits: Start Visit when none exists,
 Resume Visit while in progress, and View Visit after completion. Today may
 resume the same Visit editor directly; completion dismisses back to Today so
-the projection can surface eligible invoice work. Visit Detail
-is shared by Appointment Detail and Horse History. Horse Detail owns its
-completed-history projection and routes to Visit Detail. No Visit tab or global
-history destination is added.
+the projection can surface eligible invoice work. Visit Detail is shared by
+Appointment Detail and Horse History and exposes the recoverable Schedule-owned
+next-appointment assistant. The Unit 5 handoff passes only a
+successfully completed Visit identifier and waits for the Visit editor to
+dismiss before Today or Appointment Detail presents that assistant. Horse
+Detail owns its completed-history projection and routes to Visit Detail. No
+Visit tab or global history destination is added.
 
 Client Detail owns Create Invoice. Successful generation replaces the creation
 route with Invoice Detail. Invoice list and Business Profile are also reachable
@@ -494,7 +503,7 @@ validation, and accessibility behavior must work on both platform generations.
 Standard controls, rather than simulated platform effects, provide the
 appropriate appearance on each OS.
 
-## Explicit Non-Goals Through Slice 5A
+## Explicit Non-Goals Through Active Slice 7
 
 - Networking or server-backed repositories.
 - CloudKit synchronization or backup.

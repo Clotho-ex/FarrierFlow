@@ -8,7 +8,8 @@ struct AppointmentDetailView: View {
     @State private var model = AppointmentDetailModel()
     @State private var showsEditor = false
     @State private var showsDeleteConfirmation = false
-    @State private var completedVisitFromEditor = false
+    @State private var pendingCompletedVisitID: PersistentIdentifier?
+    @State private var nextAppointmentVisitID: PersistentIdentifier?
 
     let appointmentID: PersistentIdentifier
     private let onVisitCompleted: (() -> Void)?
@@ -162,9 +163,17 @@ struct AppointmentDetailView: View {
                 VisitEditorView(
                     visitID: visitID,
                     container: context.container
-                ) {
-                    completedVisitFromEditor = true
+                ) { completedVisitID in
+                    pendingCompletedVisitID = completedVisitID
                 }
+            }
+        }
+        .sheet(
+            isPresented: nextAppointmentIsPresented,
+            onDismiss: handleNextAppointmentDismissal
+        ) {
+            if let nextAppointmentVisitID {
+                NextAppointmentAssistantView(visitID: nextAppointmentVisitID)
             }
         }
         .sheet(item: detailPresentation, onDismiss: reload) { presentation in
@@ -190,9 +199,25 @@ struct AppointmentDetailView: View {
 
     private func handleVisitEditorDismissal() {
         reload()
-        guard completedVisitFromEditor else { return }
-        completedVisitFromEditor = false
+        guard let completedVisitID = pendingCompletedVisitID else { return }
+        pendingCompletedVisitID = nil
+        nextAppointmentVisitID = completedVisitID
+    }
+
+    private func handleNextAppointmentDismissal() {
+        reload()
         onVisitCompleted?()
+    }
+
+    private var nextAppointmentIsPresented: Binding<Bool> {
+        Binding(
+            get: { nextAppointmentVisitID != nil },
+            set: { isPresented in
+                if !isPresented {
+                    nextAppointmentVisitID = nil
+                }
+            }
+        )
     }
 
     private var editorPresentation: Binding<VisitPresentation?> {

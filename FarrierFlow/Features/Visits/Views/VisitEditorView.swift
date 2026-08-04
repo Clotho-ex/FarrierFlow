@@ -12,13 +12,13 @@ struct VisitEditorView: View {
     @State private var addServiceHorse: VisitHorseDraft?
     @State private var workItemEditorTarget: WorkItemEditorTarget?
     @FocusState private var focusedWorkNotesID: PersistentIdentifier?
-    private let onCompleted: (() -> Void)?
+    private let onCompleted: ((PersistentIdentifier) -> Void)?
 
     init(
         visitID: PersistentIdentifier,
         container: ModelContainer,
         mode: VisitEditorMode = .inProgress,
-        onCompleted: (() -> Void)? = nil
+        onCompleted: ((PersistentIdentifier) -> Void)? = nil
     ) {
         _model = State(
             initialValue: VisitEditorModel(visitID: visitID, in: container, mode: mode)
@@ -78,7 +78,7 @@ struct VisitEditorView: View {
                         Button("Complete Visit") {
                             focusedWorkNotesID = nil
                             if model.completeVisit() {
-                                onCompleted?()
+                                onCompleted?(model.visitID)
                                 dismiss()
                             }
                         }

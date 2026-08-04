@@ -421,19 +421,20 @@ The complete product and architecture contract is recorded in
 ## Later Slices
 
 Slice numbering records the capability sequence, not a required implementation
-order. Slice 7 is the recommended next implementation candidate. Every slice
-still requires explicit implementation approval.
+order. Slice 7 is the active implementation slice. Units 1 through 5 are
+complete, and Unit 6 final acceptance and closure remain pending. Every later
+slice still requires explicit implementation approval.
 
 ### Slice 6 — Payment Processing
 
 Unpaid/Paid status and payment date shipped in Slice 5. Any future payment
 collection or processing requires a separate product, privacy, failure, and App
-Store decision and remains deferred. It is not the next implementation
+Store decision and remains deferred. It is not the active implementation
 candidate.
 
 ### Slice 7 — Next Appointment Assistance
 
-**Status:** Shaped; implementation not approved.
+**Status:** In progress. Units 1 through 5 are complete; Unit 6 is pending.
 
 After successful Visit completion, offer a dismissible assistant that uses each
 Horse's interval to prepare one editable Appointment draft. Preselect eligible
@@ -446,7 +447,7 @@ The farrier must review and save the normal Appointment. Add no automatic
 creation, recurring series, reminder queue, Today ranking change, model, or
 migration.
 
-The complete shaped contract is recorded in
+The approved implementation contract is recorded in
 `docs/superpowers/specs/2026-08-03-slice-7-next-appointment-assistance-design.md`.
 
 ### Slice 8 — Export
@@ -465,7 +466,7 @@ Evaluate an opt-in backup or synchronization design only after privacy,
 conflict, account, recovery, migration, and operational requirements are
 defined. CloudKit is not assumed.
 
-## Deferred Beyond Slice 5A
+## Deferred Capabilities
 
 - Taxes, discounts, partial payments, payment processing, overdue automation,
   Draft or Sent states, recurring invoices, monthly statements, multi-client

@@ -7,6 +7,7 @@ struct TodayView: View {
     @State private var path = NavigationPath()
     @State private var model = TodayModel()
     @State private var presentedSheet: TodaySheet?
+    @State private var pendingCompletedVisitID: PersistentIdentifier?
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -31,7 +32,7 @@ struct TodayView: View {
             .navigationDestination(for: TodayRoute.self) { route in
                 destination(for: route)
             }
-            .sheet(item: $presentedSheet, onDismiss: reload) { sheet in
+            .sheet(item: $presentedSheet, onDismiss: handleSheetDismissal) { sheet in
                 switch sheet {
                 case .appointment:
                     AppointmentEditorView()
@@ -41,7 +42,11 @@ struct TodayView: View {
                     VisitEditorView(
                         visitID: id,
                         container: context.container
-                    )
+                    ) { completedVisitID in
+                        pendingCompletedVisitID = completedVisitID
+                    }
+                case .nextAppointment(let visitID):
+                    NextAppointmentAssistantView(visitID: visitID)
                 }
             }
             .onAppear(perform: reload)
@@ -196,6 +201,13 @@ struct TodayView: View {
     private func reload() {
         model.load(in: context, now: .now, calendar: .autoupdatingCurrent)
     }
+
+    private func handleSheetDismissal() {
+        reload()
+        guard let completedVisitID = pendingCompletedVisitID else { return }
+        pendingCompletedVisitID = nil
+        presentedSheet = .nextAppointment(completedVisitID)
+    }
 }
 
 private enum TodayRoute: Hashable {
@@ -326,6 +338,7 @@ private enum TodaySheet: Identifiable {
     case appointment
     case client
     case visit(PersistentIdentifier)
+    case nextAppointment(PersistentIdentifier)
 
     var id: String {
         switch self {
@@ -335,6 +348,8 @@ private enum TodaySheet: Identifiable {
             "client"
         case .visit(let id):
             "visit-\(String(describing: id))"
+        case .nextAppointment(let id):
+            "next-appointment-\(String(describing: id))"
         }
     }
 }
