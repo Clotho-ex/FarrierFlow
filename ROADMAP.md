@@ -421,9 +421,8 @@ The complete product and architecture contract is recorded in
 ## Later Slices
 
 Slice numbering records the capability sequence, not a required implementation
-order. Slice 7 is the active implementation slice. Units 1 through 5 are
-complete, and Unit 6 final acceptance and closure remain pending. Every later
-slice still requires explicit implementation approval.
+order. Slice 7 is complete. No later slice is active; every later slice still
+requires explicit implementation approval.
 
 ### Slice 6 — Payment Processing
 
@@ -434,7 +433,7 @@ candidate.
 
 ### Slice 7 — Next Appointment Assistance
 
-**Status:** In progress. Units 1 through 5 are complete; Unit 6 is pending.
+**Status:** Complete. Units 1 through 6 are implemented and verified.
 
 After successful Visit completion, offer a dismissible assistant that uses each
 Horse's interval to prepare one editable Appointment draft. Preselect eligible
@@ -446,6 +445,12 @@ through Horse History.
 The farrier must review and save the normal Appointment. Add no automatic
 creation, recurring series, reminder queue, Today ranking change, model, or
 migration.
+
+Closure verifies the complete three-Horse flow, Not Now without persistence,
+Horse History recovery, selection-driven date recalculation, manual override
+retention, ordinary subset save, Appointment detail, store reopening, and fresh
+partial-duplicate projection. VoiceOver with accessibility Dynamic Type, iOS
+18 and iOS 26 tests, persistent reopening, and both platform builds pass.
 
 The approved implementation contract is recorded in
 `docs/superpowers/specs/2026-08-03-slice-7-next-appointment-assistance-design.md`.

@@ -123,6 +123,8 @@ final class OwnerSetupUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter().wait(for: [enabled], timeout: 3), .completed)
         completeVisit.tap()
 
+        XCTAssertTrue(app.navigationBars["Next Appointment"].waitForExistence(timeout: 5))
+        app.buttons["Not Now"].tap()
         XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Ready to Invoice"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.buttons.matching(

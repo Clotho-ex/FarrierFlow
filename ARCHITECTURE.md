@@ -6,7 +6,7 @@ FarrierFlow is a local-first, iPhone-only SwiftUI application. Slices 1 through
 5A provide connected records, Visit completion and Horse History,
 VisitHorse-owned photographs, structured Services and WorkItems, immutable
 Invoices, payment status, native PDF sharing, owner setup, and the Run Sheet
-hub. In-progress Slice 7 adds transient next-appointment assistance through the
+hub. Completed Slice 7 adds transient next-appointment assistance through the
 existing Schedule and Visit boundaries. The app adds no networking, CloudKit,
 or third-party dependency.
 
@@ -28,7 +28,7 @@ local source of truth.
 
 ## Source Organization
 
-Active ownership through in-progress Slice 7 uses the approved feature-first
+Source ownership through completed Slice 7 uses the approved feature-first
 structure:
 
 ```text
@@ -151,7 +151,7 @@ remain owned by their contextual features and never block identity completion.
   My Business. Each destination remains inside the Clients navigation
   stack.
 - No generalized Settings route, screen, folder, toolbar item, or empty
-  destination exists through active Slice 7. Business Profile remains the
+  destination exists through Slice 7. Business Profile remains the
   concrete owner-configuration destination. Settings may be introduced later
   only when concrete settings require a destination.
 
@@ -503,7 +503,7 @@ validation, and accessibility behavior must work on both platform generations.
 Standard controls, rather than simulated platform effects, provide the
 appropriate appearance on each OS.
 
-## Explicit Non-Goals Through Active Slice 7
+## Explicit Non-Goals Through Slice 7
 
 - Networking or server-backed repositories.
 - CloudKit synchronization or backup.

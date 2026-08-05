@@ -13,7 +13,9 @@ final class EditorAccessibilityUITests: XCTestCase {
         let addClient = app.buttons["Add Client"].firstMatch
         XCTAssertTrue(addClient.waitForExistence(timeout: 10))
         addClient.tap()
-        app.buttons["client-more-details"].tap()
+        let clientMoreDetails = app.buttons["client-more-details"]
+        XCTAssertTrue(clientMoreDetails.waitForExistence(timeout: 3))
+        clientMoreDetails.tap()
         XCTAssertTrue(app.textViews["Client Notes"].waitForExistence(timeout: 3))
         app.textFields["client-name-field"].tap()
         app.textFields["client-name-field"].typeText("Accessible Client")

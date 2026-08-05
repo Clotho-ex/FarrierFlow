@@ -281,8 +281,11 @@ final class VisitCompletionUITests: XCTestCase {
             in: app
         )
         app.buttons["Clear Recorded Work"].tap()
-        XCTAssertFalse(padRow.exists)
-        XCTAssertFalse(app.buttons["visit-add-service-\(graph.servicedHorseName)"].exists)
+        XCTAssertTrue(padRow.waitForNonExistence(timeout: 3))
+        XCTAssertTrue(
+            app.buttons["visit-add-service-\(graph.servicedHorseName)"]
+                .waitForNonExistence(timeout: 3)
+        )
     }
 
     @MainActor

@@ -182,6 +182,8 @@ enum UITestFixtures {
                 in: container,
                 photographRootURL: photographRootURL
             )
+        case .nextAppointment:
+            try seedNextAppointment(in: container)
         case .ownerSetup:
             break
         }
@@ -276,6 +278,99 @@ enum UITestFixtures {
             horseName: invoiceHorse.name,
             rootURL: photographRootURL,
             in: container
+        )
+    }
+
+    private static func seedNextAppointment(
+        in container: ModelContainer
+    ) throws {
+        let context = container.mainContext
+        let clientName = "Next Appointment Client"
+        let existingClients = try context.fetch(FetchDescriptor<Client>())
+        guard !existingClients.contains(where: { $0.name == clientName }) else {
+            return
+        }
+        if try context.fetchCount(FetchDescriptor<BusinessProfile>()) == 0 {
+            context.insert(BusinessProfile(name: "UI Test Farrier"))
+        }
+
+        let client = Client(name: clientName)
+        let barn = Barn(
+            name: "Next Appointment Service Location",
+            address: "100 Follow Up Road"
+        )
+        let service = Service(
+            name: "Next Appointment Trim",
+            defaultAmountMinorUnits: 5_000
+        )
+        let atlas = Horse(
+            name: "Atlas",
+            appointmentIntervalWeeks: 4,
+            client: client,
+            currentBarn: barn
+        )
+        let beacon = Horse(
+            name: "Beacon",
+            appointmentIntervalWeeks: 6,
+            client: client,
+            currentBarn: barn
+        )
+        let clover = Horse(
+            name: "Clover",
+            appointmentIntervalWeeks: 8,
+            client: client,
+            currentBarn: barn
+        )
+
+        context.insert(client)
+        context.insert(barn)
+        context.insert(service)
+        [atlas, beacon, clover].forEach(context.insert)
+        client.horses.append(contentsOf: [atlas, beacon, clover])
+        barn.horses.append(contentsOf: [atlas, beacon, clover])
+
+        let calendar = Calendar.autoupdatingCurrent
+        let today = calendar.startOfDay(for: .now)
+        let sourceDay = calendar.date(byAdding: .day, value: -1, to: today) ?? today
+        let sourceStart = calendar.date(byAdding: .hour, value: 9, to: sourceDay)
+            ?? sourceDay
+        let appointment = makeAppointment(
+            startDate: sourceStart,
+            barn: barn,
+            horses: [atlas, beacon, clover],
+            in: context
+        )
+        try DomainGraphValidator.save(context)
+
+        let visitID = try VisitStartUseCase.start(
+            appointmentID: appointment.persistentModelID,
+            now: sourceStart.addingTimeInterval(30 * 60),
+            in: container
+        )
+        let visitContext = ModelContext(container)
+        var draft = try VisitSaveUseCase.loadDraft(
+            visitID: visitID,
+            in: visitContext
+        )
+        for index in draft.horses.indices {
+            switch draft.horses[index].horseName {
+            case atlas.name, beacon.name:
+                draft.horses[index].outcome = .serviced
+                draft.horses[index].workItems = [
+                    WorkItemDraft(
+                        serviceID: service.persistentModelID,
+                        serviceNameSnapshot: service.name,
+                        amountMinorUnits: service.defaultAmountMinorUnits
+                    )
+                ]
+            default:
+                draft.horses[index].outcome = .notServiced
+            }
+        }
+        _ = try VisitSaveUseCase.complete(
+            draft: draft,
+            completedAt: sourceStart.addingTimeInterval(60 * 60),
+            in: visitContext
         )
     }
 

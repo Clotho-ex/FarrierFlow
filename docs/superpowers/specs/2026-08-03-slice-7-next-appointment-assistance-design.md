@@ -1,12 +1,12 @@
 # Slice 7 — Next Appointment Assistance Design
 
-**Status:** Approved; implementation in progress
+**Status:** Approved and implemented
 
 **Date:** 2026-08-03
 
-**Execution status (2026-08-04):** Units 1 through 5 are complete. Unit 6
-acceptance, relaunch, accessibility, and platform-closure work has not started.
-Slice 7 is not complete until those remaining gates pass.
+**Execution status (2026-08-05):** Units 1 through 6 are complete. Acceptance,
+relaunch, accessibility, persistent reopening, and iOS 18/iOS 26 platform gates
+pass without a schema or migration change.
 
 ## Purpose
 

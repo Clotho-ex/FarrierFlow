@@ -10,6 +10,7 @@ final class InvoiceFlowUITests: XCTestCase {
         )
         defer { app.terminate() }
 
+        app.tabBars.buttons["Schedule"].tap()
         let appointment = app.descendants(matching: .any)[
             "appointment-row-Invoice Service Location"
         ].firstMatch
@@ -157,10 +158,9 @@ final class InvoiceFlowUITests: XCTestCase {
         XCTAssertFalse(app.buttons["invoice-delete-action"].exists)
 
         app.navigationBars.buttons["Invoice Client"].tap()
-        app.buttons["client-create-invoice-action"].tap()
         XCTAssertTrue(
-            app.staticTexts["No completed, uninvoiced work is available for this client."]
-                .waitForExistence(timeout: 3)
+            app.buttons["client-create-invoice-action"]
+                .waitForNonExistence(timeout: 3)
         )
 
         app.terminate()

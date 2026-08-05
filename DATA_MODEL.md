@@ -12,7 +12,7 @@ individual VisitHorse records, structured Services and WorkItems, and immutable
 Client Invoices. The BusinessProfile also owns optional reusable
 Appointment-duration and Invoice-due defaults introduced by Slice 5A.
 
-This contract remains current during Slice 7. Next-appointment assistance is a
+This contract remains current through Slice 7. Next-appointment assistance is a
 transient projection over the existing Visit, Horse, Appointment, and
 AppointmentHorse graph; only the ordinary Appointment save boundary persists a
 reviewed result. Slice 7 adds no model, field, relationship, schema version, or

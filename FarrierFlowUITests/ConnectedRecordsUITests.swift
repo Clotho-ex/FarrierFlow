@@ -62,10 +62,12 @@ final class ConnectedRecordsUITests: XCTestCase {
         barnOptions.element(boundBy: barnOptions.count - 1).tap()
         app.buttons["appointment-horse-\(horseName)"].tap()
         app.buttons["Save"].tap()
+        app.tabBars.buttons["Schedule"].tap()
         XCTAssertTrue(app.staticTexts["appointment-row-\(barnName)"].waitForExistence(timeout: 3))
 
         app.terminate()
         app.launch()
+        app.tabBars.buttons["Schedule"].tap()
         XCTAssertTrue(app.staticTexts["appointment-row-\(barnName)"].waitForExistence(timeout: 5))
 
         app.tabBars.buttons["Clients"].tap()

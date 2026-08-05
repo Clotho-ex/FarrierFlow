@@ -23,8 +23,8 @@ repository, source-Visit link, or follow-up flag is introduced.
 Foundation Calendar, Swift Testing/XCTest, iOS 18.0 minimum, latest stable iOS
 26 SDK.
 
-**Execution status (2026-08-04):** Units 1 through 5 are complete. Unit 6 has
-not started. No final Slice 7 acceptance or completion claim has been made.
+**Execution status (2026-08-05):** Units 1 through 6 are complete. Final Slice
+7 acceptance, relaunch, accessibility, reopening, and platform gates pass.
 
 ## Global Constraints
 
@@ -482,7 +482,8 @@ Commit `feat(visits): offer next appointment after completion`.
 Appointment persistence, accessibility, and platform compatibility without
 adding product behavior.
 
-**Execution status:** Not started.
+**Execution status:** Complete. The three-Horse acceptance flow, saved-subset
+reopening, accessibility checks, and both platform gates pass.
 
 **Files likely affected**
 
@@ -513,15 +514,15 @@ adding product behavior.
 
 **Focused tests and manual verification**
 
-- [ ] Automate: two Serviced selected with individual suggestions; Not Serviced
+- [x] Automate: two Serviced selected with individual suggestions; Not Serviced
   unselected without suggestion; earliest group date; Not Now no record;
   recovery through Horse History; deselection recalculation; manual override;
   save; Appointment detail; partial duplicate state.
-- [ ] Add persistent-store reopen coverage for the saved subset and fresh
+- [x] Add persistent-store reopen coverage for the saved subset and fresh
   duplicate projection.
-- [ ] Manually repeat the acceptance flow on iOS 26 with VoiceOver and
+- [x] Manually repeat the acceptance flow on iOS 26 with VoiceOver and
   accessibility Dynamic Type, then smoke-test the same flow on iOS 18.
-- [ ] Run the final gates once, serially, with the resource preflight before
+- [x] Run the final gates once, serially, with the resource preflight before
   every command:
 
   ```bash
@@ -563,13 +564,14 @@ adding product behavior.
   xcodebuild build -project FarrierFlow.xcodeproj -scheme FarrierFlow \
     -destination "$IOS26_DESTINATION"
 
-  plutil -lint FarrierFlow/Resources/Localizable.xcstrings
+  jq empty FarrierFlow/Resources/Localizable.xcstrings
   git diff --check
   ```
 
   Expected: both unit suites, focused iOS 18 flow, full iOS 26 UI suite,
-  reopening gates, builds, catalog lint, and diff check pass. There is no
-  migration gate because no schema change exists.
+  reopening gates, builds, catalog JSON syntax check, and diff check pass. Both
+  builds also compile the String Catalog. There is no migration gate because
+  no schema change exists.
 
 **Commit boundary:** After all gates pass, stage only the fixture, launch
 scenario, acceptance/reopen tests, and truthful roadmap/spec updates. Commit
@@ -579,5 +581,5 @@ scenario, acceptance/reopen tests, and truthful roadmap/spec updates. Commit
 
 ## Execution Handoff
 
-Unit 5 is complete. Do not begin **Unit 6 — Acceptance, Relaunch, and Slice
-Closure** without explicit user approval.
+Units 1 through 6 are complete. Slice 7 is closed; do not begin a later slice
+without explicit user approval.

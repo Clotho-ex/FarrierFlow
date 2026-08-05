@@ -27,7 +27,7 @@ final class FormatterDisplayUITests: XCTestCase {
         app.navigationBars.buttons["Clients"].tap()
 
         app.staticTexts["client-row-\(clientName)"].tap()
-        app.buttons["Add Horse"].tap()
+        app.buttons["Add Horse"].firstMatch.tap()
         app.textFields["horse-name-field"].tap()
         app.textFields["horse-name-field"].typeText(horseName)
         app.buttons["horse-barn-picker"].tap()
@@ -42,7 +42,7 @@ final class FormatterDisplayUITests: XCTestCase {
         XCTAssertTrue(accessibilityText(of: interval).contains("6 weeks"))
 
         app.buttons["Edit"].tap()
-        let decrement = app.steppers.firstMatch.buttons["Decrement"]
+        let decrement = app.buttons["horse-more-details-Decrement"]
         XCTAssertTrue(decrement.waitForExistence(timeout: 3))
         for _ in 0..<5 {
             decrement.tap()
@@ -61,6 +61,7 @@ final class FormatterDisplayUITests: XCTestCase {
         durationField.tap()
         durationField.typeText(String(Int.max))
         app.buttons["Save"].tap()
+        app.tabBars.buttons["Schedule"].tap()
         app.staticTexts["appointment-row-\(barnName)"].tap()
 
         let duration = app.descendants(matching: .any)[
