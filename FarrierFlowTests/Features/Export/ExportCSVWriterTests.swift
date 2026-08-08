@@ -31,13 +31,24 @@ struct ExportCSVWriterTests {
             definition: .init(relativePath: "Data/clients.csv", columns: ["text"]),
             rows: [
                 [.empty],
-                [.userText("=2+2")], [.userText("  +2")], [.userText("\t-2")], [.userText("\r@x")], [.userText("\n=1")],
+                [.userText("=2+2")], [.userText("  +2")], [.userText("  -2")], [.userText("  @x")], [.userText("\t-2")], [.userText("\r@x")], [.userText("\n=1")],
                 [.userText("safe text")], [.raw("=raw")],
             ]
         )
 
         let output = try #require(String(data: ExportCSVWriter().encode(table), encoding: .utf8))
 
-        #expect(output == "text\r\n\r\n'=2+2\r\n'  +2\r\n'\t-2\r\n\"'\r@x\"\r\n\"'\n=1\"\r\nsafe text\r\n=raw\r\n")
+        #expect(output == "text\r\n\r\n'=2+2\r\n'  +2\r\n'  -2\r\n'  @x\r\n'\t-2\r\n\"'\r@x\"\r\n\"'\n=1\"\r\nsafe text\r\n=raw\r\n")
+    }
+
+    @Test func rejectsRowsWhoseWidthDoesNotMatchTheHeader() {
+        let table = ExportCSVTable(
+            definition: .init(relativePath: "Data/clients.csv", columns: ["export_id", "name"]),
+            rows: [[.raw("client-000001")]]
+        )
+
+        #expect(throws: ExportFormatError.invalidRowWidth(relativePath: "Data/clients.csv", expected: 2, actual: 1)) {
+            _ = try ExportCSVWriter().encode(table)
+        }
     }
 }

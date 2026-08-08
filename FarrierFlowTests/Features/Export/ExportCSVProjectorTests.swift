@@ -35,12 +35,12 @@ struct ExportCSVProjectorTests {
         #expect(tables[3].rows[0] == [.raw("horse-000001"), .userText("Milo"), .empty, .raw("6"), .raw("client-000001"), .raw("service-location-000001"), .empty])
         #expect(tables[4].rows[0] == [.raw("appointment-000001"), .raw("2024-08-30T06:40:00.123456Z"), .raw("2024-08-30T02:40:00.123456-04:00"), .empty, .raw("60"), .raw("service-location-000001")])
         #expect(tables[5].rows[0] == [.raw("appointment-horse-000001"), .raw("appointment-000001"), .raw("horse-000001")])
-        #expect(tables[6].rows[0][0] == .raw("visit-000001"))
+        #expect(tables[6].rows[0] == [.raw("visit-000001"), .raw("2024-08-30T06:40:00.123456Z"), .raw("2024-08-30T02:40:00.123456-04:00"), .empty, .empty, .userText("North Field"), .empty, .raw("appointment-000001"), .raw("service-location-000001")])
         #expect(tables[7].rows[0] == [.raw("visit-horse-000001"), .raw("serviced"), .userText("Done"), .raw("visit-000001"), .raw("horse-000001")])
         #expect(tables[8].rows[0] == [.raw("photograph-000001"), .raw("01234567-89AB-CDEF-0123-456789ABCDEF"), .raw("2024-08-30T06:40:00.123456Z"), .raw("2024-08-30T02:40:00.123456-04:00"), .raw("1200"), .raw("900"), .raw("42"), .raw("visit-horse-000001"), .raw("available"), .raw("Photographs/01234567-89ab-cdef-0123-456789abcdef.jpg")])
         #expect(tables[9].rows[0] == [.raw("service-000001"), .userText("Trim"), .raw("12500"), .raw("USD"), .raw("$125.00"), .raw("false")])
         #expect(tables[10].rows[0] == [.raw("work-item-000001"), .userText("Trim"), .raw("12500"), .raw("USD"), .raw("$125.00"), .raw("service-000001"), .raw("visit-horse-000001"), .empty])
-        #expect(tables[11].rows[0][7] == .raw("paid"))
+        #expect(tables[11].rows[0] == [.raw("invoice-000001"), .raw("7"), .raw("2024-08-30T06:40:00.123456Z"), .raw("2024-08-30T02:40:00.123456-04:00"), .empty, .empty, .empty, .raw("paid"), .raw("2024-08-30T06:40:00.123456Z"), .raw("2024-08-30T02:40:00.123456-04:00"), .userText("Client"), .empty, .empty, .userText("Farrier = Co"), .empty, .empty, .empty, .raw("USD"), .raw("client-000001"), .raw("Invoices/Invoice-0007.pdf")])
         #expect(tables[12].rows[0] == [.raw("invoice-visit-000001"), .raw("2024-08-30T06:40:00.123456Z"), .raw("2024-08-30T02:40:00.123456-04:00"), .userText("North Field"), .empty, .raw("invoice-000001"), .raw("visit-000001")])
         #expect(tables[13].rows[0] == [.raw("invoice-line-item-000001"), .userText("Milo"), .userText("Trim"), .raw("12500"), .raw("USD"), .raw("$125.00"), .raw("invoice-visit-000001"), .raw("work-item-000001")])
 
@@ -69,6 +69,18 @@ struct ExportCSVProjectorTests {
         }
         #expect(throws: ExportFormatError.invalidPhotographCopy(relativePath: "", byteCount: 42)) {
             _ = try ExportCSVProjector.tables(from: Self.snapshot(), photographResults: [Self.photographUUID: .copied(relativePath: "", byteCount: 42)])
+        }
+        #expect(throws: ExportFormatError.invalidPhotographCopy(relativePath: "Photographs/file.jpg", byteCount: 41)) {
+            _ = try ExportCSVProjector.tables(from: Self.snapshot(), photographResults: [Self.photographUUID: .copied(relativePath: "Photographs/file.jpg", byteCount: 41)])
+        }
+        #expect(throws: ExportFormatError.invalidPhotographCopy(relativePath: "Photographs/file.jpg", byteCount: -1)) {
+            _ = try ExportCSVProjector.tables(from: Self.snapshot(), photographResults: [Self.photographUUID: .copied(relativePath: "Photographs/file.jpg", byteCount: -1)])
+        }
+        #expect(throws: ExportFormatError.invalidPhotographCopy(relativePath: "/Photographs/file.jpg", byteCount: 42)) {
+            _ = try ExportCSVProjector.tables(from: Self.snapshot(), photographResults: [Self.photographUUID: .copied(relativePath: "/Photographs/file.jpg", byteCount: 42)])
+        }
+        #expect(throws: ExportFormatError.invalidPhotographCopy(relativePath: "Photographs/../file.jpg", byteCount: 42)) {
+            _ = try ExportCSVProjector.tables(from: Self.snapshot(), photographResults: [Self.photographUUID: .copied(relativePath: "Photographs/../file.jpg", byteCount: 42)])
         }
         #expect(throws: ExportFormatError.unsupportedVisitOutcome("unknown")) {
             _ = try ExportCSVProjector.tables(from: Self.snapshot(outcome: "unknown"), photographResults: [Self.photographUUID: .unavailable])
