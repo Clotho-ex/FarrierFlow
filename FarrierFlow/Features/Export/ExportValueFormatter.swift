@@ -32,10 +32,8 @@ nonisolated enum ExportValueFormatter {
         formatter.locale = Locale(identifier: localeIdentifier)
         formatter.numberStyle = .currency
         formatter.currencyCode = "USD"
-        formatter.currencySymbol = "$"
         formatter.minimumFractionDigits = 2
         formatter.maximumFractionDigits = 2
-        formatter.positiveFormat = "¤#,##0.00"
         let amount = Decimal(minorUnits) / 100
         return formatter.string(from: NSDecimalNumber(decimal: amount))
     }

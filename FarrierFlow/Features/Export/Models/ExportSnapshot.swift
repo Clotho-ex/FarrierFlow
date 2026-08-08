@@ -16,7 +16,7 @@ nonisolated struct BusinessProfileExportRecord: Sendable, Equatable {
     let defaultInvoiceNote: String?
     let defaultAppointmentDurationMinutes: Int?
     let defaultInvoiceDueDays: Int?
-    let nextInvoiceNumber: Int
+    let nextInvoiceNumber: Int64
 }
 
 nonisolated struct ClientExportRecord: Sendable, Equatable {
@@ -106,7 +106,7 @@ nonisolated struct WorkItemExportRecord: Sendable, Equatable {
 
 nonisolated struct InvoiceExportRecord: Sendable, Equatable {
     let id: ExportRecordID
-    let number: Int
+    let number: Int64
     let invoiceDate: Date
     let dueDate: Date?
     let note: String?
