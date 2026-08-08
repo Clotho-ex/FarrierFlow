@@ -24,10 +24,27 @@ struct ExportFormatV1Tests {
         ])
     }
 
-    @Test func formatsTypedIDsWithMinimumWidthWithoutTruncatingLargerOrdinals() {
-        #expect(ExportRecordID(entity: .client, ordinal: 1).value == "client-000001")
-        #expect(ExportRecordID(entity: .invoiceLineItem, ordinal: 1_234_567).value == "invoice-line-item-1234567")
-        #expect(ExportRecordID(entity: .client, ordinal: Int(Int32.max) + 1).value == "client-2147483648")
-        #expect(ExportRecordID(entity: .client, ordinal: Int.max).value == "client-9223372036854775807")
+    @Test func derivesCanonicalInvoicePDFPathsWithoutNarrowingOrTruncation() {
+        #expect(ExportFormatV1.invoicePDFRelativePath(number: 7) == "Invoices/Invoice-0007.pdf")
+        #expect(ExportFormatV1.invoicePDFRelativePath(number: 42) == "Invoices/Invoice-0042.pdf")
+        #expect(ExportFormatV1.invoicePDFRelativePath(number: 1_234) == "Invoices/Invoice-1234.pdf")
+        #expect(ExportFormatV1.invoicePDFRelativePath(number: 12_345) == "Invoices/Invoice-12345.pdf")
+        #expect(ExportFormatV1.invoicePDFRelativePath(number: .max) == "Invoices/Invoice-9223372036854775807.pdf")
+    }
+
+    @Test func formatsTypedIDsWithMinimumWidthWithoutTruncatingLargerOrdinals() throws {
+        #expect(try ExportRecordID(entity: .client, ordinal: 1).value == "client-000001")
+        #expect(try ExportRecordID(entity: .invoiceLineItem, ordinal: 1_234_567).value == "invoice-line-item-1234567")
+        #expect(try ExportRecordID(entity: .client, ordinal: Int(Int32.max) + 1).value == "client-2147483648")
+        #expect(try ExportRecordID(entity: .client, ordinal: Int.max).value == "client-9223372036854775807")
+    }
+
+    @Test func rejectsNonpositiveExportRecordOrdinals() {
+        #expect(throws: ExportFormatError.invalidExportRecordOrdinal(0)) {
+            _ = try ExportRecordID(entity: .client, ordinal: 0)
+        }
+        #expect(throws: ExportFormatError.invalidExportRecordOrdinal(-1)) {
+            _ = try ExportRecordID(entity: .client, ordinal: -1)
+        }
     }
 }

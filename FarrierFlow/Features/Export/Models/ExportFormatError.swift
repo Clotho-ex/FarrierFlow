@@ -1,6 +1,7 @@
 import Foundation
 
 nonisolated enum ExportFormatError: Error, Equatable {
+    case invalidExportRecordOrdinal(Int)
     case unsupportedVisitOutcome(String)
     case unsupportedInvoiceStatus(String)
     case unsupportedCurrencyCode(String)

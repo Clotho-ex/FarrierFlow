@@ -62,7 +62,7 @@ struct ExportCSVProjectorTests {
     }
 
     @Test func preservesPersistedInt64InvoiceNumbersWithoutNarrowing() throws {
-        let snapshot = Self.snapshot(nextInvoiceNumber: .max, invoiceNumber: .max)
+        let snapshot = try Self.snapshot(nextInvoiceNumber: .max, invoiceNumber: .max)
         let businessProfileNextInvoiceNumber: Int64 = snapshot.businessProfiles[0].nextInvoiceNumber
         let invoiceNumber: Int64 = snapshot.invoices[0].number
 
@@ -73,6 +73,15 @@ struct ExportCSVProjectorTests {
 
         #expect(tables[0].rows[0][8] == .raw("9223372036854775807"))
         #expect(tables[11].rows[0][1] == .raw("9223372036854775807"))
+    }
+
+    @Test func derivesInvoicePDFPathFromTheImmutableInvoiceNumber() throws {
+        let tables = try ExportCSVProjector.tables(
+            from: Self.snapshot(invoiceNumber: 42),
+            photographResults: [Self.photographUUID: .unavailable]
+        )
+
+        #expect(tables[11].rows[0][19] == .raw("Invoices/Invoice-0042.pdf"))
     }
 
     @Test func projectsUnavailablePhotographsAndRejectsInvalidExportValues() throws {
@@ -135,10 +144,12 @@ struct ExportCSVProjectorTests {
     private static let photographUUID = UUID(uuidString: "01234567-89AB-CDEF-0123-456789ABCDEF")!
     private static let context = ExportContext(createdAt: date, localeIdentifier: "en_US_POSIX", calendarIdentifier: .gregorian, timeZoneIdentifier: "America/New_York")
 
-    private static func id(_ entity: ExportEntity) -> ExportRecordID { .init(entity: entity, ordinal: 1) }
+    private static func id(_ entity: ExportEntity) throws -> ExportRecordID {
+        try .init(entity: entity, ordinal: 1)
+    }
 
-    private static func snapshot(outcome: String = "serviced", status: String = "paid", currencyCode: String = "USD", minorUnits: Int64 = 12_500, nextInvoiceNumber: Int64 = 7, invoiceNumber: Int64 = 7) -> ExportSnapshot {
-        let businessProfile = id(.businessProfile), client = id(.client), location = id(.serviceLocation), horse = id(.horse), appointment = id(.appointment), appointmentHorse = id(.appointmentHorse), visit = id(.visit), visitHorse = id(.visitHorse), photograph = id(.photograph), service = id(.service), workItem = id(.workItem), invoice = id(.invoice), invoiceVisit = id(.invoiceVisit), invoiceLineItem = id(.invoiceLineItem)
+    private static func snapshot(outcome: String = "serviced", status: String = "paid", currencyCode: String = "USD", minorUnits: Int64 = 12_500, nextInvoiceNumber: Int64 = 7, invoiceNumber: Int64 = 7) throws -> ExportSnapshot {
+        let businessProfile = try id(.businessProfile), client = try id(.client), location = try id(.serviceLocation), horse = try id(.horse), appointment = try id(.appointment), appointmentHorse = try id(.appointmentHorse), visit = try id(.visit), visitHorse = try id(.visitHorse), photograph = try id(.photograph), service = try id(.service), workItem = try id(.workItem), invoice = try id(.invoice), invoiceVisit = try id(.invoiceVisit), invoiceLineItem = try id(.invoiceLineItem)
         return .init(
             context: context,
             businessProfiles: [.init(id: businessProfile, name: "Farrier = Co", phone: "555-0100", email: nil, address: nil, defaultInvoiceNote: nil, defaultAppointmentDurationMinutes: 45, defaultInvoiceDueDays: nil, nextInvoiceNumber: nextInvoiceNumber)],
@@ -152,7 +163,7 @@ struct ExportCSVProjectorTests {
             photographs: [.init(id: photograph, photographID: photographUUID, createdAt: date, pixelWidth: 1200, pixelHeight: 900, byteCount: 42, visitHorseID: visitHorse)],
             services: [.init(id: service, name: "Trim", defaultAmountMinorUnits: minorUnits, currencyCode: currencyCode, isArchived: false)],
             workItems: [.init(id: workItem, serviceNameSnapshot: "Trim", amountMinorUnits: minorUnits, currencyCode: currencyCode, serviceID: service, visitHorseID: visitHorse, invoiceLineItemID: nil)],
-            invoices: [.init(id: invoice, number: invoiceNumber, invoiceDate: date, dueDate: nil, note: nil, statusRawValue: status, paidAt: date, clientNameSnapshot: "Client", clientPhoneSnapshot: nil, clientEmailSnapshot: nil, businessNameSnapshot: "Farrier = Co", businessPhoneSnapshot: nil, businessEmailSnapshot: nil, businessAddressSnapshot: nil, currencyCode: currencyCode, clientID: client, pdfFileName: "Invoices/Invoice-0007.pdf")],
+            invoices: [.init(id: invoice, number: invoiceNumber, invoiceDate: date, dueDate: nil, note: nil, statusRawValue: status, paidAt: date, clientNameSnapshot: "Client", clientPhoneSnapshot: nil, clientEmailSnapshot: nil, businessNameSnapshot: "Farrier = Co", businessPhoneSnapshot: nil, businessEmailSnapshot: nil, businessAddressSnapshot: nil, currencyCode: currencyCode, clientID: client)],
             invoiceVisits: [.init(id: invoiceVisit, visitDateSnapshot: date, serviceLocationNameSnapshot: "North Field", serviceLocationAddressSnapshot: nil, invoiceID: invoice, sourceVisitID: visit)],
             invoiceLineItems: [.init(id: invoiceLineItem, horseNameSnapshot: "Milo", serviceNameSnapshot: "Trim", amountMinorUnits: minorUnits, currencyCode: currencyCode, invoiceVisitID: invoiceVisit, sourceWorkItemID: workItem)],
             invoiceDocuments: []

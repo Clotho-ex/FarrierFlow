@@ -121,7 +121,6 @@ nonisolated struct InvoiceExportRecord: Sendable, Equatable {
     let businessAddressSnapshot: String?
     let currencyCode: String
     let clientID: ExportRecordID
-    let pdfFileName: String
 }
 
 nonisolated struct InvoiceVisitExportRecord: Sendable, Equatable {

@@ -4,6 +4,12 @@ nonisolated enum ExportFormatV1 {
     static let version = 1
     static let rootDirectory = "FarrierFlow Export"
 
+    static func invoicePDFRelativePath(number: Int64) -> String {
+        let decimal = String(number)
+        let padding = String(repeating: "0", count: max(0, 4 - decimal.count))
+        return "Invoices/Invoice-\(padding)\(decimal).pdf"
+    }
+
     static let csvDefinitions: [ExportCSVDefinition] = [
         .init(relativePath: "Data/business-profile.csv", columns: ["export_id", "name", "phone", "email", "address", "default_invoice_note", "default_appointment_duration_minutes", "default_invoice_due_days", "next_invoice_number"]),
         .init(relativePath: "Data/clients.csv", columns: ["export_id", "name", "phone", "email", "notes"]),
@@ -42,6 +48,14 @@ nonisolated enum ExportEntity: String, Sendable, CaseIterable {
 nonisolated struct ExportRecordID: Sendable, Hashable, Equatable {
     let entity: ExportEntity
     let ordinal: Int
+
+    init(entity: ExportEntity, ordinal: Int) throws {
+        guard ordinal > 0 else {
+            throw ExportFormatError.invalidExportRecordOrdinal(ordinal)
+        }
+        self.entity = entity
+        self.ordinal = ordinal
+    }
 
     var value: String {
         let decimal = String(ordinal)
