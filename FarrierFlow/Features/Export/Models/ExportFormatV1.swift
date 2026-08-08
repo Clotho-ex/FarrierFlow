@@ -44,7 +44,9 @@ nonisolated struct ExportRecordID: Sendable, Hashable, Equatable {
     let ordinal: Int
 
     var value: String {
-        "\(entity.rawValue)-\(String(format: "%06d", ordinal))"
+        let decimal = String(ordinal)
+        let padding = String(repeating: "0", count: max(0, 6 - decimal.count))
+        return "\(entity.rawValue)-\(padding)\(decimal)"
     }
 }
 

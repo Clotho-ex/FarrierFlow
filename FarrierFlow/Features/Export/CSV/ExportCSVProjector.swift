@@ -19,7 +19,7 @@ nonisolated enum ExportCSVProjector {
             table(7, try snapshot.visitHorses.map { [id($0.id), raw(try visitOutcome($0.outcomeRawValue)), text($0.workNotes), id($0.visitID), id($0.horseID)] }),
             table(8, try snapshot.photographs.map { record in
                 let result = try photographResult(for: record, in: photographResults)
-                return [id(record.id), raw(record.photographID.uuidString), raw(ExportValueFormatter.utc(record.createdAt)), raw(ExportValueFormatter.local(record.createdAt, context: context)), integer(record.pixelWidth), integer(record.pixelHeight), integer(record.byteCount), id(record.visitHorseID), raw(result.status), result.fileName.map(raw) ?? .empty]
+                return [id(record.id), raw(record.photographID.uuidString.lowercased()), raw(ExportValueFormatter.utc(record.createdAt)), raw(ExportValueFormatter.local(record.createdAt, context: context)), integer(record.pixelWidth), integer(record.pixelHeight), integer(record.byteCount), id(record.visitHorseID), raw(result.status), result.fileName.map(raw) ?? .empty]
             }),
             table(9, try snapshot.services.map { record in
                 let display = try moneyDisplay(record.defaultAmountMinorUnits, currencyCode: record.currencyCode, localeIdentifier: context.localeIdentifier)
@@ -91,14 +91,14 @@ nonisolated enum ExportCSVProjector {
         case .unavailable:
             return ("unavailable", nil)
         case let .copied(relativePath, byteCount):
-            guard byteCount == record.byteCount, byteCount >= 0, isValidRelativePath(relativePath) else {
+            guard byteCount == record.byteCount, byteCount >= 0, isValidPhotographPath(relativePath, photographID: record.photographID) else {
                 throw ExportFormatError.invalidPhotographCopy(relativePath: relativePath, byteCount: byteCount)
             }
             return ("available", relativePath)
         }
     }
 
-    private static func isValidRelativePath(_ path: String) -> Bool {
-        !path.isEmpty && !path.hasPrefix("/") && !path.split(separator: "/").contains("..")
+    private static func isValidPhotographPath(_ path: String, photographID: UUID) -> Bool {
+        path == "Photographs/\(photographID.uuidString.lowercased()).jpg"
     }
 }

@@ -27,5 +27,7 @@ struct ExportFormatV1Tests {
     @Test func formatsTypedIDsWithMinimumWidthWithoutTruncatingLargerOrdinals() {
         #expect(ExportRecordID(entity: .client, ordinal: 1).value == "client-000001")
         #expect(ExportRecordID(entity: .invoiceLineItem, ordinal: 1_234_567).value == "invoice-line-item-1234567")
+        #expect(ExportRecordID(entity: .client, ordinal: Int(Int32.max) + 1).value == "client-2147483648")
+        #expect(ExportRecordID(entity: .client, ordinal: Int.max).value == "client-9223372036854775807")
     }
 }
