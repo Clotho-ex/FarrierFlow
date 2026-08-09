@@ -10,6 +10,7 @@ enum ExportTestFixtures {
     static func makeCompleteGraph() throws -> CompleteGraph {
         let container = try ModelContainerFactory.inMemoryTest()
         let context = container.mainContext
+        let mutationCoordinator = PersistenceMutationCoordinator()
         let exportContext = ExportContext(
             createdAt: date(9_000),
             localeIdentifier: "en_US",
@@ -204,6 +205,7 @@ enum ExportTestFixtures {
         return CompleteGraph(
             container: container,
             context: context,
+            mutationCoordinator: mutationCoordinator,
             exportContext: exportContext,
             profile: profile,
             clients: [alex, blair],
@@ -257,6 +259,7 @@ enum ExportTestFixtures {
 struct CompleteGraph {
     let container: ModelContainer
     let context: ModelContext
+    let mutationCoordinator: PersistenceMutationCoordinator
     let exportContext: ExportContext
     let profile: BusinessProfile
     let clients: [Client]

@@ -12,6 +12,7 @@ struct ExportSnapshotBuilderTests {
 
         let snapshot = try await ExportSnapshotBuilder.build(
             in: graph.context,
+            mutationCoordinator: graph.mutationCoordinator,
             exportContext: graph.exportContext,
             progress: { _ in }
         )
@@ -95,6 +96,7 @@ struct ExportSnapshotBuilderTests {
         await #expect(throws: ExportSnapshotError.invalidGraph(expectedViolation)) {
             _ = try await ExportSnapshotBuilder.build(
                 in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
                 exportContext: graph.exportContext,
                 progress: { progress.append($0) }
             )
@@ -126,6 +128,7 @@ struct ExportSnapshotBuilderTests {
         ) {
             _ = try await ExportSnapshotBuilder.build(
                 in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
                 exportContext: graph.exportContext,
                 progress: { progress.append($0) }
             )
@@ -149,6 +152,7 @@ struct ExportSnapshotBuilderTests {
         await #expect(throws: (any Error).self) {
             _ = try await ExportSnapshotBuilder.build(
                 in: exportGraph.context,
+                mutationCoordinator: exportGraph.mutationCoordinator,
                 exportContext: exportGraph.exportContext,
                 progress: { progress.append($0) }
             )
@@ -186,6 +190,7 @@ struct ExportSnapshotBuilderTests {
         ) {
             _ = try await ExportSnapshotBuilder.build(
                 in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
                 exportContext: graph.exportContext,
                 progress: { progress.append($0) }
             )
@@ -221,6 +226,7 @@ struct ExportSnapshotBuilderTests {
         ) {
             _ = try await ExportSnapshotBuilder.build(
                 in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
                 exportContext: graph.exportContext,
                 progress: { progress.append($0) }
             )
@@ -254,6 +260,7 @@ struct ExportSnapshotBuilderTests {
 
         let snapshot = try await ExportSnapshotBuilder.build(
             in: graph.context,
+            mutationCoordinator: graph.mutationCoordinator,
             exportContext: graph.exportContext,
             progress: { progress.append($0) }
         )
@@ -284,6 +291,7 @@ struct ExportSnapshotBuilderTests {
 
         let snapshot = try await ExportSnapshotBuilder.build(
             in: graph.context,
+            mutationCoordinator: graph.mutationCoordinator,
             exportContext: graph.exportContext,
             progress: { progress.append($0) }
         )
@@ -326,6 +334,7 @@ struct ExportSnapshotBuilderTests {
         ) {
             _ = try await ExportSnapshotBuilder.build(
                 in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
                 exportContext: graph.exportContext,
                 progress: { progress.append($0) }
             )
@@ -365,6 +374,7 @@ struct ExportSnapshotBuilderTests {
         ) {
             _ = try await ExportSnapshotBuilder.build(
                 in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
                 exportContext: graph.exportContext,
                 progress: { progress.append($0) }
             )
@@ -387,6 +397,7 @@ struct ExportSnapshotBuilderTests {
         await #expect(throws: ExportSnapshotError.invalidGraph(.duplicateHorseMembership)) {
             _ = try await ExportSnapshotBuilder.build(
                 in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
                 exportContext: graph.exportContext,
                 progress: { progress.append($0) }
             )
@@ -403,6 +414,7 @@ struct ExportSnapshotBuilderTests {
         await #expect(throws: ExportSnapshotError.unsupportedVisitOutcome("cancelled")) {
             _ = try await ExportSnapshotBuilder.build(
                 in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
                 exportContext: graph.exportContext,
                 progress: { progress.append($0) }
             )
@@ -419,6 +431,7 @@ struct ExportSnapshotBuilderTests {
         await #expect(throws: ExportSnapshotError.unsupportedInvoiceStatus("void")) {
             _ = try await ExportSnapshotBuilder.build(
                 in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
                 exportContext: graph.exportContext,
                 progress: { progress.append($0) }
             )
@@ -435,6 +448,7 @@ struct ExportSnapshotBuilderTests {
         await #expect(throws: ExportSnapshotError.invalidInvoicePaymentState) {
             _ = try await ExportSnapshotBuilder.build(
                 in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
                 exportContext: graph.exportContext,
                 progress: { progress.append($0) }
             )
@@ -451,6 +465,7 @@ struct ExportSnapshotBuilderTests {
         await #expect(throws: ExportSnapshotError.invalidGraph(.serviceAmountNegative)) {
             _ = try await ExportSnapshotBuilder.build(
                 in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
                 exportContext: graph.exportContext,
                 progress: { progress.append($0) }
             )
@@ -467,6 +482,7 @@ struct ExportSnapshotBuilderTests {
         await #expect(throws: ExportSnapshotError.invalidGraph(.workItemCurrencyInvalid)) {
             _ = try await ExportSnapshotBuilder.build(
                 in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
                 exportContext: graph.exportContext,
                 progress: { progress.append($0) }
             )
@@ -485,6 +501,7 @@ struct ExportSnapshotBuilderTests {
         ) {
             _ = try await ExportSnapshotBuilder.build(
                 in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
                 exportContext: graph.exportContext,
                 progress: { progress.append($0) }
             )
@@ -511,6 +528,7 @@ struct ExportSnapshotBuilderTests {
         await #expect(throws: ExportSnapshotError.invalidGraph(.duplicatePhotographID)) {
             _ = try await ExportSnapshotBuilder.build(
                 in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
                 exportContext: graph.exportContext,
                 progress: { progress.append($0) }
             )
@@ -530,11 +548,13 @@ struct ExportSnapshotBuilderTests {
 
         let first = try await ExportSnapshotBuilder.build(
             in: graph.context,
+            mutationCoordinator: graph.mutationCoordinator,
             exportContext: graph.exportContext,
             progress: { _ in }
         )
         let second = try await ExportSnapshotBuilder.build(
             in: graph.context,
+            mutationCoordinator: graph.mutationCoordinator,
             exportContext: graph.exportContext,
             progress: { _ in }
         )
@@ -556,12 +576,217 @@ struct ExportSnapshotBuilderTests {
     }
 
     @Test
+    func rejectsCleanScalarMutationAfterCapture() async throws {
+        let graph = try ExportTestFixtures.makeCompleteGraph()
+        let service = graph.services[0]
+        var progress = [ExportSnapshotProgress]()
+        var snapshot: ExportSnapshot?
+        let holder = ExportSnapshotTaskHolder()
+
+        await #expect(throws: ExportSnapshotError.sourceDataChanged) {
+            snapshot = try await ExportSnapshotBuilder.build(
+                in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
+                exportContext: graph.exportContext,
+                progress: { update in
+                    progress.append(update)
+                    guard update.completedRecords == 0,
+                          holder.mutationTask == nil else {
+                        return
+                    }
+                    holder.mutationTask = Task { @MainActor in
+                        graph.mutationCoordinator.withMutation {
+                            service.name = "Changed After Capture"
+                            holder.progressCountWhenMutationAccepted = progress.count
+                        }
+                    }
+                }
+            )
+        }
+        await holder.mutationTask?.value
+
+        #expect(snapshot == nil)
+        #expect(progress.count == holder.progressCountWhenMutationAccepted)
+    }
+
+    @Test
+    func rejectsForwardRelationshipMutationAfterCapture() async throws {
+        let graph = try ExportTestFixtures.makeCompleteGraph()
+        let horse = graph.horses[2]
+        let replacement = graph.services[1]
+        var progress = [ExportSnapshotProgress]()
+        var snapshot: ExportSnapshot?
+        let holder = ExportSnapshotTaskHolder()
+
+        await #expect(throws: ExportSnapshotError.sourceDataChanged) {
+            snapshot = try await ExportSnapshotBuilder.build(
+                in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
+                exportContext: graph.exportContext,
+                progress: { update in
+                    progress.append(update)
+                    guard update.completedRecords == 0,
+                          holder.mutationTask == nil else {
+                        return
+                    }
+                    holder.mutationTask = Task { @MainActor in
+                        graph.mutationCoordinator.withMutation {
+                            horse.defaultService = replacement
+                            holder.progressCountWhenMutationAccepted = progress.count
+                        }
+                    }
+                }
+            )
+        }
+        await holder.mutationTask?.value
+
+        #expect(snapshot == nil)
+        #expect(progress.count == holder.progressCountWhenMutationAccepted)
+    }
+
+    @Test
+    func rejectsSecondMutationOfModelAlreadyDirtyAtReadStart() async throws {
+        let graph = try ExportTestFixtures.makeCompleteGraph()
+        let service = graph.services[0]
+        graph.mutationCoordinator.withMutation {
+            service.name = "Initially Dirty"
+        }
+        #expect(graph.context.changedModelsArray.contains {
+            $0.persistentModelID == service.persistentModelID
+        })
+        var progress = [ExportSnapshotProgress]()
+        var snapshot: ExportSnapshot?
+        let holder = ExportSnapshotTaskHolder()
+
+        await #expect(throws: ExportSnapshotError.sourceDataChanged) {
+            snapshot = try await ExportSnapshotBuilder.build(
+                in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
+                exportContext: graph.exportContext,
+                progress: { update in
+                    progress.append(update)
+                    guard update.completedRecords == 0,
+                          holder.mutationTask == nil else {
+                        return
+                    }
+                    holder.mutationTask = Task { @MainActor in
+                        graph.mutationCoordinator.withMutation {
+                            service.name = "Changed Again"
+                            holder.progressCountWhenMutationAccepted = progress.count
+                        }
+                    }
+                }
+            )
+        }
+        await holder.mutationTask?.value
+
+        #expect(snapshot == nil)
+        #expect(progress.count == holder.progressCountWhenMutationAccepted)
+    }
+
+    @Test
+    func rejectsTransientServiceInsertDeleteWithinOneMutationScope() async throws {
+        let graph = try ExportTestFixtures.makeCompleteGraph()
+        for index in 1...401 {
+            _ = ModelFixtures.makeService(
+                name: "Transient Baseline Service \(index)",
+                defaultAmountMinorUnits: Int64(index),
+                in: graph.context
+            )
+        }
+        try DomainGraphValidator.save(graph.context)
+        graph.mutationCoordinator.withMutation {
+            graph.profile.name = "Initially Dirty Profile"
+        }
+        let initialHasChanges = graph.context.hasChanges
+        let initialChanged = Set(graph.context.changedModelsArray.map(\.persistentModelID))
+        let initialInserted = Set(graph.context.insertedModelsArray.map(\.persistentModelID))
+        let initialDeleted = Set(graph.context.deletedModelsArray.map(\.persistentModelID))
+        var progress = [ExportSnapshotProgress]()
+        var snapshot: ExportSnapshot?
+        let holder = ExportSnapshotTaskHolder()
+
+        holder.task = Task { @MainActor in
+            try await ExportSnapshotBuilder.build(
+                in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
+                exportContext: graph.exportContext,
+                batchSize: 200,
+                progress: { progress.append($0) }
+            )
+        }
+        holder.mutationTask = Task { @MainActor in
+            // Against the pre-coordinator builder, turn 20 inserts before Service
+            // capture and turn 160 deletes after Service membership recheck.
+            for _ in 0..<20 {
+                await Task.yield()
+            }
+            await graph.mutationCoordinator.withMutation {
+                let transient = Service(
+                    name: "Transient Coordinated Service",
+                    defaultAmountMinorUnits: 9_999
+                )
+                graph.context.insert(transient)
+                holder.progressCountWhenMutationAccepted = progress.count
+                for _ in 0..<140 {
+                    await Task.yield()
+                }
+                graph.context.delete(transient)
+            }
+        }
+
+        let task = try #require(holder.task)
+        await #expect(throws: ExportSnapshotError.sourceDataChanged) {
+            snapshot = try await task.value
+        }
+        await holder.mutationTask?.value
+
+        #expect(snapshot == nil)
+        #expect(progress.count == holder.progressCountWhenMutationAccepted)
+        #expect(graph.context.hasChanges == initialHasChanges)
+        #expect(Set(graph.context.changedModelsArray.map(\.persistentModelID)) == initialChanged)
+        #expect(Set(graph.context.insertedModelsArray.map(\.persistentModelID)) == initialInserted)
+        #expect(Set(graph.context.deletedModelsArray.map(\.persistentModelID)) == initialDeleted)
+    }
+
+    @Test
+    func rejectsReadWhenWriterIsAlreadyActive() async throws {
+        let graph = try ExportTestFixtures.makeCompleteGraph()
+        let gate = ExportMutationGate()
+        var progress = [ExportSnapshotProgress]()
+        var snapshot: ExportSnapshot?
+        let holder = ExportSnapshotTaskHolder()
+        holder.mutationTask = Task { @MainActor in
+            await graph.mutationCoordinator.withMutation {
+                holder.progressCountWhenMutationAccepted = progress.count
+                await gate.signalStartedAndWait()
+            }
+        }
+        await gate.waitUntilStarted()
+
+        await #expect(throws: ExportSnapshotError.sourceDataChanged) {
+            snapshot = try await ExportSnapshotBuilder.build(
+                in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
+                exportContext: graph.exportContext,
+                progress: { progress.append($0) }
+            )
+        }
+        await gate.release()
+        await holder.mutationTask?.value
+
+        #expect(snapshot == nil)
+        #expect(progress.count == holder.progressCountWhenMutationAccepted)
+    }
+
+    @Test
     func reportsEveryRecordAtBatchSizeOne() async throws {
         let graph = try ExportTestFixtures.makeCompleteGraph()
         var progress = [ExportSnapshotProgress]()
 
         _ = try await ExportSnapshotBuilder.build(
             in: graph.context,
+            mutationCoordinator: graph.mutationCoordinator,
             exportContext: graph.exportContext,
             batchSize: 1,
             progress: { progress.append($0) }
@@ -582,6 +807,7 @@ struct ExportSnapshotBuilderTests {
         holder.task = Task { @MainActor in
             try await ExportSnapshotBuilder.build(
                 in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
                 exportContext: graph.exportContext,
                 batchSize: 1,
                 progress: { update in
@@ -622,6 +848,7 @@ struct ExportSnapshotBuilderTests {
         holder.task = Task { @MainActor in
             try await ExportSnapshotBuilder.build(
                 in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
                 exportContext: graph.exportContext,
                 batchSize: 64,
                 progress: { update in
@@ -660,6 +887,7 @@ struct ExportSnapshotBuilderTests {
         holder.task = Task { @MainActor in
             try await ExportSnapshotBuilder.build(
                 in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
                 exportContext: graph.exportContext,
                 batchSize: 1,
                 progress: { progress.append($0) }
@@ -692,6 +920,7 @@ struct ExportSnapshotBuilderTests {
         holder.task = Task { @MainActor in
             try await ExportSnapshotBuilder.build(
                 in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
                 exportContext: graph.exportContext,
                 batchSize: 200,
                 progress: { progress.append($0) }
@@ -734,6 +963,7 @@ struct ExportSnapshotBuilderTests {
 
         let snapshot = try await ExportSnapshotBuilder.build(
             in: graph.context,
+            mutationCoordinator: graph.mutationCoordinator,
             exportContext: graph.exportContext,
             batchSize: 200,
             progress: { progress.append($0) }
@@ -763,11 +993,13 @@ struct ExportSnapshotBuilderTests {
         try DomainGraphValidator.save(graph.context)
         let removedService = try #require(serviceToDelete)
         var progress = [ExportSnapshotProgress]()
+        var snapshot: ExportSnapshot?
         let holder = ExportSnapshotTaskHolder()
 
         holder.task = Task { @MainActor in
             try await ExportSnapshotBuilder.build(
                 in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
                 exportContext: graph.exportContext,
                 batchSize: 200,
                 progress: { progress.append($0) }
@@ -779,15 +1011,19 @@ struct ExportSnapshotBuilderTests {
             for _ in 0..<100 {
                 await Task.yield()
             }
-            graph.context.delete(removedService)
+            graph.mutationCoordinator.withMutation {
+                graph.context.delete(removedService)
+                holder.progressCountWhenMutationAccepted = progress.count
+            }
         }
         let task = try #require(holder.task)
-        await #expect(throws: ExportSnapshotError.sourceGraphChanged(.service)) {
-            _ = try await task.value
+        await #expect(throws: ExportSnapshotError.sourceDataChanged) {
+            snapshot = try await task.value
         }
         await holder.canceller?.value
 
-        #expect(progress.isEmpty)
+        #expect(snapshot == nil)
+        #expect(progress.count == holder.progressCountWhenMutationAccepted)
     }
 
     @Test
@@ -804,11 +1040,13 @@ struct ExportSnapshotBuilderTests {
         }
         try DomainGraphValidator.save(graph.context)
         var progress = [ExportSnapshotProgress]()
+        var snapshot: ExportSnapshot?
         let holder = ExportSnapshotTaskHolder()
 
         holder.task = Task { @MainActor in
             try await ExportSnapshotBuilder.build(
                 in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
                 exportContext: graph.exportContext,
                 batchSize: 200,
                 progress: { progress.append($0) }
@@ -820,15 +1058,19 @@ struct ExportSnapshotBuilderTests {
             for _ in 0..<100 {
                 await Task.yield()
             }
-            graph.context.delete(clientToDelete)
+            graph.mutationCoordinator.withMutation {
+                graph.context.delete(clientToDelete)
+                holder.progressCountWhenMutationAccepted = progress.count
+            }
         }
         let task = try #require(holder.task)
-        await #expect(throws: ExportSnapshotError.sourceGraphChanged(.client)) {
-            _ = try await task.value
+        await #expect(throws: ExportSnapshotError.sourceDataChanged) {
+            snapshot = try await task.value
         }
         await holder.canceller?.value
 
-        #expect(progress.isEmpty)
+        #expect(snapshot == nil)
+        #expect(progress.count == holder.progressCountWhenMutationAccepted)
     }
 
     @Test
@@ -845,11 +1087,13 @@ struct ExportSnapshotBuilderTests {
         }
         try DomainGraphValidator.save(graph.context)
         var progress = [ExportSnapshotProgress]()
+        var snapshot: ExportSnapshot?
         let holder = ExportSnapshotTaskHolder()
 
         holder.task = Task { @MainActor in
             try await ExportSnapshotBuilder.build(
                 in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
                 exportContext: graph.exportContext,
                 batchSize: 200,
                 progress: { progress.append($0) }
@@ -859,21 +1103,25 @@ struct ExportSnapshotBuilderTests {
             for _ in 0..<100 {
                 await Task.yield()
             }
-            graph.context.delete(clientToDelete)
-            do {
-                try graph.context.save()
-            } catch {
-                holder.mutationError = error
+            graph.mutationCoordinator.withMutation {
+                graph.context.delete(clientToDelete)
+                holder.progressCountWhenMutationAccepted = progress.count
+                do {
+                    try graph.context.save()
+                } catch {
+                    holder.mutationError = error
+                }
             }
         }
         let task = try #require(holder.task)
-        await #expect(throws: ExportSnapshotError.sourceGraphChanged(.client)) {
-            _ = try await task.value
+        await #expect(throws: ExportSnapshotError.sourceDataChanged) {
+            snapshot = try await task.value
         }
         await holder.canceller?.value
 
         #expect(holder.mutationError == nil)
-        #expect(progress.isEmpty)
+        #expect(snapshot == nil)
+        #expect(progress.count == holder.progressCountWhenMutationAccepted)
     }
 
     @Test
@@ -884,6 +1132,7 @@ struct ExportSnapshotBuilderTests {
         await #expect(throws: ExportSnapshotError.invalidBatchSize(0)) {
             _ = try await ExportSnapshotBuilder.build(
                 in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
                 exportContext: graph.exportContext,
                 batchSize: 0,
                 progress: { progress.append($0) }
@@ -900,6 +1149,7 @@ struct ExportSnapshotBuilderTests {
         await #expect(throws: ExportSnapshotError.batchSizeExceedsMaximum(201)) {
             _ = try await ExportSnapshotBuilder.build(
                 in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
                 exportContext: graph.exportContext,
                 batchSize: 201,
                 progress: { progress.append($0) }
@@ -947,7 +1197,40 @@ struct ExportSnapshotBuilderTests {
 private final class ExportSnapshotTaskHolder {
     var task: Task<ExportSnapshot, Error>?
     var canceller: Task<Void, Never>?
+    var mutationTask: Task<Void, Never>?
     var mutationError: Error?
+    var progressCountWhenMutationAccepted: Int?
+}
+
+private actor ExportMutationGate {
+    private var hasStarted = false
+    private var startedWaiter: CheckedContinuation<Void, Never>?
+    private var releaseWaiter: CheckedContinuation<Void, Never>?
+
+    func signalStartedAndWait() async {
+        hasStarted = true
+        startedWaiter?.resume()
+        startedWaiter = nil
+
+        await withCheckedContinuation { continuation in
+            releaseWaiter = continuation
+        }
+    }
+
+    func waitUntilStarted() async {
+        guard !hasStarted else {
+            return
+        }
+
+        await withCheckedContinuation { continuation in
+            startedWaiter = continuation
+        }
+    }
+
+    func release() {
+        releaseWaiter?.resume()
+        releaseWaiter = nil
+    }
 }
 
 enum PublicInverseMutation: CaseIterable, CustomTestStringConvertible {

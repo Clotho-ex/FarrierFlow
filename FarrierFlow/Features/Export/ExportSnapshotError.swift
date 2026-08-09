@@ -2,7 +2,7 @@ nonisolated enum ExportSnapshotError: Error, Equatable {
     case invalidBatchSize(Int)
     case batchSizeExceedsMaximum(Int)
     case invalidGraph(DomainGraphViolation)
-    case sourceGraphChanged(ExportEntity)
+    case sourceDataChanged
     case missingProjectedRelationship(entity: ExportEntity, relationship: String)
     case unsupportedVisitOutcome(String)
     case unsupportedInvoiceStatus(String)

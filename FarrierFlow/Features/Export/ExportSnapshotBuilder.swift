@@ -1,5 +1,4 @@
 import Foundation
-import Synchronization
 import SwiftData
 
 nonisolated struct ExportSnapshotProgress: Sendable, Equatable {
@@ -11,6 +10,7 @@ nonisolated struct ExportSnapshotProgress: Sendable, Equatable {
 enum ExportSnapshotBuilder {
     static func build(
         in context: ModelContext,
+        mutationCoordinator: PersistenceMutationCoordinator,
         exportContext: ExportContext,
         batchSize: Int = 200,
         progress: @escaping @MainActor (ExportSnapshotProgress) -> Void
@@ -23,12 +23,32 @@ enum ExportSnapshotBuilder {
         }
 
         try Task.checkCancellation()
-        let danglingStart = DanglingRelationshipHints.captureOperationStart(in: context)
-        let mutationGuard = SourceGraphMutationGuard.capture(
+        let readGuard = try SnapshotReadGuard.begin(using: mutationCoordinator)
+        let danglingStartCapture = DanglingRelationshipHints.beginCaptureOperationStart(
             in: context,
-            initialDeletedModels: danglingStart.deletedModels
+            batchSize: batchSize
         )
-        defer { mutationGuard.stop() }
+        let snapshot = try await SnapshotCooperation.withReadGuard(readGuard) {
+            try await buildSnapshot(
+                in: context,
+                danglingStartCapture: danglingStartCapture,
+                exportContext: exportContext,
+                batchSize: batchSize,
+                progress: progress
+            )
+        }
+        try readGuard.validate()
+        return snapshot
+    }
+
+    private static func buildSnapshot(
+        in context: ModelContext,
+        danglingStartCapture: DanglingRelationshipHints.OperationStartCapture,
+        exportContext: ExportContext,
+        batchSize: Int,
+        progress: @escaping @MainActor (ExportSnapshotProgress) -> Void
+    ) async throws -> ExportSnapshot {
+        let danglingStart = try await danglingStartCapture.finish(batchSize: batchSize)
         let danglingRelationships = try await DanglingRelationshipHints.capture(
             in: context,
             operationStart: danglingStart,
@@ -43,7 +63,7 @@ enum ExportSnapshotBuilder {
 
         let ordered = try await OrderedGraph.make(from: source, batchSize: batchSize)
         let totalRecords = ordered.totalRecords
-        try mutationGuard.validate(in: context, source: source)
+        try SnapshotCooperation.validateRead()
         progress(.init(completedRecords: 0, totalRecords: totalRecords))
         try Task.checkCancellation()
 
@@ -416,7 +436,6 @@ enum ExportSnapshotBuilder {
             invoiceLineItems: invoiceLineItems,
             invoiceDocuments: invoiceDocuments
         )
-        try mutationGuard.validate(in: context, source: source)
         return snapshot
     }
 
@@ -653,9 +672,7 @@ enum ExportSnapshotBuilder {
             }
             completedRecords += end - start
             progress(.init(completedRecords: completedRecords, totalRecords: totalRecords))
-            try Task.checkCancellation()
-            await Task.yield()
-            try Task.checkCancellation()
+            try await SnapshotCooperation.checkpoint()
             start = end
         }
         return output
@@ -742,99 +759,49 @@ private struct SourceGraph {
     let invoices: [Invoice]
     let invoiceVisits: [InvoiceVisit]
     let invoiceLineItems: [InvoiceLineItem]
-    let membership: [ExportEntity: Set<PersistentIdentifier>]
 
     static func fetch(in context: ModelContext, batchSize: Int) async throws -> SourceGraph {
-        let businessProfiles = try await fetch(BusinessProfile.self, entity: .businessProfile, in: context, batchSize: batchSize)
-        let clients = try await fetch(Client.self, entity: .client, in: context, batchSize: batchSize)
-        let serviceLocations = try await fetch(Barn.self, entity: .serviceLocation, in: context, batchSize: batchSize)
-        let horses = try await fetch(Horse.self, entity: .horse, in: context, batchSize: batchSize)
-        let appointments = try await fetch(Appointment.self, entity: .appointment, in: context, batchSize: batchSize)
-        let appointmentHorses = try await fetch(AppointmentHorse.self, entity: .appointmentHorse, in: context, batchSize: batchSize)
-        let visits = try await fetch(Visit.self, entity: .visit, in: context, batchSize: batchSize)
-        let visitHorses = try await fetch(VisitHorse.self, entity: .visitHorse, in: context, batchSize: batchSize)
-        let photographs = try await fetch(Photograph.self, entity: .photograph, in: context, batchSize: batchSize)
-        let services = try await fetch(Service.self, entity: .service, in: context, batchSize: batchSize)
-        let workItems = try await fetch(WorkItem.self, entity: .workItem, in: context, batchSize: batchSize)
-        let invoices = try await fetch(Invoice.self, entity: .invoice, in: context, batchSize: batchSize)
-        let invoiceVisits = try await fetch(InvoiceVisit.self, entity: .invoiceVisit, in: context, batchSize: batchSize)
-        let invoiceLineItems = try await fetch(InvoiceLineItem.self, entity: .invoiceLineItem, in: context, batchSize: batchSize)
-
-        try await verifyMembership(businessProfiles, entity: .businessProfile, in: context, batchSize: batchSize)
-        try await verifyMembership(clients, entity: .client, in: context, batchSize: batchSize)
-        try await verifyMembership(serviceLocations, entity: .serviceLocation, in: context, batchSize: batchSize)
-        try await verifyMembership(horses, entity: .horse, in: context, batchSize: batchSize)
-        try await verifyMembership(appointments, entity: .appointment, in: context, batchSize: batchSize)
-        try await verifyMembership(appointmentHorses, entity: .appointmentHorse, in: context, batchSize: batchSize)
-        try await verifyMembership(visits, entity: .visit, in: context, batchSize: batchSize)
-        try await verifyMembership(visitHorses, entity: .visitHorse, in: context, batchSize: batchSize)
-        try await verifyMembership(photographs, entity: .photograph, in: context, batchSize: batchSize)
-        try await verifyMembership(services, entity: .service, in: context, batchSize: batchSize)
-        try await verifyMembership(workItems, entity: .workItem, in: context, batchSize: batchSize)
-        try await verifyMembership(invoices, entity: .invoice, in: context, batchSize: batchSize)
-        try await verifyMembership(invoiceVisits, entity: .invoiceVisit, in: context, batchSize: batchSize)
-        try await verifyMembership(invoiceLineItems, entity: .invoiceLineItem, in: context, batchSize: batchSize)
+        let businessProfiles = try await fetch(BusinessProfile.self, in: context, batchSize: batchSize)
+        let clients = try await fetch(Client.self, in: context, batchSize: batchSize)
+        let serviceLocations = try await fetch(Barn.self, in: context, batchSize: batchSize)
+        let horses = try await fetch(Horse.self, in: context, batchSize: batchSize)
+        let appointments = try await fetch(Appointment.self, in: context, batchSize: batchSize)
+        let appointmentHorses = try await fetch(AppointmentHorse.self, in: context, batchSize: batchSize)
+        let visits = try await fetch(Visit.self, in: context, batchSize: batchSize)
+        let visitHorses = try await fetch(VisitHorse.self, in: context, batchSize: batchSize)
+        let photographs = try await fetch(Photograph.self, in: context, batchSize: batchSize)
+        let services = try await fetch(Service.self, in: context, batchSize: batchSize)
+        let workItems = try await fetch(WorkItem.self, in: context, batchSize: batchSize)
+        let invoices = try await fetch(Invoice.self, in: context, batchSize: batchSize)
+        let invoiceVisits = try await fetch(InvoiceVisit.self, in: context, batchSize: batchSize)
+        let invoiceLineItems = try await fetch(InvoiceLineItem.self, in: context, batchSize: batchSize)
 
         return SourceGraph(
-            businessProfiles: businessProfiles.models,
-            clients: clients.models,
-            serviceLocations: serviceLocations.models,
-            horses: horses.models,
-            appointments: appointments.models,
-            appointmentHorses: appointmentHorses.models,
-            visits: visits.models,
-            visitHorses: visitHorses.models,
-            photographs: photographs.models,
-            services: services.models,
-            workItems: workItems.models,
-            invoices: invoices.models,
-            invoiceVisits: invoiceVisits.models,
-            invoiceLineItems: invoiceLineItems.models,
-            membership: [
-                .businessProfile: businessProfiles.identifierSet,
-                .client: clients.identifierSet,
-                .serviceLocation: serviceLocations.identifierSet,
-                .horse: horses.identifierSet,
-                .appointment: appointments.identifierSet,
-                .appointmentHorse: appointmentHorses.identifierSet,
-                .visit: visits.identifierSet,
-                .visitHorse: visitHorses.identifierSet,
-                .photograph: photographs.identifierSet,
-                .service: services.identifierSet,
-                .workItem: workItems.identifierSet,
-                .invoice: invoices.identifierSet,
-                .invoiceVisit: invoiceVisits.identifierSet,
-                .invoiceLineItem: invoiceLineItems.identifierSet,
-            ]
+            businessProfiles: businessProfiles,
+            clients: clients,
+            serviceLocations: serviceLocations,
+            horses: horses,
+            appointments: appointments,
+            appointmentHorses: appointmentHorses,
+            visits: visits,
+            visitHorses: visitHorses,
+            photographs: photographs,
+            services: services,
+            workItems: workItems,
+            invoices: invoices,
+            invoiceVisits: invoiceVisits,
+            invoiceLineItems: invoiceLineItems
         )
-    }
-
-    func entity(containing identifier: PersistentIdentifier) -> ExportEntity? {
-        ExportEntity.allCases.first {
-            membership[$0, default: []].contains(identifier)
-        }
-    }
-
-    private struct StableModels<Model: PersistentModel> {
-        let identifiers: [PersistentIdentifier]
-        let identifierSet: Set<PersistentIdentifier>
-        let models: [Model]
     }
 
     private static func fetch<Model: PersistentModel>(
         _ type: Model.Type,
-        entity: ExportEntity,
         in context: ModelContext,
         batchSize: Int
-    ) async throws -> StableModels<Model> {
+    ) async throws -> [Model] {
         try await SnapshotCooperation.checkpoint()
         let identifiers = try context.fetchIdentifiers(FetchDescriptor<Model>())
         try await SnapshotCooperation.checkpoint()
-        let identifierSet = try await identifierSet(
-            identifiers,
-            entity: entity,
-            batchSize: batchSize
-        )
 
         var models = [Model]()
         models.reserveCapacity(identifiers.count)
@@ -844,53 +811,14 @@ private struct SourceGraph {
             for identifier in identifiers[start..<end] {
                 guard let model = context.model(for: identifier) as? Model,
                       !model.isDeleted else {
-                    throw ExportSnapshotError.sourceGraphChanged(entity)
+                    throw ExportSnapshotError.sourceDataChanged
                 }
                 models.append(model)
             }
             try await SnapshotCooperation.checkpoint()
             start = end
         }
-        return StableModels(
-            identifiers: identifiers,
-            identifierSet: identifierSet,
-            models: models
-        )
-    }
-
-    private static func verifyMembership<Model: PersistentModel>(
-        _ captured: StableModels<Model>,
-        entity: ExportEntity,
-        in context: ModelContext,
-        batchSize: Int
-    ) async throws {
-        try await SnapshotCooperation.checkpoint()
-        let current = try context.fetchIdentifiers(FetchDescriptor<Model>())
-        try await SnapshotCooperation.checkpoint()
-        _ = try await identifierSet(current, entity: entity, batchSize: batchSize)
-        guard current.count == captured.identifiers.count else {
-            throw ExportSnapshotError.sourceGraphChanged(entity)
-        }
-        try await SnapshotCooperation.forEach(current, batchSize: batchSize) { identifier in
-            guard captured.identifierSet.contains(identifier) else {
-                throw ExportSnapshotError.sourceGraphChanged(entity)
-            }
-        }
-    }
-
-    private static func identifierSet(
-        _ identifiers: [PersistentIdentifier],
-        entity: ExportEntity,
-        batchSize: Int
-    ) async throws -> Set<PersistentIdentifier> {
-        var result = Set<PersistentIdentifier>()
-        result.reserveCapacity(identifiers.count)
-        try await SnapshotCooperation.forEach(identifiers, batchSize: batchSize) { identifier in
-            guard result.insert(identifier).inserted else {
-                throw ExportSnapshotError.sourceGraphChanged(entity)
-            }
-        }
-        return result
+        return models
     }
 }
 
@@ -1022,11 +950,55 @@ private struct IDGraph {
 }
 
 @MainActor
+private struct SnapshotReadGuard: Sendable {
+    private let coordinator: PersistenceMutationCoordinator
+    private let generation: PersistenceMutationCoordinator.ReadGeneration
+
+    static func begin(
+        using coordinator: PersistenceMutationCoordinator
+    ) throws -> SnapshotReadGuard {
+        do {
+            return SnapshotReadGuard(
+                coordinator: coordinator,
+                generation: try coordinator.beginRead()
+            )
+        } catch {
+            throw ExportSnapshotError.sourceDataChanged
+        }
+    }
+
+    func validate() throws {
+        do {
+            try coordinator.validate(generation)
+        } catch {
+            throw ExportSnapshotError.sourceDataChanged
+        }
+    }
+}
+
+@MainActor
 private enum SnapshotCooperation {
+    @TaskLocal private static var readGuard: SnapshotReadGuard?
+
+    static func withReadGuard<Output>(
+        _ guardValue: SnapshotReadGuard,
+        operation: () async throws -> Output
+    ) async rethrows -> Output {
+        try await $readGuard.withValue(guardValue, operation: operation)
+    }
+
+    static func validateRead() throws {
+        guard let readGuard else {
+            preconditionFailure("Snapshot read guard must be installed")
+        }
+        try readGuard.validate()
+    }
+
     static func checkpoint() async throws {
         try Task.checkCancellation()
         await Task.yield()
         try Task.checkCancellation()
+        try validateRead()
     }
 
     static func forEach<Element>(
@@ -1135,141 +1107,6 @@ private enum SnapshotCooperation {
 }
 
 @MainActor
-private struct SourceGraphMutationGuard {
-    private nonisolated final class SavedChanges: Sendable {
-        private let identifiers = Mutex(Set<PersistentIdentifier>())
-
-        func record(_ notification: Notification) {
-            let keys: [ModelContext.NotificationKey] = [
-                .insertedIdentifiers,
-                .updatedIdentifiers,
-                .deletedIdentifiers,
-            ]
-            var savedIdentifiers = Set<PersistentIdentifier>()
-            for key in keys {
-                if let values = notification.userInfo?[key.rawValue]
-                    as? Set<PersistentIdentifier> {
-                    savedIdentifiers.formUnion(values)
-                } else if let values = notification.userInfo?[key.rawValue]
-                    as? [PersistentIdentifier] {
-                    savedIdentifiers.formUnion(values)
-                }
-            }
-            identifiers.withLock { $0.formUnion(savedIdentifiers) }
-        }
-
-        func snapshot() -> Set<PersistentIdentifier> {
-            identifiers.withLock { $0 }
-        }
-    }
-
-    private struct PendingMembership {
-        let inserted: [ExportEntity: Set<PersistentIdentifier>]
-        let deleted: [ExportEntity: Set<PersistentIdentifier>]
-
-        static func capture(in context: ModelContext) -> PendingMembership {
-            PendingMembership(
-                inserted: group(context.insertedModelsArray),
-                deleted: group(context.deletedModelsArray)
-            )
-        }
-
-        static func capture(
-            in context: ModelContext,
-            initialDeletedModels: [any PersistentModel]
-        ) -> PendingMembership {
-            PendingMembership(
-                inserted: group(context.insertedModelsArray),
-                deleted: group(initialDeletedModels)
-            )
-        }
-
-        private static func group(
-            _ models: [any PersistentModel]
-        ) -> [ExportEntity: Set<PersistentIdentifier>] {
-            var result = [ExportEntity: Set<PersistentIdentifier>]()
-            for model in models {
-                guard let entity = exportEntity(of: model) else { continue }
-                result[entity, default: []].insert(model.persistentModelID)
-            }
-            return result
-        }
-
-        func entity(containing identifier: PersistentIdentifier) -> ExportEntity? {
-            ExportEntity.allCases.first {
-                inserted[$0, default: []].contains(identifier)
-                    || deleted[$0, default: []].contains(identifier)
-            }
-        }
-    }
-
-    private let initial: PendingMembership
-    private let savedChanges: SavedChanges
-    private let observer: NSObjectProtocol
-
-    static func capture(
-        in context: ModelContext,
-        initialDeletedModels: [any PersistentModel]
-    ) -> SourceGraphMutationGuard {
-        let savedChanges = SavedChanges()
-        let observer = NotificationCenter.default.addObserver(
-            forName: ModelContext.didSave,
-            object: context,
-            queue: nil
-        ) { notification in
-            savedChanges.record(notification)
-        }
-        return SourceGraphMutationGuard(initial: PendingMembership.capture(
-            in: context,
-            initialDeletedModels: initialDeletedModels
-        ), savedChanges: savedChanges, observer: observer)
-    }
-
-    func validate(in context: ModelContext, source: SourceGraph) throws {
-        let current = PendingMembership.capture(in: context)
-        for entity in ExportEntity.allCases {
-            guard current.inserted[entity, default: []] == initial.inserted[entity, default: []],
-                  current.deleted[entity, default: []] == initial.deleted[entity, default: []] else {
-                throw ExportSnapshotError.sourceGraphChanged(entity)
-            }
-        }
-        for identifier in savedChanges.snapshot() {
-            let entity = source.entity(containing: identifier)
-                ?? initial.entity(containing: identifier)
-                ?? exportEntity(of: context.model(for: identifier))
-            if let entity {
-                throw ExportSnapshotError.sourceGraphChanged(entity)
-            }
-        }
-    }
-
-    func stop() {
-        NotificationCenter.default.removeObserver(observer)
-    }
-}
-
-@MainActor
-private func exportEntity(of model: any PersistentModel) -> ExportEntity? {
-    switch model {
-    case is BusinessProfile: .businessProfile
-    case is Client: .client
-    case is Barn: .serviceLocation
-    case is Horse: .horse
-    case is Appointment: .appointment
-    case is AppointmentHorse: .appointmentHorse
-    case is Visit: .visit
-    case is VisitHorse: .visitHorse
-    case is Photograph: .photograph
-    case is Service: .service
-    case is WorkItem: .workItem
-    case is Invoice: .invoice
-    case is InvoiceVisit: .invoiceVisit
-    case is InvoiceLineItem: .invoiceLineItem
-    default: nil
-    }
-}
-
-@MainActor
 private struct DanglingRelationshipHints {
     struct Key: Hashable {
         let entity: ExportEntity
@@ -1291,46 +1128,48 @@ private struct DanglingRelationshipHints {
         private var targets = [Key: [PersistentIdentifier: CurrentTarget]]()
         var entries = [Entry]()
 
-        static func capture(
-            _ changedModels: [any PersistentModel]
-        ) -> CurrentRelationshipTargets {
-            var result = CurrentRelationshipTargets()
-            for model in changedModels {
+        mutating func captureBatch(
+            _ changedModels: [any PersistentModel],
+            startingAt start: Int,
+            batchSize: Int
+        ) -> Int {
+            let end = min(start + batchSize, changedModels.count)
+            for model in changedModels[start..<end] {
                 switch model {
                 case let horse as Horse:
-                    result.record(horse.client, owner: horse, entity: .horse, relationship: "client")
-                    result.record(horse.currentBarn, owner: horse, entity: .horse, relationship: "currentBarn")
-                    result.record(horse.defaultService, owner: horse, entity: .horse, relationship: "defaultService")
+                    record(horse.client, owner: horse, entity: .horse, relationship: "client")
+                    record(horse.currentBarn, owner: horse, entity: .horse, relationship: "currentBarn")
+                    record(horse.defaultService, owner: horse, entity: .horse, relationship: "defaultService")
                 case let appointment as Appointment:
-                    result.record(appointment.barn, owner: appointment, entity: .appointment, relationship: "barn")
+                    record(appointment.barn, owner: appointment, entity: .appointment, relationship: "barn")
                 case let membership as AppointmentHorse:
-                    result.record(membership.appointment, owner: membership, entity: .appointmentHorse, relationship: "appointment")
-                    result.record(membership.horse, owner: membership, entity: .appointmentHorse, relationship: "horse")
+                    record(membership.appointment, owner: membership, entity: .appointmentHorse, relationship: "appointment")
+                    record(membership.horse, owner: membership, entity: .appointmentHorse, relationship: "horse")
                 case let visit as Visit:
-                    result.record(visit.appointment, owner: visit, entity: .visit, relationship: "appointment")
-                    result.record(visit.barn, owner: visit, entity: .visit, relationship: "barn")
+                    record(visit.appointment, owner: visit, entity: .visit, relationship: "appointment")
+                    record(visit.barn, owner: visit, entity: .visit, relationship: "barn")
                 case let membership as VisitHorse:
-                    result.record(membership.visit, owner: membership, entity: .visitHorse, relationship: "visit")
-                    result.record(membership.horse, owner: membership, entity: .visitHorse, relationship: "horse")
+                    record(membership.visit, owner: membership, entity: .visitHorse, relationship: "visit")
+                    record(membership.horse, owner: membership, entity: .visitHorse, relationship: "horse")
                 case let photograph as Photograph:
-                    result.record(photograph.visitHorse, owner: photograph, entity: .photograph, relationship: "visitHorse")
+                    record(photograph.visitHorse, owner: photograph, entity: .photograph, relationship: "visitHorse")
                 case let workItem as WorkItem:
-                    result.record(workItem.visitHorse, owner: workItem, entity: .workItem, relationship: "visitHorse")
-                    result.record(workItem.service, owner: workItem, entity: .workItem, relationship: "service")
-                    result.record(workItem.invoiceLineItem, owner: workItem, entity: .workItem, relationship: "invoiceLineItem")
+                    record(workItem.visitHorse, owner: workItem, entity: .workItem, relationship: "visitHorse")
+                    record(workItem.service, owner: workItem, entity: .workItem, relationship: "service")
+                    record(workItem.invoiceLineItem, owner: workItem, entity: .workItem, relationship: "invoiceLineItem")
                 case let invoice as Invoice:
-                    result.record(invoice.client, owner: invoice, entity: .invoice, relationship: "client")
+                    record(invoice.client, owner: invoice, entity: .invoice, relationship: "client")
                 case let invoiceVisit as InvoiceVisit:
-                    result.record(invoiceVisit.invoice, owner: invoiceVisit, entity: .invoiceVisit, relationship: "invoice")
-                    result.record(invoiceVisit.sourceVisit, owner: invoiceVisit, entity: .invoiceVisit, relationship: "sourceVisit")
+                    record(invoiceVisit.invoice, owner: invoiceVisit, entity: .invoiceVisit, relationship: "invoice")
+                    record(invoiceVisit.sourceVisit, owner: invoiceVisit, entity: .invoiceVisit, relationship: "sourceVisit")
                 case let lineItem as InvoiceLineItem:
-                    result.record(lineItem.invoiceVisit, owner: lineItem, entity: .invoiceLineItem, relationship: "invoiceVisit")
-                    result.record(lineItem.sourceWorkItem, owner: lineItem, entity: .invoiceLineItem, relationship: "sourceWorkItem")
+                    record(lineItem.invoiceVisit, owner: lineItem, entity: .invoiceLineItem, relationship: "invoiceVisit")
+                    record(lineItem.sourceWorkItem, owner: lineItem, entity: .invoiceLineItem, relationship: "sourceWorkItem")
                 default:
                     break
                 }
             }
-            return result
+            return end
         }
 
         func target(
@@ -1365,12 +1204,47 @@ private struct DanglingRelationshipHints {
         let currentRelationships: CurrentRelationshipTargets
     }
 
-    static func captureOperationStart(in context: ModelContext) -> OperationStart {
+    struct OperationStartCapture {
+        let deletedModels: [any PersistentModel]
+        let changedModels: [any PersistentModel]
+        var currentRelationships: CurrentRelationshipTargets
+        var nextChangedIndex: Int
+
+        func finish(batchSize: Int) async throws -> OperationStart {
+            var capture = self
+            while capture.nextChangedIndex < capture.changedModels.count {
+                try await SnapshotCooperation.checkpoint()
+                capture.nextChangedIndex = capture.currentRelationships.captureBatch(
+                    capture.changedModels,
+                    startingAt: capture.nextChangedIndex,
+                    batchSize: batchSize
+                )
+            }
+            try await SnapshotCooperation.checkpoint()
+            return OperationStart(
+                deletedModels: capture.deletedModels,
+                currentRelationships: capture.currentRelationships
+            )
+        }
+    }
+
+    static func beginCaptureOperationStart(
+        in context: ModelContext,
+        batchSize: Int
+    ) -> OperationStartCapture {
         let deletedModels = context.deletedModelsArray
         let changedModels = context.changedModelsArray
-        return OperationStart(
+        var currentRelationships = CurrentRelationshipTargets()
+        let nextChangedIndex = currentRelationships.captureBatch(
+            changedModels,
+            startingAt: 0,
+            batchSize: batchSize
+        )
+        return OperationStartCapture(
             deletedModels: deletedModels,
-            currentRelationships: CurrentRelationshipTargets.capture(changedModels)
+            changedModels: changedModels,
+            currentRelationships: currentRelationships,
+            nextChangedIndex: nextChangedIndex
         )
     }
 
