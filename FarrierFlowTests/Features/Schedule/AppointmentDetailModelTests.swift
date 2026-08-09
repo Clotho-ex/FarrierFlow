@@ -108,7 +108,8 @@ struct AppointmentDetailModelTests {
         _ = try VisitStartUseCase.start(
             appointmentID: appointment.persistentModelID,
             now: Date(timeIntervalSinceReferenceDate: 100),
-            in: container
+            in: container,
+            coordinator: PersistenceMutationCoordinator()
         )
 
         let deletionContext = ModelContext(container)

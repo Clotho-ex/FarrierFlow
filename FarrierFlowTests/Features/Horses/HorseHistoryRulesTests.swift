@@ -381,7 +381,8 @@ struct HorseHistoryRulesTests {
         let visitID = try VisitStartUseCase.start(
             appointmentID: appointment.persistentModelID,
             now: Date(timeIntervalSinceReferenceDate: 100),
-            in: fixture.container
+            in: fixture.container,
+            coordinator: PersistenceMutationCoordinator()
         )
         let saveContext = ModelContext(fixture.container)
         var draft = try VisitSaveUseCase.loadDraft(visitID: visitID, in: saveContext)
@@ -389,7 +390,8 @@ struct HorseHistoryRulesTests {
         _ = try VisitSaveUseCase.complete(
             draft: draft,
             completedAt: Date(timeIntervalSinceReferenceDate: 200),
-            in: saveContext
+            in: saveContext,
+            coordinator: PersistenceMutationCoordinator()
         )
 
         let model = HorseDetailModel()

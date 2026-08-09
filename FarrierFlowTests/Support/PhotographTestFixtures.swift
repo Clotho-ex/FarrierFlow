@@ -77,6 +77,7 @@ enum PhotographTestFixtures {
         rootURL: URL,
         fileStore: PhotographFileStore? = nil,
         normalizer: PhotographNormalizer = PhotographNormalizer(),
+        mutationCoordinator: PersistenceMutationCoordinator = PersistenceMutationCoordinator(),
         coordinator: PhotographStorageCoordinator = PhotographStorageCoordinator(),
         protectedDataAvailable: @escaping @MainActor () -> Bool = { true },
         saving: @escaping @MainActor (ModelContext) throws -> Void = {
@@ -89,6 +90,7 @@ enum PhotographTestFixtures {
     ) -> PhotographLibrary {
         PhotographLibrary(
             container: graph.container,
+            mutationCoordinator: mutationCoordinator,
             fileStore: fileStore ?? PhotographFileStore(rootURL: rootURL),
             normalizer: normalizer,
             coordinator: coordinator,

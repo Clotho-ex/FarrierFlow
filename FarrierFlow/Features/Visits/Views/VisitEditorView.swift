@@ -6,6 +6,7 @@ struct VisitEditorView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.locale) private var locale
     @Environment(PhotographLibrary.self) private var photographLibrary
+    @Environment(PersistenceMutationCoordinator.self) private var mutationCoordinator
     @State private var model: VisitEditorModel
     @State private var showsDismissConfirmation = false
     @State private var showsDiscardVisitConfirmation = false
@@ -70,14 +71,14 @@ struct VisitEditorView: View {
                     ToolbarItemGroup(placement: .bottomBar) {
                         Button("Save Progress") {
                             focusedWorkNotesID = nil
-                            model.saveProgress()
+                            model.saveProgress(coordinator: mutationCoordinator)
                         }
                         .accessibilityIdentifier("visit-save-progress")
                         .disabled(!model.canSaveProgress)
                         Spacer()
                         Button("Complete Visit") {
                             focusedWorkNotesID = nil
-                            if model.completeVisit() {
+                            if model.completeVisit(coordinator: mutationCoordinator) {
                                 onCompleted?(model.visitID)
                                 dismiss()
                             }
@@ -90,7 +91,7 @@ struct VisitEditorView: View {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Save Changes") {
                             focusedWorkNotesID = nil
-                            if model.saveCorrection() {
+                            if model.saveCorrection(coordinator: mutationCoordinator) {
                                 dismiss()
                             }
                         }
@@ -117,7 +118,9 @@ struct VisitEditorView: View {
             switch newPhase {
             case .background:
                 if model.mode == .inProgress, model.isDirty {
-                    _ = model.saveProgressForBackground()
+                    _ = model.saveProgressForBackground(
+                        coordinator: mutationCoordinator
+                    )
                 }
             case .active:
                 model.surfacePendingBackgroundSaveErrorIfNeeded()

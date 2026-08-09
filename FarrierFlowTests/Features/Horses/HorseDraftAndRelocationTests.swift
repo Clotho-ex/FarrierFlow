@@ -284,7 +284,8 @@ struct HorseDraftAndRelocationTests {
             let completedVisitID = try VisitStartUseCase.start(
                 appointmentID: completedAppointmentID,
                 now: Date(timeIntervalSinceReferenceDate: 100),
-                in: container
+                in: container,
+                coordinator: PersistenceMutationCoordinator()
             )
             let visitContext = ModelContext(container)
             let completedVisit = try #require(
@@ -309,7 +310,8 @@ struct HorseDraftAndRelocationTests {
             _ = try VisitSaveUseCase.complete(
                 draft: completedDraft,
                 completedAt: Date(timeIntervalSinceReferenceDate: 200),
-                in: visitContext
+                in: visitContext,
+                coordinator: PersistenceMutationCoordinator()
             )
 
             let relocationContext = ModelContext(container)
@@ -491,7 +493,8 @@ struct HorseDraftAndRelocationTests {
         let visitID = try VisitStartUseCase.start(
             appointmentID: appointment.persistentModelID,
             now: Date(timeIntervalSinceReferenceDate: 100),
-            in: container
+            in: container,
+            coordinator: PersistenceMutationCoordinator()
         )
         let completionContext = ModelContext(container)
         let visit = try #require(completionContext.model(for: visitID) as? Visit)
@@ -508,7 +511,8 @@ struct HorseDraftAndRelocationTests {
         _ = try VisitSaveUseCase.complete(
             draft: draft,
             completedAt: Date(timeIntervalSinceReferenceDate: 200),
-            in: completionContext
+            in: completionContext,
+            coordinator: PersistenceMutationCoordinator()
         )
         return (
             container,

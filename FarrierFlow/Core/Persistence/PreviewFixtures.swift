@@ -345,7 +345,8 @@ enum UITestFixtures {
         let visitID = try VisitStartUseCase.start(
             appointmentID: appointment.persistentModelID,
             now: sourceStart.addingTimeInterval(30 * 60),
-            in: container
+            in: container,
+            coordinator: PersistenceMutationCoordinator()
         )
         let visitContext = ModelContext(container)
         var draft = try VisitSaveUseCase.loadDraft(
@@ -370,7 +371,8 @@ enum UITestFixtures {
         _ = try VisitSaveUseCase.complete(
             draft: draft,
             completedAt: sourceStart.addingTimeInterval(60 * 60),
-            in: visitContext
+            in: visitContext,
+            coordinator: PersistenceMutationCoordinator()
         )
     }
 
@@ -400,7 +402,8 @@ enum UITestFixtures {
         let visitID = try VisitStartUseCase.start(
             appointmentID: appointmentID,
             now: startedAt,
-            in: container
+            in: container,
+            coordinator: PersistenceMutationCoordinator()
         )
         let context = ModelContext(container)
         var draft = try VisitSaveUseCase.loadDraft(visitID: visitID, in: context)
@@ -411,7 +414,8 @@ enum UITestFixtures {
         _ = try VisitSaveUseCase.complete(
             draft: draft,
             completedAt: completedAt,
-            in: context
+            in: context,
+            coordinator: PersistenceMutationCoordinator()
         )
         return visitID
     }

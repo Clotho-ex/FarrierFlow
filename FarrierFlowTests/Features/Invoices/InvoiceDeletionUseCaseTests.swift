@@ -10,14 +10,23 @@ struct InvoiceDeletionUseCaseTests {
     func deletingAnUnpaidInvoiceReleasesOnlyItsWorkItemAndRestoresCorrectionWhenLastReferenceIsRemoved() throws {
         let graph = try InvoiceActionGraph.make()
         let visit = try #require(graph.context.model(for: graph.visitID) as? Visit)
+        let coordinator = PersistenceMutationCoordinator()
+        let generation = try coordinator.beginRead()
         #expect(InvoiceDomainRules.isCorrectionLocked(visit))
 
-        try InvoiceDeletionUseCase.deleteUnpaid(invoiceID: graph.invoiceID, in: graph.context)
+        try InvoiceDeletionUseCase.deleteUnpaid(
+            invoiceID: graph.invoiceID,
+            in: graph.context,
+            coordinator: coordinator
+        )
 
         #expect(try graph.context.fetchCount(FetchDescriptor<Invoice>()) == 0)
         #expect((try #require(graph.context.model(for: graph.workItemID) as? WorkItem)).invoiceLineItem == nil)
         #expect(!InvoiceDomainRules.isCorrectionLocked(visit))
         #expect(try graph.context.fetchCount(FetchDescriptor<Visit>()) == 1)
+        #expect(throws: PersistenceMutationCoordinatorError.sourceChanged) {
+            try coordinator.validate(generation)
+        }
     }
 
     @Test
@@ -25,7 +34,11 @@ struct InvoiceDeletionUseCaseTests {
         let graph = try InvoiceActionGraph.make(status: .paid)
 
         #expect(throws: InvoiceDeletionError.invoicePaid) {
-            try InvoiceDeletionUseCase.deleteUnpaid(invoiceID: graph.invoiceID, in: graph.context)
+            try InvoiceDeletionUseCase.deleteUnpaid(
+                invoiceID: graph.invoiceID,
+                in: graph.context,
+                coordinator: PersistenceMutationCoordinator()
+            )
         }
         #expect(graph.context.model(for: graph.invoiceID) as? Invoice != nil)
     }

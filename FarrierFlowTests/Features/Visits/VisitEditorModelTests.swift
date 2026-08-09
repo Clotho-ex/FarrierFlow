@@ -7,6 +7,25 @@ import Testing
 @MainActor
 struct VisitEditorModelTests {
     @Test
+    func savingProgressInvalidatesTheCapturedReadGeneration() throws {
+        let graph = try makeVisitGraph()
+        let coordinator = PersistenceMutationCoordinator()
+        let model = VisitEditorModel(visitID: graph.visitID, in: graph.container)
+        model.load()
+        var draft = try #require(model.draft)
+        let miloIndex = try horseIndex(named: "Milo", in: draft)
+        draft.horses[miloIndex].outcome = .serviced
+        model.draft = draft
+        let generation = try coordinator.beginRead()
+
+        #expect(model.saveProgress(coordinator: coordinator))
+
+        #expect(throws: PersistenceMutationCoordinatorError.sourceChanged) {
+            try coordinator.validate(generation)
+        }
+    }
+
+    @Test
     func loadStateRetainsPreviouslyLoadedDraftAfterFailureAndRetry() throws {
         let graph = try makeVisitGraph()
         var loadCount = 0
@@ -60,7 +79,7 @@ struct VisitEditorModelTests {
 
         #expect(model.isDirty)
         #expect(model.canSaveProgress)
-        #expect(model.saveProgress())
+        #expect(model.saveProgress(coordinator: PersistenceMutationCoordinator()))
         #expect(!model.isDirty)
         #expect(model.draft == model.lastSavedDraft)
 
@@ -128,7 +147,7 @@ struct VisitEditorModelTests {
             priceInput: "12.345",
             for: milo.id
         ))
-        #expect(model.saveProgress())
+        #expect(model.saveProgress(coordinator: PersistenceMutationCoordinator()))
 
         let verificationContext = ModelContext(graph.container)
         let visit = try #require(verificationContext.model(for: graph.visitID) as? Visit)
@@ -153,7 +172,7 @@ struct VisitEditorModelTests {
                 .first(where: { $0.serviceID == pads.persistentModelID })
         )
         #expect(model.removeWorkItem(workItemToRemove.id, from: milo.id))
-        #expect(model.saveProgress())
+        #expect(model.saveProgress(coordinator: PersistenceMutationCoordinator()))
 
         let afterRemovalContext = ModelContext(graph.container)
         let afterRemovalVisit = try #require(afterRemovalContext.model(for: graph.visitID) as? Visit)
@@ -248,14 +267,14 @@ struct VisitEditorModelTests {
         let model = VisitEditorModel(
             visitID: graph.visitID,
             in: graph.container,
-            saving: { _, _ in throw VisitEditorTestFailure.unavailable }
+            saving: { _, _, _ in throw VisitEditorTestFailure.unavailable }
         )
         model.load()
         let milo = try #require(model.draft?.horses.first(where: { $0.horseName == "Milo" }))
 
         #expect(model.addService(service.persistentModelID, to: milo.id))
         let editedDraft = try #require(model.draft)
-        #expect(!model.saveProgress())
+        #expect(!model.saveProgress(coordinator: PersistenceMutationCoordinator()))
         #expect(model.draft == editedDraft)
 
         let verificationContext = ModelContext(graph.container)
@@ -305,7 +324,7 @@ struct VisitEditorModelTests {
             let model = VisitEditorModel(
                 visitID: graph.visitID,
                 in: container,
-                saving: { _, _ in throw VisitEditorTestFailure.unavailable }
+                saving: { _, _, _ in throw VisitEditorTestFailure.unavailable }
             )
             model.load()
 
@@ -315,7 +334,7 @@ struct VisitEditorModelTests {
             draft.horses[miloIndex].workNotes = "Unsaved work"
             model.draft = draft
 
-            #expect(!model.saveProgress())
+            #expect(!model.saveProgress(coordinator: PersistenceMutationCoordinator()))
             #expect(model.isDirty)
             #expect(model.draft == draft)
 
@@ -370,6 +389,7 @@ struct VisitEditorModelTests {
                 try VisitSaveUseCase.saveProgress(
                     draft: draft,
                     in: actionContext,
+                    coordinator: PersistenceMutationCoordinator(),
                     saving: { context in
                         let visit = try #require(
                             context.model(for: graph.visitID) as? Visit
@@ -424,7 +444,7 @@ struct VisitEditorModelTests {
         model.draft = draft
 
         #expect(!model.canSaveProgress)
-        #expect(!model.saveProgress())
+        #expect(!model.saveProgress(coordinator: PersistenceMutationCoordinator()))
         #expect(model.isDirty)
 
         model.discardUnsavedChanges()
@@ -449,7 +469,12 @@ struct VisitEditorModelTests {
 
         let completedAt = Date(timeIntervalSinceReferenceDate: 200)
         #expect(model.canComplete)
-        #expect(model.completeVisit(at: completedAt))
+        #expect(
+            model.completeVisit(
+                at: completedAt,
+                coordinator: PersistenceMutationCoordinator()
+            )
+        )
         #expect(!model.isDirty)
 
         let context = ModelContext(graph.container)
@@ -478,7 +503,12 @@ struct VisitEditorModelTests {
         model.draft = draft
 
         #expect(!model.canComplete)
-        #expect(!model.completeVisit(at: Date(timeIntervalSinceReferenceDate: 200)))
+        #expect(
+            !model.completeVisit(
+                at: Date(timeIntervalSinceReferenceDate: 200),
+                coordinator: PersistenceMutationCoordinator()
+            )
+        )
 
         let context = ModelContext(graph.container)
         let visit = try #require(context.model(for: graph.visitID) as? Visit)
@@ -519,7 +549,7 @@ struct VisitEditorModelTests {
         let model = VisitEditorModel(
             visitID: graph.visitID,
             in: graph.container,
-            completing: { _, _, _ in throw VisitEditorTestFailure.unavailable }
+            completing: { _, _, _, _ in throw VisitEditorTestFailure.unavailable }
         )
         model.load()
 
@@ -531,7 +561,12 @@ struct VisitEditorModelTests {
         draft.horses[scoutIndex].outcome = .notServiced
         model.draft = draft
 
-        #expect(!model.completeVisit(at: Date(timeIntervalSinceReferenceDate: 200)))
+        #expect(
+            !model.completeVisit(
+                at: Date(timeIntervalSinceReferenceDate: 200),
+                coordinator: PersistenceMutationCoordinator()
+            )
+        )
         #expect(model.isDirty)
         #expect(model.draft == draft)
 
@@ -559,6 +594,7 @@ struct VisitEditorModelTests {
                 draft: draft,
                 completedAt: Date(timeIntervalSinceReferenceDate: 200),
                 in: actionContext,
+                coordinator: PersistenceMutationCoordinator(),
                 saving: { context in
                     let visit = try #require(context.model(for: graph.visitID) as? Visit)
                     observedCompletedMutation = visit.completedAt != nil
@@ -602,12 +638,22 @@ struct VisitEditorModelTests {
         ]
         model.draft = draft
         #expect(!model.canComplete)
-        #expect(!model.completeVisit(at: Date(timeIntervalSinceReferenceDate: 200)))
+        #expect(
+            !model.completeVisit(
+                at: Date(timeIntervalSinceReferenceDate: 200),
+                coordinator: PersistenceMutationCoordinator()
+            )
+        )
 
         draft.horses[miloIndex].workNotes = ""
         model.draft = draft
         #expect(model.canComplete)
-        #expect(!model.completeVisit(at: Date(timeIntervalSinceReferenceDate: 99)))
+        #expect(
+            !model.completeVisit(
+                at: Date(timeIntervalSinceReferenceDate: 99),
+                coordinator: PersistenceMutationCoordinator()
+            )
+        )
 
         let context = ModelContext(graph.container)
         let visit = try #require(context.model(for: graph.visitID) as? Visit)
@@ -632,13 +678,13 @@ struct VisitEditorModelTests {
         model.draft = draft
 
         #expect(!model.canSaveCorrection)
-        #expect(!model.saveCorrection())
+        #expect(!model.saveCorrection(coordinator: PersistenceMutationCoordinator()))
 
         draft.horses[miloIndex].outcome = .serviced
         draft.horses[miloIndex].workNotes = "Corrected work notes"
         model.draft = draft
         #expect(model.canSaveCorrection)
-        #expect(model.saveCorrection())
+        #expect(model.saveCorrection(coordinator: PersistenceMutationCoordinator()))
 
         let context = ModelContext(graph.container)
         let visit = try #require(context.model(for: graph.visitID) as? Visit)
@@ -717,7 +763,7 @@ struct VisitEditorModelTests {
         let model = VisitEditorModel(
             visitID: graph.visitID,
             in: graph.container,
-            saving: { _, _ in throw VisitEditorTestFailure.unavailable }
+            saving: { _, _, _ in throw VisitEditorTestFailure.unavailable }
         )
         model.load()
         var draft = try #require(model.draft)
@@ -725,7 +771,11 @@ struct VisitEditorModelTests {
         draft.horses[miloIndex].outcome = .serviced
         model.draft = draft
 
-        #expect(!model.saveProgressForBackground())
+        #expect(
+            !model.saveProgressForBackground(
+                coordinator: PersistenceMutationCoordinator()
+            )
+        )
         #expect(model.isDirty)
         #expect(model.alert == nil)
 
@@ -740,7 +790,11 @@ struct VisitEditorModelTests {
         let graph = try makeVisitGraph()
         let context = ModelContext(graph.container)
 
-        try VisitDiscardUseCase.discard(visitID: graph.visitID, in: context)
+        try VisitDiscardUseCase.discard(
+            visitID: graph.visitID,
+            in: context,
+            coordinator: PersistenceMutationCoordinator()
+        )
 
         let verificationContext = ModelContext(graph.container)
         #expect(try verificationContext.fetch(FetchDescriptor<Visit>()).isEmpty)
@@ -764,7 +818,11 @@ struct VisitEditorModelTests {
 
         let context = ModelContext(graph.container)
         #expect(throws: RecordDeletionBlock.completedVisitCannotBeDeleted) {
-            try VisitDiscardUseCase.discard(visitID: graph.visitID, in: context)
+            try VisitDiscardUseCase.discard(
+                visitID: graph.visitID,
+                in: context,
+                coordinator: PersistenceMutationCoordinator()
+            )
         }
     }
 
@@ -802,7 +860,11 @@ struct VisitEditorModelTests {
                     amountMinorUnits: miloWorkItem.amountMinorUnits
                 ),
             ]
-            _ = try VisitSaveUseCase.saveCorrection(draft: correction, in: actionContext)
+            _ = try VisitSaveUseCase.saveCorrection(
+                draft: correction,
+                in: actionContext,
+                coordinator: PersistenceMutationCoordinator()
+            )
         }
 
         try autoreleasepool {
@@ -866,7 +928,8 @@ struct VisitEditorModelTests {
         let visitID = try VisitStartUseCase.start(
             appointmentID: appointment.persistentModelID,
             now: Date(timeIntervalSinceReferenceDate: 100),
-            in: container
+            in: container,
+            coordinator: PersistenceMutationCoordinator()
         )
 
         return VisitEditorGraph(
@@ -890,7 +953,8 @@ struct VisitEditorModelTests {
         _ = try VisitSaveUseCase.complete(
             draft: draft,
             completedAt: completedAt,
-            in: context
+            in: context,
+            coordinator: PersistenceMutationCoordinator()
         )
     }
 

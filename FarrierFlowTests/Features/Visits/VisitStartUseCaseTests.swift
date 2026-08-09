@@ -7,6 +7,24 @@ import Testing
 @MainActor
 struct VisitStartUseCaseTests {
     @Test
+    func startingVisitInvalidatesTheCapturedReadGeneration() throws {
+        let graph = try makeTwoHorseGraph()
+        let coordinator = PersistenceMutationCoordinator()
+        let generation = try coordinator.beginRead()
+
+        _ = try VisitStartUseCase.start(
+            appointmentID: graph.appointment.persistentModelID,
+            now: Date(timeIntervalSinceReferenceDate: 123_456),
+            in: graph.container,
+            coordinator: coordinator
+        )
+
+        #expect(throws: PersistenceMutationCoordinatorError.sourceChanged) {
+            try coordinator.validate(generation)
+        }
+    }
+
+    @Test
     func startingVisitCopiesAppointmentMembershipAndLocationSnapshots() throws {
         let graph = try makeTwoHorseGraph()
         let startedAt = Date(timeIntervalSinceReferenceDate: 123_456)
@@ -14,7 +32,8 @@ struct VisitStartUseCaseTests {
         let visitID = try VisitStartUseCase.start(
             appointmentID: graph.appointment.persistentModelID,
             now: startedAt,
-            in: graph.container
+            in: graph.container,
+            coordinator: PersistenceMutationCoordinator()
         )
 
         let verificationContext = ModelContext(graph.container)
@@ -64,7 +83,8 @@ struct VisitStartUseCaseTests {
         let visitID = try VisitStartUseCase.start(
             appointmentID: graph.appointment.persistentModelID,
             now: Date(timeIntervalSinceReferenceDate: 123_456),
-            in: graph.container
+            in: graph.container,
+            coordinator: PersistenceMutationCoordinator()
         )
 
         let context = ModelContext(graph.container)
@@ -104,7 +124,8 @@ struct VisitStartUseCaseTests {
             try VisitStartUseCase.start(
                 appointmentID: graph.appointment.persistentModelID,
                 now: Date(timeIntervalSinceReferenceDate: 123_456),
-                in: graph.container
+                in: graph.container,
+                coordinator: PersistenceMutationCoordinator()
             )
         }
 
@@ -125,7 +146,8 @@ struct VisitStartUseCaseTests {
             try VisitStartUseCase.start(
                 appointmentID: graph.appointment.persistentModelID,
                 now: Date(timeIntervalSinceReferenceDate: 100),
-                in: graph.container
+                in: graph.container,
+                coordinator: PersistenceMutationCoordinator()
             )
         }
 
@@ -153,6 +175,7 @@ struct VisitStartUseCaseTests {
                 appointmentID: graph.appointment.persistentModelID,
                 now: Date(timeIntervalSinceReferenceDate: 100),
                 in: graph.container,
+                coordinator: PersistenceMutationCoordinator(),
                 actionContext: actionContext,
                 saving: { _ in }
             )
@@ -183,6 +206,7 @@ struct VisitStartUseCaseTests {
                     appointmentID: graph.appointment.persistentModelID,
                     now: Date(timeIntervalSinceReferenceDate: 100),
                     in: container,
+                    coordinator: PersistenceMutationCoordinator(),
                     saving: { _ in throw ForcedSaveFailure.unavailable }
                 )
             }

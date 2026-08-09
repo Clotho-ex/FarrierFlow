@@ -11,25 +11,28 @@ enum InvoiceStatusUseCase {
     static func markPaid(
         invoiceID: PersistentIdentifier,
         paidAt: Date,
-        in context: ModelContext
+        in context: ModelContext,
+        coordinator: PersistenceMutationCoordinator
     ) throws {
-        do {
-            try DomainGraphValidator.validateAll(in: context)
-            guard let invoice = try context.existingModel(Invoice.self, for: invoiceID) else {
-                throw InvoiceStatusError.invoiceUnavailable
+        try coordinator.withMutation {
+            do {
+                try DomainGraphValidator.validateAll(in: context)
+                guard let invoice = try context.existingModel(Invoice.self, for: invoiceID) else {
+                    throw InvoiceStatusError.invoiceUnavailable
+                }
+                guard try InvoiceDomainRules.validatedStatus(
+                    rawValue: invoice.statusRawValue,
+                    paidAt: invoice.paidAt
+                ) == .unpaid else {
+                    throw InvoiceStatusError.invoiceAlreadyPaid
+                }
+                invoice.statusRawValue = InvoiceStatus.paid.rawValue
+                invoice.paidAt = paidAt
+                try DomainGraphValidator.save(context)
+            } catch {
+                context.rollback()
+                throw error
             }
-            guard try InvoiceDomainRules.validatedStatus(
-                rawValue: invoice.statusRawValue,
-                paidAt: invoice.paidAt
-            ) == .unpaid else {
-                throw InvoiceStatusError.invoiceAlreadyPaid
-            }
-            invoice.statusRawValue = InvoiceStatus.paid.rawValue
-            invoice.paidAt = paidAt
-            try DomainGraphValidator.save(context)
-        } catch {
-            context.rollback()
-            throw error
         }
     }
 }

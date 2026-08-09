@@ -108,11 +108,14 @@ private struct RootPreview: View {
     var body: some View {
         switch containerResult {
         case .success(let container):
+            let mutationCoordinator = PersistenceMutationCoordinator()
             RootView()
                 .modelContainer(container)
+                .environment(mutationCoordinator)
                 .environment(
                     PhotographLibrary(
                         container: container,
+                        mutationCoordinator: mutationCoordinator,
                         fileStore: PhotographFileStore(
                             rootURL: FileManager.default.temporaryDirectory.appending(
                                 path: "FarrierFlow-Preview-Photographs",

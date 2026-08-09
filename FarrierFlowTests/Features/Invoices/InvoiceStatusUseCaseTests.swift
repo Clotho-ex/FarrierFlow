@@ -10,14 +10,29 @@ struct InvoiceStatusUseCaseTests {
     func markPaidPersistsThePaidStatusAndExactPaymentDate() throws {
         let graph = try InvoiceActionGraph.make()
         let paidAt = Date(timeIntervalSinceReferenceDate: 999)
+        let coordinator = PersistenceMutationCoordinator()
+        let generation = try coordinator.beginRead()
 
-        try InvoiceStatusUseCase.markPaid(invoiceID: graph.invoiceID, paidAt: paidAt, in: graph.context)
+        try InvoiceStatusUseCase.markPaid(
+            invoiceID: graph.invoiceID,
+            paidAt: paidAt,
+            in: graph.context,
+            coordinator: coordinator
+        )
 
         let invoice = try #require(graph.context.model(for: graph.invoiceID) as? Invoice)
         #expect(invoice.statusRawValue == InvoiceStatus.paid.rawValue)
         #expect(invoice.paidAt == paidAt)
+        #expect(throws: PersistenceMutationCoordinatorError.sourceChanged) {
+            try coordinator.validate(generation)
+        }
         #expect(throws: InvoiceStatusError.invoiceAlreadyPaid) {
-            try InvoiceStatusUseCase.markPaid(invoiceID: graph.invoiceID, paidAt: paidAt, in: graph.context)
+            try InvoiceStatusUseCase.markPaid(
+                invoiceID: graph.invoiceID,
+                paidAt: paidAt,
+                in: graph.context,
+                coordinator: coordinator
+            )
         }
     }
 }

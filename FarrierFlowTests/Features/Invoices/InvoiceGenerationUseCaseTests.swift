@@ -7,6 +7,23 @@ import Testing
 @MainActor
 struct InvoiceGenerationUseCaseTests {
     @Test
+    func generationInvalidatesTheCapturedReadGeneration() throws {
+        let graph = try makeGenerationGraph()
+        let coordinator = PersistenceMutationCoordinator()
+        let generation = try coordinator.beginRead()
+
+        _ = try InvoiceGenerationUseCase.generate(
+            draft(for: graph.alexID, visitID: graph.mixedVisitID),
+            in: ModelContext(graph.container),
+            coordinator: coordinator
+        )
+
+        #expect(throws: PersistenceMutationCoordinatorError.sourceChanged) {
+            try coordinator.validate(generation)
+        }
+    }
+
+    @Test
     func generatesEveryEligibleClientWorkItemWithExactImmutableSnapshots() throws {
         let graph = try makeGenerationGraph()
         let invoiceID = try InvoiceGenerationUseCase.generate(
@@ -17,7 +34,8 @@ struct InvoiceGenerationUseCaseTests {
                 dueDate: Date(timeIntervalSinceReferenceDate: 514),
                 note: "  Thank you for your business.  "
             ),
-            in: ModelContext(graph.container)
+            in: ModelContext(graph.container),
+            coordinator: PersistenceMutationCoordinator()
         )
         let verificationContext = ModelContext(graph.container)
         let invoice = try #require(
@@ -73,11 +91,13 @@ struct InvoiceGenerationUseCaseTests {
         let graph = try makeGenerationGraph()
         let alexInvoiceID = try InvoiceGenerationUseCase.generate(
             draft(for: graph.alexID, visitID: graph.mixedVisitID),
-            in: ModelContext(graph.container)
+            in: ModelContext(graph.container),
+            coordinator: PersistenceMutationCoordinator()
         )
         let blairInvoiceID = try InvoiceGenerationUseCase.generate(
             draft(for: graph.blairID, visitID: graph.mixedVisitID),
-            in: ModelContext(graph.container)
+            in: ModelContext(graph.container),
+            coordinator: PersistenceMutationCoordinator()
         )
         let context = ModelContext(graph.container)
         let alexInvoice = try #require(context.model(for: alexInvoiceID) as? Invoice)
@@ -99,13 +119,15 @@ struct InvoiceGenerationUseCaseTests {
         let graph = try makeGenerationGraph()
         _ = try InvoiceGenerationUseCase.generate(
             draft(for: graph.alexID, visitID: graph.mixedVisitID),
-            in: ModelContext(graph.container)
+            in: ModelContext(graph.container),
+            coordinator: PersistenceMutationCoordinator()
         )
 
         #expect(throws: InvoiceGenerationError.visitNoLongerEligible) {
             _ = try InvoiceGenerationUseCase.generate(
                 draft(for: graph.alexID, visitID: graph.mixedVisitID),
-                in: ModelContext(graph.container)
+                in: ModelContext(graph.container),
+                coordinator: PersistenceMutationCoordinator()
             )
         }
         let afterRepeat = ModelContext(graph.container)
@@ -118,7 +140,8 @@ struct InvoiceGenerationUseCaseTests {
         #expect(throws: InvoiceGenerationError.invoiceNumberOverflow) {
             _ = try InvoiceGenerationUseCase.generate(
                 draft(for: overflow.alexID, visitID: overflow.mixedVisitID),
-                in: ModelContext(overflow.container)
+                in: ModelContext(overflow.container),
+                coordinator: PersistenceMutationCoordinator()
             )
         }
         let overflowContext = ModelContext(overflow.container)
@@ -145,7 +168,8 @@ struct InvoiceGenerationUseCaseTests {
             let graph = try makeGenerationGraph(in: container.mainContext, container: container)
             _ = try InvoiceGenerationUseCase.generate(
                 draft(for: graph.alexID, visitID: graph.mixedVisitID),
-                in: ModelContext(container)
+                in: ModelContext(container),
+                coordinator: PersistenceMutationCoordinator()
             )
         }
 

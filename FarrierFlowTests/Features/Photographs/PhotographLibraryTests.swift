@@ -59,8 +59,13 @@ struct PhotographLibraryTests {
 
     @Test
     func failedAddSaveRollsBackMetadataAndCanonicalFile() async throws {
-        let fixture = try makeFixture(saving: { _ in throw ForcedFailure.expected })
+        let coordinator = PersistenceMutationCoordinator()
+        let fixture = try makeFixture(
+            mutationCoordinator: coordinator,
+            saving: { _ in throw ForcedFailure.expected }
+        )
         let id = UUID()
+        let generation = try coordinator.beginRead()
 
         await #expect(throws: PhotographLibraryError.persistenceFailed) {
             try await fixture.library.add(
@@ -73,6 +78,9 @@ struct PhotographLibraryTests {
         let context = ModelContext(fixture.graph.container)
         #expect(try context.fetchCount(FetchDescriptor<Photograph>()) == 0)
         #expect(!FileManager.default.fileExists(atPath: fixture.store.canonicalURL(for: id).path))
+        #expect(throws: PersistenceMutationCoordinatorError.sourceChanged) {
+            try coordinator.validate(generation)
+        }
     }
 
     @Test
@@ -386,7 +394,8 @@ struct PhotographLibraryTests {
 
         _ = try VisitSaveUseCase.saveCorrection(
             draft: draft,
-            in: correctionContext
+            in: correctionContext,
+            coordinator: PersistenceMutationCoordinator()
         )
 
         let verification = ModelContext(graph.container)
@@ -399,6 +408,7 @@ struct PhotographLibraryTests {
     }
 
     private func makeFixture(
+        mutationCoordinator: PersistenceMutationCoordinator = PersistenceMutationCoordinator(),
         saving: @escaping @MainActor (ModelContext) throws -> Void = {
             try DomainGraphValidator.save($0)
         }
@@ -416,6 +426,7 @@ struct PhotographLibraryTests {
             library: PhotographTestFixtures.makeLibrary(
                 graph: graph,
                 rootURL: store.rootURL,
+                mutationCoordinator: mutationCoordinator,
                 saving: saving
             )
         )

@@ -29,6 +29,7 @@ struct FarrierFlowApp: App {
                     mutationCoordinator: mutationCoordinator,
                     photographLibrary: PhotographLibrary(
                         container: container,
+                        mutationCoordinator: mutationCoordinator,
                         fileStore: PhotographFileStore(
                             rootURL: storeURL
                                 .deletingPathExtension()
@@ -54,6 +55,7 @@ struct FarrierFlowApp: App {
                 mutationCoordinator: mutationCoordinator,
                 photographLibrary: PhotographLibrary(
                     container: container,
+                    mutationCoordinator: mutationCoordinator,
                     fileStore: PhotographFileStore(
                         applicationSupportURL: applicationSupportURL
                     )

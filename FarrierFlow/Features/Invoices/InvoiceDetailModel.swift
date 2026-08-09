@@ -56,12 +56,17 @@ final class InvoiceDetailModel {
         }
     }
 
-    func markPaid(now: Date = .now, in context: ModelContext) {
+    func markPaid(
+        now: Date = .now,
+        in context: ModelContext,
+        coordinator: PersistenceMutationCoordinator
+    ) {
         do {
             try InvoiceStatusUseCase.markPaid(
                 invoiceID: invoiceID,
                 paidAt: now,
-                in: context
+                in: context,
+                coordinator: coordinator
             )
             load(in: context)
         } catch {
@@ -72,9 +77,16 @@ final class InvoiceDetailModel {
         }
     }
 
-    func delete(in context: ModelContext) {
+    func delete(
+        in context: ModelContext,
+        coordinator: PersistenceMutationCoordinator
+    ) {
         do {
-            try InvoiceDeletionUseCase.deleteUnpaid(invoiceID: invoiceID, in: context)
+            try InvoiceDeletionUseCase.deleteUnpaid(
+                invoiceID: invoiceID,
+                in: context,
+                coordinator: coordinator
+            )
             didDelete = true
             detail = nil
         } catch {

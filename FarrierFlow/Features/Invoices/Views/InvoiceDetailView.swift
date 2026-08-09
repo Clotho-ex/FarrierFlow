@@ -5,6 +5,7 @@ struct InvoiceDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
+    @Environment(PersistenceMutationCoordinator.self) private var mutationCoordinator
     @State private var model: InvoiceDetailModel
     @State private var showsPaidConfirmation = false
     @State private var showsDeleteConfirmation = false
@@ -90,7 +91,7 @@ struct InvoiceDetailView: View {
         }
         .confirmationDialog("Mark Invoice Paid?", isPresented: $showsPaidConfirmation, titleVisibility: .visible) {
             Button("Mark Paid") {
-                model.markPaid(in: context)
+                model.markPaid(in: context, coordinator: mutationCoordinator)
             }
             .accessibilityIdentifier("invoice-mark-paid-confirmation")
         } message: {
@@ -98,7 +99,7 @@ struct InvoiceDetailView: View {
         }
         .confirmationDialog("Delete Invoice?", isPresented: $showsDeleteConfirmation, titleVisibility: .visible) {
             Button("Delete Invoice", role: .destructive) {
-                model.delete(in: context)
+                model.delete(in: context, coordinator: mutationCoordinator)
                 if model.didDelete { dismiss() }
             }
             .accessibilityIdentifier("invoice-delete-confirmation")

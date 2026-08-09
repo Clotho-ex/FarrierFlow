@@ -291,7 +291,8 @@ struct VisitDetailModelTests {
             _ = try VisitStartUseCase.start(
                 appointmentID: appointment.persistentModelID,
                 now: Date(timeIntervalSinceReferenceDate: 100),
-                in: container
+                in: container,
+                coordinator: PersistenceMutationCoordinator()
             )
 
             let detailContext = ModelContext(container)
@@ -385,7 +386,8 @@ struct VisitDetailModelTests {
         let visitID = try VisitStartUseCase.start(
             appointmentID: appointment.persistentModelID,
             now: Date(timeIntervalSinceReferenceDate: 100),
-            in: container
+            in: container,
+            coordinator: PersistenceMutationCoordinator()
         )
         if let completedAt {
             let actionContext = ModelContext(container)
@@ -398,7 +400,8 @@ struct VisitDetailModelTests {
             _ = try VisitSaveUseCase.complete(
                 draft: draft,
                 completedAt: completedAt,
-                in: actionContext
+                in: actionContext,
+                coordinator: PersistenceMutationCoordinator()
             )
         }
         return VisitDetailGraph(container: container, visitID: visitID, barnID: barn.persistentModelID)

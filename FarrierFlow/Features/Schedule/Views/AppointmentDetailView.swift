@@ -104,7 +104,10 @@ struct AppointmentDetailView: View {
                     if appointment.visit == nil {
                         Section {
                             Button("Start Visit") {
-                                model.startVisit(in: context.container)
+                                model.startVisit(
+                                    in: context.container,
+                                    coordinator: mutationCoordinator
+                                )
                             }
                             .buttonStyle(.borderedProminent)
                             .controlSize(.large)

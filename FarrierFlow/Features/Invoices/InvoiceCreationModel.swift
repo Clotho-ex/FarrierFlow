@@ -190,7 +190,10 @@ final class InvoiceCreationModel {
     }
 
     @discardableResult
-    func generate(in context: ModelContext) -> PersistentIdentifier? {
+    func generate(
+        in context: ModelContext,
+        coordinator: PersistenceMutationCoordinator
+    ) -> PersistentIdentifier? {
         guard let draft, canGenerate else {
             return nil
         }
@@ -198,7 +201,11 @@ final class InvoiceCreationModel {
         defer { isGenerating = false }
 
         do {
-            let invoiceID = try InvoiceGenerationUseCase.generate(draft, in: context)
+            let invoiceID = try InvoiceGenerationUseCase.generate(
+                draft,
+                in: context,
+                coordinator: coordinator
+            )
             alert = nil
             return invoiceID
         } catch {

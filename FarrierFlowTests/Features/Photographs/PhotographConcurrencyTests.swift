@@ -7,6 +7,41 @@ import Testing
 @MainActor
 struct PhotographConcurrencyTests {
     @Test
+    func addRetainsMutationScopeAcrossTheStorageSuspensionPoint() async throws {
+        let gate = SuspensionPoint()
+        let mutationCoordinator = PersistenceMutationCoordinator()
+        let generation = try mutationCoordinator.beginRead()
+        let fixture = try makeFixture(
+            mutationCoordinator: mutationCoordinator,
+            hooks: PhotographOperationHooks(
+                afterAddCanonicalMove: {
+                    await gate.suspend()
+                }
+            )
+        )
+
+        let addTask = Task {
+            try await fixture.library.add(
+                sourceData: PhotographTestFixtures.jpeg(),
+                to: fixture.graph.visitHorseID
+            )
+        }
+        await gate.waitUntilSuspended()
+
+        #expect(throws: PersistenceMutationCoordinatorError.writerActive) {
+            _ = try mutationCoordinator.beginRead()
+        }
+
+        gate.resume()
+        let id = try await addTask.value
+        #expect(FileManager.default.fileExists(atPath: fixture.store.canonicalURL(for: id).path))
+        #expect(try fixture.library.items(for: fixture.graph.visitHorseID).map(\.id) == [id])
+        #expect(throws: PersistenceMutationCoordinatorError.sourceChanged) {
+            try mutationCoordinator.validate(generation)
+        }
+    }
+
+    @Test
     func reconciliationWaitsUntilAddMetadataSaveCompletes() async throws {
         let gate = SuspensionPoint()
         let events = EventRecorder()
@@ -260,6 +295,7 @@ struct PhotographConcurrencyTests {
     }
 
     private func makeFixture(
+        mutationCoordinator: PersistenceMutationCoordinator = PersistenceMutationCoordinator(),
         hooks: PhotographOperationHooks = .production
     ) throws -> ConcurrencyFixture {
         let graph = try PhotographTestFixtures.makeVisitGraph()
@@ -275,6 +311,7 @@ struct PhotographConcurrencyTests {
             library: PhotographTestFixtures.makeLibrary(
                 graph: graph,
                 rootURL: store.rootURL,
+                mutationCoordinator: mutationCoordinator,
                 hooks: hooks
             )
         )

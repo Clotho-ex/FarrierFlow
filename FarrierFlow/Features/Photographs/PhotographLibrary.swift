@@ -7,6 +7,7 @@ import UIKit
 @Observable
 final class PhotographLibrary {
     @ObservationIgnored private let container: ModelContainer
+    @ObservationIgnored private let mutationCoordinator: PersistenceMutationCoordinator
     @ObservationIgnored let fileStore: PhotographFileStore
     @ObservationIgnored private let normalizer: PhotographNormalizer
     @ObservationIgnored private let coordinator: PhotographStorageCoordinator
@@ -17,6 +18,7 @@ final class PhotographLibrary {
 
     init(
         container: ModelContainer,
+        mutationCoordinator: PersistenceMutationCoordinator,
         fileStore: PhotographFileStore,
         normalizer: PhotographNormalizer = PhotographNormalizer(),
         coordinator: PhotographStorageCoordinator = PhotographStorageCoordinator(),
@@ -32,6 +34,7 @@ final class PhotographLibrary {
         hooks: PhotographOperationHooks = .production
     ) {
         self.container = container
+        self.mutationCoordinator = mutationCoordinator
         self.fileStore = fileStore
         self.normalizer = normalizer
         self.coordinator = coordinator
@@ -89,25 +92,31 @@ final class PhotographLibrary {
         id: UUID = UUID(),
         createdAt: Date = .now
     ) async throws -> UUID {
-        try await coordinator.withExclusiveOperation { @MainActor [self] in
-            try await addExclusive(
-                sourceData: sourceData,
-                to: visitHorseID,
-                id: id,
-                createdAt: createdAt
-            )
+        try await mutationCoordinator.withMutation {
+            try await coordinator.withExclusiveOperation { @MainActor [self] in
+                try await addExclusive(
+                    sourceData: sourceData,
+                    to: visitHorseID,
+                    id: id,
+                    createdAt: createdAt
+                )
+            }
         }
     }
 
     func delete(id: UUID) async throws {
-        try await coordinator.withExclusiveOperation { @MainActor [self] in
-            try await deleteExclusive(id: id)
+        try await mutationCoordinator.withMutation {
+            try await coordinator.withExclusiveOperation { @MainActor [self] in
+                try await deleteExclusive(id: id)
+            }
         }
     }
 
     func discardInProgressVisit(id visitID: PersistentIdentifier) async throws {
-        try await coordinator.withExclusiveOperation { @MainActor [self] in
-            try await discardExclusive(visitID: visitID)
+        try await mutationCoordinator.withMutation {
+            try await coordinator.withExclusiveOperation { @MainActor [self] in
+                try await discardExclusive(visitID: visitID)
+            }
         }
     }
 

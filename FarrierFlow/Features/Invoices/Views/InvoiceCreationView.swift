@@ -4,6 +4,7 @@ import SwiftUI
 struct InvoiceCreationView: View {
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
+    @Environment(PersistenceMutationCoordinator.self) private var mutationCoordinator
     @State private var model: InvoiceCreationModel
     @FocusState private var isNoteFocused: Bool
 
@@ -166,7 +167,10 @@ struct InvoiceCreationView: View {
     }
 
     private func generate() {
-        guard let invoiceID = model.generate(in: context) else { return }
+        guard let invoiceID = model.generate(
+            in: context,
+            coordinator: mutationCoordinator
+        ) else { return }
         onGenerated(invoiceID)
     }
 

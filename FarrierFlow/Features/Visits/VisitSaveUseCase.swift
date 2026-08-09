@@ -86,11 +86,13 @@ enum VisitSaveUseCase {
 
     static func saveProgress(
         draft: VisitDraft,
-        in context: ModelContext
+        in context: ModelContext,
+        coordinator: PersistenceMutationCoordinator
     ) throws -> VisitDraft {
         try saveProgress(
             draft: draft,
             in: context,
+            coordinator: coordinator,
             saving: { context in
                 try DomainGraphValidator.save(context)
             }
@@ -100,36 +102,41 @@ enum VisitSaveUseCase {
     static func saveProgress(
         draft: VisitDraft,
         in context: ModelContext,
+        coordinator: PersistenceMutationCoordinator,
         saving: (ModelContext) throws -> Void
     ) throws -> VisitDraft {
-        do {
-            let visit = try resolveVisit(for: draft, in: context)
-            try DomainGraphValidator.validateInProgress(visit)
+        try coordinator.withMutation {
+            do {
+                let visit = try resolveVisit(for: draft, in: context)
+                try DomainGraphValidator.validateInProgress(visit)
 
-            if let violation = VisitRules.progressViolation(in: draft) {
-                throw violation
+                if let violation = VisitRules.progressViolation(in: draft) {
+                    throw violation
+                }
+                try apply(draft, to: visit, in: context)
+
+                try saving(context)
+                return try loadDraft(visitID: draft.visitID, in: context)
+            } catch {
+                // The Visit editor owns this context and keeps all user edits in its
+                // draft, so rollback cannot discard unrelated screen mutations.
+                context.rollback()
+                throw error
             }
-            try apply(draft, to: visit, in: context)
-
-            try saving(context)
-            return try loadDraft(visitID: draft.visitID, in: context)
-        } catch {
-            // The Visit editor owns this context and keeps all user edits in its
-            // draft, so rollback cannot discard unrelated screen mutations.
-            context.rollback()
-            throw error
         }
     }
 
     static func complete(
         draft: VisitDraft,
         completedAt: Date,
-        in context: ModelContext
+        in context: ModelContext,
+        coordinator: PersistenceMutationCoordinator
     ) throws -> VisitDraft {
         try complete(
             draft: draft,
             completedAt: completedAt,
             in: context,
+            coordinator: coordinator,
             saving: { context in
                 try DomainGraphValidator.save(context)
             }
@@ -140,37 +147,42 @@ enum VisitSaveUseCase {
         draft: VisitDraft,
         completedAt: Date,
         in context: ModelContext,
+        coordinator: PersistenceMutationCoordinator,
         saving: (ModelContext) throws -> Void
     ) throws -> VisitDraft {
-        do {
-            let visit = try resolveVisit(for: draft, in: context)
-            try DomainGraphValidator.validateInProgress(visit)
-            if let violation = VisitRules.completionViolation(in: draft) {
-                throw violation
-            }
-            guard completedAt >= visit.startedAt else {
-                throw VisitSaveError.completionPredatesStart
-            }
+        try coordinator.withMutation {
+            do {
+                let visit = try resolveVisit(for: draft, in: context)
+                try DomainGraphValidator.validateInProgress(visit)
+                if let violation = VisitRules.completionViolation(in: draft) {
+                    throw violation
+                }
+                guard completedAt >= visit.startedAt else {
+                    throw VisitSaveError.completionPredatesStart
+                }
 
-            try apply(draft, to: visit, in: context)
-            visit.completedAt = completedAt
-            try saving(context)
-            return try loadDraft(visitID: draft.visitID, in: context)
-        } catch {
-            // A Visit editor owns its action context, so this removes every
-            // failed completion mutation without touching another screen.
-            context.rollback()
-            throw error
+                try apply(draft, to: visit, in: context)
+                visit.completedAt = completedAt
+                try saving(context)
+                return try loadDraft(visitID: draft.visitID, in: context)
+            } catch {
+                // A Visit editor owns its action context, so this removes every
+                // failed completion mutation without touching another screen.
+                context.rollback()
+                throw error
+            }
         }
     }
 
     static func saveCorrection(
         draft: VisitDraft,
-        in context: ModelContext
+        in context: ModelContext,
+        coordinator: PersistenceMutationCoordinator
     ) throws -> VisitDraft {
         try saveCorrection(
             draft: draft,
             in: context,
+            coordinator: coordinator,
             saving: { context in
                 try DomainGraphValidator.save(context)
             }
@@ -180,32 +192,35 @@ enum VisitSaveUseCase {
     static func saveCorrection(
         draft: VisitDraft,
         in context: ModelContext,
+        coordinator: PersistenceMutationCoordinator,
         saving: (ModelContext) throws -> Void
     ) throws -> VisitDraft {
-        do {
-            let visit = try resolveVisit(for: draft, in: context)
-            guard visit.completedAt != nil else {
-                throw VisitSaveError.correctionRequiresCompletedVisit
-            }
-            guard !InvoiceDomainRules.isCorrectionLocked(visit) else {
-                throw VisitSaveError.invoicedVisitCannotBeCorrected
-            }
-            if let violation = VisitRules.correctionViolation(in: draft) {
-                throw violation
-            }
+        try coordinator.withMutation {
+            do {
+                let visit = try resolveVisit(for: draft, in: context)
+                guard visit.completedAt != nil else {
+                    throw VisitSaveError.correctionRequiresCompletedVisit
+                }
+                guard !InvoiceDomainRules.isCorrectionLocked(visit) else {
+                    throw VisitSaveError.invoicedVisitCannotBeCorrected
+                }
+                if let violation = VisitRules.correctionViolation(in: draft) {
+                    throw violation
+                }
 
-            let immutableState = VisitImmutableState(visit: visit)
-            try apply(draft, to: visit, in: context)
-            guard immutableState.matches(visit) else {
-                throw DomainGraphViolation.visitMembershipMismatch
+                let immutableState = VisitImmutableState(visit: visit)
+                try apply(draft, to: visit, in: context)
+                guard immutableState.matches(visit) else {
+                    throw DomainGraphViolation.visitMembershipMismatch
+                }
+                try saving(context)
+                return try loadDraft(visitID: draft.visitID, in: context)
+            } catch {
+                // Correction uses the same isolated Visit context as progress and
+                // completion, which makes rollback safe and preserves the draft.
+                context.rollback()
+                throw error
             }
-            try saving(context)
-            return try loadDraft(visitID: draft.visitID, in: context)
-        } catch {
-            // Correction uses the same isolated Visit context as progress and
-            // completion, which makes rollback safe and preserves the draft.
-            context.rollback()
-            throw error
         }
     }
 

@@ -38,11 +38,24 @@ final class VisitEditorModel {
     @ObservationIgnored
     private let loading: (PersistentIdentifier, ModelContext) throws -> VisitDraft
     @ObservationIgnored
-    private let saving: (VisitDraft, ModelContext) throws -> VisitDraft
+    private let saving: (
+        VisitDraft,
+        ModelContext,
+        PersistenceMutationCoordinator
+    ) throws -> VisitDraft
     @ObservationIgnored
-    private let completing: (VisitDraft, Date, ModelContext) throws -> VisitDraft
+    private let completing: (
+        VisitDraft,
+        Date,
+        ModelContext,
+        PersistenceMutationCoordinator
+    ) throws -> VisitDraft
     @ObservationIgnored
-    private let correcting: (VisitDraft, ModelContext) throws -> VisitDraft
+    private let correcting: (
+        VisitDraft,
+        ModelContext,
+        PersistenceMutationCoordinator
+    ) throws -> VisitDraft
 
     private(set) var loadState: VisitEditorLoadState = .loading
     private(set) var lastSavedDraft: VisitDraft?
@@ -85,14 +98,32 @@ final class VisitEditorModel {
         loading: @escaping (PersistentIdentifier, ModelContext) throws -> VisitDraft = {
             try VisitEditorModel.loadDraft(visitID: $0, in: $1)
         },
-        saving: @escaping (VisitDraft, ModelContext) throws -> VisitDraft = {
-            try VisitSaveUseCase.saveProgress(draft: $0, in: $1)
+        saving: @escaping (
+            VisitDraft,
+            ModelContext,
+            PersistenceMutationCoordinator
+        ) throws -> VisitDraft = {
+            try VisitSaveUseCase.saveProgress(draft: $0, in: $1, coordinator: $2)
         },
-        completing: @escaping (VisitDraft, Date, ModelContext) throws -> VisitDraft = {
-            try VisitSaveUseCase.complete(draft: $0, completedAt: $1, in: $2)
+        completing: @escaping (
+            VisitDraft,
+            Date,
+            ModelContext,
+            PersistenceMutationCoordinator
+        ) throws -> VisitDraft = {
+            try VisitSaveUseCase.complete(
+                draft: $0,
+                completedAt: $1,
+                in: $2,
+                coordinator: $3
+            )
         },
-        correcting: @escaping (VisitDraft, ModelContext) throws -> VisitDraft = {
-            try VisitSaveUseCase.saveCorrection(draft: $0, in: $1)
+        correcting: @escaping (
+            VisitDraft,
+            ModelContext,
+            PersistenceMutationCoordinator
+        ) throws -> VisitDraft = {
+            try VisitSaveUseCase.saveCorrection(draft: $0, in: $1, coordinator: $2)
         }
     ) {
         self.visitID = visitID
@@ -355,21 +386,31 @@ final class VisitEditorModel {
     }
 
     @discardableResult
-    func saveProgress() -> Bool {
+    func saveProgress(coordinator: PersistenceMutationCoordinator) -> Bool {
         guard let draft, canSaveProgress else {
             return false
         }
 
-        return saveProgress(draft: draft, surfacesFailureImmediately: true)
+        return saveProgress(
+            draft: draft,
+            coordinator: coordinator,
+            surfacesFailureImmediately: true
+        )
     }
 
     @discardableResult
-    func saveProgressForBackground() -> Bool {
+    func saveProgressForBackground(
+        coordinator: PersistenceMutationCoordinator
+    ) -> Bool {
         guard let draft, canSaveProgress else {
             return false
         }
 
-        return saveProgress(draft: draft, surfacesFailureImmediately: false)
+        return saveProgress(
+            draft: draft,
+            coordinator: coordinator,
+            surfacesFailureImmediately: false
+        )
     }
 
     func surfacePendingBackgroundSaveErrorIfNeeded() {
@@ -379,13 +420,16 @@ final class VisitEditorModel {
     }
 
     @discardableResult
-    func completeVisit(at completedAt: Date = .now) -> Bool {
+    func completeVisit(
+        at completedAt: Date = .now,
+        coordinator: PersistenceMutationCoordinator
+    ) -> Bool {
         guard let draft, canComplete else {
             return false
         }
 
         do {
-            let savedDraft = try completing(draft, completedAt, context)
+            let savedDraft = try completing(draft, completedAt, context, coordinator)
             self.draft = savedDraft
             lastSavedDraft = savedDraft
             alert = nil
@@ -401,13 +445,13 @@ final class VisitEditorModel {
     }
 
     @discardableResult
-    func saveCorrection() -> Bool {
+    func saveCorrection(coordinator: PersistenceMutationCoordinator) -> Bool {
         guard let draft, canSaveCorrection else {
             return false
         }
 
         do {
-            let savedDraft = try correcting(draft, context)
+            let savedDraft = try correcting(draft, context, coordinator)
             self.draft = savedDraft
             lastSavedDraft = savedDraft
             alert = nil
@@ -451,10 +495,11 @@ final class VisitEditorModel {
     @discardableResult
     private func saveProgress(
         draft: VisitDraft,
+        coordinator: PersistenceMutationCoordinator,
         surfacesFailureImmediately: Bool
     ) -> Bool {
         do {
-            let savedDraft = try saving(draft, context)
+            let savedDraft = try saving(draft, context, coordinator)
             self.draft = savedDraft
             lastSavedDraft = savedDraft
             backgroundSaveErrorPending = false
