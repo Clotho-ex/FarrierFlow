@@ -304,6 +304,11 @@ enum ExportSnapshotBuilder {
                 )
             )
         }
+        let invoiceDocumentGraph = try await InvoiceDocumentGraph.make(
+            invoiceVisits: ordered.invoiceVisits,
+            invoiceLineItems: ordered.invoiceLineItems,
+            batchSize: batchSize
+        )
         let invoiceProjection = try await projectInvoices(
             ordered.invoices,
             ids: ids.invoices,
@@ -312,6 +317,7 @@ enum ExportSnapshotBuilder {
             batchSize: batchSize,
             localeIdentifier: exportContext.localeIdentifier,
             clientIDs: ids.clients,
+            documentGraph: invoiceDocumentGraph,
             progress: progress
         )
         let invoiceVisits = try await project(
@@ -437,6 +443,8 @@ enum ExportSnapshotBuilder {
 
     private static func invoicePDFContent(
         from invoice: Invoice,
+        invoiceVisits: [InvoiceVisit],
+        lineItemsByInvoiceVisit: [PersistentIdentifier: [InvoiceLineItem]],
         localeIdentifier: String,
         batchSize: Int
     ) async throws -> InvoicePDFContent {
@@ -457,7 +465,7 @@ enum ExportSnapshotBuilder {
         }
         let locale = Locale(identifier: localeIdentifier)
         let orderedVisits = try await SnapshotCooperation.sorted(
-            invoice.invoiceVisits,
+            invoiceVisits,
             batchSize: batchSize,
             by: { left, right in
                 InvoiceDomainRules.orderedVisits([left, right], locale: locale).first === left
@@ -467,7 +475,7 @@ enum ExportSnapshotBuilder {
         visits.reserveCapacity(orderedVisits.count)
         try await SnapshotCooperation.forEach(orderedVisits, batchSize: batchSize) { visit in
             let orderedLineItems = try await SnapshotCooperation.sorted(
-                visit.lineItems,
+                lineItemsByInvoiceVisit[visit.persistentModelID, default: []],
                 batchSize: batchSize,
                 by: { left, right in
                     InvoiceDomainRules.orderedLineItems([left, right], locale: locale).first === left
@@ -493,6 +501,8 @@ enum ExportSnapshotBuilder {
         let total: Int64
         do {
             total = try await checkedInvoiceTotal(visits, batchSize: batchSize)
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             throw ExportSnapshotError.invalidInvoiceTotal
         }
@@ -536,6 +546,7 @@ enum ExportSnapshotBuilder {
         batchSize: Int,
         localeIdentifier: String,
         clientIDs: [PersistentIdentifier: ExportRecordID],
+        documentGraph: InvoiceDocumentGraph,
         progress: @escaping @MainActor (ExportSnapshotProgress) -> Void
     ) async throws -> [(InvoiceExportRecord, ExportInvoiceDocument)] {
         var output = [(InvoiceExportRecord, ExportInvoiceDocument)]()
@@ -576,6 +587,11 @@ enum ExportSnapshotBuilder {
                 )
                 let content = try await invoicePDFContent(
                     from: model,
+                    invoiceVisits: documentGraph.visitsByInvoice[
+                        model.persistentModelID,
+                        default: []
+                    ],
+                    lineItemsByInvoiceVisit: documentGraph.lineItemsByInvoiceVisit,
                     localeIdentifier: localeIdentifier,
                     batchSize: batchSize
                 )
@@ -660,6 +676,39 @@ enum ExportSnapshotBuilder {
             )
         }
         return id
+    }
+}
+
+@MainActor
+private struct InvoiceDocumentGraph {
+    let visitsByInvoice: [PersistentIdentifier: [InvoiceVisit]]
+    let lineItemsByInvoiceVisit: [PersistentIdentifier: [InvoiceLineItem]]
+
+    static func make(
+        invoiceVisits: [InvoiceVisit],
+        invoiceLineItems: [InvoiceLineItem],
+        batchSize: Int
+    ) async throws -> InvoiceDocumentGraph {
+        var visitsByInvoice = [PersistentIdentifier: [InvoiceVisit]]()
+        try await SnapshotCooperation.forEach(invoiceVisits, batchSize: batchSize) { visit in
+            guard let invoice = visit.invoice else {
+                throw ExportSnapshotError.invalidGraph(.invoiceVisitMissingInvoice)
+            }
+            visitsByInvoice[invoice.persistentModelID, default: []].append(visit)
+        }
+
+        var lineItemsByInvoiceVisit = [PersistentIdentifier: [InvoiceLineItem]]()
+        try await SnapshotCooperation.forEach(invoiceLineItems, batchSize: batchSize) { lineItem in
+            guard let invoiceVisit = lineItem.invoiceVisit else {
+                throw ExportSnapshotError.invalidGraph(.invoiceLineItemMissingInvoiceVisit)
+            }
+            lineItemsByInvoiceVisit[invoiceVisit.persistentModelID, default: []].append(lineItem)
+        }
+
+        return InvoiceDocumentGraph(
+            visitsByInvoice: visitsByInvoice,
+            lineItemsByInvoiceVisit: lineItemsByInvoiceVisit
+        )
     }
 }
 
@@ -1364,6 +1413,7 @@ private enum CooperativeDomainGraphValidator {
         }
 
         var visitsByInvoice = [PersistentIdentifier: [InvoiceVisit]]()
+        var invoiceVisitsBySourceVisit = [PersistentIdentifier: [InvoiceVisit]]()
         try await SnapshotCooperation.forEach(source.invoiceVisits, batchSize: batchSize) { invoiceVisit in
             try await validate(
                 invoiceVisit,
@@ -1374,11 +1424,16 @@ private enum CooperativeDomainGraphValidator {
                 throw DomainGraphViolation.invoiceVisitMissingInvoice
             }
             visitsByInvoice[invoice.persistentModelID, default: []].append(invoiceVisit)
+            guard let sourceVisit = invoiceVisit.sourceVisit else {
+                throw DomainGraphViolation.invoiceVisitMissingSourceVisit
+            }
+            invoiceVisitsBySourceVisit[sourceVisit.persistentModelID, default: []].append(invoiceVisit)
         }
         try await SnapshotCooperation.forEach(source.invoices, batchSize: batchSize) { invoice in
             try await validate(
                 invoice,
                 visits: visitsByInvoice[invoice.persistentModelID, default: []],
+                lineItemsByInvoiceVisit: lineItemsByInvoiceVisit,
                 batchSize: batchSize
             )
         }
@@ -1421,6 +1476,7 @@ private enum CooperativeDomainGraphValidator {
             try await validate(
                 visit,
                 memberships: visitMemberships[visit.persistentModelID, default: []],
+                invoiceVisits: invoiceVisitsBySourceVisit[visit.persistentModelID, default: []],
                 appointmentMemberships: appointmentMemberships,
                 batchSize: batchSize
             )
@@ -1515,15 +1571,12 @@ private enum CooperativeDomainGraphValidator {
         }
     }
 
-    private static func validate(_ lineItem: InvoiceLineItem, batchSize: Int) async throws {
+    private static func validate(_ lineItem: InvoiceLineItem, batchSize _: Int) async throws {
         guard let invoiceVisit = lineItem.invoiceVisit else {
             throw DomainGraphViolation.invoiceLineItemMissingInvoiceVisit
         }
         guard let sourceWorkItem = lineItem.sourceWorkItem else {
             throw DomainGraphViolation.invoiceLineItemMissingSourceWorkItem
-        }
-        guard try await containsIdentical(lineItem, in: invoiceVisit.lineItems, batchSize: batchSize) else {
-            throw DomainGraphViolation.invoiceLineItemVisitInverseMismatch
         }
         guard sourceWorkItem.invoiceLineItem === lineItem else {
             throw DomainGraphViolation.invoiceLineItemWorkItemInverseMismatch
@@ -1554,17 +1607,11 @@ private enum CooperativeDomainGraphValidator {
         lineItems: [InvoiceLineItem],
         batchSize: Int
     ) async throws {
-        guard let invoice = invoiceVisit.invoice else {
+        guard invoiceVisit.invoice != nil else {
             throw DomainGraphViolation.invoiceVisitMissingInvoice
         }
-        guard let sourceVisit = invoiceVisit.sourceVisit else {
+        guard invoiceVisit.sourceVisit != nil else {
             throw DomainGraphViolation.invoiceVisitMissingSourceVisit
-        }
-        guard try await containsIdentical(invoiceVisit, in: invoice.invoiceVisits, batchSize: batchSize) else {
-            throw DomainGraphViolation.invoiceVisitInvoiceInverseMismatch
-        }
-        guard try await containsIdentical(invoiceVisit, in: sourceVisit.invoiceVisits, batchSize: batchSize) else {
-            throw DomainGraphViolation.invoiceVisitSourceInverseMismatch
         }
         guard TextNormalization.required(invoiceVisit.serviceLocationNameSnapshot)
                 == invoiceVisit.serviceLocationNameSnapshot,
@@ -1574,15 +1621,7 @@ private enum CooperativeDomainGraphValidator {
         guard !lineItems.isEmpty else {
             throw DomainGraphViolation.invoiceVisitHasNoLineItem
         }
-        guard lineItems.count == invoiceVisit.lineItems.count else {
-            throw DomainGraphViolation.invoiceLineItemVisitInverseMismatch
-        }
         try await SnapshotCooperation.forEach(lineItems, batchSize: batchSize) {
-            guard $0.invoiceVisit === invoiceVisit else {
-                throw DomainGraphViolation.invoiceLineItemVisitInverseMismatch
-            }
-        }
-        try await SnapshotCooperation.forEach(invoiceVisit.lineItems, batchSize: batchSize) {
             guard $0.invoiceVisit === invoiceVisit else {
                 throw DomainGraphViolation.invoiceLineItemVisitInverseMismatch
             }
@@ -1592,13 +1631,11 @@ private enum CooperativeDomainGraphValidator {
     private static func validate(
         _ invoice: Invoice,
         visits: [InvoiceVisit],
+        lineItemsByInvoiceVisit: [PersistentIdentifier: [InvoiceLineItem]],
         batchSize: Int
     ) async throws {
-        guard let client = invoice.client else {
+        guard invoice.client != nil else {
             throw DomainGraphViolation.invoiceMissingClient
-        }
-        guard try await containsIdentical(invoice, in: client.invoices, batchSize: batchSize) else {
-            throw DomainGraphViolation.invoiceClientInverseMismatch
         }
         guard TextNormalization.required(invoice.clientNameSnapshot) == invoice.clientNameSnapshot,
               TextNormalization.required(invoice.businessNameSnapshot) == invoice.businessNameSnapshot,
@@ -1619,9 +1656,6 @@ private enum CooperativeDomainGraphValidator {
             throw DomainGraphViolation.invoiceStatusInvalid
         }
         guard !visits.isEmpty else { throw DomainGraphViolation.invoiceHasNoVisit }
-        guard visits.count == invoice.invoiceVisits.count else {
-            throw DomainGraphViolation.invoiceVisitInvoiceInverseMismatch
-        }
         var sourceVisitIDs = Set<PersistentIdentifier>()
         var total: Int64 = 0
         try await SnapshotCooperation.forEach(visits, batchSize: batchSize) { visit in
@@ -1634,17 +1668,15 @@ private enum CooperativeDomainGraphValidator {
             guard sourceVisitIDs.insert(sourceVisit.persistentModelID).inserted else {
                 throw DomainGraphViolation.duplicateInvoiceVisitSource
             }
-            try await SnapshotCooperation.forEach(visit.lineItems, batchSize: batchSize) { lineItem in
+            try await SnapshotCooperation.forEach(
+                lineItemsByInvoiceVisit[visit.persistentModelID, default: []],
+                batchSize: batchSize
+            ) { lineItem in
                 do {
                     total = try CheckedMoneyTotal.sum([total, lineItem.amountMinorUnits])
                 } catch {
                     throw DomainGraphViolation.invoiceTotalOverflow
                 }
-            }
-        }
-        try await SnapshotCooperation.forEach(invoice.invoiceVisits, batchSize: batchSize) {
-            guard $0.invoice === invoice else {
-                throw DomainGraphViolation.invoiceVisitInvoiceInverseMismatch
             }
         }
     }
@@ -1668,6 +1700,7 @@ private enum CooperativeDomainGraphValidator {
     private static func validate(
         _ visit: Visit,
         memberships: [VisitHorse],
+        invoiceVisits: [InvoiceVisit],
         appointmentMemberships: [PersistentIdentifier: [AppointmentHorse]],
         batchSize: Int
     ) async throws {
@@ -1680,7 +1713,7 @@ private enum CooperativeDomainGraphValidator {
             throw DomainGraphViolation.visitLocationNameMissing
         }
         guard !memberships.isEmpty else { throw DomainGraphViolation.visitHasNoHorse }
-        try await SnapshotCooperation.forEach(visit.invoiceVisits, batchSize: batchSize) {
+        try await SnapshotCooperation.forEach(invoiceVisits, batchSize: batchSize) {
             guard $0.sourceVisit === visit else {
                 throw DomainGraphViolation.invoiceVisitSourceInverseMismatch
             }

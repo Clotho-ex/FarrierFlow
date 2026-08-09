@@ -433,17 +433,21 @@ struct ExportSnapshotBuilderTests {
     }
 
     @Test
-    func acceptsCancellationWhileBuildingALargeNestedInvoiceBeforeInvoiceProgress() async throws {
+    func acceptsCancellationAfterBoundedNestedInvoiceConstructionBegins() async throws {
         let graph = try ExportTestFixtures.makeCompleteGraph()
         let additionalLineItemCount = 64
         try ExportTestFixtures.appendInvoiceLineItems(
             count: additionalLineItemCount,
             to: graph
         )
+        let sourceLineItems = try invoiceLineItemValues(in: graph.context)
         let originalRecordsBeforeInvoices = 27
         let addedRecordsBeforeInvoices = additionalLineItemCount * 2
         let recordsBeforeInvoices = originalRecordsBeforeInvoices + addedRecordsBeforeInvoices
         let totalRecords = 33 + additionalLineItemCount * 3
+        // With 65 nested items at batch size 64, these turns pass the outer
+        // invoice checkpoint and enter nested visit/line-item document work.
+        let cancellationTurnCount = 20
         var progress = [ExportSnapshotProgress]()
         let holder = ExportSnapshotTaskHolder()
 
@@ -451,12 +455,14 @@ struct ExportSnapshotBuilderTests {
             try await ExportSnapshotBuilder.build(
                 in: graph.context,
                 exportContext: graph.exportContext,
-                batchSize: 1,
+                batchSize: 64,
                 progress: { update in
                     progress.append(update)
                     if update.completedRecords == recordsBeforeInvoices {
                         holder.canceller = Task { @MainActor in
-                            await Task.yield()
+                            for _ in 0..<cancellationTurnCount {
+                                await Task.yield()
+                            }
                             holder.task?.cancel()
                         }
                     }
@@ -473,6 +479,7 @@ struct ExportSnapshotBuilderTests {
             completedRecords: recordsBeforeInvoices,
             totalRecords: totalRecords
         ))
+        #expect(try invoiceLineItemValues(in: graph.context) == sourceLineItems)
     }
 
     @Test
@@ -539,6 +546,12 @@ struct ExportSnapshotBuilderTests {
         try context.fetch(FetchDescriptor<Model>()).map {
             String(describing: $0.persistentModelID)
         }
+    }
+
+    private func invoiceLineItemValues(in context: ModelContext) throws -> [String] {
+        try context.fetch(FetchDescriptor<InvoiceLineItem>()).map {
+            "\($0.horseNameSnapshot)|\($0.serviceNameSnapshot)|\($0.amountMinorUnits)"
+        }.sorted()
     }
 }
 
