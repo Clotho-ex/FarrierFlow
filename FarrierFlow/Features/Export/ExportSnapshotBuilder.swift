@@ -17,6 +17,9 @@ enum ExportSnapshotBuilder {
         guard batchSize > 0 else {
             throw ExportSnapshotError.invalidBatchSize(batchSize)
         }
+        guard batchSize <= 200 else {
+            throw ExportSnapshotError.batchSizeExceedsMaximum(batchSize)
+        }
 
         try Task.checkCancellation()
         let danglingRelationships = try await DanglingRelationshipHints.capture(
@@ -731,30 +734,45 @@ private struct SourceGraph {
 
     static func fetch(in context: ModelContext, batchSize: Int) async throws -> SourceGraph {
         SourceGraph(
-            businessProfiles: try await fetch(BusinessProfile.self, in: context),
-            clients: try await fetch(Client.self, in: context),
-            serviceLocations: try await fetch(Barn.self, in: context),
-            horses: try await fetch(Horse.self, in: context),
-            appointments: try await fetch(Appointment.self, in: context),
-            appointmentHorses: try await fetch(AppointmentHorse.self, in: context),
-            visits: try await fetch(Visit.self, in: context),
-            visitHorses: try await fetch(VisitHorse.self, in: context),
-            photographs: try await fetch(Photograph.self, in: context),
-            services: try await fetch(Service.self, in: context),
-            workItems: try await fetch(WorkItem.self, in: context),
-            invoices: try await fetch(Invoice.self, in: context),
-            invoiceVisits: try await fetch(InvoiceVisit.self, in: context),
-            invoiceLineItems: try await fetch(InvoiceLineItem.self, in: context)
+            businessProfiles: try await fetch(BusinessProfile.self, in: context, batchSize: batchSize),
+            clients: try await fetch(Client.self, in: context, batchSize: batchSize),
+            serviceLocations: try await fetch(Barn.self, in: context, batchSize: batchSize),
+            horses: try await fetch(Horse.self, in: context, batchSize: batchSize),
+            appointments: try await fetch(Appointment.self, in: context, batchSize: batchSize),
+            appointmentHorses: try await fetch(AppointmentHorse.self, in: context, batchSize: batchSize),
+            visits: try await fetch(Visit.self, in: context, batchSize: batchSize),
+            visitHorses: try await fetch(VisitHorse.self, in: context, batchSize: batchSize),
+            photographs: try await fetch(Photograph.self, in: context, batchSize: batchSize),
+            services: try await fetch(Service.self, in: context, batchSize: batchSize),
+            workItems: try await fetch(WorkItem.self, in: context, batchSize: batchSize),
+            invoices: try await fetch(Invoice.self, in: context, batchSize: batchSize),
+            invoiceVisits: try await fetch(InvoiceVisit.self, in: context, batchSize: batchSize),
+            invoiceLineItems: try await fetch(InvoiceLineItem.self, in: context, batchSize: batchSize)
         )
     }
 
     private static func fetch<Model: PersistentModel>(
         _ type: Model.Type,
-        in context: ModelContext
+        in context: ModelContext,
+        batchSize: Int
     ) async throws -> [Model] {
         try await SnapshotCooperation.checkpoint()
-        let models = try context.fetch(FetchDescriptor<Model>())
+        let count = try context.fetchCount(FetchDescriptor<Model>())
         try await SnapshotCooperation.checkpoint()
+        var models = [Model]()
+        models.reserveCapacity(count)
+        var offset = 0
+        while offset < count {
+            var descriptor = FetchDescriptor<Model>()
+            descriptor.fetchLimit = min(batchSize, count - offset)
+            descriptor.fetchOffset = offset
+            try await SnapshotCooperation.checkpoint()
+            let page = try context.fetch(descriptor)
+            models.append(contentsOf: page)
+            try await SnapshotCooperation.checkpoint()
+            offset += page.count
+            guard !page.isEmpty else { break }
+        }
         return models
     }
 }
@@ -1012,59 +1030,207 @@ private struct DanglingRelationshipHints {
         in context: ModelContext,
         batchSize: Int
     ) async throws -> DanglingRelationshipHints {
-        let deletedModels = context.deletedModelsArray
         try await SnapshotCooperation.checkpoint()
+        let deletedModels = context.deletedModelsArray
         var result = DanglingRelationshipHints()
-        var deletedSinceCheckpoint = 0
-        for deletedModel in deletedModels {
+        try await SnapshotCooperation.forEach(deletedModels, batchSize: batchSize) { deletedModel in
             switch deletedModel {
             case let client as Client:
-                try await result.register(client.horses, entity: .horse, relationship: "client", batchSize: batchSize)
-                try await result.register(client.invoices, entity: .invoice, relationship: "client", batchSize: batchSize)
+                let targetID = client.persistentModelID
+                try await result.register(
+                    FetchDescriptor<Horse>(predicate: #Predicate {
+                        $0.client?.persistentModelID == targetID
+                    }),
+                    in: context,
+                    entity: .horse,
+                    relationship: "client",
+                    batchSize: batchSize
+                )
+                try await result.register(
+                    FetchDescriptor<Invoice>(predicate: #Predicate {
+                        $0.client?.persistentModelID == targetID
+                    }),
+                    in: context,
+                    entity: .invoice,
+                    relationship: "client",
+                    batchSize: batchSize
+                )
             case let barn as Barn:
-                try await result.register(barn.horses, entity: .horse, relationship: "currentBarn", batchSize: batchSize)
-                try await result.register(barn.appointments, entity: .appointment, relationship: "barn", batchSize: batchSize)
-                try await result.register(barn.visits, entity: .visit, relationship: "barn", batchSize: batchSize)
+                let targetID = barn.persistentModelID
+                try await result.register(
+                    FetchDescriptor<Horse>(predicate: #Predicate {
+                        $0.currentBarn?.persistentModelID == targetID
+                    }),
+                    in: context,
+                    entity: .horse,
+                    relationship: "currentBarn",
+                    batchSize: batchSize
+                )
+                try await result.register(
+                    FetchDescriptor<Appointment>(predicate: #Predicate {
+                        $0.barn?.persistentModelID == targetID
+                    }),
+                    in: context,
+                    entity: .appointment,
+                    relationship: "barn",
+                    batchSize: batchSize
+                )
+                try await result.register(
+                    FetchDescriptor<Visit>(predicate: #Predicate {
+                        $0.barn?.persistentModelID == targetID
+                    }),
+                    in: context,
+                    entity: .visit,
+                    relationship: "barn",
+                    batchSize: batchSize
+                )
             case let service as Service:
-                try await result.register(service.horsesUsingAsDefault, entity: .horse, relationship: "defaultService", batchSize: batchSize)
-                try await result.register(service.workItems, entity: .workItem, relationship: "service", batchSize: batchSize)
+                let targetID = service.persistentModelID
+                try await result.register(
+                    FetchDescriptor<Horse>(predicate: #Predicate {
+                        $0.defaultService?.persistentModelID == targetID
+                    }),
+                    in: context,
+                    entity: .horse,
+                    relationship: "defaultService",
+                    batchSize: batchSize
+                )
+                try await result.register(
+                    FetchDescriptor<WorkItem>(predicate: #Predicate {
+                        $0.service?.persistentModelID == targetID
+                    }),
+                    in: context,
+                    entity: .workItem,
+                    relationship: "service",
+                    batchSize: batchSize
+                )
             case let appointment as Appointment:
-                try await result.register(appointment.appointmentHorses, entity: .appointmentHorse, relationship: "appointment", batchSize: batchSize)
-                if let visit = appointment.visit {
-                    result.register(visit, entity: .visit, relationship: "appointment")
-                }
+                let targetID = appointment.persistentModelID
+                try await result.register(
+                    FetchDescriptor<AppointmentHorse>(predicate: #Predicate {
+                        $0.appointment?.persistentModelID == targetID
+                    }),
+                    in: context,
+                    entity: .appointmentHorse,
+                    relationship: "appointment",
+                    batchSize: batchSize
+                )
+                try await result.register(
+                    FetchDescriptor<Visit>(predicate: #Predicate {
+                        $0.appointment?.persistentModelID == targetID
+                    }),
+                    in: context,
+                    entity: .visit,
+                    relationship: "appointment",
+                    batchSize: batchSize
+                )
             case let horse as Horse:
-                try await result.register(horse.appointmentHorses, entity: .appointmentHorse, relationship: "horse", batchSize: batchSize)
-                try await result.register(horse.visitHorses, entity: .visitHorse, relationship: "horse", batchSize: batchSize)
+                let targetID = horse.persistentModelID
+                try await result.register(
+                    FetchDescriptor<AppointmentHorse>(predicate: #Predicate {
+                        $0.horse?.persistentModelID == targetID
+                    }),
+                    in: context,
+                    entity: .appointmentHorse,
+                    relationship: "horse",
+                    batchSize: batchSize
+                )
+                try await result.register(
+                    FetchDescriptor<VisitHorse>(predicate: #Predicate {
+                        $0.horse?.persistentModelID == targetID
+                    }),
+                    in: context,
+                    entity: .visitHorse,
+                    relationship: "horse",
+                    batchSize: batchSize
+                )
             case let visit as Visit:
-                try await result.register(visit.visitHorses, entity: .visitHorse, relationship: "visit", batchSize: batchSize)
-                try await result.register(visit.invoiceVisits, entity: .invoiceVisit, relationship: "sourceVisit", batchSize: batchSize)
+                let targetID = visit.persistentModelID
+                try await result.register(
+                    FetchDescriptor<VisitHorse>(predicate: #Predicate {
+                        $0.visit?.persistentModelID == targetID
+                    }),
+                    in: context,
+                    entity: .visitHorse,
+                    relationship: "visit",
+                    batchSize: batchSize
+                )
+                try await result.register(
+                    FetchDescriptor<InvoiceVisit>(predicate: #Predicate {
+                        $0.sourceVisit?.persistentModelID == targetID
+                    }),
+                    in: context,
+                    entity: .invoiceVisit,
+                    relationship: "sourceVisit",
+                    batchSize: batchSize
+                )
             case let visitHorse as VisitHorse:
-                try await result.register(visitHorse.photographs, entity: .photograph, relationship: "visitHorse", batchSize: batchSize)
-                try await result.register(visitHorse.workItems, entity: .workItem, relationship: "visitHorse", batchSize: batchSize)
+                let targetID = visitHorse.persistentModelID
+                try await result.register(
+                    FetchDescriptor<Photograph>(predicate: #Predicate {
+                        $0.visitHorse?.persistentModelID == targetID
+                    }),
+                    in: context,
+                    entity: .photograph,
+                    relationship: "visitHorse",
+                    batchSize: batchSize
+                )
+                try await result.register(
+                    FetchDescriptor<WorkItem>(predicate: #Predicate {
+                        $0.visitHorse?.persistentModelID == targetID
+                    }),
+                    in: context,
+                    entity: .workItem,
+                    relationship: "visitHorse",
+                    batchSize: batchSize
+                )
             case let workItem as WorkItem:
-                if let lineItem = workItem.invoiceLineItem {
-                    result.register(lineItem, entity: .invoiceLineItem, relationship: "sourceWorkItem")
-                }
+                let targetID = workItem.persistentModelID
+                try await result.register(
+                    FetchDescriptor<InvoiceLineItem>(predicate: #Predicate {
+                        $0.sourceWorkItem?.persistentModelID == targetID
+                    }),
+                    in: context,
+                    entity: .invoiceLineItem,
+                    relationship: "sourceWorkItem",
+                    batchSize: batchSize
+                )
             case let invoice as Invoice:
-                try await result.register(invoice.invoiceVisits, entity: .invoiceVisit, relationship: "invoice", batchSize: batchSize)
+                let targetID = invoice.persistentModelID
+                try await result.register(
+                    FetchDescriptor<InvoiceVisit>(predicate: #Predicate {
+                        $0.invoice?.persistentModelID == targetID
+                    }),
+                    in: context,
+                    entity: .invoiceVisit,
+                    relationship: "invoice",
+                    batchSize: batchSize
+                )
             case let invoiceVisit as InvoiceVisit:
-                try await result.register(invoiceVisit.lineItems, entity: .invoiceLineItem, relationship: "invoiceVisit", batchSize: batchSize)
+                let targetID = invoiceVisit.persistentModelID
+                try await result.register(
+                    FetchDescriptor<InvoiceLineItem>(predicate: #Predicate {
+                        $0.invoiceVisit?.persistentModelID == targetID
+                    }),
+                    in: context,
+                    entity: .invoiceLineItem,
+                    relationship: "invoiceVisit",
+                    batchSize: batchSize
+                )
             case let lineItem as InvoiceLineItem:
-                if let workItem = lineItem.sourceWorkItem {
-                    result.register(workItem, entity: .workItem, relationship: "invoiceLineItem")
-                }
+                let targetID = lineItem.persistentModelID
+                try await result.register(
+                    FetchDescriptor<WorkItem>(predicate: #Predicate {
+                        $0.invoiceLineItem?.persistentModelID == targetID
+                    }),
+                    in: context,
+                    entity: .workItem,
+                    relationship: "invoiceLineItem",
+                    batchSize: batchSize
+                )
             default:
                 break
             }
-            deletedSinceCheckpoint += 1
-            if deletedSinceCheckpoint == batchSize {
-                try await SnapshotCooperation.checkpoint()
-                deletedSinceCheckpoint = 0
-            }
-        }
-        if deletedSinceCheckpoint > 0 {
-            try await SnapshotCooperation.checkpoint()
         }
         return result
     }
@@ -1096,32 +1262,34 @@ private struct DanglingRelationshipHints {
     }
 
     private mutating func register<Model: PersistentModel>(
-        _ models: [Model],
+        _ baseDescriptor: FetchDescriptor<Model>,
+        in context: ModelContext,
         entity: ExportEntity,
         relationship: String,
         batchSize: Int
     ) async throws {
-        var registered = 0
-        for model in models {
-            register(model, entity: entity, relationship: relationship)
-            registered += 1
-            if registered == batchSize {
-                try await SnapshotCooperation.checkpoint()
-                registered = 0
-            }
-        }
-        if registered > 0 {
+        // Query the last saved graph because SwiftData normalizes deleted targets out of
+        // the deleting context's forward links before export can inspect them.
+        let persistedContext = ModelContext(context.container)
+        persistedContext.autosaveEnabled = false
+        try await SnapshotCooperation.checkpoint()
+        let count = try persistedContext.fetchCount(baseDescriptor)
+        try await SnapshotCooperation.checkpoint()
+        var offset = 0
+        while offset < count {
+            var descriptor = baseDescriptor
+            descriptor.fetchLimit = min(batchSize, count - offset)
+            descriptor.fetchOffset = offset
             try await SnapshotCooperation.checkpoint()
+            let owners = try persistedContext.fetch(descriptor)
+            try await SnapshotCooperation.forEach(owners, batchSize: batchSize) { owner in
+                ownerIDs[Key(entity: entity, relationship: relationship), default: []].insert(
+                    owner.persistentModelID
+                )
+            }
+            offset += owners.count
+            guard !owners.isEmpty else { break }
         }
-    }
-
-    private mutating func register<Model: PersistentModel>(
-        _ model: Model,
-        entity: ExportEntity,
-        relationship: String
-    ) {
-        ownerIDs[Key(entity: entity, relationship: relationship), default: []]
-            .insert(model.persistentModelID)
     }
 }
 
@@ -1388,14 +1556,23 @@ private enum CooperativeDomainGraphValidator {
             throw DomainGraphViolation.businessProfileSequenceInvalid
         }
 
+        // SwiftData derives the declared service, client, invoice, visit, visit-horse,
+        // and invoice-visit inverse collections from their children's to-one links.
+        // Complete fetched-child indexes therefore express those same canonical
+        // memberships and cardinalities without faulting any owner to-many collection.
         try await SnapshotCooperation.forEach(source.services, batchSize: batchSize) { service in
-            try await validate(service, batchSize: batchSize)
+            try validate(service)
         }
         try await SnapshotCooperation.forEach(source.horses, batchSize: batchSize) { horse in
-            try await validate(horse, batchSize: batchSize)
+            try validate(horse)
         }
+        var workItemsByVisitHorse = [PersistentIdentifier: [WorkItem]]()
         try await SnapshotCooperation.forEach(source.workItems, batchSize: batchSize) { workItem in
-            try await validate(workItem, batchSize: batchSize)
+            try validate(workItem)
+            guard let visitHorse = workItem.visitHorse else {
+                throw DomainGraphViolation.workItemMissingVisitHorse
+            }
+            workItemsByVisitHorse[visitHorse.persistentModelID, default: []].append(workItem)
         }
 
         var lineItemsByInvoiceVisit = [PersistentIdentifier: [InvoiceLineItem]]()
@@ -1462,7 +1639,7 @@ private enum CooperativeDomainGraphValidator {
 
         var photographIDs = Set<UUID>()
         try await SnapshotCooperation.forEach(source.photographs, batchSize: batchSize) { photograph in
-            try await validate(photograph, batchSize: batchSize)
+            try validate(photograph)
             guard photographIDs.insert(photograph.id).inserted else {
                 throw DomainGraphViolation.duplicatePhotographID
             }
@@ -1476,6 +1653,7 @@ private enum CooperativeDomainGraphValidator {
             try await validate(
                 visit,
                 memberships: visitMemberships[visit.persistentModelID, default: []],
+                workItemsByVisitHorse: workItemsByVisitHorse,
                 invoiceVisits: invoiceVisitsBySourceVisit[visit.persistentModelID, default: []],
                 appointmentMemberships: appointmentMemberships,
                 batchSize: batchSize
@@ -1508,7 +1686,7 @@ private enum CooperativeDomainGraphValidator {
         }
     }
 
-    private static func validate(_ service: Service, batchSize: Int) async throws {
+    private static func validate(_ service: Service) throws {
         guard TextNormalization.required(service.name) == service.name else {
             throw DomainGraphViolation.serviceNameNotNormalized
         }
@@ -1518,43 +1696,24 @@ private enum CooperativeDomainGraphValidator {
         guard service.currencyCode == "USD" else {
             throw DomainGraphViolation.serviceCurrencyInvalid
         }
-        try await SnapshotCooperation.forEach(service.horsesUsingAsDefault, batchSize: batchSize) {
-            guard $0.defaultService === service else {
-                throw DomainGraphViolation.serviceHorseDefaultInverseMismatch
-            }
-        }
-        try await SnapshotCooperation.forEach(service.workItems, batchSize: batchSize) {
-            guard $0.service === service else {
-                throw DomainGraphViolation.serviceWorkItemInverseMismatch
-            }
-        }
     }
 
-    private static func validate(_ horse: Horse, batchSize: Int) async throws {
+    private static func validate(_ horse: Horse) throws {
         guard horse.client != nil else { throw DomainGraphViolation.horseMissingClient }
         guard horse.currentBarn != nil else { throw DomainGraphViolation.horseMissingCurrentBarn }
         if let service = horse.defaultService {
             guard !service.isArchived else {
                 throw DomainGraphViolation.horseDefaultServiceArchived
             }
-            guard try await containsIdentical(horse, in: service.horsesUsingAsDefault, batchSize: batchSize) else {
-                throw DomainGraphViolation.horseDefaultServiceInverseMismatch
-            }
         }
     }
 
-    private static func validate(_ workItem: WorkItem, batchSize: Int) async throws {
-        guard let service = workItem.service else {
+    private static func validate(_ workItem: WorkItem) throws {
+        guard workItem.service != nil else {
             throw DomainGraphViolation.workItemMissingService
         }
-        guard let visitHorse = workItem.visitHorse else {
+        guard workItem.visitHorse != nil else {
             throw DomainGraphViolation.workItemMissingVisitHorse
-        }
-        guard try await containsIdentical(workItem, in: service.workItems, batchSize: batchSize) else {
-            throw DomainGraphViolation.workItemServiceInverseMismatch
-        }
-        guard try await containsIdentical(workItem, in: visitHorse.workItems, batchSize: batchSize) else {
-            throw DomainGraphViolation.workItemVisitHorseInverseMismatch
         }
         guard TextNormalization.required(workItem.serviceNameSnapshot) == workItem.serviceNameSnapshot else {
             throw DomainGraphViolation.workItemServiceNameSnapshotNotNormalized
@@ -1681,12 +1840,9 @@ private enum CooperativeDomainGraphValidator {
         }
     }
 
-    private static func validate(_ photograph: Photograph, batchSize: Int) async throws {
-        guard let visitHorse = photograph.visitHorse else {
+    private static func validate(_ photograph: Photograph) throws {
+        guard photograph.visitHorse != nil else {
             throw DomainGraphViolation.photographMissingVisitHorse
-        }
-        guard try await containsIdentical(photograph, in: visitHorse.photographs, batchSize: batchSize) else {
-            throw DomainGraphViolation.photographInverseMismatch
         }
         guard photograph.pixelWidth > 0, photograph.pixelHeight > 0,
               max(photograph.pixelWidth, photograph.pixelHeight) <= 2_560 else {
@@ -1700,6 +1856,7 @@ private enum CooperativeDomainGraphValidator {
     private static func validate(
         _ visit: Visit,
         memberships: [VisitHorse],
+        workItemsByVisitHorse: [PersistentIdentifier: [WorkItem]],
         invoiceVisits: [InvoiceVisit],
         appointmentMemberships: [PersistentIdentifier: [AppointmentHorse]],
         batchSize: Int
@@ -1748,11 +1905,12 @@ private enum CooperativeDomainGraphValidator {
                outcome != .serviced {
                 throw DomainGraphViolation.workNotesRequireServicedOutcome
             }
-            if outcome == .notServiced, !membership.workItems.isEmpty {
+            let workItems = workItemsByVisitHorse[membership.persistentModelID, default: []]
+            if outcome == .notServiced, !workItems.isEmpty {
                 throw DomainGraphViolation.notServicedVisitHorseHasWorkItems
             }
             var serviceIDs = Set<PersistentIdentifier>()
-            try await SnapshotCooperation.forEach(membership.workItems, batchSize: batchSize) { workItem in
+            try await SnapshotCooperation.forEach(workItems, batchSize: batchSize) { workItem in
                 guard let service = workItem.service else {
                     throw DomainGraphViolation.workItemMissingService
                 }
@@ -1767,7 +1925,7 @@ private enum CooperativeDomainGraphValidator {
             }
             hasPendingHorse = hasPendingHorse || outcome == .pending
             hasServicedHorse = hasServicedHorse || outcome == .serviced
-            if visit.completedAt != nil, outcome == .serviced, membership.workItems.isEmpty {
+            if visit.completedAt != nil, outcome == .serviced, workItems.isEmpty {
                 throw DomainGraphViolation.completedServicedVisitHorseHasNoWorkItems
             }
         }
@@ -1815,18 +1973,6 @@ private enum CooperativeDomainGraphValidator {
                 throw DomainGraphViolation.duplicateHorseMembership
             }
         }
-    }
-
-    private static func containsIdentical<Model: PersistentModel>(
-        _ target: Model,
-        in models: [Model],
-        batchSize: Int
-    ) async throws -> Bool {
-        var found = false
-        try await SnapshotCooperation.forEach(models, batchSize: batchSize) {
-            found = found || $0 === target
-        }
-        return found
     }
 
     private static func isNormalized(_ value: String?) -> Bool {

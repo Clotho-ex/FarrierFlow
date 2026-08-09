@@ -133,6 +133,29 @@ struct ExportSnapshotBuilderTests {
         #expect(progress.isEmpty)
     }
 
+    @Test(arguments: PublicInverseMutation.rejectedCases)
+    func rejectsEveryFeasibleInverseMutationRejectedByCanonicalValidation(
+        mutation: PublicInverseMutation
+    ) async throws {
+        let canonicalGraph = try ExportTestFixtures.makeCompleteGraph()
+        try mutation.apply(to: canonicalGraph)
+        #expect(throws: (any Error).self) {
+            try DomainGraphValidator.validateAll(in: canonicalGraph.context)
+        }
+
+        let exportGraph = try ExportTestFixtures.makeCompleteGraph()
+        try mutation.apply(to: exportGraph)
+        var progress = [ExportSnapshotProgress]()
+        await #expect(throws: (any Error).self) {
+            _ = try await ExportSnapshotBuilder.build(
+                in: exportGraph.context,
+                exportContext: exportGraph.exportContext,
+                progress: { progress.append($0) }
+            )
+        }
+        #expect(progress.isEmpty)
+    }
+
     @Test
     func rejectsDanglingRequiredTargetBeforeReportingProgress() async throws {
         let graph = try ExportTestFixtures.makeCompleteGraph()
@@ -507,6 +530,49 @@ struct ExportSnapshotBuilderTests {
     }
 
     @Test
+    func acceptsCancellationWhilePagingMoreThanTwoHundredRecordsBeforeProgress() async throws {
+        let graph = try ExportTestFixtures.makeCompleteGraph()
+        let additionalServiceCount = 401
+        for index in 1...additionalServiceCount {
+            _ = ModelFixtures.makeService(
+                name: "Paged Service \(index)",
+                defaultAmountMinorUnits: Int64(index),
+                in: graph.context
+            )
+        }
+        try DomainGraphValidator.save(graph.context)
+        var progress = [ExportSnapshotProgress]()
+        let holder = ExportSnapshotTaskHolder()
+
+        holder.task = Task { @MainActor in
+            try await ExportSnapshotBuilder.build(
+                in: graph.context,
+                exportContext: graph.exportContext,
+                batchSize: 200,
+                progress: { progress.append($0) }
+            )
+        }
+        holder.canceller = Task { @MainActor in
+            // Two dangling-hint checkpoints plus nine four-checkpoint entity fetches
+            // put the service fetch at turn 39. Turn 43 is between its first and
+            // second 200-record pages, before any projection progress is legal.
+            for _ in 0..<43 {
+                await Task.yield()
+            }
+            holder.task?.cancel()
+        }
+        let task = try #require(holder.task)
+        await #expect(throws: CancellationError.self) {
+            _ = try await task.value
+        }
+        await holder.canceller?.value
+
+        #expect(progress.isEmpty)
+        #expect(try graph.context.fetchCount(FetchDescriptor<Service>()) == 404)
+        #expect(graph.context.hasChanges == false)
+    }
+
+    @Test
     func rejectsInvalidBatchSizeBeforeFetchingOrReportingProgress() async throws {
         let graph = try ExportTestFixtures.makeCompleteGraph()
         var progress = [ExportSnapshotProgress]()
@@ -520,6 +586,24 @@ struct ExportSnapshotBuilderTests {
             )
         }
         #expect(progress.isEmpty)
+    }
+
+    @Test
+    func rejectsBatchSizeAboveMaximumBeforeFetchingOrReportingProgress() async throws {
+        let graph = try ExportTestFixtures.makeCompleteGraph()
+        var progress = [ExportSnapshotProgress]()
+
+        await #expect(throws: ExportSnapshotError.batchSizeExceedsMaximum(201)) {
+            _ = try await ExportSnapshotBuilder.build(
+                in: graph.context,
+                exportContext: graph.exportContext,
+                batchSize: 201,
+                progress: { progress.append($0) }
+            )
+        }
+
+        #expect(progress.isEmpty)
+        #expect(graph.context.hasChanges == false)
     }
 
     private func persistentIDDescriptions(in context: ModelContext) throws -> [String] {
@@ -559,6 +643,89 @@ struct ExportSnapshotBuilderTests {
 private final class ExportSnapshotTaskHolder {
     var task: Task<ExportSnapshot, Error>?
     var canceller: Task<Void, Never>?
+}
+
+enum PublicInverseMutation: CaseIterable, CustomTestStringConvertible {
+    case clientHorses
+    case barnHorses
+    case barnAppointments
+    case barnVisits
+    case serviceWorkItems
+    case horseAppointmentHorses
+    case horseVisitHorses
+    case appointmentHorses
+    case appointmentVisit
+    case visitHorses
+    case visitHorseWorkItems
+    case clientInvoices
+    case invoiceVisits
+    case sourceVisitInvoiceVisits
+    case invoiceVisitLineItems
+    case workItemInvoiceLineItem
+    case visitHorsePhotographs
+
+    static var rejectedCases: [PublicInverseMutation] { allCases }
+
+    var testDescription: String { String(describing: self) }
+
+    @MainActor
+    func apply(to graph: CompleteGraph) throws {
+        switch self {
+        case .clientHorses:
+            let client = try #require(graph.horses[0].client)
+            client.setValue(forKey: \Client.horses, to: [] as [Horse])
+        case .barnHorses:
+            let barn = try #require(graph.horses[0].currentBarn)
+            barn.setValue(forKey: \Barn.horses, to: [] as [Horse])
+        case .barnAppointments:
+            let barn = try #require(graph.appointments[0].barn)
+            barn.setValue(forKey: \Barn.appointments, to: [] as [Appointment])
+        case .barnVisits:
+            let barn = try #require(graph.visits[0].barn)
+            barn.setValue(forKey: \Barn.visits, to: [] as [Visit])
+        case .serviceWorkItems:
+            let service = try #require(graph.workItems[0].service)
+            service.setValue(forKey: \Service.workItems, to: [] as [WorkItem])
+        case .horseAppointmentHorses:
+            let membership = try #require(graph.appointments[0].appointmentHorses.first)
+            let horse = try #require(membership.horse)
+            horse.setValue(forKey: \Horse.appointmentHorses, to: [] as [AppointmentHorse])
+        case .horseVisitHorses:
+            let horse = try #require(graph.visitHorses[0].horse)
+            horse.setValue(forKey: \Horse.visitHorses, to: [] as [VisitHorse])
+        case .appointmentHorses:
+            graph.appointments[0].setValue(
+                forKey: \Appointment.appointmentHorses,
+                to: [] as [AppointmentHorse]
+            )
+        case .appointmentVisit:
+            graph.appointments[0].setValue(forKey: \Appointment.visit, to: nil as Visit?)
+        case .visitHorses:
+            graph.visits[0].setValue(forKey: \Visit.visitHorses, to: [] as [VisitHorse])
+        case .visitHorseWorkItems:
+            let owner = try #require(graph.workItems[0].visitHorse)
+            owner.setValue(forKey: \VisitHorse.workItems, to: [] as [WorkItem])
+        case .clientInvoices:
+            let client = try #require(graph.invoices[0].client)
+            client.setValue(forKey: \Client.invoices, to: [] as [Invoice])
+        case .invoiceVisits:
+            graph.invoices[0].setValue(forKey: \Invoice.invoiceVisits, to: [] as [InvoiceVisit])
+        case .sourceVisitInvoiceVisits:
+            let sourceVisit = try #require(graph.invoices[0].invoiceVisits[0].sourceVisit)
+            sourceVisit.setValue(forKey: \Visit.invoiceVisits, to: [] as [InvoiceVisit])
+        case .invoiceVisitLineItems:
+            let invoiceVisit = graph.invoices[0].invoiceVisits[0]
+            invoiceVisit.setValue(forKey: \InvoiceVisit.lineItems, to: [] as [InvoiceLineItem])
+        case .workItemInvoiceLineItem:
+            let invoiceVisit = try #require(graph.invoices[0].invoiceVisits.first)
+            let lineItem = try #require(invoiceVisit.lineItems.first)
+            let workItem = try #require(lineItem.sourceWorkItem)
+            workItem.setValue(forKey: \WorkItem.invoiceLineItem, to: nil as InvoiceLineItem?)
+        case .visitHorsePhotographs:
+            let owner = try #require(graph.photograph.visitHorse)
+            owner.setValue(forKey: \VisitHorse.photographs, to: [] as [Photograph])
+        }
+    }
 }
 
 enum MissingRelationship: CaseIterable, CustomTestStringConvertible {
