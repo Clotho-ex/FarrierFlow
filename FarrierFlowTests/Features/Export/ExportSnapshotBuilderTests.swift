@@ -229,6 +229,71 @@ struct ExportSnapshotBuilderTests {
     }
 
     @Test
+    func acceptsReassignedOptionalRelationshipBeforeDeletingItsSavedTarget() async throws {
+        let graph = try ExportTestFixtures.makeCompleteGraph()
+        let oldService = ModelFixtures.makeService(
+            name: "Old Default",
+            defaultAmountMinorUnits: 7_000,
+            in: graph.context
+        )
+        let replacement = ModelFixtures.makeService(
+            name: "New Default",
+            defaultAmountMinorUnits: 8_000,
+            in: graph.context
+        )
+        let horse = graph.horses[2]
+        horse.defaultService = oldService
+        oldService.horsesUsingAsDefault.append(horse)
+        try DomainGraphValidator.save(graph.context)
+
+        oldService.horsesUsingAsDefault.removeAll { $0 === horse }
+        horse.defaultService = replacement
+        replacement.horsesUsingAsDefault.append(horse)
+        graph.context.delete(oldService)
+        var progress = [ExportSnapshotProgress]()
+
+        let snapshot = try await ExportSnapshotBuilder.build(
+            in: graph.context,
+            exportContext: graph.exportContext,
+            progress: { progress.append($0) }
+        )
+
+        let exportedHorse = try #require(snapshot.horses.first { $0.name == horse.name })
+        let exportedService = try #require(snapshot.services.first { $0.name == replacement.name })
+        #expect(exportedHorse.defaultServiceID == exportedService.id)
+        #expect(progress.last?.completedRecords == progress.last?.totalRecords)
+    }
+
+    @Test
+    func acceptsClearedOptionalRelationshipBeforeDeletingItsSavedTarget() async throws {
+        let graph = try ExportTestFixtures.makeCompleteGraph()
+        let oldService = ModelFixtures.makeService(
+            name: "Cleared Default",
+            defaultAmountMinorUnits: 7_000,
+            in: graph.context
+        )
+        let horse = graph.horses[2]
+        horse.defaultService = oldService
+        oldService.horsesUsingAsDefault.append(horse)
+        try DomainGraphValidator.save(graph.context)
+
+        oldService.horsesUsingAsDefault.removeAll { $0 === horse }
+        horse.defaultService = nil
+        graph.context.delete(oldService)
+        var progress = [ExportSnapshotProgress]()
+
+        let snapshot = try await ExportSnapshotBuilder.build(
+            in: graph.context,
+            exportContext: graph.exportContext,
+            progress: { progress.append($0) }
+        )
+
+        let exportedHorse = try #require(snapshot.horses.first { $0.name == horse.name })
+        #expect(exportedHorse.defaultServiceID == nil)
+        #expect(progress.last?.completedRecords == progress.last?.totalRecords)
+    }
+
+    @Test
     func rejectsDuplicateUniqueRelationshipBeforeProjection() async throws {
         let graph = try ExportTestFixtures.makeCompleteGraph()
         let appointment = graph.appointments[0]
@@ -570,6 +635,79 @@ struct ExportSnapshotBuilderTests {
         #expect(progress.isEmpty)
         #expect(try graph.context.fetchCount(FetchDescriptor<Service>()) == 404)
         #expect(graph.context.hasChanges == false)
+    }
+
+    @Test
+    func projectsEveryRecordExactlyOnceAcrossMoreThanTwoFetchGroups() async throws {
+        let graph = try ExportTestFixtures.makeCompleteGraph()
+        let additionalServiceCount = 401
+        let additionalNames = (1...additionalServiceCount).map { "Exact Service \($0)" }
+        for (index, name) in additionalNames.enumerated() {
+            _ = ModelFixtures.makeService(
+                name: name,
+                defaultAmountMinorUnits: Int64(index + 1),
+                in: graph.context
+            )
+        }
+        try DomainGraphValidator.save(graph.context)
+        var progress = [ExportSnapshotProgress]()
+
+        let snapshot = try await ExportSnapshotBuilder.build(
+            in: graph.context,
+            exportContext: graph.exportContext,
+            batchSize: 200,
+            progress: { progress.append($0) }
+        )
+
+        let expectedNames = Set(graph.services.map(\.name) + additionalNames)
+        let actualNames = snapshot.services.map(\.name)
+        #expect(actualNames.count == 404)
+        #expect(Set(actualNames) == expectedNames)
+        #expect(Set(actualNames).count == actualNames.count)
+        #expect(progress.last == ExportSnapshotProgress(completedRecords: 434, totalRecords: 434))
+    }
+
+    @Test
+    func rejectsMembershipMutationDuringGroupedFetchBeforeProgress() async throws {
+        let graph = try ExportTestFixtures.makeCompleteGraph()
+        let additionalServiceCount = 401
+        var serviceToDelete: Service?
+        for index in 1...additionalServiceCount {
+            let service = ModelFixtures.makeService(
+                name: "Mutable Service \(index)",
+                defaultAmountMinorUnits: Int64(index),
+                in: graph.context
+            )
+            serviceToDelete = serviceToDelete ?? service
+        }
+        try DomainGraphValidator.save(graph.context)
+        let removedService = try #require(serviceToDelete)
+        var progress = [ExportSnapshotProgress]()
+        let holder = ExportSnapshotTaskHolder()
+
+        holder.task = Task { @MainActor in
+            try await ExportSnapshotBuilder.build(
+                in: graph.context,
+                exportContext: graph.exportContext,
+                batchSize: 200,
+                progress: { progress.append($0) }
+            )
+        }
+        holder.canceller = Task { @MainActor in
+            // The preceding entity membership captures and Service's three bounded ID
+            // groups finish before this turn; final membership verification has not.
+            for _ in 0..<100 {
+                await Task.yield()
+            }
+            graph.context.delete(removedService)
+        }
+        let task = try #require(holder.task)
+        await #expect(throws: ExportSnapshotError.sourceGraphChanged(.service)) {
+            _ = try await task.value
+        }
+        await holder.canceller?.value
+
+        #expect(progress.isEmpty)
     }
 
     @Test

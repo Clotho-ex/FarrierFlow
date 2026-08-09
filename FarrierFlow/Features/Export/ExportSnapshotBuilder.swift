@@ -733,47 +733,130 @@ private struct SourceGraph {
     let invoiceLineItems: [InvoiceLineItem]
 
     static func fetch(in context: ModelContext, batchSize: Int) async throws -> SourceGraph {
-        SourceGraph(
-            businessProfiles: try await fetch(BusinessProfile.self, in: context, batchSize: batchSize),
-            clients: try await fetch(Client.self, in: context, batchSize: batchSize),
-            serviceLocations: try await fetch(Barn.self, in: context, batchSize: batchSize),
-            horses: try await fetch(Horse.self, in: context, batchSize: batchSize),
-            appointments: try await fetch(Appointment.self, in: context, batchSize: batchSize),
-            appointmentHorses: try await fetch(AppointmentHorse.self, in: context, batchSize: batchSize),
-            visits: try await fetch(Visit.self, in: context, batchSize: batchSize),
-            visitHorses: try await fetch(VisitHorse.self, in: context, batchSize: batchSize),
-            photographs: try await fetch(Photograph.self, in: context, batchSize: batchSize),
-            services: try await fetch(Service.self, in: context, batchSize: batchSize),
-            workItems: try await fetch(WorkItem.self, in: context, batchSize: batchSize),
-            invoices: try await fetch(Invoice.self, in: context, batchSize: batchSize),
-            invoiceVisits: try await fetch(InvoiceVisit.self, in: context, batchSize: batchSize),
-            invoiceLineItems: try await fetch(InvoiceLineItem.self, in: context, batchSize: batchSize)
+        let businessProfiles = try await fetch(BusinessProfile.self, entity: .businessProfile, in: context, batchSize: batchSize)
+        let clients = try await fetch(Client.self, entity: .client, in: context, batchSize: batchSize)
+        let serviceLocations = try await fetch(Barn.self, entity: .serviceLocation, in: context, batchSize: batchSize)
+        let horses = try await fetch(Horse.self, entity: .horse, in: context, batchSize: batchSize)
+        let appointments = try await fetch(Appointment.self, entity: .appointment, in: context, batchSize: batchSize)
+        let appointmentHorses = try await fetch(AppointmentHorse.self, entity: .appointmentHorse, in: context, batchSize: batchSize)
+        let visits = try await fetch(Visit.self, entity: .visit, in: context, batchSize: batchSize)
+        let visitHorses = try await fetch(VisitHorse.self, entity: .visitHorse, in: context, batchSize: batchSize)
+        let photographs = try await fetch(Photograph.self, entity: .photograph, in: context, batchSize: batchSize)
+        let services = try await fetch(Service.self, entity: .service, in: context, batchSize: batchSize)
+        let workItems = try await fetch(WorkItem.self, entity: .workItem, in: context, batchSize: batchSize)
+        let invoices = try await fetch(Invoice.self, entity: .invoice, in: context, batchSize: batchSize)
+        let invoiceVisits = try await fetch(InvoiceVisit.self, entity: .invoiceVisit, in: context, batchSize: batchSize)
+        let invoiceLineItems = try await fetch(InvoiceLineItem.self, entity: .invoiceLineItem, in: context, batchSize: batchSize)
+
+        try await verifyMembership(businessProfiles, entity: .businessProfile, in: context, batchSize: batchSize)
+        try await verifyMembership(clients, entity: .client, in: context, batchSize: batchSize)
+        try await verifyMembership(serviceLocations, entity: .serviceLocation, in: context, batchSize: batchSize)
+        try await verifyMembership(horses, entity: .horse, in: context, batchSize: batchSize)
+        try await verifyMembership(appointments, entity: .appointment, in: context, batchSize: batchSize)
+        try await verifyMembership(appointmentHorses, entity: .appointmentHorse, in: context, batchSize: batchSize)
+        try await verifyMembership(visits, entity: .visit, in: context, batchSize: batchSize)
+        try await verifyMembership(visitHorses, entity: .visitHorse, in: context, batchSize: batchSize)
+        try await verifyMembership(photographs, entity: .photograph, in: context, batchSize: batchSize)
+        try await verifyMembership(services, entity: .service, in: context, batchSize: batchSize)
+        try await verifyMembership(workItems, entity: .workItem, in: context, batchSize: batchSize)
+        try await verifyMembership(invoices, entity: .invoice, in: context, batchSize: batchSize)
+        try await verifyMembership(invoiceVisits, entity: .invoiceVisit, in: context, batchSize: batchSize)
+        try await verifyMembership(invoiceLineItems, entity: .invoiceLineItem, in: context, batchSize: batchSize)
+
+        return SourceGraph(
+            businessProfiles: businessProfiles.models,
+            clients: clients.models,
+            serviceLocations: serviceLocations.models,
+            horses: horses.models,
+            appointments: appointments.models,
+            appointmentHorses: appointmentHorses.models,
+            visits: visits.models,
+            visitHorses: visitHorses.models,
+            photographs: photographs.models,
+            services: services.models,
+            workItems: workItems.models,
+            invoices: invoices.models,
+            invoiceVisits: invoiceVisits.models,
+            invoiceLineItems: invoiceLineItems.models
         )
+    }
+
+    private struct StableModels<Model: PersistentModel> {
+        let identifiers: [PersistentIdentifier]
+        let identifierSet: Set<PersistentIdentifier>
+        let models: [Model]
     }
 
     private static func fetch<Model: PersistentModel>(
         _ type: Model.Type,
+        entity: ExportEntity,
         in context: ModelContext,
         batchSize: Int
-    ) async throws -> [Model] {
+    ) async throws -> StableModels<Model> {
         try await SnapshotCooperation.checkpoint()
-        let count = try context.fetchCount(FetchDescriptor<Model>())
+        let identifiers = try context.fetchIdentifiers(FetchDescriptor<Model>())
         try await SnapshotCooperation.checkpoint()
+        let identifierSet = try await identifierSet(
+            identifiers,
+            entity: entity,
+            batchSize: batchSize
+        )
+
         var models = [Model]()
-        models.reserveCapacity(count)
-        var offset = 0
-        while offset < count {
-            var descriptor = FetchDescriptor<Model>()
-            descriptor.fetchLimit = min(batchSize, count - offset)
-            descriptor.fetchOffset = offset
+        models.reserveCapacity(identifiers.count)
+        var start = 0
+        while start < identifiers.count {
+            let end = min(start + batchSize, identifiers.count)
+            for identifier in identifiers[start..<end] {
+                guard let model = context.model(for: identifier) as? Model,
+                      !model.isDeleted else {
+                    throw ExportSnapshotError.sourceGraphChanged(entity)
+                }
+                models.append(model)
+            }
             try await SnapshotCooperation.checkpoint()
-            let page = try context.fetch(descriptor)
-            models.append(contentsOf: page)
-            try await SnapshotCooperation.checkpoint()
-            offset += page.count
-            guard !page.isEmpty else { break }
+            start = end
         }
-        return models
+        return StableModels(
+            identifiers: identifiers,
+            identifierSet: identifierSet,
+            models: models
+        )
+    }
+
+    private static func verifyMembership<Model: PersistentModel>(
+        _ captured: StableModels<Model>,
+        entity: ExportEntity,
+        in context: ModelContext,
+        batchSize: Int
+    ) async throws {
+        try await SnapshotCooperation.checkpoint()
+        let current = try context.fetchIdentifiers(FetchDescriptor<Model>())
+        try await SnapshotCooperation.checkpoint()
+        _ = try await identifierSet(current, entity: entity, batchSize: batchSize)
+        guard current.count == captured.identifiers.count else {
+            throw ExportSnapshotError.sourceGraphChanged(entity)
+        }
+        try await SnapshotCooperation.forEach(current, batchSize: batchSize) { identifier in
+            guard captured.identifierSet.contains(identifier) else {
+                throw ExportSnapshotError.sourceGraphChanged(entity)
+            }
+        }
+    }
+
+    private static func identifierSet(
+        _ identifiers: [PersistentIdentifier],
+        entity: ExportEntity,
+        batchSize: Int
+    ) async throws -> Set<PersistentIdentifier> {
+        var result = Set<PersistentIdentifier>()
+        result.reserveCapacity(identifiers.count)
+        try await SnapshotCooperation.forEach(identifiers, batchSize: batchSize) { identifier in
+            guard result.insert(identifier).inserted else {
+                throw ExportSnapshotError.sourceGraphChanged(entity)
+            }
+        }
+        return result
     }
 }
 
@@ -1024,14 +1107,88 @@ private struct DanglingRelationshipHints {
         let relationship: String
     }
 
+    private enum CurrentTarget {
+        case none
+        case identifier(PersistentIdentifier)
+    }
+
+    private struct CurrentRelationshipTargets {
+        private var targets = [Key: [PersistentIdentifier: CurrentTarget]]()
+
+        static func capture(
+            _ changedModels: [any PersistentModel],
+            batchSize: Int
+        ) async throws -> CurrentRelationshipTargets {
+            var result = CurrentRelationshipTargets()
+            try await SnapshotCooperation.forEach(changedModels, batchSize: batchSize) { model in
+                switch model {
+                case let horse as Horse:
+                    result.record(horse.client, owner: horse, entity: .horse, relationship: "client")
+                    result.record(horse.currentBarn, owner: horse, entity: .horse, relationship: "currentBarn")
+                    result.record(horse.defaultService, owner: horse, entity: .horse, relationship: "defaultService")
+                case let appointment as Appointment:
+                    result.record(appointment.barn, owner: appointment, entity: .appointment, relationship: "barn")
+                case let membership as AppointmentHorse:
+                    result.record(membership.appointment, owner: membership, entity: .appointmentHorse, relationship: "appointment")
+                    result.record(membership.horse, owner: membership, entity: .appointmentHorse, relationship: "horse")
+                case let visit as Visit:
+                    result.record(visit.appointment, owner: visit, entity: .visit, relationship: "appointment")
+                    result.record(visit.barn, owner: visit, entity: .visit, relationship: "barn")
+                case let membership as VisitHorse:
+                    result.record(membership.visit, owner: membership, entity: .visitHorse, relationship: "visit")
+                    result.record(membership.horse, owner: membership, entity: .visitHorse, relationship: "horse")
+                case let photograph as Photograph:
+                    result.record(photograph.visitHorse, owner: photograph, entity: .photograph, relationship: "visitHorse")
+                case let workItem as WorkItem:
+                    result.record(workItem.visitHorse, owner: workItem, entity: .workItem, relationship: "visitHorse")
+                    result.record(workItem.service, owner: workItem, entity: .workItem, relationship: "service")
+                    result.record(workItem.invoiceLineItem, owner: workItem, entity: .workItem, relationship: "invoiceLineItem")
+                case let invoice as Invoice:
+                    result.record(invoice.client, owner: invoice, entity: .invoice, relationship: "client")
+                case let invoiceVisit as InvoiceVisit:
+                    result.record(invoiceVisit.invoice, owner: invoiceVisit, entity: .invoiceVisit, relationship: "invoice")
+                    result.record(invoiceVisit.sourceVisit, owner: invoiceVisit, entity: .invoiceVisit, relationship: "sourceVisit")
+                case let lineItem as InvoiceLineItem:
+                    result.record(lineItem.invoiceVisit, owner: lineItem, entity: .invoiceLineItem, relationship: "invoiceVisit")
+                    result.record(lineItem.sourceWorkItem, owner: lineItem, entity: .invoiceLineItem, relationship: "sourceWorkItem")
+                default:
+                    break
+                }
+            }
+            return result
+        }
+
+        func target(
+            ownerID: PersistentIdentifier,
+            entity: ExportEntity,
+            relationship: String
+        ) -> CurrentTarget? {
+            targets[Key(entity: entity, relationship: relationship)]?[ownerID]
+        }
+
+        private mutating func record<Owner: PersistentModel, Target: PersistentModel>(
+            _ target: Target?,
+            owner: Owner,
+            entity: ExportEntity,
+            relationship: String
+        ) {
+            targets[Key(entity: entity, relationship: relationship), default: [:]][owner.persistentModelID] =
+                target.map { .identifier($0.persistentModelID) } ?? CurrentTarget.none
+        }
+    }
+
     private var ownerIDs = [Key: Set<PersistentIdentifier>]()
 
     static func capture(
         in context: ModelContext,
         batchSize: Int
     ) async throws -> DanglingRelationshipHints {
-        try await SnapshotCooperation.checkpoint()
         let deletedModels = context.deletedModelsArray
+        let changedModels = context.changedModelsArray
+        let currentRelationships = try await CurrentRelationshipTargets.capture(
+            changedModels,
+            batchSize: batchSize
+        )
         var result = DanglingRelationshipHints()
         try await SnapshotCooperation.forEach(deletedModels, batchSize: batchSize) { deletedModel in
             switch deletedModel {
@@ -1042,18 +1199,22 @@ private struct DanglingRelationshipHints {
                         $0.client?.persistentModelID == targetID
                     }),
                     in: context,
+                    targetID: targetID,
                     entity: .horse,
                     relationship: "client",
-                    batchSize: batchSize
+                    batchSize: batchSize,
+                    currentRelationships: currentRelationships
                 )
                 try await result.register(
                     FetchDescriptor<Invoice>(predicate: #Predicate {
                         $0.client?.persistentModelID == targetID
                     }),
                     in: context,
+                    targetID: targetID,
                     entity: .invoice,
                     relationship: "client",
-                    batchSize: batchSize
+                    batchSize: batchSize,
+                    currentRelationships: currentRelationships
                 )
             case let barn as Barn:
                 let targetID = barn.persistentModelID
@@ -1062,27 +1223,33 @@ private struct DanglingRelationshipHints {
                         $0.currentBarn?.persistentModelID == targetID
                     }),
                     in: context,
+                    targetID: targetID,
                     entity: .horse,
                     relationship: "currentBarn",
-                    batchSize: batchSize
+                    batchSize: batchSize,
+                    currentRelationships: currentRelationships
                 )
                 try await result.register(
                     FetchDescriptor<Appointment>(predicate: #Predicate {
                         $0.barn?.persistentModelID == targetID
                     }),
                     in: context,
+                    targetID: targetID,
                     entity: .appointment,
                     relationship: "barn",
-                    batchSize: batchSize
+                    batchSize: batchSize,
+                    currentRelationships: currentRelationships
                 )
                 try await result.register(
                     FetchDescriptor<Visit>(predicate: #Predicate {
                         $0.barn?.persistentModelID == targetID
                     }),
                     in: context,
+                    targetID: targetID,
                     entity: .visit,
                     relationship: "barn",
-                    batchSize: batchSize
+                    batchSize: batchSize,
+                    currentRelationships: currentRelationships
                 )
             case let service as Service:
                 let targetID = service.persistentModelID
@@ -1091,18 +1258,22 @@ private struct DanglingRelationshipHints {
                         $0.defaultService?.persistentModelID == targetID
                     }),
                     in: context,
+                    targetID: targetID,
                     entity: .horse,
                     relationship: "defaultService",
-                    batchSize: batchSize
+                    batchSize: batchSize,
+                    currentRelationships: currentRelationships
                 )
                 try await result.register(
                     FetchDescriptor<WorkItem>(predicate: #Predicate {
                         $0.service?.persistentModelID == targetID
                     }),
                     in: context,
+                    targetID: targetID,
                     entity: .workItem,
                     relationship: "service",
-                    batchSize: batchSize
+                    batchSize: batchSize,
+                    currentRelationships: currentRelationships
                 )
             case let appointment as Appointment:
                 let targetID = appointment.persistentModelID
@@ -1111,18 +1282,22 @@ private struct DanglingRelationshipHints {
                         $0.appointment?.persistentModelID == targetID
                     }),
                     in: context,
+                    targetID: targetID,
                     entity: .appointmentHorse,
                     relationship: "appointment",
-                    batchSize: batchSize
+                    batchSize: batchSize,
+                    currentRelationships: currentRelationships
                 )
                 try await result.register(
                     FetchDescriptor<Visit>(predicate: #Predicate {
                         $0.appointment?.persistentModelID == targetID
                     }),
                     in: context,
+                    targetID: targetID,
                     entity: .visit,
                     relationship: "appointment",
-                    batchSize: batchSize
+                    batchSize: batchSize,
+                    currentRelationships: currentRelationships
                 )
             case let horse as Horse:
                 let targetID = horse.persistentModelID
@@ -1131,18 +1306,22 @@ private struct DanglingRelationshipHints {
                         $0.horse?.persistentModelID == targetID
                     }),
                     in: context,
+                    targetID: targetID,
                     entity: .appointmentHorse,
                     relationship: "horse",
-                    batchSize: batchSize
+                    batchSize: batchSize,
+                    currentRelationships: currentRelationships
                 )
                 try await result.register(
                     FetchDescriptor<VisitHorse>(predicate: #Predicate {
                         $0.horse?.persistentModelID == targetID
                     }),
                     in: context,
+                    targetID: targetID,
                     entity: .visitHorse,
                     relationship: "horse",
-                    batchSize: batchSize
+                    batchSize: batchSize,
+                    currentRelationships: currentRelationships
                 )
             case let visit as Visit:
                 let targetID = visit.persistentModelID
@@ -1151,18 +1330,22 @@ private struct DanglingRelationshipHints {
                         $0.visit?.persistentModelID == targetID
                     }),
                     in: context,
+                    targetID: targetID,
                     entity: .visitHorse,
                     relationship: "visit",
-                    batchSize: batchSize
+                    batchSize: batchSize,
+                    currentRelationships: currentRelationships
                 )
                 try await result.register(
                     FetchDescriptor<InvoiceVisit>(predicate: #Predicate {
                         $0.sourceVisit?.persistentModelID == targetID
                     }),
                     in: context,
+                    targetID: targetID,
                     entity: .invoiceVisit,
                     relationship: "sourceVisit",
-                    batchSize: batchSize
+                    batchSize: batchSize,
+                    currentRelationships: currentRelationships
                 )
             case let visitHorse as VisitHorse:
                 let targetID = visitHorse.persistentModelID
@@ -1171,18 +1354,22 @@ private struct DanglingRelationshipHints {
                         $0.visitHorse?.persistentModelID == targetID
                     }),
                     in: context,
+                    targetID: targetID,
                     entity: .photograph,
                     relationship: "visitHorse",
-                    batchSize: batchSize
+                    batchSize: batchSize,
+                    currentRelationships: currentRelationships
                 )
                 try await result.register(
                     FetchDescriptor<WorkItem>(predicate: #Predicate {
                         $0.visitHorse?.persistentModelID == targetID
                     }),
                     in: context,
+                    targetID: targetID,
                     entity: .workItem,
                     relationship: "visitHorse",
-                    batchSize: batchSize
+                    batchSize: batchSize,
+                    currentRelationships: currentRelationships
                 )
             case let workItem as WorkItem:
                 let targetID = workItem.persistentModelID
@@ -1191,9 +1378,11 @@ private struct DanglingRelationshipHints {
                         $0.sourceWorkItem?.persistentModelID == targetID
                     }),
                     in: context,
+                    targetID: targetID,
                     entity: .invoiceLineItem,
                     relationship: "sourceWorkItem",
-                    batchSize: batchSize
+                    batchSize: batchSize,
+                    currentRelationships: currentRelationships
                 )
             case let invoice as Invoice:
                 let targetID = invoice.persistentModelID
@@ -1202,9 +1391,11 @@ private struct DanglingRelationshipHints {
                         $0.invoice?.persistentModelID == targetID
                     }),
                     in: context,
+                    targetID: targetID,
                     entity: .invoiceVisit,
                     relationship: "invoice",
-                    batchSize: batchSize
+                    batchSize: batchSize,
+                    currentRelationships: currentRelationships
                 )
             case let invoiceVisit as InvoiceVisit:
                 let targetID = invoiceVisit.persistentModelID
@@ -1213,9 +1404,11 @@ private struct DanglingRelationshipHints {
                         $0.invoiceVisit?.persistentModelID == targetID
                     }),
                     in: context,
+                    targetID: targetID,
                     entity: .invoiceLineItem,
                     relationship: "invoiceVisit",
-                    batchSize: batchSize
+                    batchSize: batchSize,
+                    currentRelationships: currentRelationships
                 )
             case let lineItem as InvoiceLineItem:
                 let targetID = lineItem.persistentModelID
@@ -1224,9 +1417,11 @@ private struct DanglingRelationshipHints {
                         $0.invoiceLineItem?.persistentModelID == targetID
                     }),
                     in: context,
+                    targetID: targetID,
                     entity: .workItem,
                     relationship: "invoiceLineItem",
-                    batchSize: batchSize
+                    batchSize: batchSize,
+                    currentRelationships: currentRelationships
                 )
             default:
                 break
@@ -1264,31 +1459,43 @@ private struct DanglingRelationshipHints {
     private mutating func register<Model: PersistentModel>(
         _ baseDescriptor: FetchDescriptor<Model>,
         in context: ModelContext,
+        targetID: PersistentIdentifier,
         entity: ExportEntity,
         relationship: String,
-        batchSize: Int
+        batchSize: Int,
+        currentRelationships: CurrentRelationshipTargets
     ) async throws {
         // Query the last saved graph because SwiftData normalizes deleted targets out of
-        // the deleting context's forward links before export can inspect them.
+        // the deleting context's fetch results. Changed owners were snapshotted before
+        // this saved-graph query, so reassignment and optional clearing can be reconciled
+        // without traversing a target's potentially unbounded inverse collection.
         let persistedContext = ModelContext(context.container)
         persistedContext.autosaveEnabled = false
         try await SnapshotCooperation.checkpoint()
-        let count = try persistedContext.fetchCount(baseDescriptor)
+        let savedOwnerIDs = try persistedContext.fetchIdentifiers(baseDescriptor)
         try await SnapshotCooperation.checkpoint()
-        var offset = 0
-        while offset < count {
-            var descriptor = baseDescriptor
-            descriptor.fetchLimit = min(batchSize, count - offset)
-            descriptor.fetchOffset = offset
-            try await SnapshotCooperation.checkpoint()
-            let owners = try persistedContext.fetch(descriptor)
-            try await SnapshotCooperation.forEach(owners, batchSize: batchSize) { owner in
-                ownerIDs[Key(entity: entity, relationship: relationship), default: []].insert(
-                    owner.persistentModelID
-                )
+        var start = 0
+        while start < savedOwnerIDs.count {
+            let end = min(start + batchSize, savedOwnerIDs.count)
+            for ownerID in savedOwnerIDs[start..<end] {
+                guard let owner = context.model(for: ownerID) as? Model,
+                      !owner.isDeleted else {
+                    continue
+                }
+                if let currentTarget = currentRelationships.target(
+                    ownerID: ownerID,
+                    entity: entity,
+                    relationship: relationship
+                ) {
+                    guard case let .identifier(currentTargetID) = currentTarget,
+                          currentTargetID == targetID else {
+                        continue
+                    }
+                }
+                ownerIDs[Key(entity: entity, relationship: relationship), default: []].insert(ownerID)
             }
-            offset += owners.count
-            guard !owners.isEmpty else { break }
+            try await SnapshotCooperation.checkpoint()
+            start = end
         }
     }
 }
