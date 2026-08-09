@@ -49,7 +49,10 @@ final class BusinessProfileEditorModel {
         }
     }
 
-    func save(in context: ModelContext) -> Bool {
+    func save(
+        in context: ModelContext,
+        coordinator: PersistenceMutationCoordinator
+    ) -> Bool {
         guard
             loadState == .loaded,
             let values = try? BusinessProfileRules.validated(draft)
@@ -57,41 +60,43 @@ final class BusinessProfileEditorModel {
             return false
         }
 
-        do {
-            let profiles = try fetchProfiles(in: context)
-            guard profiles.count <= 1 else {
-                throw BusinessProfileEditorError.multipleProfiles
-            }
+        return coordinator.withMutation {
+            do {
+                let profiles = try fetchProfiles(in: context)
+                guard profiles.count <= 1 else {
+                    throw BusinessProfileEditorError.multipleProfiles
+                }
 
-            let profile: BusinessProfile
-            if let existing = profiles.first {
-                profile = existing
-            } else {
-                profile = BusinessProfile(
-                    name: values.name,
-                    nextInvoiceNumber: 1
+                let profile: BusinessProfile
+                if let existing = profiles.first {
+                    profile = existing
+                } else {
+                    profile = BusinessProfile(
+                        name: values.name,
+                        nextInvoiceNumber: 1
+                    )
+                    context.insert(profile)
+                }
+
+                profile.name = values.name
+                profile.phone = values.phone
+                profile.email = values.email
+                profile.address = values.address
+                profile.defaultInvoiceNote = values.defaultInvoiceNote
+                profile.defaultAppointmentDurationMinutes = values.defaultAppointmentDurationMinutes
+                profile.defaultInvoiceDueDays = values.defaultInvoiceDueDays
+
+                try DomainGraphValidator.save(context)
+                alert = nil
+                return true
+            } catch {
+                context.rollback()
+                alert = FeatureAlert(
+                    title: "Couldn’t Save My Business",
+                    message: "Your changes are still in the form. Try saving again."
                 )
-                context.insert(profile)
+                return false
             }
-
-            profile.name = values.name
-            profile.phone = values.phone
-            profile.email = values.email
-            profile.address = values.address
-            profile.defaultInvoiceNote = values.defaultInvoiceNote
-            profile.defaultAppointmentDurationMinutes = values.defaultAppointmentDurationMinutes
-            profile.defaultInvoiceDueDays = values.defaultInvoiceDueDays
-
-            try DomainGraphValidator.save(context)
-            alert = nil
-            return true
-        } catch {
-            context.rollback()
-            alert = FeatureAlert(
-                title: "Couldn’t Save My Business",
-                message: "Your changes are still in the form. Try saving again."
-            )
-            return false
         }
     }
 

@@ -53,10 +53,14 @@ struct ServiceDetailModelTests {
         let model = ServiceDetailModel()
         model.load(id: service.persistentModelID, in: context)
 
-        #expect(!model.archive(in: context))
+        #expect(
+            !model.archive(in: context, coordinator: PersistenceMutationCoordinator())
+        )
         #expect(!service.isArchived)
         #expect(horse.defaultService === service)
-        #expect(!model.delete(in: context))
+        #expect(
+            !model.delete(in: context, coordinator: PersistenceMutationCoordinator())
+        )
         #expect(horse.defaultService === service)
     }
 
@@ -67,9 +71,11 @@ struct ServiceDetailModelTests {
         let model = ServiceDetailModel()
         model.load(id: service.persistentModelID, in: context)
 
-        #expect(model.archive(in: context))
+        #expect(model.archive(in: context, coordinator: PersistenceMutationCoordinator()))
         #expect(service.isArchived)
-        #expect(model.reactivate(in: context))
+        #expect(
+            model.reactivate(in: context, coordinator: PersistenceMutationCoordinator())
+        )
         #expect(!service.isArchived)
     }
 
@@ -82,14 +88,19 @@ struct ServiceDetailModelTests {
 
         let model = ServiceDetailModel()
         model.load(id: unreferenced.persistentModelID, in: context)
-        #expect(model.delete(in: context))
+        #expect(model.delete(in: context, coordinator: PersistenceMutationCoordinator()))
         #expect(try context.fetchCount(FetchDescriptor<Service>()) == 0)
 
         let (referencedContainer, referenced) = try serviceWithRecordedWork()
         let referencedContext = referencedContainer.mainContext
         let referencedModel = ServiceDetailModel()
         referencedModel.load(id: referenced.persistentModelID, in: referencedContext)
-        #expect(!referencedModel.delete(in: referencedContext))
+        #expect(
+            !referencedModel.delete(
+                in: referencedContext,
+                coordinator: PersistenceMutationCoordinator()
+            )
+        )
     }
 
     private func serviceWithRecordedWork() throws -> (ModelContainer, Service) {

@@ -5,6 +5,7 @@ struct HorseDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
+    @Environment(PersistenceMutationCoordinator.self) private var mutationCoordinator
     @State private var model = HorseDetailModel()
     @State private var showsEditor = false
     @State private var showsDeleteConfirmation = false
@@ -74,7 +75,10 @@ struct HorseDetailView: View {
                     titleVisibility: .visible
                 ) {
                     Button("Delete Horse", role: .destructive) {
-                        if model.delete(in: context) { dismiss() }
+                        if model.delete(
+                            in: context,
+                            coordinator: mutationCoordinator
+                        ) { dismiss() }
                     }
                 }
             } else {

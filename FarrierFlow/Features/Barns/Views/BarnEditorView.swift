@@ -4,6 +4,7 @@ import SwiftUI
 struct BarnEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(PersistenceMutationCoordinator.self) private var mutationCoordinator
     @State private var model: BarnEditorModel
     @State private var showsMoreDetails: Bool
     private let createdBarnID: Binding<PersistentIdentifier?>?
@@ -50,7 +51,10 @@ struct BarnEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        if let id = model.save(in: context) {
+                        if let id = model.save(
+                            in: context,
+                            coordinator: mutationCoordinator
+                        ) {
                             createdBarnID?.wrappedValue = id
                             dismiss()
                         }

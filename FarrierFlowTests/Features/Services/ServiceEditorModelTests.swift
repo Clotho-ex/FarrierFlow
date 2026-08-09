@@ -12,8 +12,13 @@ struct ServiceEditorModelTests {
         let context = container.mainContext
         let model = ServiceEditorModel()
         model.draft = ServiceDraft(name: "  Hoof Trim ", priceInput: "0")
+        let coordinator = PersistenceMutationCoordinator()
+        let generation = try coordinator.beginRead()
 
-        let id = try #require(model.save(in: context))
+        let id = try #require(model.save(in: context, coordinator: coordinator))
+        #expect(throws: PersistenceMutationCoordinatorError.sourceChanged) {
+            try coordinator.validate(generation)
+        }
         let service = try #require(context.model(for: id) as? Service)
         #expect(service.name == "Hoof Trim")
         #expect(service.defaultAmountMinorUnits == 0)
@@ -48,7 +53,13 @@ struct ServiceEditorModelTests {
 
         let model = ServiceEditorModel(service: service)
         model.draft = ServiceDraft(name: "Front Shoes and Pads", priceInput: "150.00")
-        #expect(model.save(in: context) == service.persistentModelID)
+        let coordinator = PersistenceMutationCoordinator()
+        let generation = try coordinator.beginRead()
+
+        #expect(model.save(in: context, coordinator: coordinator) == service.persistentModelID)
+        #expect(throws: PersistenceMutationCoordinatorError.sourceChanged) {
+            try coordinator.validate(generation)
+        }
         #expect(service.name == "Front Shoes and Pads")
         #expect(service.defaultAmountMinorUnits == 15_000)
         #expect(workItem.serviceNameSnapshot == "Front Shoes")

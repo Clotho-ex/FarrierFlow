@@ -35,7 +35,10 @@ struct AppointmentDetailModelTests {
             deletionContext.model(for: appointment.persistentModelID) as? Appointment
         )
 
-        let deleted = model.delete(in: deletionContext) { resolvedAppointment, context in
+        let deleted = model.delete(
+            in: deletionContext,
+            coordinator: PersistenceMutationCoordinator()
+        ) { resolvedAppointment, context in
             #expect(context === deletionContext)
             #expect(resolvedAppointment === expectedDeletionAppointment)
             try RecordDeletionRules.delete(resolvedAppointment, in: context)
@@ -65,7 +68,12 @@ struct AppointmentDetailModelTests {
         let model = AppointmentDetailModel()
         model.load(id: appointment.persistentModelID, in: context)
 
-        #expect(!model.delete(in: context))
+        #expect(
+            !model.delete(
+                in: context,
+                coordinator: PersistenceMutationCoordinator()
+            )
+        )
         #expect(model.appointment?.persistentModelID == appointment.persistentModelID)
         let alert = try #require(model.alert)
         let expectedAlert = RecordDeletionBlock.appointmentHasVisit.alert
@@ -104,7 +112,12 @@ struct AppointmentDetailModelTests {
         )
 
         let deletionContext = ModelContext(container)
-        #expect(!model.delete(in: deletionContext))
+        #expect(
+            !model.delete(
+                in: deletionContext,
+                coordinator: PersistenceMutationCoordinator()
+            )
+        )
         let alert = try #require(model.alert)
         let expectedAlert = RecordDeletionBlock.appointmentHasVisit.alert
         #expect(alert.title == expectedAlert.title)

@@ -70,7 +70,11 @@ final class ExistingHorsePickerModel {
         }
     }
 
-    func move(to destinationBarnID: PersistentIdentifier, in context: ModelContext) -> Bool {
+    func move(
+        to destinationBarnID: PersistentIdentifier,
+        in context: ModelContext,
+        coordinator: PersistenceMutationCoordinator
+    ) -> Bool {
         guard
             let selectedHorseID,
             let horse = context.model(for: selectedHorseID) as? Horse,
@@ -93,25 +97,27 @@ final class ExistingHorsePickerModel {
             return false
         }
 
-        horse.currentBarn = destination
-        if !destination.horses.contains(where: { $0 === horse }) {
-            destination.horses.append(horse)
-        }
-
-        do {
-            try saving(context)
-            return true
-        } catch {
-            horse.currentBarn = originalBarn
-            destination.horses.removeAll { $0 === horse }
-            if !originalBarn.horses.contains(where: { $0 === horse }) {
-                originalBarn.horses.append(horse)
+        return coordinator.withMutation {
+            horse.currentBarn = destination
+            if !destination.horses.contains(where: { $0 === horse }) {
+                destination.horses.append(horse)
             }
-            alert = FeatureAlert(
-                title: "Couldn’t Move Horse",
-                message: "The horse remains at its previous service location."
-            )
-            return false
+
+            do {
+                try saving(context)
+                return true
+            } catch {
+                horse.currentBarn = originalBarn
+                destination.horses.removeAll { $0 === horse }
+                if !originalBarn.horses.contains(where: { $0 === horse }) {
+                    originalBarn.horses.append(horse)
+                }
+                alert = FeatureAlert(
+                    title: "Couldn’t Move Horse",
+                    message: "The horse remains at its previous service location."
+                )
+                return false
+            }
         }
     }
 }

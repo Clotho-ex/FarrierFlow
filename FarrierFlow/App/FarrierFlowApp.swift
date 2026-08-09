@@ -23,8 +23,10 @@ struct FarrierFlowApp: App {
                 )
                 let container = try ModelContainerFactory.persistentStoreTest(at: storeURL)
                 try uiTestConfiguration.prepare(container)
+                let mutationCoordinator = PersistenceMutationCoordinator()
                 return AppDependencies(
                     container: container,
+                    mutationCoordinator: mutationCoordinator,
                     photographLibrary: PhotographLibrary(
                         container: container,
                         fileStore: PhotographFileStore(
@@ -46,8 +48,10 @@ struct FarrierFlowApp: App {
                 appropriateFor: nil,
                 create: true
             )
+            let mutationCoordinator = PersistenceMutationCoordinator()
             return AppDependencies(
                 container: container,
+                mutationCoordinator: mutationCoordinator,
                 photographLibrary: PhotographLibrary(
                     container: container,
                     fileStore: PhotographFileStore(
@@ -64,6 +68,7 @@ struct FarrierFlowApp: App {
             case .success(let dependencies):
                 RootView()
                     .modelContainer(dependencies.container)
+                    .environment(dependencies.mutationCoordinator)
                     .environment(dependencies.photographLibrary)
             case .failure:
                 ModelContainerFailureView()
@@ -75,5 +80,6 @@ struct FarrierFlowApp: App {
 @MainActor
 private struct AppDependencies {
     let container: ModelContainer
+    let mutationCoordinator: PersistenceMutationCoordinator
     let photographLibrary: PhotographLibrary
 }

@@ -24,7 +24,9 @@ struct ClientDraftAndModelTests {
             notes: "\n"
         )
 
-        let id = try #require(editor.save(in: context))
+        let id = try #require(
+            editor.save(in: context, coordinator: PersistenceMutationCoordinator())
+        )
         let client = try #require(context.model(for: id) as? Client)
         #expect(client.name == "Alex Carter")
         #expect(client.phone == nil)
@@ -33,7 +35,9 @@ struct ClientDraftAndModelTests {
 
         let edit = ClientEditorModel(client: client)
         edit.draft.name = "Alex B. Carter"
-        #expect(edit.save(in: context) == id)
+        #expect(
+            edit.save(in: context, coordinator: PersistenceMutationCoordinator()) == id
+        )
         #expect(client.name == "Alex B. Carter")
     }
 
@@ -48,6 +52,25 @@ struct ClientDraftAndModelTests {
         let model = ClientListModel()
         model.load(in: context)
         #expect(model.clients.map(\.name) == ["Alex", "Zoe"])
+    }
+
+    @Test
+    func detailDeletionInvalidatesAnActiveReadGeneration() throws {
+        let container = try ModelContainerFactory.inMemoryTest()
+        let context = container.mainContext
+        let client = Client(name: "Alex")
+        context.insert(client)
+        try context.save()
+        let model = ClientDetailModel()
+        model.load(id: client.persistentModelID, in: context)
+        let coordinator = PersistenceMutationCoordinator()
+        let generation = try coordinator.beginRead()
+
+        #expect(model.delete(in: context, coordinator: coordinator))
+        #expect(try context.fetchCount(FetchDescriptor<Client>()) == 0)
+        #expect(throws: PersistenceMutationCoordinatorError.sourceChanged) {
+            try coordinator.validate(generation)
+        }
     }
 
     @Test

@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 
 nonisolated enum PersistenceMutationCoordinatorError: Error, Equatable {
     case writerActive
@@ -6,6 +7,7 @@ nonisolated enum PersistenceMutationCoordinatorError: Error, Equatable {
 }
 
 @MainActor
+@Observable
 final class PersistenceMutationCoordinator {
     nonisolated struct ReadGeneration: Equatable, Sendable {
         fileprivate let token: UUID

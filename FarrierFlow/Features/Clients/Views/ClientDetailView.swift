@@ -4,6 +4,7 @@ import SwiftUI
 struct ClientDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(PersistenceMutationCoordinator.self) private var mutationCoordinator
     @State private var model = ClientDetailModel()
     @State private var showsEditor = false
     @State private var showsHorseEditor = false
@@ -88,7 +89,10 @@ struct ClientDetailView: View {
                     titleVisibility: .visible
                 ) {
                     Button("Delete Client", role: .destructive) {
-                        if model.delete(in: context) { dismiss() }
+                        if model.delete(
+                            in: context,
+                            coordinator: mutationCoordinator
+                        ) { dismiss() }
                     }
                 }
             } else {

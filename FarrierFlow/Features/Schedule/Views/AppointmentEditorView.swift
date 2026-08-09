@@ -4,6 +4,7 @@ import SwiftUI
 struct AppointmentEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(PersistenceMutationCoordinator.self) private var mutationCoordinator
     @State private var model: AppointmentEditorModel
     @State private var showsBarnEditor = false
     @State private var createdBarnID: PersistentIdentifier?
@@ -148,7 +149,10 @@ struct AppointmentEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        if let appointmentID = model.save(in: context) {
+                        if let appointmentID = model.save(
+                            in: context,
+                            coordinator: mutationCoordinator
+                        ) {
                             onSaved?(appointmentID)
                             dismiss()
                         }

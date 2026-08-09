@@ -117,7 +117,12 @@ struct HorseDraftAndRelocationTests {
 
         let editor = HorseEditorModel(horse: graph.horse)
         editor.draft.barnID = destination.persistentModelID
-        #expect(editor.save(in: graph.context) == nil)
+        #expect(
+            editor.save(
+                in: graph.context,
+                coordinator: PersistenceMutationCoordinator()
+            ) == nil
+        )
         #expect(graph.horse.currentBarn === originalBarn)
         #expect(try graph.context.fetchCount(FetchDescriptor<Appointment>()) == appointmentCount)
         #expect(try graph.context.fetchCount(FetchDescriptor<AppointmentHorse>()) == joinCount)
@@ -218,6 +223,30 @@ struct HorseDraftAndRelocationTests {
 
         #expect(picker.loadState == .failed)
         #expect(picker.horses.map(\.name) == ["Milo"])
+    }
+
+    @Test
+    func pickerRelocationInvalidatesAnActiveReadGeneration() throws {
+        let graph = try makeCompletedRelocationGraph()
+        let context = ModelContext(graph.container)
+        let horse = try #require(context.model(for: graph.horseID) as? Horse)
+        let destination = try #require(
+            context.model(for: graph.destinationBarnID) as? Barn
+        )
+        let picker = ExistingHorsePickerModel()
+        picker.selectedHorseID = horse.persistentModelID
+        let coordinator = PersistenceMutationCoordinator()
+        let generation = try coordinator.beginRead()
+
+        #expect(picker.move(
+            to: destination.persistentModelID,
+            in: context,
+            coordinator: coordinator
+        ))
+        #expect(horse.currentBarn === destination)
+        #expect(throws: PersistenceMutationCoordinatorError.sourceChanged) {
+            try coordinator.validate(generation)
+        }
     }
 
     @Test
@@ -342,7 +371,8 @@ struct HorseDraftAndRelocationTests {
 
             #expect(!failingPicker.move(
                 to: destinationBarnID,
-                in: relocationContext
+                in: relocationContext,
+                coordinator: PersistenceMutationCoordinator()
             ))
             #expect(observedRelocationBeforeFailure)
             #expect(relocationHorse.currentBarn === relocationOriginalBarn)

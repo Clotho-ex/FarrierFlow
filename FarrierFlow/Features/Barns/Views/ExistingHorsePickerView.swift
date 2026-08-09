@@ -4,6 +4,7 @@ import SwiftUI
 struct ExistingHorsePickerView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(PersistenceMutationCoordinator.self) private var mutationCoordinator
     @State private var model = ExistingHorsePickerModel()
 
     let destinationBarnID: PersistentIdentifier
@@ -50,7 +51,11 @@ struct ExistingHorsePickerView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Move") {
-                        if model.move(to: destinationBarnID, in: context) {
+                        if model.move(
+                            to: destinationBarnID,
+                            in: context,
+                            coordinator: mutationCoordinator
+                        ) {
                             dismiss()
                         }
                     }

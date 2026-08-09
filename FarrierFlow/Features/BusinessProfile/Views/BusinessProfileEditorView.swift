@@ -9,6 +9,7 @@ struct BusinessProfileEditorView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(PersistenceMutationCoordinator.self) private var mutationCoordinator
     @State private var model = BusinessProfileEditorModel()
     @FocusState private var focusedField: Field?
 
@@ -188,7 +189,7 @@ struct BusinessProfileEditorView: View {
     }
 
     private func save() {
-        guard model.save(in: context) else {
+        guard model.save(in: context, coordinator: mutationCoordinator) else {
             return
         }
 

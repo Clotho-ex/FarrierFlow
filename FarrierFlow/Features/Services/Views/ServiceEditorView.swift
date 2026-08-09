@@ -5,6 +5,7 @@ struct ServiceEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
+    @Environment(PersistenceMutationCoordinator.self) private var mutationCoordinator
     @State private var model: ServiceEditorModel
     private let createdServiceID: Binding<PersistentIdentifier?>?
 
@@ -40,7 +41,10 @@ struct ServiceEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        if let id = model.save(in: context) {
+                        if let id = model.save(
+                            in: context,
+                            coordinator: mutationCoordinator
+                        ) {
                             createdServiceID?.wrappedValue = id
                             dismiss()
                         }

@@ -30,23 +30,28 @@ final class ClientDetailModel {
         }
     }
 
-    func delete(in context: ModelContext) -> Bool {
+    func delete(
+        in context: ModelContext,
+        coordinator: PersistenceMutationCoordinator
+    ) -> Bool {
         guard let client else { return false }
-        self.client = nil
-        do {
-            try RecordDeletionRules.delete(client, in: context)
-            return true
-        } catch let block as RecordDeletionBlock {
-            self.client = client
-            alert = block.alert
-            return false
-        } catch {
-            self.client = client
-            alert = FeatureAlert(
-                title: "Couldn’t Delete Client",
-                message: "The client wasn’t deleted. Try again."
-            )
-            return false
+        return coordinator.withMutation {
+            self.client = nil
+            do {
+                try RecordDeletionRules.delete(client, in: context)
+                return true
+            } catch let block as RecordDeletionBlock {
+                self.client = client
+                alert = block.alert
+                return false
+            } catch {
+                self.client = client
+                alert = FeatureAlert(
+                    title: "Couldn’t Delete Client",
+                    message: "The client wasn’t deleted. Try again."
+                )
+                return false
+            }
         }
     }
 }

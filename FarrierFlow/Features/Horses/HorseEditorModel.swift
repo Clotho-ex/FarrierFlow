@@ -106,7 +106,10 @@ final class HorseEditorModel {
         draft.clientID = id
     }
 
-    func save(in context: ModelContext) -> PersistentIdentifier? {
+    func save(
+        in context: ModelContext,
+        coordinator: PersistenceMutationCoordinator
+    ) -> PersistentIdentifier? {
         guard
             let name = TextNormalization.required(draft.name),
             draft.appointmentIntervalWeeks > 0,
@@ -116,82 +119,84 @@ final class HorseEditorModel {
             let barn = context.model(for: barnID) as? Barn
         else { return nil }
 
-        let defaultService: Service?
-        if let defaultServiceID = draft.defaultServiceID {
-            guard
-                activeServiceChoices.contains(where: { $0.id == defaultServiceID }),
-                let service = context.model(for: defaultServiceID) as? Service,
-                ServiceRules.activeChoices([service]).count == 1
-            else {
-                alert = FeatureAlert(
-                    title: "Default Service Unavailable",
-                    message: "Choose an active service or None before saving this horse."
-                )
-                return nil
+        return coordinator.withMutation {
+            let defaultService: Service?
+            if let defaultServiceID = draft.defaultServiceID {
+                guard
+                    activeServiceChoices.contains(where: { $0.id == defaultServiceID }),
+                    let service = context.model(for: defaultServiceID) as? Service,
+                    ServiceRules.activeChoices([service]).count == 1
+                else {
+                    alert = FeatureAlert(
+                        title: "Default Service Unavailable",
+                        message: "Choose an active service or None before saving this horse."
+                    )
+                    return nil
+                }
+                defaultService = service
+            } else {
+                defaultService = nil
             }
-            defaultService = service
-        } else {
-            defaultService = nil
-        }
 
-        let horse: Horse
-        if let horseID {
-            guard let existing = context.model(for: horseID) as? Horse else {
-                return nil
+            let horse: Horse
+            if let horseID {
+                guard let existing = context.model(for: horseID) as? Horse else {
+                    return nil
+                }
+                guard existing.currentBarn != nil else {
+                    alert = FeatureAlert(
+                        title: "Horse Unavailable",
+                        message: "This horse is missing its current service location."
+                    )
+                    return nil
+                }
+                guard
+                    let projection = HorseRelocationRules.projection(
+                        for: existing,
+                        destinationBarnID: barnID
+                    ),
+                    HorseRelocationRules.canRelocate(
+                        appointmentStates: projection.appointmentStates,
+                        hasInProgressVisitHorse: projection.hasInProgressVisitHorse,
+                        isSameBarn: projection.isSameBarn
+                    )
+                else {
+                    alert = FeatureAlert(
+                        title: "Can’t Change Service Location",
+                        message: "Complete or remove unresolved appointments before changing this service location."
+                    )
+                    return nil
+                }
+                horse = existing
+            } else {
+                horse = Horse(name: name, client: client, currentBarn: barn)
+                context.insert(horse)
             }
-            guard existing.currentBarn != nil else {
-                alert = FeatureAlert(
-                    title: "Horse Unavailable",
-                    message: "This horse is missing its current service location."
-                )
-                return nil
-            }
-            guard
-                let projection = HorseRelocationRules.projection(
-                    for: existing,
-                    destinationBarnID: barnID
-                ),
-                HorseRelocationRules.canRelocate(
-                    appointmentStates: projection.appointmentStates,
-                    hasInProgressVisitHorse: projection.hasInProgressVisitHorse,
-                    isSameBarn: projection.isSameBarn
-                )
-            else {
-                alert = FeatureAlert(
-                    title: "Can’t Change Service Location",
-                    message: "Complete or remove unresolved appointments before changing this service location."
-                )
-                return nil
-            }
-            horse = existing
-        } else {
-            horse = Horse(name: name, client: client, currentBarn: barn)
-            context.insert(horse)
-        }
 
-        horse.name = name
-        horse.safetyNotes = TextNormalization.optional(draft.safetyNotes)
-        horse.appointmentIntervalWeeks = draft.appointmentIntervalWeeks
-        horse.client = client
-        horse.currentBarn = barn
-        horse.defaultService = defaultService
-        if !client.horses.contains(where: { $0 === horse }) {
-            client.horses.append(horse)
-        }
-        if !barn.horses.contains(where: { $0 === horse }) {
-            barn.horses.append(horse)
-        }
+            horse.name = name
+            horse.safetyNotes = TextNormalization.optional(draft.safetyNotes)
+            horse.appointmentIntervalWeeks = draft.appointmentIntervalWeeks
+            horse.client = client
+            horse.currentBarn = barn
+            horse.defaultService = defaultService
+            if !client.horses.contains(where: { $0 === horse }) {
+                client.horses.append(horse)
+            }
+            if !barn.horses.contains(where: { $0 === horse }) {
+                barn.horses.append(horse)
+            }
 
-        do {
-            try DomainGraphValidator.save(context)
-            return horse.persistentModelID
-        } catch {
-            context.rollback()
-            alert = FeatureAlert(
-                title: "Couldn’t Save Horse",
-                message: "Your changes are still in the form. Try saving again."
-            )
-            return nil
+            do {
+                try DomainGraphValidator.save(context)
+                return horse.persistentModelID
+            } catch {
+                context.rollback()
+                alert = FeatureAlert(
+                    title: "Couldn’t Save Horse",
+                    message: "Your changes are still in the form. Try saving again."
+                )
+                return nil
+            }
         }
     }
 

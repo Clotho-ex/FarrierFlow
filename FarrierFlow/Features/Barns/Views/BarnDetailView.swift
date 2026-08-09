@@ -4,6 +4,7 @@ import SwiftUI
 struct BarnDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(PersistenceMutationCoordinator.self) private var mutationCoordinator
     @State private var model = BarnDetailModel()
     @State private var showsEditor = false
     @State private var showsHorseEditor = false
@@ -74,7 +75,10 @@ struct BarnDetailView: View {
                     titleVisibility: .visible
                 ) {
                     Button("Delete Service Location", role: .destructive) {
-                        if model.delete(in: context) { dismiss() }
+                        if model.delete(
+                            in: context,
+                            coordinator: mutationCoordinator
+                        ) { dismiss() }
                     }
                 }
             } else {

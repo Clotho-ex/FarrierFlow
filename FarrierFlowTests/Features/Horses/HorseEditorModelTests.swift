@@ -53,14 +53,24 @@ struct HorseEditorModelTests {
         let editor = HorseEditorModel(horse: graph.horse)
         editor.loadChoices(in: graph.context)
         editor.draft.defaultServiceID = service.persistentModelID
-        #expect(editor.save(in: graph.context) == graph.horse.persistentModelID)
+        #expect(
+            editor.save(
+                in: graph.context,
+                coordinator: PersistenceMutationCoordinator()
+            ) == graph.horse.persistentModelID
+        )
         #expect(graph.horse.defaultService === service)
         #expect(service.horsesUsingAsDefault.contains { $0 === graph.horse })
 
         let clearEditor = HorseEditorModel(horse: graph.horse)
         clearEditor.loadChoices(in: graph.context)
         clearEditor.draft.defaultServiceID = nil
-        #expect(clearEditor.save(in: graph.context) == graph.horse.persistentModelID)
+        #expect(
+            clearEditor.save(
+                in: graph.context,
+                coordinator: PersistenceMutationCoordinator()
+            ) == graph.horse.persistentModelID
+        )
         #expect(graph.horse.defaultService == nil)
         #expect(!service.horsesUsingAsDefault.contains { $0 === graph.horse })
     }
@@ -76,7 +86,12 @@ struct HorseEditorModelTests {
         editor.draft.defaultServiceID = archived.persistentModelID
 
         #expect(!editor.canSave)
-        #expect(editor.save(in: graph.context) == nil)
+        #expect(
+            editor.save(
+                in: graph.context,
+                coordinator: PersistenceMutationCoordinator()
+            ) == nil
+        )
         #expect(graph.horse.defaultService == nil)
     }
 
@@ -92,7 +107,12 @@ struct HorseEditorModelTests {
         editor.draft.defaultServiceID = service.persistentModelID
         graph.context.insert(Service(name: "Invalid", defaultAmountMinorUnits: -1))
 
-        #expect(editor.save(in: graph.context) == nil)
+        #expect(
+            editor.save(
+                in: graph.context,
+                coordinator: PersistenceMutationCoordinator()
+            ) == nil
+        )
         #expect(editor.draft.defaultServiceID == service.persistentModelID)
         let verificationContext = ModelContext(graph.container)
         let reloadedHorse = try #require(verificationContext.model(for: horseID) as? Horse)
@@ -140,7 +160,12 @@ struct HorseEditorModelTests {
         let editor = HorseEditorModel(horse: graph.horse)
         editor.loadChoices(in: graph.context)
         editor.draft.defaultServiceID = service.persistentModelID
-        #expect(editor.save(in: graph.context) == graph.horse.persistentModelID)
+        #expect(
+            editor.save(
+                in: graph.context,
+                coordinator: PersistenceMutationCoordinator()
+            ) == graph.horse.persistentModelID
+        )
 
         #expect(appointment.persistentModelID == appointmentID)
         #expect(visit.persistentModelID == visitID)

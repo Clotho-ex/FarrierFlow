@@ -21,38 +21,44 @@ final class ClientEditorModel {
         )
     }
 
-    func save(in context: ModelContext) -> PersistentIdentifier? {
+    func save(
+        in context: ModelContext,
+        coordinator: PersistenceMutationCoordinator
+    ) -> PersistentIdentifier? {
         guard let name = TextNormalization.required(draft.name) else { return nil }
 
-        let client: Client
-        if let clientID {
-            guard let existing = context.model(for: clientID) as? Client else {
+        return coordinator.withMutation {
+            let client: Client
+            if let clientID {
+                guard let existing = context.model(for: clientID) as? Client else {
+                    alert = FeatureAlert(
+                        title: "Client Unavailable",
+                        message: "This client is no longer available."
+                    )
+                    return nil
+                }
+                client = existing
+            } else {
+                client = Client(name: name)
+                context.insert(client)
+            }
+
+            client.name = name
+            client.phone = TextNormalization.optional(draft.phone)
+            client.email = TextNormalization.optional(draft.email)
+            client.notes = TextNormalization.optional(draft.notes)
+
+            do {
+                try DomainGraphValidator.save(context)
+                return client.persistentModelID
+            } catch {
+                context.rollback()
                 alert = FeatureAlert(
-                    title: "Client Unavailable",
-                    message: "This client is no longer available."
+                    title: "Couldn’t Save Client",
+                    message: "Your changes are still in the form. Try saving again."
                 )
                 return nil
             }
-            client = existing
-        } else {
-            client = Client(name: name)
-            context.insert(client)
-        }
-
-        client.name = name
-        client.phone = TextNormalization.optional(draft.phone)
-        client.email = TextNormalization.optional(draft.email)
-        client.notes = TextNormalization.optional(draft.notes)
-
-        do {
-            try DomainGraphValidator.save(context)
-            return client.persistentModelID
-        } catch {
-            alert = FeatureAlert(
-                title: "Couldn’t Save Client",
-                message: "Your changes are still in the form. Try saving again."
-            )
-            return nil
         }
     }
 }

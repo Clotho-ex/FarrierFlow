@@ -20,49 +20,52 @@ final class AppointmentDetailModel {
 
     func delete(
         in context: ModelContext,
+        coordinator: PersistenceMutationCoordinator,
         deleting: (Appointment, ModelContext) throws -> Void = { appointment, context in
             try RecordDeletionRules.delete(appointment, in: context)
         }
     ) -> Bool {
         guard appointment != nil, let appointmentID else { return false }
-        let actionAppointment: Appointment?
-        do {
-            actionAppointment = try context.existingModel(
-                Appointment.self,
-                for: appointmentID
-            )
-        } catch {
-            displayContext = context
-            alert = FeatureAlert(
-                title: "Couldn’t Delete Appointment",
-                message: "The appointment wasn’t deleted. Try again."
-            )
-            return false
-        }
-        guard let appointment = actionAppointment else {
-            self.appointment = nil
-            alert = FeatureAlert(
-                title: "Appointment Unavailable",
-                message: "The appointment couldn’t be found. Try again."
-            )
-            return false
-        }
-        do {
-            try deleting(appointment, context)
-            self.appointment = nil
-            self.appointmentID = nil
-            displayContext = nil
-            return true
-        } catch let block as RecordDeletionBlock {
-            alert = block.alert
-            return false
-        } catch {
-            displayContext = context
-            alert = FeatureAlert(
-                title: "Couldn’t Delete Appointment",
-                message: "The appointment wasn’t deleted. Try again."
-            )
-            return false
+        return coordinator.withMutation {
+            let actionAppointment: Appointment?
+            do {
+                actionAppointment = try context.existingModel(
+                    Appointment.self,
+                    for: appointmentID
+                )
+            } catch {
+                displayContext = context
+                alert = FeatureAlert(
+                    title: "Couldn’t Delete Appointment",
+                    message: "The appointment wasn’t deleted. Try again."
+                )
+                return false
+            }
+            guard let appointment = actionAppointment else {
+                self.appointment = nil
+                alert = FeatureAlert(
+                    title: "Appointment Unavailable",
+                    message: "The appointment couldn’t be found. Try again."
+                )
+                return false
+            }
+            do {
+                try deleting(appointment, context)
+                self.appointment = nil
+                self.appointmentID = nil
+                displayContext = nil
+                return true
+            } catch let block as RecordDeletionBlock {
+                alert = block.alert
+                return false
+            } catch {
+                displayContext = context
+                alert = FeatureAlert(
+                    title: "Couldn’t Delete Appointment",
+                    message: "The appointment wasn’t deleted. Try again."
+                )
+                return false
+            }
         }
     }
 

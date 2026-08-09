@@ -5,6 +5,7 @@ struct ServiceDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
+    @Environment(PersistenceMutationCoordinator.self) private var mutationCoordinator
     @State private var model = ServiceDetailModel()
     @State private var showsEditor = false
     @State private var showsDeleteConfirmation = false
@@ -42,11 +43,17 @@ struct ServiceDetailView: View {
                             Button("Edit", systemImage: "pencil") { showsEditor = true }
                             if service.isArchived {
                                 Button("Reactivate", systemImage: "arrow.counterclockwise") {
-                                    _ = model.reactivate(in: context)
+                                    _ = model.reactivate(
+                                        in: context,
+                                        coordinator: mutationCoordinator
+                                    )
                                 }
                             } else {
                                 Button("Archive", systemImage: "archivebox") {
-                                    _ = model.archive(in: context)
+                                    _ = model.archive(
+                                        in: context,
+                                        coordinator: mutationCoordinator
+                                    )
                                 }
                             }
                             Divider()
@@ -67,7 +74,10 @@ struct ServiceDetailView: View {
                     titleVisibility: .visible
                 ) {
                     Button("Delete Service", role: .destructive) {
-                        if model.delete(in: context) {
+                        if model.delete(
+                            in: context,
+                            coordinator: mutationCoordinator
+                        ) {
                             dismiss()
                         }
                     }

@@ -29,7 +29,7 @@ struct BusinessProfileEditorModelTests {
         )
 
         #expect(model.canSave)
-        #expect(model.save(in: context))
+        #expect(model.save(in: context, coordinator: PersistenceMutationCoordinator()))
 
         let profiles = try context.fetch(FetchDescriptor<BusinessProfile>())
         let profile = try #require(profiles.first)
@@ -68,7 +68,7 @@ struct BusinessProfileEditorModelTests {
         model.draft.defaultAppointmentDurationMinutes = 60
         model.draft.defaultInvoiceDueDays = nil
 
-        #expect(model.save(in: context))
+        #expect(model.save(in: context, coordinator: PersistenceMutationCoordinator()))
         #expect(profile.name == "Carter and Son Farriers")
         #expect(profile.phone == nil)
         #expect(profile.email == "office@example.com")
@@ -92,7 +92,7 @@ struct BusinessProfileEditorModelTests {
 
         #expect(model.loadState == .failed)
         #expect(!model.canSave)
-        #expect(!model.save(in: context))
+        #expect(!model.save(in: context, coordinator: PersistenceMutationCoordinator()))
         #expect(try context.fetchCount(FetchDescriptor<BusinessProfile>()) == 2)
     }
 
@@ -119,7 +119,7 @@ struct BusinessProfileEditorModelTests {
         model.draft.name = "Updated Farrier Name"
         horse.client = nil
 
-        #expect(!model.save(in: context))
+        #expect(!model.save(in: context, coordinator: PersistenceMutationCoordinator()))
         #expect(model.draft.name == "Updated Farrier Name")
         #expect(model.alert != nil)
 
@@ -144,7 +144,12 @@ struct BusinessProfileEditorModelTests {
             defaultInvoiceNote: "A new default note."
         )
 
-        #expect(model.save(in: graph.context))
+        #expect(
+            model.save(
+                in: graph.context,
+                coordinator: PersistenceMutationCoordinator()
+            )
+        )
 
         #expect(graph.profile.name == "New Business Name")
         #expect(graph.invoice.businessNameSnapshot == "Original Farrier")

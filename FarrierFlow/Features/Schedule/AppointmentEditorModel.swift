@@ -208,116 +208,121 @@ final class AppointmentEditorModel {
         }
     }
 
-    func save(in context: ModelContext) -> PersistentIdentifier? {
+    func save(
+        in context: ModelContext,
+        coordinator: PersistenceMutationCoordinator
+    ) -> PersistentIdentifier? {
         guard
             draft.isValid,
             let barnID = draft.barnID,
             let barn = context.model(for: barnID) as? Barn
         else { return nil }
 
-        let appointment: Appointment
-        if let appointmentID {
-            guard let existing = context.model(for: appointmentID) as? Appointment else {
+        return coordinator.withMutation {
+            let appointment: Appointment
+            if let appointmentID {
+                guard let existing = context.model(for: appointmentID) as? Appointment else {
+                    return nil
+                }
+                if existing.visit != nil {
+                    let lock: AppointmentVisitLock
+                    do {
+                        lock = try visitLock(for: existing)
+                        apply(lock, synchronizingDraft: false)
+                    } catch {
+                        alert = FeatureAlert(
+                            title: "Appointment Unavailable",
+                            message: "The appointment’s locked visit records couldn’t be verified."
+                        )
+                        return nil
+                    }
+                    guard lockedDraftMatchesPersistedMembership else {
+                        alert = FeatureAlert(
+                            title: "Work Has Started",
+                            message: "The service location and horses can’t change after a visit starts."
+                        )
+                        return nil
+                    }
+
+                    existing.startDate = draft.startDate
+                    existing.notes = TextNormalization.optional(draft.notes)
+                    existing.expectedDurationMinutes = draft.expectedDurationMinutes
+                    do {
+                        try DomainGraphValidator.save(context)
+                        return existing.persistentModelID
+                    } catch {
+                        context.rollback()
+                        alert = FeatureAlert(
+                            title: "Couldn’t Save Appointment",
+                            message: "Your changes are still in the form. Try saving again."
+                        )
+                        return nil
+                    }
+                }
+                appointment = existing
+            } else {
+                appointment = Appointment(startDate: draft.startDate, barn: barn)
+                context.insert(appointment)
+            }
+
+            let horses = draft.selectedHorseIDs.compactMap {
+                context.model(for: $0) as? Horse
+            }
+            let eligibleIDs = Set(horses.filter {
+                $0.currentBarn?.persistentModelID == barnID
+                    && $0.client != nil
+            }.map(\.persistentModelID))
+            guard
+                horses.count == draft.selectedHorseIDs.count,
+                AppointmentRules.validate(
+                    selectedHorseIDs: Array(draft.selectedHorseIDs),
+                    eligibleHorseIDs: eligibleIDs
+                ) == .valid
+            else {
+                alert = FeatureAlert(
+                    title: "Review Selected Horses",
+                    message: "Every selected horse must be at this service location."
+                )
                 return nil
             }
-            if existing.visit != nil {
-                let lock: AppointmentVisitLock
-                do {
-                    lock = try visitLock(for: existing)
-                    apply(lock, synchronizingDraft: false)
-                } catch {
-                    alert = FeatureAlert(
-                        title: "Appointment Unavailable",
-                        message: "The appointment’s locked visit records couldn’t be verified."
-                    )
-                    return nil
-                }
-                guard lockedDraftMatchesPersistedMembership else {
-                    alert = FeatureAlert(
-                        title: "Work Has Started",
-                        message: "The service location and horses can’t change after a visit starts."
-                    )
-                    return nil
-                }
 
-                existing.startDate = draft.startDate
-                existing.notes = TextNormalization.optional(draft.notes)
-                existing.expectedDurationMinutes = draft.expectedDurationMinutes
-                do {
-                    try DomainGraphValidator.save(context)
-                    return existing.persistentModelID
-                } catch {
-                    context.rollback()
-                    alert = FeatureAlert(
-                        title: "Couldn’t Save Appointment",
-                        message: "Your changes are still in the form. Try saving again."
-                    )
-                    return nil
-                }
+            appointment.startDate = draft.startDate
+            appointment.notes = TextNormalization.optional(draft.notes)
+            appointment.expectedDurationMinutes = draft.expectedDurationMinutes
+            appointment.barn = barn
+            if !barn.appointments.contains(where: { $0 === appointment }) {
+                barn.appointments.append(appointment)
             }
-            appointment = existing
-        } else {
-            appointment = Appointment(startDate: draft.startDate, barn: barn)
-            context.insert(appointment)
-        }
 
-        let horses = draft.selectedHorseIDs.compactMap {
-            context.model(for: $0) as? Horse
-        }
-        let eligibleIDs = Set(horses.filter {
-            $0.currentBarn?.persistentModelID == barnID
-                && $0.client != nil
-        }.map(\.persistentModelID))
-        guard
-            horses.count == draft.selectedHorseIDs.count,
-            AppointmentRules.validate(
-                selectedHorseIDs: Array(draft.selectedHorseIDs),
-                eligibleHorseIDs: eligibleIDs
-            ) == .valid
-        else {
-            alert = FeatureAlert(
-                title: "Review Selected Horses",
-                message: "Every selected horse must be at this service location."
+            let selectedIDs = draft.selectedHorseIDs
+            for join in appointment.appointmentHorses
+                where join.horse.map({
+                    !selectedIDs.contains($0.persistentModelID)
+                }) ?? true {
+                context.delete(join)
+            }
+
+            let existingIDs = Set(
+                appointment.appointmentHorses.compactMap(\.horse?.persistentModelID)
             )
-            return nil
-        }
+            for horse in horses where !existingIDs.contains(horse.persistentModelID) {
+                let join = AppointmentHorse(appointment: appointment, horse: horse)
+                context.insert(join)
+                appointment.appointmentHorses.append(join)
+                horse.appointmentHorses.append(join)
+            }
 
-        appointment.startDate = draft.startDate
-        appointment.notes = TextNormalization.optional(draft.notes)
-        appointment.expectedDurationMinutes = draft.expectedDurationMinutes
-        appointment.barn = barn
-        if !barn.appointments.contains(where: { $0 === appointment }) {
-            barn.appointments.append(appointment)
-        }
-
-        let selectedIDs = draft.selectedHorseIDs
-        for join in appointment.appointmentHorses
-            where join.horse.map({
-                !selectedIDs.contains($0.persistentModelID)
-            }) ?? true {
-            context.delete(join)
-        }
-
-        let existingIDs = Set(
-            appointment.appointmentHorses.compactMap(\.horse?.persistentModelID)
-        )
-        for horse in horses where !existingIDs.contains(horse.persistentModelID) {
-            let join = AppointmentHorse(appointment: appointment, horse: horse)
-            context.insert(join)
-            appointment.appointmentHorses.append(join)
-            horse.appointmentHorses.append(join)
-        }
-
-        do {
-            try DomainGraphValidator.save(context)
-            return appointment.persistentModelID
-        } catch {
-            context.rollback()
-            alert = FeatureAlert(
-                title: "Couldn’t Save Appointment",
-                message: "Your changes are still in the form. Try saving again."
-            )
-            return nil
+            do {
+                try DomainGraphValidator.save(context)
+                return appointment.persistentModelID
+            } catch {
+                context.rollback()
+                alert = FeatureAlert(
+                    title: "Couldn’t Save Appointment",
+                    message: "Your changes are still in the form. Try saving again."
+                )
+                return nil
+            }
         }
     }
 

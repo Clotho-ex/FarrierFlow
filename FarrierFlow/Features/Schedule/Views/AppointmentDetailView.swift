@@ -5,6 +5,7 @@ struct AppointmentDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
+    @Environment(PersistenceMutationCoordinator.self) private var mutationCoordinator
     @State private var model = AppointmentDetailModel()
     @State private var showsEditor = false
     @State private var showsDeleteConfirmation = false
@@ -146,7 +147,10 @@ struct AppointmentDetailView: View {
                     titleVisibility: .visible
                 ) {
                     Button("Delete Appointment", role: .destructive) {
-                        if model.delete(in: ModelContext(context.container)) { dismiss() }
+                        if model.delete(
+                            in: ModelContext(context.container),
+                            coordinator: mutationCoordinator
+                        ) { dismiss() }
                     }
                     .accessibilityIdentifier("appointment-delete-confirmation")
                 }

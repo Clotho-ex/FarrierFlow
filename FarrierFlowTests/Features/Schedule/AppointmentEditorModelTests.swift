@@ -154,7 +154,12 @@ struct AppointmentEditorModelTests {
         #expect(editor.draft.selectedHorseIDs.isEmpty)
         #expect(editor.eligibleHorses.isEmpty)
         #expect(editor.saveRequirement == .horse)
-        #expect(editor.save(in: fixture.context) == nil)
+        #expect(
+            editor.save(
+                in: fixture.context,
+                coordinator: PersistenceMutationCoordinator()
+            ) == nil
+        )
         #expect(try fixture.context.fetchCount(FetchDescriptor<Appointment>()) == 0)
     }
 
@@ -196,8 +201,15 @@ struct AppointmentEditorModelTests {
         )
         let editor = AppointmentEditorModel(seed: seed)
         editor.load(in: fixture.context)
+        let coordinator = PersistenceMutationCoordinator()
+        let generation = try coordinator.beginRead()
 
-        let savedID = try #require(editor.save(in: fixture.context))
+        let savedID = try #require(
+            editor.save(in: fixture.context, coordinator: coordinator)
+        )
+        #expect(throws: PersistenceMutationCoordinatorError.sourceChanged) {
+            try coordinator.validate(generation)
+        }
 
         let appointments = try fixture.context.fetch(FetchDescriptor<Appointment>())
         let appointment = try #require(appointments.first)
@@ -229,8 +241,13 @@ struct AppointmentEditorModelTests {
         editor.load(in: fixture.context)
         editor.draft.notes = "Keep this draft"
         editor.draft.expectedDurationText = "55"
+        let coordinator = PersistenceMutationCoordinator()
+        let generation = try coordinator.beginRead()
 
-        #expect(editor.save(in: fixture.context) == nil)
+        #expect(editor.save(in: fixture.context, coordinator: coordinator) == nil)
+        #expect(throws: PersistenceMutationCoordinatorError.sourceChanged) {
+            try coordinator.validate(generation)
+        }
 
         #expect(editor.alert?.title == "Couldn’t Save Appointment")
         #expect(editor.draft.barnID == fixture.barn.persistentModelID)
@@ -313,7 +330,12 @@ struct AppointmentEditorModelTests {
         editor.toggleHorse(fixture.horses[0].persistentModelID)
         editor.toggleHorse(fixture.horses[1].persistentModelID)
 
-        let id = try #require(editor.save(in: fixture.context))
+        let id = try #require(
+            editor.save(
+                in: fixture.context,
+                coordinator: PersistenceMutationCoordinator()
+            )
+        )
         let appointment = try #require(fixture.context.model(for: id) as? Appointment)
         #expect(appointment.appointmentHorses.count == 2)
         #expect(
@@ -487,7 +509,12 @@ struct AppointmentEditorModelTests {
         editor.draft.notes = "  Gate code changed  "
         editor.draft.expectedDurationText = "45"
 
-        #expect(editor.save(in: fixture.context) == appointment.persistentModelID)
+        #expect(
+            editor.save(
+                in: fixture.context,
+                coordinator: PersistenceMutationCoordinator()
+            ) == appointment.persistentModelID
+        )
         #expect(appointment.startDate == Date(timeIntervalSinceReferenceDate: 300))
         #expect(appointment.notes == "Gate code changed")
         #expect(appointment.expectedDurationMinutes == 45)
@@ -641,7 +668,12 @@ struct AppointmentEditorModelTests {
         editor.draft.barnID = otherBarn.persistentModelID
         editor.draft.selectedHorseIDs = [otherHorse.persistentModelID]
 
-        #expect(editor.save(in: fixture.context) == nil)
+        #expect(
+            editor.save(
+                in: fixture.context,
+                coordinator: PersistenceMutationCoordinator()
+            ) == nil
+        )
         #expect(appointment.barn?.persistentModelID == originalBarnID)
         #expect(
             Set(appointment.appointmentHorses.compactMap { $0.horse?.persistentModelID })
@@ -658,7 +690,12 @@ struct AppointmentEditorModelTests {
         editor.draft.notes = "  Gate code changed  "
         editor.draft.expectedDurationText = "45"
 
-        #expect(editor.save(in: fixture.context) == appointment.persistentModelID)
+        #expect(
+            editor.save(
+                in: fixture.context,
+                coordinator: PersistenceMutationCoordinator()
+            ) == appointment.persistentModelID
+        )
         #expect(appointment.startDate == Date(timeIntervalSinceReferenceDate: 300))
         #expect(appointment.notes == "Gate code changed")
         #expect(appointment.expectedDurationMinutes == 45)
@@ -727,7 +764,12 @@ struct AppointmentEditorModelTests {
         editor.draft.notes = "  Updated schedule  "
         editor.draft.expectedDurationText = "50"
 
-        #expect(editor.save(in: fixture.context) == appointment.persistentModelID)
+        #expect(
+            editor.save(
+                in: fixture.context,
+                coordinator: PersistenceMutationCoordinator()
+            ) == appointment.persistentModelID
+        )
         #expect(appointment.startDate == Date(timeIntervalSinceReferenceDate: 400))
         #expect(appointment.notes == "Updated schedule")
         #expect(appointment.expectedDurationMinutes == 50)
