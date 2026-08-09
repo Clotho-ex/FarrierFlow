@@ -1,6 +1,8 @@
 import Foundation
 import SwiftData
 
+private let exportSnapshotMaximumBatchSize = 200
+
 nonisolated struct ExportSnapshotProgress: Sendable, Equatable {
     let completedRecords: Int
     let totalRecords: Int
@@ -18,20 +20,17 @@ enum ExportSnapshotBuilder {
         guard batchSize > 0 else {
             throw ExportSnapshotError.invalidBatchSize(batchSize)
         }
-        guard batchSize <= 200 else {
+        guard batchSize <= exportSnapshotMaximumBatchSize else {
             throw ExportSnapshotError.batchSizeExceedsMaximum(batchSize)
         }
 
         try Task.checkCancellation()
         let readGuard = try SnapshotReadGuard.begin(using: mutationCoordinator)
-        let danglingStartCapture = DanglingRelationshipHints.beginCaptureOperationStart(
-            in: context,
-            batchSize: batchSize
-        )
+        let danglingStart = try DanglingRelationshipHints.captureOperationStart(in: context)
         let snapshot = try await SnapshotCooperation.withReadGuard(readGuard) {
             try await buildSnapshot(
                 in: context,
-                danglingStartCapture: danglingStartCapture,
+                danglingStart: danglingStart,
                 exportContext: exportContext,
                 batchSize: batchSize,
                 progress: progress
@@ -43,12 +42,11 @@ enum ExportSnapshotBuilder {
 
     private static func buildSnapshot(
         in context: ModelContext,
-        danglingStartCapture: DanglingRelationshipHints.OperationStartCapture,
+        danglingStart: DanglingRelationshipHints.OperationStart,
         exportContext: ExportContext,
         batchSize: Int,
         progress: @escaping @MainActor (ExportSnapshotProgress) -> Void
     ) async throws -> ExportSnapshot {
-        let danglingStart = try await danglingStartCapture.finish(batchSize: batchSize)
         let danglingRelationships = try await DanglingRelationshipHints.capture(
             in: context,
             operationStart: danglingStart,
@@ -1204,47 +1202,24 @@ private struct DanglingRelationshipHints {
         let currentRelationships: CurrentRelationshipTargets
     }
 
-    struct OperationStartCapture {
-        let deletedModels: [any PersistentModel]
-        let changedModels: [any PersistentModel]
-        var currentRelationships: CurrentRelationshipTargets
-        var nextChangedIndex: Int
-
-        func finish(batchSize: Int) async throws -> OperationStart {
-            var capture = self
-            while capture.nextChangedIndex < capture.changedModels.count {
-                try await SnapshotCooperation.checkpoint()
-                capture.nextChangedIndex = capture.currentRelationships.captureBatch(
-                    capture.changedModels,
-                    startingAt: capture.nextChangedIndex,
-                    batchSize: batchSize
-                )
-            }
-            try await SnapshotCooperation.checkpoint()
-            return OperationStart(
-                deletedModels: capture.deletedModels,
-                currentRelationships: capture.currentRelationships
-            )
-        }
-    }
-
-    static func beginCaptureOperationStart(
-        in context: ModelContext,
-        batchSize: Int
-    ) -> OperationStartCapture {
+    static func captureOperationStart(in context: ModelContext) throws -> OperationStart {
         let deletedModels = context.deletedModelsArray
         let changedModels = context.changedModelsArray
+        // SwiftData can normalize pending links to deleted targets at the first yield.
+        // Capture every candidate now when the work fits one bounded group; otherwise
+        // fail closed instead of silently exporting a normalized relationship.
+        guard changedModels.count <= exportSnapshotMaximumBatchSize else {
+            throw ExportSnapshotError.sourceDataChanged
+        }
         var currentRelationships = CurrentRelationshipTargets()
-        let nextChangedIndex = currentRelationships.captureBatch(
+        _ = currentRelationships.captureBatch(
             changedModels,
             startingAt: 0,
-            batchSize: batchSize
+            batchSize: exportSnapshotMaximumBatchSize
         )
-        return OperationStartCapture(
+        return OperationStart(
             deletedModels: deletedModels,
-            changedModels: changedModels,
-            currentRelationships: currentRelationships,
-            nextChangedIndex: nextChangedIndex
+            currentRelationships: currentRelationships
         )
     }
 

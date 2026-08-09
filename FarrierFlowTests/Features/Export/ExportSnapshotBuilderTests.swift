@@ -235,6 +235,137 @@ struct ExportSnapshotBuilderTests {
     }
 
     @Test
+    func rejectsRelationshipCaptureBeyondFixedDirtyOwnerBoundBeforeProgress() async throws {
+        let graph = try ExportTestFixtures.makeCompleteGraph()
+        let service = ModelFixtures.makeService(
+            name: "Deleted Batched Default",
+            defaultAmountMinorUnits: 7_500,
+            in: graph.context
+        )
+        var horses = [Horse]()
+        for index in 1...201 {
+            let horse = Horse(
+                name: "Dirty Batched Horse \(index)",
+                client: graph.clients[0],
+                currentBarn: graph.barns[0],
+                defaultService: service
+            )
+            graph.context.insert(horse)
+            graph.clients[0].horses.append(horse)
+            graph.barns[0].horses.append(horse)
+            service.horsesUsingAsDefault.append(horse)
+            horses.append(horse)
+        }
+        try DomainGraphValidator.save(graph.context)
+
+        service.horsesUsingAsDefault.removeAll()
+        for horse in horses {
+            horse.name += " — Dirty"
+            horse.defaultService = nil
+        }
+        let horsesByID = Dictionary(uniqueKeysWithValues: horses.map {
+            ($0.persistentModelID, $0)
+        })
+        let danglingHorse = try #require(
+            graph.context.changedModelsArray.reversed().compactMap {
+                horsesByID[$0.persistentModelID]
+            }.first
+        )
+        danglingHorse.defaultService = service
+        service.horsesUsingAsDefault.append(danglingHorse)
+        graph.context.delete(service)
+
+        let changedModels = graph.context.changedModelsArray
+        let danglingIndex = try #require(changedModels.firstIndex {
+            $0.persistentModelID == danglingHorse.persistentModelID
+        })
+        try #require(changedModels.count > 200)
+        try #require(danglingIndex >= 200)
+        #expect(danglingHorse.defaultService === service)
+        var progress = [ExportSnapshotProgress]()
+
+        await #expect(
+            throws: ExportSnapshotError.sourceDataChanged
+        ) {
+            _ = try await ExportSnapshotBuilder.build(
+                in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
+                exportContext: graph.exportContext,
+                batchSize: 200,
+                progress: { progress.append($0) }
+            )
+        }
+        #expect(progress.isEmpty)
+    }
+
+    @Test
+    func preservesDanglingRelationshipTruthBeyondCallerBatchBeforeProgress() async throws {
+        let graph = try ExportTestFixtures.makeCompleteGraph()
+        let service = ModelFixtures.makeService(
+            name: "Deleted Small-Batch Default",
+            defaultAmountMinorUnits: 7_500,
+            in: graph.context
+        )
+        var horses = [Horse]()
+        for index in 1...3 {
+            let horse = Horse(
+                name: "Dirty Small-Batch Horse \(index)",
+                client: graph.clients[0],
+                currentBarn: graph.barns[0],
+                defaultService: service
+            )
+            graph.context.insert(horse)
+            graph.clients[0].horses.append(horse)
+            graph.barns[0].horses.append(horse)
+            service.horsesUsingAsDefault.append(horse)
+            horses.append(horse)
+        }
+        try DomainGraphValidator.save(graph.context)
+
+        service.horsesUsingAsDefault.removeAll()
+        for horse in horses {
+            horse.name += " — Dirty"
+            horse.defaultService = nil
+        }
+        let horsesByID = Dictionary(uniqueKeysWithValues: horses.map {
+            ($0.persistentModelID, $0)
+        })
+        let danglingHorse = try #require(
+            graph.context.changedModelsArray.reversed().compactMap {
+                horsesByID[$0.persistentModelID]
+            }.first
+        )
+        danglingHorse.defaultService = service
+        service.horsesUsingAsDefault.append(danglingHorse)
+        graph.context.delete(service)
+
+        let changedModels = graph.context.changedModelsArray
+        let danglingIndex = try #require(changedModels.firstIndex {
+            $0.persistentModelID == danglingHorse.persistentModelID
+        })
+        try #require(changedModels.count <= 200)
+        try #require(danglingIndex >= 1)
+        #expect(danglingHorse.defaultService === service)
+        var progress = [ExportSnapshotProgress]()
+
+        await #expect(
+            throws: ExportSnapshotError.missingProjectedRelationship(
+                entity: .horse,
+                relationship: "defaultService"
+            )
+        ) {
+            _ = try await ExportSnapshotBuilder.build(
+                in: graph.context,
+                mutationCoordinator: graph.mutationCoordinator,
+                exportContext: graph.exportContext,
+                batchSize: 1,
+                progress: { progress.append($0) }
+            )
+        }
+        #expect(progress.isEmpty)
+    }
+
+    @Test
     func acceptsReassignedOptionalRelationshipBeforeDeletingItsSavedTarget() async throws {
         let graph = try ExportTestFixtures.makeCompleteGraph()
         let oldService = ModelFixtures.makeService(
