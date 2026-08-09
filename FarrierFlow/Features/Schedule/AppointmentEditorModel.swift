@@ -219,7 +219,7 @@ final class AppointmentEditorModel {
         else { return nil }
 
         return coordinator.withMutation {
-            let appointment: Appointment
+            let existingAppointment: Appointment?
             if let appointmentID {
                 guard let existing = context.model(for: appointmentID) as? Appointment else {
                     return nil
@@ -259,10 +259,9 @@ final class AppointmentEditorModel {
                         return nil
                     }
                 }
-                appointment = existing
+                existingAppointment = existing
             } else {
-                appointment = Appointment(startDate: draft.startDate, barn: barn)
-                context.insert(appointment)
+                existingAppointment = nil
             }
 
             let horses = draft.selectedHorseIDs.compactMap {
@@ -284,6 +283,14 @@ final class AppointmentEditorModel {
                     message: "Every selected horse must be at this service location."
                 )
                 return nil
+            }
+
+            let appointment: Appointment
+            if let existingAppointment {
+                appointment = existingAppointment
+            } else {
+                appointment = Appointment(startDate: draft.startDate, barn: barn)
+                context.insert(appointment)
             }
 
             appointment.startDate = draft.startDate
