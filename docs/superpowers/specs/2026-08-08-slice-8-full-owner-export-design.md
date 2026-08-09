@@ -85,8 +85,9 @@ custom encryption, or a third-party dependency.
 - Introduce `Features/Export/` now that Slice 8 is shaped. It owns the export
   screen, route, immutable projections, CSV and manifest writers, temporary
   storage, ZIP creation, progress, cancellation, and sharing.
-- `ClientListView` gains only an `ExportRoute`; no global coordinator or
-  generalized Settings architecture is introduced.
+- `ClientListView` gains only an `ExportRoute`; no generalized Settings
+  architecture is introduced. Source-mutation coordination is an app-composition
+  persistence dependency described below, not navigation or Settings ownership.
 - A `@MainActor @Observable ExportModel` controls UI state and coordinates one
   export operation at a time.
 - An `ExportSnapshotBuilder` reads the shared SwiftData container through a
@@ -96,6 +97,35 @@ custom encryption, or a third-party dependency.
   must yield between bounded record groups so a large local store does not
   monopolize the main actor. SwiftData models and `ModelContext` never cross
   actors.
+- `AppDependencies` creates one `PersistenceMutationCoordinator` beside the
+  production `ModelContainer` and supplies that same coordinator explicitly to
+  controlled persistence writers and `ExportSnapshotBuilder`. The coordinator
+  owns only an in-memory opaque generation token and active-writer count. It is
+  not a global singleton, service locator, repository, notification bus,
+  persisted model, export-history record, or source of business data.
+- Every production operation that inserts, deletes, or changes a SwiftData
+  model enters a coordinator write scope synchronously before its first model
+  mutation. The scope remains active across validation, save, rollback, and any
+  operation-owned suspension points, and ends only after the context has
+  reached its final success or failure state. Beginning and ending a write
+  scope both replace the opaque generation token, so a write that starts and
+  finishes between two export checks cannot disappear as a net-zero change.
+  Preview and test fixture seeding that completes before an export begins is
+  not a concurrent production writer.
+- Snapshot construction begins only from a quiescent coordinator and captures
+  its generation token. It validates that the coordinator remains quiescent
+  and unchanged immediately after every cooperative suspension boundary,
+  before every progress callback, and immediately before returning the
+  immutable snapshot. No suspension occurs between the final validation and
+  return. A writer is never delayed or rejected for export; if any writer
+  begins while snapshot construction is active, export fails at the next safe
+  boundary with a typed source-data-changed error and emits no later progress
+  or shareable output.
+- All app-owned record iteration used to establish or validate the snapshot is
+  bounded by the approved batch size. The atomic generation checks are
+  constant-time and must not be implemented by synchronously rescanning
+  changed, inserted, deleted, or fetched model collections. Production code may
+  not mutate the shared SwiftData graph outside a coordinator write scope.
 - Snapshot creation is read-only and introduces no schema or migration change.
 - The exact persisted entities included in a full export are defined by this
   contract rather than inferred dynamically from the schema. Adding a future
@@ -139,6 +169,10 @@ custom encryption, or a third-party dependency.
 - Invalid required graph relationships, unavailable protected data,
   insufficient storage, serialization failure, PDF failure, or archive failure
   produce typed errors and remove the complete staging operation.
+- A source mutation observed through the persistence coordinator during
+  snapshot construction produces a typed source-data-changed error. The owner
+  may retry after the write finishes; source records are never blocked,
+  reverted, repaired, or partially exported.
 - A Photograph metadata record whose canonical JPEG is already unavailable
   before export copying begins is the sole partial-success case. Its CSV row
   remains, the missing file is omitted, and the manifest and warnings identify
@@ -408,6 +442,18 @@ Verification must cover:
 
 - Snapshot projection of every approved scalar and relationship across all 14
   entities.
+- Coordinator coverage for every production SwiftData write entry point,
+  including writers that use action-specific `ModelContext` instances.
+- Rejection before initial progress when a writer is already active, plus
+  rejection at the next safe boundary when a clean model, an already-dirty
+  model, a forward relationship, or membership changes during snapshot work.
+  Verification includes a writer that starts and finishes between export
+  checks, an asynchronous writer spanning suspension points, and a captured
+  insert-then-delete cycle whose public SwiftData pending state returns to its
+  baseline.
+- Constant-time generation validation and batch-bounded processing of any
+  initial changed or deleted model collections; no unbounded app-owned scan is
+  accepted as an atomicity substitute.
 - Deterministic ordering and internally consistent typed export IDs.
 - Required-versus-optional relationship handling and unknown-enum rejection.
 - UTC and local date formatting, monetary representation, RFC 4180 escaping,
@@ -471,3 +517,5 @@ Verification must cover:
 - SwiftData schema changes.
 - Third-party dependencies.
 - Mutation, repair, or omission of source business records during export.
+- A generalized repository, global persistence singleton, notification event
+  bus, or export-owned lock that delays ordinary business-record writes.
