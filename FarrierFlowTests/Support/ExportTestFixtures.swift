@@ -219,6 +219,31 @@ enum ExportTestFixtures {
         )
     }
 
+    static func appendInvoiceLineItems(count: Int, to graph: CompleteGraph) throws {
+        let invoiceVisit = try #require(graph.invoices[0].invoiceVisits.first)
+        let visitHorse = graph.visitHorses[0]
+
+        for offset in 0..<count {
+            let index = offset + 1
+            let service = ModelFixtures.makeService(
+                name: "Nested Service \(index)",
+                defaultAmountMinorUnits: Int64(1_000 + index),
+                in: graph.context
+            )
+            let workItem = ModelFixtures.makeWorkItem(
+                service: service,
+                visitHorse: visitHorse,
+                in: graph.context
+            )
+            _ = try ModelFixtures.makeInvoiceLineItem(
+                invoiceVisit: invoiceVisit,
+                sourceWorkItem: workItem,
+                in: graph.context
+            )
+        }
+        try DomainGraphValidator.save(graph.context)
+    }
+
     private static func requiredVisitHorse(for horse: Horse, in visit: Visit) throws -> VisitHorse {
         try #require(visit.visitHorses.first(where: { $0.horse === horse }))
     }

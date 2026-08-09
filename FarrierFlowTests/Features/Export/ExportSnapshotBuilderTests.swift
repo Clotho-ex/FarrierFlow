@@ -134,6 +134,78 @@ struct ExportSnapshotBuilderTests {
     }
 
     @Test
+    func rejectsDanglingRequiredTargetBeforeReportingProgress() async throws {
+        let graph = try ExportTestFixtures.makeCompleteGraph()
+        let client = Client(name: "Deleted Owner")
+        let horse = Horse(
+            name: "Dangling Required",
+            client: client,
+            currentBarn: graph.barns[0]
+        )
+        graph.context.insert(client)
+        graph.context.insert(horse)
+        client.horses.append(horse)
+        graph.barns[0].horses.append(horse)
+        try DomainGraphValidator.save(graph.context)
+        let deletedID = client.persistentModelID
+        graph.context.delete(client)
+        #expect(horse.client === client)
+        #expect(try !graph.context.fetch(FetchDescriptor<Client>()).contains {
+            $0.persistentModelID == deletedID
+        })
+        var progress = [ExportSnapshotProgress]()
+
+        await #expect(
+            throws: ExportSnapshotError.missingProjectedRelationship(
+                entity: .horse,
+                relationship: "client"
+            )
+        ) {
+            _ = try await ExportSnapshotBuilder.build(
+                in: graph.context,
+                exportContext: graph.exportContext,
+                progress: { progress.append($0) }
+            )
+        }
+        #expect(progress.isEmpty)
+    }
+
+    @Test
+    func rejectsDanglingOptionalTargetInsteadOfSilentlyOmittingIt() async throws {
+        let graph = try ExportTestFixtures.makeCompleteGraph()
+        let service = ModelFixtures.makeService(
+            name: "Deleted Default",
+            defaultAmountMinorUnits: 7_500,
+            in: graph.context
+        )
+        let horse = graph.horses[2]
+        horse.defaultService = service
+        service.horsesUsingAsDefault.append(horse)
+        try DomainGraphValidator.save(graph.context)
+        let deletedID = service.persistentModelID
+        graph.context.delete(service)
+        #expect(horse.defaultService === service)
+        #expect(try !graph.context.fetch(FetchDescriptor<Service>()).contains {
+            $0.persistentModelID == deletedID
+        })
+        var progress = [ExportSnapshotProgress]()
+
+        await #expect(
+            throws: ExportSnapshotError.missingProjectedRelationship(
+                entity: .horse,
+                relationship: "defaultService"
+            )
+        ) {
+            _ = try await ExportSnapshotBuilder.build(
+                in: graph.context,
+                exportContext: graph.exportContext,
+                progress: { progress.append($0) }
+            )
+        }
+        #expect(progress.isEmpty)
+    }
+
+    @Test
     func rejectsDuplicateUniqueRelationshipBeforeProjection() async throws {
         let graph = try ExportTestFixtures.makeCompleteGraph()
         let appointment = graph.appointments[0]
@@ -361,6 +433,73 @@ struct ExportSnapshotBuilderTests {
     }
 
     @Test
+    func acceptsCancellationWhileBuildingALargeNestedInvoiceBeforeInvoiceProgress() async throws {
+        let graph = try ExportTestFixtures.makeCompleteGraph()
+        let additionalLineItemCount = 64
+        try ExportTestFixtures.appendInvoiceLineItems(
+            count: additionalLineItemCount,
+            to: graph
+        )
+        let originalRecordsBeforeInvoices = 27
+        let addedRecordsBeforeInvoices = additionalLineItemCount * 2
+        let recordsBeforeInvoices = originalRecordsBeforeInvoices + addedRecordsBeforeInvoices
+        let totalRecords = 33 + additionalLineItemCount * 3
+        var progress = [ExportSnapshotProgress]()
+        let holder = ExportSnapshotTaskHolder()
+
+        holder.task = Task { @MainActor in
+            try await ExportSnapshotBuilder.build(
+                in: graph.context,
+                exportContext: graph.exportContext,
+                batchSize: 1,
+                progress: { update in
+                    progress.append(update)
+                    if update.completedRecords == recordsBeforeInvoices {
+                        holder.canceller = Task { @MainActor in
+                            await Task.yield()
+                            holder.task?.cancel()
+                        }
+                    }
+                }
+            )
+        }
+        let task = try #require(holder.task)
+        await #expect(throws: CancellationError.self) {
+            _ = try await task.value
+        }
+        await holder.canceller?.value
+
+        #expect(progress.last == ExportSnapshotProgress(
+            completedRecords: recordsBeforeInvoices,
+            totalRecords: totalRecords
+        ))
+    }
+
+    @Test
+    func preCancelledBuildStopsBeforeInvalidGraphValidation() async throws {
+        let graph = try ExportTestFixtures.makeCompleteGraph()
+        graph.services[0].defaultAmountMinorUnits = -1
+        var progress = [ExportSnapshotProgress]()
+        let holder = ExportSnapshotTaskHolder()
+
+        holder.task = Task { @MainActor in
+            try await ExportSnapshotBuilder.build(
+                in: graph.context,
+                exportContext: graph.exportContext,
+                batchSize: 1,
+                progress: { progress.append($0) }
+            )
+        }
+        let task = try #require(holder.task)
+        task.cancel()
+
+        await #expect(throws: CancellationError.self) {
+            _ = try await task.value
+        }
+        #expect(progress.isEmpty)
+    }
+
+    @Test
     func rejectsInvalidBatchSizeBeforeFetchingOrReportingProgress() async throws {
         let graph = try ExportTestFixtures.makeCompleteGraph()
         var progress = [ExportSnapshotProgress]()
@@ -406,6 +545,7 @@ struct ExportSnapshotBuilderTests {
 @MainActor
 private final class ExportSnapshotTaskHolder {
     var task: Task<ExportSnapshot, Error>?
+    var canceller: Task<Void, Never>?
 }
 
 enum MissingRelationship: CaseIterable, CustomTestStringConvertible {
