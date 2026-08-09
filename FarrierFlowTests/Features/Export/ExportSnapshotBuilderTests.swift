@@ -294,6 +294,86 @@ struct ExportSnapshotBuilderTests {
     }
 
     @Test
+    func rejectsDeletedUnsavedReplacementForSavedOptionalRelationshipBeforeProgress() async throws {
+        let graph = try ExportTestFixtures.makeCompleteGraph()
+        let savedService = ModelFixtures.makeService(
+            name: "Saved Default",
+            defaultAmountMinorUnits: 7_000,
+            in: graph.context
+        )
+        let replacement = ModelFixtures.makeService(
+            name: "Unsaved Replacement",
+            defaultAmountMinorUnits: 8_000,
+            in: graph.context
+        )
+        let horse = graph.horses[2]
+        horse.defaultService = savedService
+        savedService.horsesUsingAsDefault.append(horse)
+        try DomainGraphValidator.save(graph.context)
+
+        savedService.horsesUsingAsDefault.removeAll { $0 === horse }
+        horse.defaultService = replacement
+        replacement.horsesUsingAsDefault.append(horse)
+        graph.context.delete(replacement)
+        #expect(horse.defaultService === replacement)
+        var progress = [ExportSnapshotProgress]()
+
+        await #expect(
+            throws: ExportSnapshotError.missingProjectedRelationship(
+                entity: .horse,
+                relationship: "defaultService"
+            )
+        ) {
+            _ = try await ExportSnapshotBuilder.build(
+                in: graph.context,
+                exportContext: graph.exportContext,
+                progress: { progress.append($0) }
+            )
+        }
+
+        #expect(progress.isEmpty)
+    }
+
+    @Test
+    func rejectsDeletedUnsavedReplacementForSavedRequiredRelationshipBeforeProgress() async throws {
+        let graph = try ExportTestFixtures.makeCompleteGraph()
+        let savedClient = Client(name: "Saved Client")
+        let replacement = Client(name: "Unsaved Replacement Client")
+        let horse = Horse(
+            name: "Required Replacement Horse",
+            client: savedClient,
+            currentBarn: graph.barns[0]
+        )
+        for model in [savedClient, replacement] { graph.context.insert(model) }
+        graph.context.insert(horse)
+        savedClient.horses.append(horse)
+        graph.barns[0].horses.append(horse)
+        try DomainGraphValidator.save(graph.context)
+
+        savedClient.horses.removeAll { $0 === horse }
+        horse.client = replacement
+        replacement.horses.append(horse)
+        graph.context.delete(replacement)
+        #expect(horse.client === replacement)
+        var progress = [ExportSnapshotProgress]()
+
+        await #expect(
+            throws: ExportSnapshotError.missingProjectedRelationship(
+                entity: .horse,
+                relationship: "client"
+            )
+        ) {
+            _ = try await ExportSnapshotBuilder.build(
+                in: graph.context,
+                exportContext: graph.exportContext,
+                progress: { progress.append($0) }
+            )
+        }
+
+        #expect(progress.isEmpty)
+    }
+
+    @Test
     func rejectsDuplicateUniqueRelationshipBeforeProjection() async throws {
         let graph = try ExportTestFixtures.makeCompleteGraph()
         let appointment = graph.appointments[0]
@@ -711,6 +791,92 @@ struct ExportSnapshotBuilderTests {
     }
 
     @Test
+    func rejectsEarlyEntityDeletionAfterItsMembershipRecheckBeforeProgress() async throws {
+        let graph = try ExportTestFixtures.makeCompleteGraph()
+        let clientToDelete = Client(name: "Post-recheck Client")
+        graph.context.insert(clientToDelete)
+        for index in 1...401 {
+            _ = ModelFixtures.makeService(
+                name: "Later Work Service \(index)",
+                defaultAmountMinorUnits: Int64(index),
+                in: graph.context
+            )
+        }
+        try DomainGraphValidator.save(graph.context)
+        var progress = [ExportSnapshotProgress]()
+        let holder = ExportSnapshotTaskHolder()
+
+        holder.task = Task { @MainActor in
+            try await ExportSnapshotBuilder.build(
+                in: graph.context,
+                exportContext: graph.exportContext,
+                batchSize: 200,
+                progress: { progress.append($0) }
+            )
+        }
+        holder.canceller = Task { @MainActor in
+            // Operation setup and all captures consume 76 yields. Business Profile
+            // and Client rechecks finish by turn 88; later entity work is still active.
+            for _ in 0..<100 {
+                await Task.yield()
+            }
+            graph.context.delete(clientToDelete)
+        }
+        let task = try #require(holder.task)
+        await #expect(throws: ExportSnapshotError.sourceGraphChanged(.client)) {
+            _ = try await task.value
+        }
+        await holder.canceller?.value
+
+        #expect(progress.isEmpty)
+    }
+
+    @Test
+    func rejectsSavedEarlyEntityDeletionAfterItsMembershipRecheckBeforeProgress() async throws {
+        let graph = try ExportTestFixtures.makeCompleteGraph()
+        let clientToDelete = Client(name: "Saved Post-recheck Client")
+        graph.context.insert(clientToDelete)
+        for index in 1...401 {
+            _ = ModelFixtures.makeService(
+                name: "Later Saved Work Service \(index)",
+                defaultAmountMinorUnits: Int64(index),
+                in: graph.context
+            )
+        }
+        try DomainGraphValidator.save(graph.context)
+        var progress = [ExportSnapshotProgress]()
+        let holder = ExportSnapshotTaskHolder()
+
+        holder.task = Task { @MainActor in
+            try await ExportSnapshotBuilder.build(
+                in: graph.context,
+                exportContext: graph.exportContext,
+                batchSize: 200,
+                progress: { progress.append($0) }
+            )
+        }
+        holder.canceller = Task { @MainActor in
+            for _ in 0..<100 {
+                await Task.yield()
+            }
+            graph.context.delete(clientToDelete)
+            do {
+                try graph.context.save()
+            } catch {
+                holder.mutationError = error
+            }
+        }
+        let task = try #require(holder.task)
+        await #expect(throws: ExportSnapshotError.sourceGraphChanged(.client)) {
+            _ = try await task.value
+        }
+        await holder.canceller?.value
+
+        #expect(holder.mutationError == nil)
+        #expect(progress.isEmpty)
+    }
+
+    @Test
     func rejectsInvalidBatchSizeBeforeFetchingOrReportingProgress() async throws {
         let graph = try ExportTestFixtures.makeCompleteGraph()
         var progress = [ExportSnapshotProgress]()
@@ -781,6 +947,7 @@ struct ExportSnapshotBuilderTests {
 private final class ExportSnapshotTaskHolder {
     var task: Task<ExportSnapshot, Error>?
     var canceller: Task<Void, Never>?
+    var mutationError: Error?
 }
 
 enum PublicInverseMutation: CaseIterable, CustomTestStringConvertible {

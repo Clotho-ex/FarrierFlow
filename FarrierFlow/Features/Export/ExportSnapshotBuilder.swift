@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import SwiftData
 
 nonisolated struct ExportSnapshotProgress: Sendable, Equatable {
@@ -22,8 +23,15 @@ enum ExportSnapshotBuilder {
         }
 
         try Task.checkCancellation()
+        let danglingStart = DanglingRelationshipHints.captureOperationStart(in: context)
+        let mutationGuard = SourceGraphMutationGuard.capture(
+            in: context,
+            initialDeletedModels: danglingStart.deletedModels
+        )
+        defer { mutationGuard.stop() }
         let danglingRelationships = try await DanglingRelationshipHints.capture(
             in: context,
+            operationStart: danglingStart,
             batchSize: batchSize
         )
         let source = try await SourceGraph.fetch(in: context, batchSize: batchSize)
@@ -35,6 +43,7 @@ enum ExportSnapshotBuilder {
 
         let ordered = try await OrderedGraph.make(from: source, batchSize: batchSize)
         let totalRecords = ordered.totalRecords
+        try mutationGuard.validate(in: context, source: source)
         progress(.init(completedRecords: 0, totalRecords: totalRecords))
         try Task.checkCancellation()
 
@@ -389,7 +398,7 @@ enum ExportSnapshotBuilder {
             batchSize: batchSize
         ) { $0.1 }
 
-        return ExportSnapshot(
+        let snapshot = ExportSnapshot(
             context: exportContext,
             businessProfiles: businessProfiles,
             clients: clients,
@@ -407,6 +416,8 @@ enum ExportSnapshotBuilder {
             invoiceLineItems: invoiceLineItems,
             invoiceDocuments: invoiceDocuments
         )
+        try mutationGuard.validate(in: context, source: source)
+        return snapshot
     }
 
     private static func validate(
@@ -731,6 +742,7 @@ private struct SourceGraph {
     let invoices: [Invoice]
     let invoiceVisits: [InvoiceVisit]
     let invoiceLineItems: [InvoiceLineItem]
+    let membership: [ExportEntity: Set<PersistentIdentifier>]
 
     static func fetch(in context: ModelContext, batchSize: Int) async throws -> SourceGraph {
         let businessProfiles = try await fetch(BusinessProfile.self, entity: .businessProfile, in: context, batchSize: batchSize)
@@ -777,8 +789,30 @@ private struct SourceGraph {
             workItems: workItems.models,
             invoices: invoices.models,
             invoiceVisits: invoiceVisits.models,
-            invoiceLineItems: invoiceLineItems.models
+            invoiceLineItems: invoiceLineItems.models,
+            membership: [
+                .businessProfile: businessProfiles.identifierSet,
+                .client: clients.identifierSet,
+                .serviceLocation: serviceLocations.identifierSet,
+                .horse: horses.identifierSet,
+                .appointment: appointments.identifierSet,
+                .appointmentHorse: appointmentHorses.identifierSet,
+                .visit: visits.identifierSet,
+                .visitHorse: visitHorses.identifierSet,
+                .photograph: photographs.identifierSet,
+                .service: services.identifierSet,
+                .workItem: workItems.identifierSet,
+                .invoice: invoices.identifierSet,
+                .invoiceVisit: invoiceVisits.identifierSet,
+                .invoiceLineItem: invoiceLineItems.identifierSet,
+            ]
         )
+    }
+
+    func entity(containing identifier: PersistentIdentifier) -> ExportEntity? {
+        ExportEntity.allCases.first {
+            membership[$0, default: []].contains(identifier)
+        }
     }
 
     private struct StableModels<Model: PersistentModel> {
@@ -1101,26 +1135,167 @@ private enum SnapshotCooperation {
 }
 
 @MainActor
+private struct SourceGraphMutationGuard {
+    private nonisolated final class SavedChanges: Sendable {
+        private let identifiers = Mutex(Set<PersistentIdentifier>())
+
+        func record(_ notification: Notification) {
+            let keys: [ModelContext.NotificationKey] = [
+                .insertedIdentifiers,
+                .updatedIdentifiers,
+                .deletedIdentifiers,
+            ]
+            var savedIdentifiers = Set<PersistentIdentifier>()
+            for key in keys {
+                if let values = notification.userInfo?[key.rawValue]
+                    as? Set<PersistentIdentifier> {
+                    savedIdentifiers.formUnion(values)
+                } else if let values = notification.userInfo?[key.rawValue]
+                    as? [PersistentIdentifier] {
+                    savedIdentifiers.formUnion(values)
+                }
+            }
+            identifiers.withLock { $0.formUnion(savedIdentifiers) }
+        }
+
+        func snapshot() -> Set<PersistentIdentifier> {
+            identifiers.withLock { $0 }
+        }
+    }
+
+    private struct PendingMembership {
+        let inserted: [ExportEntity: Set<PersistentIdentifier>]
+        let deleted: [ExportEntity: Set<PersistentIdentifier>]
+
+        static func capture(in context: ModelContext) -> PendingMembership {
+            PendingMembership(
+                inserted: group(context.insertedModelsArray),
+                deleted: group(context.deletedModelsArray)
+            )
+        }
+
+        static func capture(
+            in context: ModelContext,
+            initialDeletedModels: [any PersistentModel]
+        ) -> PendingMembership {
+            PendingMembership(
+                inserted: group(context.insertedModelsArray),
+                deleted: group(initialDeletedModels)
+            )
+        }
+
+        private static func group(
+            _ models: [any PersistentModel]
+        ) -> [ExportEntity: Set<PersistentIdentifier>] {
+            var result = [ExportEntity: Set<PersistentIdentifier>]()
+            for model in models {
+                guard let entity = exportEntity(of: model) else { continue }
+                result[entity, default: []].insert(model.persistentModelID)
+            }
+            return result
+        }
+
+        func entity(containing identifier: PersistentIdentifier) -> ExportEntity? {
+            ExportEntity.allCases.first {
+                inserted[$0, default: []].contains(identifier)
+                    || deleted[$0, default: []].contains(identifier)
+            }
+        }
+    }
+
+    private let initial: PendingMembership
+    private let savedChanges: SavedChanges
+    private let observer: NSObjectProtocol
+
+    static func capture(
+        in context: ModelContext,
+        initialDeletedModels: [any PersistentModel]
+    ) -> SourceGraphMutationGuard {
+        let savedChanges = SavedChanges()
+        let observer = NotificationCenter.default.addObserver(
+            forName: ModelContext.didSave,
+            object: context,
+            queue: nil
+        ) { notification in
+            savedChanges.record(notification)
+        }
+        return SourceGraphMutationGuard(initial: PendingMembership.capture(
+            in: context,
+            initialDeletedModels: initialDeletedModels
+        ), savedChanges: savedChanges, observer: observer)
+    }
+
+    func validate(in context: ModelContext, source: SourceGraph) throws {
+        let current = PendingMembership.capture(in: context)
+        for entity in ExportEntity.allCases {
+            guard current.inserted[entity, default: []] == initial.inserted[entity, default: []],
+                  current.deleted[entity, default: []] == initial.deleted[entity, default: []] else {
+                throw ExportSnapshotError.sourceGraphChanged(entity)
+            }
+        }
+        for identifier in savedChanges.snapshot() {
+            let entity = source.entity(containing: identifier)
+                ?? initial.entity(containing: identifier)
+                ?? exportEntity(of: context.model(for: identifier))
+            if let entity {
+                throw ExportSnapshotError.sourceGraphChanged(entity)
+            }
+        }
+    }
+
+    func stop() {
+        NotificationCenter.default.removeObserver(observer)
+    }
+}
+
+@MainActor
+private func exportEntity(of model: any PersistentModel) -> ExportEntity? {
+    switch model {
+    case is BusinessProfile: .businessProfile
+    case is Client: .client
+    case is Barn: .serviceLocation
+    case is Horse: .horse
+    case is Appointment: .appointment
+    case is AppointmentHorse: .appointmentHorse
+    case is Visit: .visit
+    case is VisitHorse: .visitHorse
+    case is Photograph: .photograph
+    case is Service: .service
+    case is WorkItem: .workItem
+    case is Invoice: .invoice
+    case is InvoiceVisit: .invoiceVisit
+    case is InvoiceLineItem: .invoiceLineItem
+    default: nil
+    }
+}
+
+@MainActor
 private struct DanglingRelationshipHints {
-    private struct Key: Hashable {
+    struct Key: Hashable {
         let entity: ExportEntity
         let relationship: String
     }
 
-    private enum CurrentTarget {
+    enum CurrentTarget {
         case none
         case identifier(PersistentIdentifier)
     }
 
-    private struct CurrentRelationshipTargets {
+    struct CurrentRelationshipTargets {
+        struct Entry {
+            let key: Key
+            let ownerID: PersistentIdentifier
+            let target: CurrentTarget
+        }
+
         private var targets = [Key: [PersistentIdentifier: CurrentTarget]]()
+        var entries = [Entry]()
 
         static func capture(
-            _ changedModels: [any PersistentModel],
-            batchSize: Int
-        ) async throws -> CurrentRelationshipTargets {
+            _ changedModels: [any PersistentModel]
+        ) -> CurrentRelationshipTargets {
             var result = CurrentRelationshipTargets()
-            try await SnapshotCooperation.forEach(changedModels, batchSize: batchSize) { model in
+            for model in changedModels {
                 switch model {
                 case let horse as Horse:
                     result.record(horse.client, owner: horse, entity: .horse, relationship: "client")
@@ -1172,24 +1347,55 @@ private struct DanglingRelationshipHints {
             entity: ExportEntity,
             relationship: String
         ) {
-            targets[Key(entity: entity, relationship: relationship), default: [:]][owner.persistentModelID] =
-                target.map { .identifier($0.persistentModelID) } ?? CurrentTarget.none
+            let key = Key(entity: entity, relationship: relationship)
+            let currentTarget = target.map { .identifier($0.persistentModelID) } ?? CurrentTarget.none
+            targets[key, default: [:]][owner.persistentModelID] = currentTarget
+            entries.append(Entry(
+                key: key,
+                ownerID: owner.persistentModelID,
+                target: currentTarget
+            ))
         }
     }
 
     private var ownerIDs = [Key: Set<PersistentIdentifier>]()
 
-    static func capture(
-        in context: ModelContext,
-        batchSize: Int
-    ) async throws -> DanglingRelationshipHints {
+    struct OperationStart {
+        let deletedModels: [any PersistentModel]
+        let currentRelationships: CurrentRelationshipTargets
+    }
+
+    static func captureOperationStart(in context: ModelContext) -> OperationStart {
         let deletedModels = context.deletedModelsArray
         let changedModels = context.changedModelsArray
-        let currentRelationships = try await CurrentRelationshipTargets.capture(
-            changedModels,
-            batchSize: batchSize
+        return OperationStart(
+            deletedModels: deletedModels,
+            currentRelationships: CurrentRelationshipTargets.capture(changedModels)
         )
+    }
+
+    static func capture(
+        in context: ModelContext,
+        operationStart: OperationStart,
+        batchSize: Int
+    ) async throws -> DanglingRelationshipHints {
+        let deletedModels = operationStart.deletedModels
+        let currentRelationships = operationStart.currentRelationships
         var result = DanglingRelationshipHints()
+        var deletedTargetIDs = Set<PersistentIdentifier>()
+        try await SnapshotCooperation.forEach(deletedModels, batchSize: batchSize) { model in
+            deletedTargetIDs.insert(model.persistentModelID)
+        }
+        try await SnapshotCooperation.forEach(
+            currentRelationships.entries,
+            batchSize: batchSize
+        ) { entry in
+            guard case let .identifier(targetID) = entry.target,
+                  deletedTargetIDs.contains(targetID) else {
+                return
+            }
+            result.ownerIDs[entry.key, default: []].insert(entry.ownerID)
+        }
         try await SnapshotCooperation.forEach(deletedModels, batchSize: batchSize) { deletedModel in
             switch deletedModel {
             case let client as Client:
