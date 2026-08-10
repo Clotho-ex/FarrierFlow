@@ -7,8 +7,10 @@ FarrierFlow is a local-first, iPhone-only SwiftUI application. Slices 1 through
 VisitHorse-owned photographs, structured Services and WorkItems, immutable
 Invoices, payment status, native PDF sharing, owner setup, and the Run Sheet
 hub. Completed Slice 7 adds transient next-appointment assistance through the
-existing Schedule and Visit boundaries. The app adds no networking, CloudKit,
-or third-party dependency.
+existing Schedule and Visit boundaries. Release 1.0 adds StoreKit-owned access
+control and native subscription presentation without changing the business
+graph. The app adds no FarrierFlow networking, CloudKit, account, or third-party
+dependency.
 
 The dependency direction is:
 
@@ -61,6 +63,8 @@ FarrierFlow/
 │   ├── Photographs/
 │   ├── Services/
 │   ├── BusinessProfile/
+│   ├── Subscription/
+│   ├── Export/
 │   └── Invoices/
 └── Resources/
     ├── Assets.xcassets
@@ -73,10 +77,13 @@ This tree shows implemented ownership through Slice 5A and the committed Slice
 `Core/Utilities` contains
 only utilities genuinely shared by active features with no clearer domain
 owner. Next-appointment assistance remains Schedule-owned and reuses Visit and
-Appointment routes rather than adding a feature directory. Later features such
-as export, subscriptions, backup, and Settings receive their own feature
-ownership only after each capability is shaped. No empty directory or
-destination is created for deferred work.
+Appointment routes rather than adding a feature directory. Export currently
+contains only its approved version-1 format and CSV foundation on `main`; its
+remaining implementation is paused for release. Subscription is an approved
+release feature and owns only StoreKit entitlement and purchase presentation.
+Later features such as backup and Settings receive ownership only after each
+capability is active. No empty directory or destination is created for deferred
+work.
 
 Within a feature, organize by responsibility:
 
@@ -96,10 +103,11 @@ directory.
 
 ## App Composition
 
-`FarrierFlowApp` creates the production `ModelContainer` and one
-`PhotographLibrary`, then supplies both through SwiftUI's environment. The
-small composition value owns the concrete Photograph file store and serial
-coordinator; it is neither a mutable global singleton nor a service locator.
+`FarrierFlowApp` creates the production `ModelContainer`, one
+`PhotographLibrary`, and one `SubscriptionAccessModel`, then supplies them
+through SwiftUI's environment. The small composition value owns the concrete
+Photograph file store and StoreKit entitlement source; it is neither a mutable
+global singleton nor a service locator.
 
 `RootView` owns first-run routing, the root `TabView`, and the selected tab.
 When no valid BusinessProfile exists, it presents owner setup before exposing
@@ -117,6 +125,12 @@ Owner setup is resumable from persisted truth and derives solely from the
 single BusinessProfile. First run asks for its required name, then opens Today.
 Service, Service Location, customer-record, contact, and owner-default setup
 remain owned by their contextual features and never block identity completion.
+
+`RootView` resolves subscription access and owner-setup readiness independently.
+A verified entitlement with no BusinessProfile opens the existing owner setup.
+No entitlement and no BusinessProfile opens the Subscription welcome surface.
+No entitlement with an existing BusinessProfile opens the ordinary tabs in
+read-only mode. A loading entitlement never exposes mutation controls.
 
 ## Route and Presentation Ownership
 
@@ -139,6 +153,9 @@ remain owned by their contextual features and never block identity completion.
 - Services owns the catalog, default prices, active availability, Horse default
   selection, and recorded WorkItem editing inside Visits.
 - BusinessProfile owns the single reusable invoice identity and contact editor.
+- Subscription owns stable StoreKit product identifiers, current-entitlement
+  observation, the native subscription store, Restore Purchases, Manage
+  Subscription, and the Today read-only notice. It owns no business record.
 - Invoices owns Client-specific eligibility, atomic generation, immutable
   projections, list/detail state, payment status, deletion, native PDF rendering,
   temporary-file lifetime, and sharing.
@@ -147,13 +164,14 @@ remain owned by their contextual features and never block identity completion.
   service-location context.
 - Barns owns the Service Locations list, service-location detail, and
   service-location editor.
-- The Clients toolbar menu exposes Service Locations, Services, Invoices, and
-  My Business. Each destination remains inside the Clients navigation
-  stack.
+- The Clients toolbar menu exposes Service Locations, Services, Invoices, My
+  Business, and the concrete Subscription destination. Each destination remains
+  inside the Clients navigation stack.
 - No generalized Settings route, screen, folder, toolbar item, or empty
   destination exists through Slice 7. Business Profile remains the
   concrete owner-configuration destination. Settings may be introduced later
-  only when concrete settings require a destination.
+  only when concrete settings require a destination. Subscription does not
+  create a generalized Settings screen.
 
 Appointment Detail owns the entry into Visits: Start Visit when none exists,
 Resume Visit while in progress, and View Visit after completion. Today may
@@ -199,6 +217,18 @@ Do not mark actor-neutral values `@MainActor` merely because a view consumes
 them. Do not move `ModelContext` across actors. Persistence mutations initiated
 by a feature model occur on the feature model's main-actor context.
 
+`SubscriptionAccessModel` is also `@MainActor @Observable`. A focused Sendable
+entitlement source iterates verified `Transaction.currentEntitlements` and
+listens for relevant `Transaction.updates`. The model publishes only loading,
+full-access, or read-only state. It does not expose StoreKit transactions to
+business features or persist a parallel entitlement Boolean.
+
+Existing feature views read access state at their mutation-entry boundary.
+They continue passing ordinary actions to their existing feature models only
+while full access is current. Existing feature models, domain rules, and
+SwiftData models do not import StoreKit. An already-open Visit editor also
+checks access before explicit or background persistence.
+
 The Today hub model fetches and converts cross-feature records into immutable
 summary values before rendering. SwiftUI views never traverse the complete
 SwiftData graph to rank actions. Ranking is deterministic: an in-progress Visit
@@ -234,6 +264,11 @@ owner-default scalars to BusinessProfile and no new model. FarrierFlow has not
 shipped, so pre-release V1-to-V4 stores receive no migration path. Future
 shipping schema changes must preserve the production store identity and require
 an explicitly designed and tested migration.
+
+Subscription access is not persisted in SwiftData. Entitlement loss, restore,
+renewal, grace, expiration, or revocation cannot add, delete, hide, repair, or
+rewrite any business record or Photograph file. Read-only screens use the same
+container and canonical files as full-access screens.
 
 ## Domain and Persistence Boundaries
 
@@ -492,6 +527,13 @@ scheduled and active-Visit Run Sheet projections, promoted-record
 deduplication, accessibility progress semantics, and persistent reopening of
 the revised BusinessProfile fields.
 
+Release 1.0 subscription coverage adds verified-entitlement projection,
+transaction-update transitions, no-profile first launch, existing-data
+read-only launch, mutation-control gating, editor entitlement loss, invoice PDF
+availability, Restore/Manage presentation, and deterministic full-access UI
+test injection. StoreKit Configuration testing covers trial, renewal, grace,
+billing retry, expiration, restore, and revocation without a production server.
+
 ## Platform Policy
 
 The product minimum is iOS 18.0 and the app is built with the latest stable iOS
@@ -503,7 +545,7 @@ validation, and accessibility behavior must work on both platform generations.
 Standard controls, rather than simulated platform effects, provide the
 appropriate appearance on each OS.
 
-## Explicit Non-Goals Through Slice 7
+## Explicit Non-Goals for Release 1.0
 
 - Networking or server-backed repositories.
 - CloudKit synchronization or backup.
@@ -513,7 +555,11 @@ appropriate appearance on each OS.
 - Unscheduled Visit horses, cancellation, no-show, or rescheduling state.
 - Taxes, discounts, partial payments, payment processing, overdue automation,
   recurring billing, statements, custom numbering, invoice theming, accounting
-  integrations, StoreKit, or notifications.
+  integrations, or notifications.
+- Subscription accounts, server receipt validation, persisted entitlement
+  state, weekly or lifetime products, writable free limits, team plans, and
+  third-party billing.
+- Completion of the remaining Slice 8 Export units before revenue launch.
 - Background tasks, external draft files, or per-change autosave.
 - Completed Visit deletion or historical-date correction.
 - A generalized Settings destination beyond the concrete Business Profile and

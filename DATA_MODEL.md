@@ -22,7 +22,9 @@ SwiftData is the local metadata source of truth. Canonical Photograph JPEGs are
 stored in Application Support and resolved only from their UUID. Invoice PDFs
 are generated on demand from persisted snapshots and are not canonical records.
 No model represents payment processing, subscriptions, cloud synchronization,
-or app-managed backup.
+or app-managed backup. Release 1.0 entitlement is verified from StoreKit at
+runtime and adds no SwiftData model, field, relationship, schema version, or
+migration. An access-state transition never mutates this graph.
 
 ## Relationship Contract
 
