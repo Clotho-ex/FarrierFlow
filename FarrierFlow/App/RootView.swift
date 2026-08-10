@@ -133,7 +133,7 @@ private struct RootPreview: View {
     }
 }
 
-private nonisolated struct StaticSubscriptionEntitlementSource:
+nonisolated struct StaticSubscriptionEntitlementSource:
     SubscriptionEntitlementSource {
     let isEntitled: Bool
 

@@ -373,6 +373,11 @@ private enum TodaySheet: Identifiable {
     if let container = try? ModelContainerFactory.inMemoryTest() {
         TodayView()
             .modelContainer(container)
+            .environment(
+                SubscriptionAccessModel(
+                    source: StaticSubscriptionEntitlementSource(isEntitled: true)
+                )
+            )
     } else {
         ModelContainerFailureView()
     }

@@ -26,9 +26,7 @@ final class SubscriptionFlowUITests: XCTestCase {
         XCTAssertEqual(app.buttons.matching(identifier: "subscription-read-only-notice").count, 1)
 
         openClients(in: app)
-        app.buttons["More"].tap()
-        let subscription = app.buttons["Subscription"]
-        XCTAssertTrue(subscription.waitForExistence(timeout: 3))
+        let subscription = openMore(in: app)
         subscription.tap()
 
         XCTAssertTrue(app.navigationBars["Subscription"].waitForExistence(timeout: 3))
@@ -56,5 +54,18 @@ final class SubscriptionFlowUITests: XCTestCase {
             }
         }
         XCTFail("Clients did not open")
+    }
+
+    @MainActor
+    private func openMore(in app: XCUIApplication) -> XCUIElement {
+        let more = app.buttons["More"].firstMatch
+        let subscription = app.buttons["Subscription"]
+        XCTAssertTrue(more.waitForExistence(timeout: 3))
+        XCTAssertTrue(more.isHittable)
+        guard more.isHittable else { return subscription }
+
+        more.tap()
+        XCTAssertTrue(subscription.waitForExistence(timeout: 3))
+        return subscription
     }
 }
