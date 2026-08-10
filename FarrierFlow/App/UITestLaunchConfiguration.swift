@@ -7,16 +7,23 @@ struct UITestLaunchConfiguration {
     static let cameraUnavailableEnvironmentKey =
         "FARRIERFLOW_UI_TEST_CAMERA_UNAVAILABLE"
     static let scenarioEnvironmentKey = "FARRIERFLOW_UI_TEST_SCENARIO"
+    static let subscriptionAccessEnvironmentKey =
+        "FARRIERFLOW_UI_TEST_SUBSCRIPTION_ACCESS"
 
     let storeURL: URL?
     let forcesCameraUnavailable: Bool
     let scenario: UITestScenario?
+    let subscriptionAccess: SubscriptionUITestAccess
 
     init(processInfo: ProcessInfo = .processInfo) {
         forcesCameraUnavailable =
             processInfo.environment[Self.cameraUnavailableEnvironmentKey] == "1"
         scenario = processInfo.environment[Self.scenarioEnvironmentKey]
             .flatMap(UITestScenario.init(rawValue:))
+        subscriptionAccess = processInfo.environment[
+            Self.subscriptionAccessEnvironmentKey
+        ]
+        .flatMap(SubscriptionUITestAccess.init(rawValue:)) ?? .full
         guard let rawName = processInfo.environment[Self.storeNameEnvironmentKey] else {
             storeURL = nil
             return
@@ -66,5 +73,25 @@ enum UITestScenario: String {
     case invoiceReady = "invoice-ready"
     case nextAppointment = "next-appointment"
     case ownerSetup = "owner-setup"
+}
+
+nonisolated enum SubscriptionUITestAccess: String, Sendable {
+    case full
+    case readOnly = "read-only"
+}
+
+nonisolated struct UITestSubscriptionEntitlementSource:
+    SubscriptionEntitlementSource {
+    let access: SubscriptionUITestAccess
+
+    func hasCurrentEntitlement(productIDs: Set<String>) async -> Bool {
+        access == .full
+    }
+
+    func updates(productIDs: Set<String>) async -> AsyncStream<Void> {
+        AsyncStream { continuation in
+            continuation.finish()
+        }
+    }
 }
 #endif

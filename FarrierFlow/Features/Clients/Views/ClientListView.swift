@@ -50,6 +50,9 @@ struct ClientListView: View {
                         ) {
                             path.append(BusinessProfileRoute.editor)
                         }
+                        Button("Subscription", systemImage: "creditcard") {
+                            path.append(SubscriptionRoute.store)
+                        }
                     } label: {
                         Label("More", systemImage: "ellipsis.circle")
                     }
@@ -85,6 +88,12 @@ struct ClientListView: View {
                 switch route {
                 case .editor:
                     BusinessProfileEditorView()
+                }
+            }
+            .navigationDestination(for: SubscriptionRoute.self) { route in
+                switch route {
+                case .store:
+                    SubscriptionView(showsManageSubscriptionButton: true)
                 }
             }
             .navigationDestination(for: InvoiceRoute.self) { route in

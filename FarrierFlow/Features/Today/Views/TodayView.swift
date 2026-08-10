@@ -3,6 +3,7 @@ import SwiftUI
 
 struct TodayView: View {
     @Environment(\.modelContext) private var context
+    @Environment(SubscriptionAccessModel.self) private var subscription
     @Environment(\.scenePhase) private var scenePhase
     @State private var path = NavigationPath()
     @State private var model = TodayModel()
@@ -31,6 +32,12 @@ struct TodayView: View {
             }
             .navigationDestination(for: TodayRoute.self) { route in
                 destination(for: route)
+            }
+            .navigationDestination(for: SubscriptionRoute.self) { route in
+                switch route {
+                case .store:
+                    SubscriptionView(showsManageSubscriptionButton: true)
+                }
             }
             .sheet(item: $presentedSheet, onDismiss: handleSheetDismissal) { sheet in
                 switch sheet {
@@ -61,6 +68,14 @@ struct TodayView: View {
 
     private var runSheet: some View {
         List {
+            if subscription.access == .readOnly {
+                Section {
+                    SubscriptionReadOnlyNotice {
+                        path.append(SubscriptionRoute.store)
+                    }
+                }
+            }
+
             Section {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(model.businessName)
