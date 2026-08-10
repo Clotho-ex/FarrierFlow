@@ -104,6 +104,7 @@ struct AppointmentDetailView: View {
                     if appointment.visit == nil, subscription.allowsMutations {
                         Section {
                             Button("Start Visit") {
+                                guard subscription.allowsMutations else { return }
                                 model.startVisit(in: context.container)
                             }
                             .buttonStyle(.borderedProminent)

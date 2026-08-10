@@ -256,6 +256,8 @@ private struct TodayAppointmentRow: View {
 }
 
 private struct TodayRunSheetBand: View {
+    @Environment(SubscriptionAccessModel.self) private var subscription
+
     enum State {
         case scheduled(TodayAppointmentSummary)
         case active(TodayVisitSummary)
@@ -327,13 +329,17 @@ private struct TodayRunSheetBand: View {
             Text("\(visit.resolvedHorseCount) of \(visit.totalHorseCount) horses resolved")
                 .font(.subheadline)
                 .monospacedDigit()
-            Label("Resume Visit", systemImage: "arrow.right")
+            Label(activeActionLabel, systemImage: "arrow.right")
                 .font(.headline)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "Next Action, Visit In Progress, \(visit.serviceLocationName), \(visit.serviceLocationAddress ?? ""), \(visit.horseNames.formatted(.list(type: .and))), \(visit.resolvedHorseCount) of \(visit.totalHorseCount) horses resolved, Resume Visit"
+            "Next Action, Visit In Progress, \(visit.serviceLocationName), \(visit.serviceLocationAddress ?? ""), \(visit.horseNames.formatted(.list(type: .and))), \(visit.resolvedHorseCount) of \(visit.totalHorseCount) horses resolved, \(activeActionLabel)"
         )
+    }
+
+    private var activeActionLabel: String {
+        subscription.allowsMutations ? "Resume Visit" : "View Visit"
     }
 
     private func recordDetails(

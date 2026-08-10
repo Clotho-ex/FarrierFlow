@@ -225,10 +225,14 @@ struct VisitEditorView: View {
                                     model.draft?.horses.first(where: { $0.id == horse.id })?.workNotes
                                         ?? ""
                                 },
-                                set: { model.setWorkNotes($0, for: horse.id) }
+                                set: {
+                                    guard subscription.allowsMutations else { return }
+                                    model.setWorkNotes($0, for: horse.id)
+                                }
                             ),
                             focusedWorkNotesID: $focusedWorkNotesID,
                             onOutcomeSelected: { outcome in
+                                guard subscription.allowsMutations else { return }
                                 if outcome != .serviced {
                                     focusedWorkNotesID = nil
                                 }
