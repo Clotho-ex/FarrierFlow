@@ -24,10 +24,12 @@ struct TodayView: View {
             }
             .navigationTitle("Today")
             .toolbar {
+                if subscription.allowsMutations {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Schedule Appointment", systemImage: "plus") {
                         presentedSheet = .appointment
                     }
+                }
                 }
             }
             .navigationDestination(for: TodayRoute.self) { route in
@@ -46,11 +48,15 @@ struct TodayView: View {
                 case .client:
                     ClientEditorView()
                 case .visit(let id):
+                    if subscription.allowsMutations {
                     VisitEditorView(
                         visitID: id,
                         container: context.container
                     ) { completedVisitID in
                         pendingCompletedVisitID = completedVisitID
+                    }
+                    } else {
+                        VisitDetailView(visitID: id, container: context.container, showsDismissAction: true)
                     }
                 case .nextAppointment(let visitID):
                     NextAppointmentAssistantView(visitID: visitID)
@@ -113,7 +119,7 @@ struct TodayView: View {
         case .resumeVisit(let visit):
             Section {
                 Button {
-                    presentedSheet = .visit(visit.id)
+                    if subscription.allowsMutations { presentedSheet = .visit(visit.id) } else { path.append(TodayRoute.visit(visit.id)) }
                 } label: {
                     TodayRunSheetBand(state: .active(visit))
                 }
@@ -136,7 +142,7 @@ struct TodayView: View {
                 .listRowSeparator(.hidden)
                 .accessibilityIdentifier("today-run-sheet-scheduled")
             }
-        case .addClient:
+        case .addClient where subscription.allowsMutations:
             Section("First Customer") {
                 Button {
                     presentedSheet = .client
@@ -149,7 +155,7 @@ struct TodayView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
-        case .createInvoice(let candidate):
+        case .createInvoice(let candidate) where subscription.allowsMutations:
             Section("Ready to Invoice") {
                 NavigationLink(value: TodayRoute.createInvoice(candidate.clientID)) {
                     LabeledContent(candidate.clientName) {
@@ -167,7 +173,7 @@ struct TodayView: View {
                     }
                 }
             }
-        case .scheduleAppointment:
+        case .scheduleAppointment where subscription.allowsMutations:
             Section {
                 ContentUnavailableView {
                     Label("No Stops Today", systemImage: "sun.max")
@@ -183,6 +189,8 @@ struct TodayView: View {
             }
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
+        default:
+            EmptyView()
         }
     }
 
@@ -210,6 +218,8 @@ struct TodayView: View {
             }
         case .invoice(let id):
             InvoiceDetailView(invoiceID: id)
+        case .visit(let id):
+            VisitDetailView(visitID: id, container: context.container)
         }
     }
 
@@ -229,6 +239,7 @@ private enum TodayRoute: Hashable {
     case appointment(PersistentIdentifier)
     case createInvoice(PersistentIdentifier)
     case invoice(PersistentIdentifier)
+    case visit(PersistentIdentifier)
 }
 
 private struct TodayAppointmentRow: View {

@@ -4,6 +4,7 @@ import SwiftUI
 struct AppointmentEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model: AppointmentEditorModel
     @State private var showsBarnEditor = false
     @State private var createdBarnID: PersistentIdentifier?
@@ -140,6 +141,7 @@ struct AppointmentEditorView: View {
                     }
                 }
             }
+            .disabled(!subscription.allowsMutations)
             .navigationTitle(model.appointmentID == nil ? "New Appointment" : "Edit Appointment")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -148,12 +150,13 @@ struct AppointmentEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
+                        guard subscription.allowsMutations else { return }
                         if let appointmentID = model.save(in: context) {
                             onSaved?(appointmentID)
                             dismiss()
                         }
                     }
-                    .disabled(!model.canSave)
+                    .disabled(!subscription.allowsMutations || !model.canSave)
                 }
             }
             .onAppear {

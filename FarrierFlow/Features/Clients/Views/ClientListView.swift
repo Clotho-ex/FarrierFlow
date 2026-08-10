@@ -3,6 +3,7 @@ import SwiftData
 
 struct ClientListView: View {
     @Environment(\.modelContext) private var context
+    @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var path = NavigationPath()
     @State private var model = ClientListModel()
     @State private var showsEditor = false
@@ -16,8 +17,10 @@ struct ClientListView: View {
                     } description: {
                         Text("Add a client to begin keeping connected horse records.")
                     } actions: {
+                        if subscription.allowsMutations {
                         Button("Add Client", systemImage: "plus") {
                             showsEditor = true
+                        }
                         }
                     }
                 } else {
@@ -31,8 +34,10 @@ struct ClientListView: View {
             .navigationTitle("Clients")
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
+                    if subscription.allowsMutations {
                     Button("Add Client", systemImage: "plus") {
                         showsEditor = true
+                    }
                     }
                     Menu {
                         Button("Service Locations", systemImage: "mappin.and.ellipse") {

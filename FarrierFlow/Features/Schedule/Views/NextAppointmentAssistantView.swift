@@ -6,6 +6,7 @@ struct NextAppointmentAssistantView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
+    @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model: NextAppointmentAssistantModel
     @State private var editorSeed: NextAppointmentSeed?
     @State private var savedAppointmentID: PersistentIdentifier?
@@ -107,7 +108,7 @@ struct NextAppointmentAssistantView: View {
                 }
             }
 
-            if hasSelectableHorse(in: projection) {
+            if subscription.allowsMutations, hasSelectableHorse(in: projection) {
                 Section {
                     Button("Continue") {
                         editorSeed = model.makeSeed()
@@ -144,6 +145,7 @@ struct NextAppointmentAssistantView: View {
             .accessibilityLabel(option.horseName)
             .accessibilityValue(accessibilityValue(for: option))
             .accessibilityIdentifier("next-appointment-horse-\(option.horseName)")
+            .disabled(!subscription.allowsMutations)
         } else {
             horseDetails(option)
                 .accessibilityElement(children: .ignore)

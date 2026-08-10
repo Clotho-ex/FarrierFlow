@@ -5,6 +5,7 @@ struct ServiceDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
+    @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model = ServiceDetailModel()
     @State private var showsEditor = false
     @State private var showsDeleteConfirmation = false
@@ -37,15 +38,18 @@ struct ServiceDetailView: View {
                 }
                 .navigationTitle(service.name)
                 .toolbar {
+                    if subscription.allowsMutations {
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {
                             Button("Edit", systemImage: "pencil") { showsEditor = true }
                             if service.isArchived {
                                 Button("Reactivate", systemImage: "arrow.counterclockwise") {
+                                    guard subscription.allowsMutations else { return }
                                     _ = model.reactivate(in: context)
                                 }
                             } else {
                                 Button("Archive", systemImage: "archivebox") {
+                                    guard subscription.allowsMutations else { return }
                                     _ = model.archive(in: context)
                                 }
                             }
@@ -57,6 +61,7 @@ struct ServiceDetailView: View {
                             Label("Actions", systemImage: "ellipsis.circle")
                         }
                     }
+                    }
                 }
                 .sheet(isPresented: $showsEditor, onDismiss: reload) {
                     ServiceEditorView(service: service)
@@ -67,6 +72,7 @@ struct ServiceDetailView: View {
                     titleVisibility: .visible
                 ) {
                     Button("Delete Service", role: .destructive) {
+                        guard subscription.allowsMutations else { return }
                         if model.delete(in: context) {
                             dismiss()
                         }

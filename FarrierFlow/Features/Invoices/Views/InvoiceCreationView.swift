@@ -4,6 +4,7 @@ import SwiftUI
 struct InvoiceCreationView: View {
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
+    @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model: InvoiceCreationModel
     @FocusState private var isNoteFocused: Bool
 
@@ -39,10 +40,12 @@ struct InvoiceCreationView: View {
         .navigationTitle("Create Invoice")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            if subscription.allowsMutations {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Generate", action: generate)
                     .disabled(!model.canGenerate)
                     .accessibilityIdentifier("invoice-generate-action")
+            }
             }
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
@@ -134,6 +137,7 @@ struct InvoiceCreationView: View {
                 }
             }
         }
+        .disabled(!subscription.allowsMutations)
         .scrollDismissesKeyboard(.interactively)
     }
 
@@ -166,6 +170,7 @@ struct InvoiceCreationView: View {
     }
 
     private func generate() {
+        guard subscription.allowsMutations else { return }
         guard let invoiceID = model.generate(in: context) else { return }
         onGenerated(invoiceID)
     }

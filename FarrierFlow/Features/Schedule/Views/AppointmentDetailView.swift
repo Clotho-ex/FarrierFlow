@@ -5,6 +5,7 @@ struct AppointmentDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
+    @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model = AppointmentDetailModel()
     @State private var showsEditor = false
     @State private var showsDeleteConfirmation = false
@@ -100,7 +101,7 @@ struct AppointmentDetailView: View {
                             }
                         }
                     }
-                    if appointment.visit == nil {
+                    if appointment.visit == nil, subscription.allowsMutations {
                         Section {
                             Button("Start Visit") {
                                 model.startVisit(in: context.container)
@@ -119,22 +120,26 @@ struct AppointmentDetailView: View {
                 .toolbar {
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         if let visit = appointment.visit {
-                            Button(
-                                visit.completedAt == nil ? "Resume Visit" : "View Visit"
-                            ) {
-                                model.present(visit)
+                            Button(visit.completedAt == nil && subscription.allowsMutations ? "Resume Visit" : "View Visit") {
+                                if visit.completedAt == nil, !subscription.allowsMutations {
+                                    model.visitPresentation = .detail(visit.persistentModelID)
+                                } else {
+                                    model.present(visit)
+                                }
                             }
                             .accessibilityIdentifier(
                                 visit.completedAt == nil
-                                    ? "visit-resume-action"
+                                    ? (subscription.allowsMutations ? "visit-resume-action" : "visit-view-action")
                                     : "visit-view-action"
                             )
                         }
+                        if subscription.allowsMutations {
                         Button("Edit", systemImage: "pencil") { showsEditor = true }
                         Button("Delete", systemImage: "trash", role: .destructive) {
                             showsDeleteConfirmation = true
                         }
                         .accessibilityIdentifier("appointment-delete-action")
+                        }
                     }
                 }
                 .sheet(isPresented: $showsEditor, onDismiss: reload) {
@@ -146,6 +151,7 @@ struct AppointmentDetailView: View {
                     titleVisibility: .visible
                 ) {
                     Button("Delete Appointment", role: .destructive) {
+                        guard subscription.allowsMutations else { return }
                         if model.delete(in: ModelContext(context.container)) { dismiss() }
                     }
                     .accessibilityIdentifier("appointment-delete-confirmation")
@@ -159,7 +165,7 @@ struct AppointmentDetailView: View {
         }
         .onAppear(perform: reload)
         .sheet(item: editorPresentation, onDismiss: handleVisitEditorDismissal) { presentation in
-            if case let .editor(visitID) = presentation {
+            if case let .editor(visitID) = presentation, subscription.allowsMutations {
                 VisitEditorView(
                     visitID: visitID,
                     container: context.container

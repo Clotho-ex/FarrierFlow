@@ -5,6 +5,7 @@ struct ServiceEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
+    @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model: ServiceEditorModel
     private let createdServiceID: Binding<PersistentIdentifier?>?
 
@@ -32,6 +33,7 @@ struct ServiceEditorView: View {
                     priceFeedback
                 }
             }
+            .disabled(!subscription.allowsMutations)
             .navigationTitle(model.serviceID == nil ? "New Service" : "Edit Service")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -40,12 +42,13 @@ struct ServiceEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
+                        guard subscription.allowsMutations else { return }
                         if let id = model.save(in: context) {
                             createdServiceID?.wrappedValue = id
                             dismiss()
                         }
                     }
-                    .disabled(!model.canSave)
+                    .disabled(!subscription.allowsMutations || !model.canSave)
                 }
             }
             .alert(item: $model.alert) {

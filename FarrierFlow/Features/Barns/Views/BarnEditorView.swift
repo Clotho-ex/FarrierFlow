@@ -4,6 +4,7 @@ import SwiftUI
 struct BarnEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model: BarnEditorModel
     @State private var showsMoreDetails: Bool
     private let createdBarnID: Binding<PersistentIdentifier?>?
@@ -42,6 +43,7 @@ struct BarnEditorView: View {
                     .accessibilityIdentifier("barn-more-details")
                 }
             }
+            .disabled(!subscription.allowsMutations)
             .navigationTitle(model.barnID == nil ? "New Service Location" : "Edit Service Location")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -50,12 +52,13 @@ struct BarnEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
+                        guard subscription.allowsMutations else { return }
                         if let id = model.save(in: context) {
                             createdBarnID?.wrappedValue = id
                             dismiss()
                         }
                     }
-                    .disabled(!model.canSave)
+                    .disabled(!subscription.allowsMutations || !model.canSave)
                 }
             }
             .alert(item: $model.alert) {

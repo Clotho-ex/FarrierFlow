@@ -6,6 +6,7 @@ struct VisitEditorView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.locale) private var locale
     @Environment(PhotographLibrary.self) private var photographLibrary
+    @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model: VisitEditorModel
     @State private var showsDismissConfirmation = false
     @State private var showsDiscardVisitConfirmation = false
@@ -54,7 +55,7 @@ struct VisitEditorView: View {
                         requestDismissal()
                     }
                 }
-                if model.mode == .inProgress, model.loadState == .loaded {
+                if subscription.allowsMutations, model.mode == .inProgress, model.loadState == .loaded {
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {
                             Button("Discard Visit", role: .destructive) {
@@ -66,9 +67,10 @@ struct VisitEditorView: View {
                         .accessibilityIdentifier("visit-actions-menu")
                     }
                 }
-                if model.mode == .inProgress {
+                if subscription.allowsMutations, model.mode == .inProgress {
                     ToolbarItemGroup(placement: .bottomBar) {
                         Button("Save Progress") {
+                            guard subscription.allowsMutations else { return }
                             focusedWorkNotesID = nil
                             model.saveProgress()
                         }
@@ -76,6 +78,7 @@ struct VisitEditorView: View {
                         .disabled(!model.canSaveProgress)
                         Spacer()
                         Button("Complete Visit") {
+                            guard subscription.allowsMutations else { return }
                             focusedWorkNotesID = nil
                             if model.completeVisit() {
                                 onCompleted?(model.visitID)
@@ -86,9 +89,10 @@ struct VisitEditorView: View {
                         .accessibilityIdentifier("visit-complete")
                         .disabled(!model.canComplete)
                     }
-                } else {
+                } else if subscription.allowsMutations {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Save Changes") {
+                            guard subscription.allowsMutations else { return }
                             focusedWorkNotesID = nil
                             if model.saveCorrection() {
                                 dismiss()
@@ -116,7 +120,7 @@ struct VisitEditorView: View {
         .onChange(of: scenePhase) { _, newPhase in
             switch newPhase {
             case .background:
-                if model.mode == .inProgress, model.isDirty {
+                if subscription.allowsMutations, model.mode == .inProgress, model.isDirty {
                     _ = model.saveProgressForBackground()
                 }
             case .active:
@@ -133,6 +137,7 @@ struct VisitEditorView: View {
             titleVisibility: .visible
         ) {
             Button("Discard Unsaved Changes", role: .destructive) {
+                guard subscription.allowsMutations else { return }
                 model.discardUnsavedChanges()
                 dismiss()
             }
@@ -153,6 +158,7 @@ struct VisitEditorView: View {
             titleVisibility: .visible
         ) {
             Button("Clear Recorded Work", role: .destructive) {
+                guard subscription.allowsMutations else { return }
                 model.confirmPendingOutcomeChange()
             }
             Button("Keep Editing", role: .cancel) {
@@ -167,6 +173,7 @@ struct VisitEditorView: View {
             titleVisibility: .visible
         ) {
             Button("Discard Visit", role: .destructive) {
+                guard subscription.allowsMutations else { return }
                 Task {
                     do {
                         try await photographLibrary.discardInProgressVisit(id: model.visitID)
@@ -232,6 +239,7 @@ struct VisitEditorView: View {
                                 )
                             }
                         )
+                        .disabled(!subscription.allowsMutations)
                         if horse.outcome != .notServiced {
                             visitWorkItems(for: horse)
                         }
@@ -292,12 +300,13 @@ struct VisitEditorView: View {
                 .accessibilityIdentifier("visit-work-items-empty-\(horse.horseName)")
         } else {
             ForEach(horse.workItems) { workItem in
-                Button {
-                    workItemEditorTarget = WorkItemEditorTarget(
-                        visitHorseID: horse.id,
-                        workItem: workItem
-                    )
-                } label: {
+                if subscription.allowsMutations {
+                    Button {
+                        workItemEditorTarget = WorkItemEditorTarget(
+                            visitHorseID: horse.id,
+                            workItem: workItem
+                        )
+                    } label: {
                     HStack(alignment: .firstTextBaseline, spacing: SpacingTokens.rowContent) {
                         VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
                             Text(workItem.serviceNameSnapshot)
@@ -317,18 +326,23 @@ struct VisitEditorView: View {
                                 "visit-work-item-amount-\(horse.horseName)-\(workItem.serviceNameSnapshot)"
                             )
                     }
-                }
-                .accessibilityLabel(
+                    }
+                    .accessibilityLabel(
                     "\(workItem.serviceNameSnapshot), \(formattedAmount(for: workItem))"
                 )
-                .accessibilityHint("Edit Service")
-                .accessibilityIdentifier(
+                    .accessibilityHint("Edit Service")
+                    .accessibilityIdentifier(
                     "visit-work-item-\(horse.horseName)-\(workItem.serviceNameSnapshot)"
-                )
+                    )
+                } else {
+                    Text(workItem.serviceNameSnapshot)
+                }
             }
         }
 
+        if subscription.allowsMutations {
         Button("Add Service", systemImage: "plus") {
+            guard subscription.allowsMutations else { return }
             switch model.requestAddService(to: horse.id) {
             case .createService, .chooseService:
                 addServiceHorse = horse
@@ -337,6 +351,7 @@ struct VisitEditorView: View {
             }
         }
         .accessibilityIdentifier("visit-add-service-\(horse.horseName)")
+        }
 
         if let subtotal = try? WorkItemRules.subtotal(for: horse.workItems),
            let formattedSubtotal = MoneyFormatter.usd(minorUnits: subtotal, locale: locale) {

@@ -5,6 +5,7 @@ import SwiftUI
 import UIKit
 
 struct PhotographCollectionView: View {
+    @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model: PhotographCollectionModel
     @State private var pickerItem: PhotosPickerItem?
     @State private var showsPhotoPicker = false
@@ -40,8 +41,10 @@ struct PhotographCollectionView: View {
             .navigationTitle("Hoof Photos")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                if subscription.allowsMutations {
                 ToolbarItem(placement: .topBarTrailing) {
                     addMenu
+                }
                 }
             }
             .task {
@@ -106,6 +109,7 @@ struct PhotographCollectionView: View {
                 presenting: pendingDeletion
             ) { item in
                 Button("Delete Photo", role: .destructive) {
+                    guard subscription.allowsMutations else { return }
                     Task {
                         await model.delete(id: item.id)
                     }
@@ -155,7 +159,9 @@ struct PhotographCollectionView: View {
                                 position: index + 1,
                                 total: model.items.count,
                                 onOpen: { selectedPhotograph = item },
-                                onDelete: { pendingDeletion = item }
+                            onDelete: subscription.allowsMutations
+                                ? { pendingDeletion = item }
+                                : nil
                             )
                         }
                     }
@@ -295,7 +301,7 @@ private struct PhotographGridItemView: View {
     let position: Int
     let total: Int
     let onOpen: () -> Void
-    let onDelete: () -> Void
+    let onDelete: (() -> Void)?
 
     var body: some View {
         VStack(spacing: SpacingTokens.rowContent) {
@@ -314,9 +320,11 @@ private struct PhotographGridItemView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("Delete", systemImage: "trash", role: .destructive, action: onDelete)
-                    .labelStyle(.iconOnly)
-                    .frame(minWidth: 44, minHeight: 44)
+                if let onDelete {
+                    Button("Delete", systemImage: "trash", role: .destructive, action: onDelete)
+                        .labelStyle(.iconOnly)
+                        .frame(minWidth: 44, minHeight: 44)
+                }
             }
         }
     }

@@ -3,6 +3,7 @@ import SwiftData
 
 struct ScheduleView: View {
     @Environment(\.modelContext) private var context
+    @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var path = NavigationPath()
     @State private var model = ScheduleModel()
     @State private var showsEditor = false
@@ -16,8 +17,10 @@ struct ScheduleView: View {
                     } description: {
                         Text("Today and future appointments will appear here.")
                     } actions: {
+                        if subscription.allowsMutations {
                         Button("Schedule Appointment", systemImage: "plus") {
                             showsEditor = true
+                        }
                         }
                     }
                 } else {
@@ -40,10 +43,12 @@ struct ScheduleView: View {
             }
             .navigationTitle("Schedule")
             .toolbar {
+                if subscription.allowsMutations {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Schedule Appointment", systemImage: "plus") {
                         showsEditor = true
                     }
+                }
                 }
             }
             .navigationDestination(for: ScheduleRoute.self) { route in

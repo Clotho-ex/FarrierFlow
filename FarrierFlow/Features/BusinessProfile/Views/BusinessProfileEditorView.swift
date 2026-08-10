@@ -9,6 +9,7 @@ struct BusinessProfileEditorView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model = BusinessProfileEditorModel()
     @FocusState private var focusedField: Field?
 
@@ -47,7 +48,7 @@ struct BusinessProfileEditorView: View {
         .navigationTitle(mode == .identity ? "Your Business" : "My Business")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if model.loadState == .loaded {
+            if subscription.allowsMutations, model.loadState == .loaded {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(mode == .identity ? "Continue" : "Save", action: save)
                         .disabled(!model.canSave)
@@ -184,10 +185,12 @@ struct BusinessProfileEditorView: View {
                 }
             }
         }
+        .disabled(!subscription.allowsMutations)
         .scrollDismissesKeyboard(.interactively)
     }
 
     private func save() {
+        guard subscription.allowsMutations else { return }
         guard model.save(in: context) else {
             return
         }

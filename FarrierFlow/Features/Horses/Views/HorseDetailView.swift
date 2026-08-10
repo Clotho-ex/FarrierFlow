@@ -5,6 +5,7 @@ struct HorseDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
+    @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model = HorseDetailModel()
     @State private var showsEditor = false
     @State private var showsDeleteConfirmation = false
@@ -58,11 +59,13 @@ struct HorseDetailView: View {
                 }
                 .navigationTitle(horse.name)
                 .toolbar {
+                    if subscription.allowsMutations {
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         Button("Edit", systemImage: "pencil") { showsEditor = true }
                         Button("Delete", systemImage: "trash", role: .destructive) {
                             showsDeleteConfirmation = true
                         }
+                    }
                     }
                 }
                 .sheet(isPresented: $showsEditor, onDismiss: reload) {
@@ -74,6 +77,7 @@ struct HorseDetailView: View {
                     titleVisibility: .visible
                 ) {
                     Button("Delete Horse", role: .destructive) {
+                        guard subscription.allowsMutations else { return }
                         if model.delete(in: context) { dismiss() }
                     }
                 }

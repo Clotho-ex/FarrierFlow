@@ -4,6 +4,7 @@ import SwiftUI
 struct WorkItemEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
+    @Environment(SubscriptionAccessModel.self) private var subscription
 
     @Bindable var model: VisitEditorModel
     let visitHorseID: PersistentIdentifier
@@ -76,6 +77,7 @@ struct WorkItemEditorView: View {
                     .accessibilityIdentifier("visit-remove-service")
                 }
             }
+            .disabled(!subscription.allowsMutations)
             .navigationTitle("Edit Service")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -86,7 +88,7 @@ struct WorkItemEditorView: View {
                     Button("Save") {
                         save()
                     }
-                    .disabled(!model.isValidPriceInput(priceInput))
+                    .disabled(!subscription.allowsMutations || !model.isValidPriceInput(priceInput))
                 }
             }
         }
@@ -96,6 +98,7 @@ struct WorkItemEditorView: View {
             titleVisibility: .visible
         ) {
             Button("Remove Service", role: .destructive) {
+                guard subscription.allowsMutations else { return }
                 if model.removeWorkItem(workItem.id, from: visitHorseID) {
                     dismiss()
                 } else {
@@ -119,6 +122,7 @@ struct WorkItemEditorView: View {
     }
 
     private func save() {
+        guard subscription.allowsMutations else { return }
         guard model.updateWorkItem(
             workItem.id,
             serviceID: workItem.serviceID,
