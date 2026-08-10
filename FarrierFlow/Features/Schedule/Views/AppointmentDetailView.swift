@@ -165,7 +165,7 @@ struct AppointmentDetailView: View {
         }
         .onAppear(perform: reload)
         .sheet(item: editorPresentation, onDismiss: handleVisitEditorDismissal) { presentation in
-            if case let .editor(visitID) = presentation, subscription.allowsMutations {
+            if case let .editor(visitID) = presentation {
                 VisitEditorView(
                     visitID: visitID,
                     container: context.container

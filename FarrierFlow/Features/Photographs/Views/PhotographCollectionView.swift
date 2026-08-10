@@ -62,6 +62,7 @@ struct PhotographCollectionView: View {
                 Task {
                     defer { pickerItem = nil }
                     if let data = try? await item.loadTransferable(type: Data.self) {
+                        guard subscription.allowsMutations else { return }
                         await model.add(sourceData: data)
                     } else {
                         model.alert = FeatureAlert(
@@ -74,6 +75,7 @@ struct PhotographCollectionView: View {
             .sheet(isPresented: $showsCamera) {
                 CameraCaptureView { data in
                     Task {
+                        guard subscription.allowsMutations else { return }
                         await model.add(sourceData: data)
                     }
                 } onFailure: {

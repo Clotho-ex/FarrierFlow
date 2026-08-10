@@ -137,7 +137,6 @@ struct VisitEditorView: View {
             titleVisibility: .visible
         ) {
             Button("Discard Unsaved Changes", role: .destructive) {
-                guard subscription.allowsMutations else { return }
                 model.discardUnsavedChanges()
                 dismiss()
             }
@@ -335,7 +334,26 @@ struct VisitEditorView: View {
                     "visit-work-item-\(horse.horseName)-\(workItem.serviceNameSnapshot)"
                     )
                 } else {
-                    Text(workItem.serviceNameSnapshot)
+                    HStack(alignment: .firstTextBaseline, spacing: SpacingTokens.rowContent) {
+                        VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
+                            Text(workItem.serviceNameSnapshot)
+                                .font(Typography.recordTitle)
+                            if workItem.serviceIsArchived {
+                                Text("Archived")
+                                    .font(Typography.recordMetadata)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        Spacer(minLength: SpacingTokens.rowContent)
+                        Text(formattedAmount(for: workItem))
+                            .font(Typography.recordMetadata)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(
+                        "\(workItem.serviceNameSnapshot), \(formattedAmount(for: workItem))"
+                    )
                 }
             }
         }

@@ -56,6 +56,14 @@ final class SubscriptionReadOnlyUITests: XCTestCase {
         app.launch()
         openInvoices(in: app)
         XCTAssertTrue(app.buttons["invoice-row-0001"].waitForExistence(timeout: 3))
+        app.buttons["invoice-row-0001"].tap()
+        XCTAssertTrue(app.staticTexts["Status, Unpaid"].exists)
+        app.navigationBars.buttons["Invoices"].tap()
+        app.tabBars.buttons["Schedule"].tap()
+        XCTAssertEqual(
+            app.buttons.matching(identifier: "appointment-row-Invoice Service Location").count,
+            2
+        )
     }
 
     @MainActor

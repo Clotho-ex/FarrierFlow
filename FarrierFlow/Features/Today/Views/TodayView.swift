@@ -48,15 +48,11 @@ struct TodayView: View {
                 case .client:
                     ClientEditorView()
                 case .visit(let id):
-                    if subscription.allowsMutations {
                     VisitEditorView(
                         visitID: id,
                         container: context.container
                     ) { completedVisitID in
                         pendingCompletedVisitID = completedVisitID
-                    }
-                    } else {
-                        VisitDetailView(visitID: id, container: context.container, showsDismissAction: true)
                     }
                 case .nextAppointment(let visitID):
                     NextAppointmentAssistantView(visitID: visitID)
