@@ -306,69 +306,32 @@ struct VisitEditorView: View {
                             workItem: workItem
                         )
                     } label: {
-                    HStack(alignment: .firstTextBaseline, spacing: SpacingTokens.rowContent) {
-                        VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
-                            Text(workItem.serviceNameSnapshot)
-                                .font(Typography.recordTitle)
-                            if workItem.serviceIsArchived {
-                                Text("Archived")
-                                    .font(Typography.recordMetadata)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        Spacer(minLength: SpacingTokens.rowContent)
-                        Text(formattedAmount(for: workItem))
-                            .font(Typography.recordMetadata)
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                            .accessibilityIdentifier(
-                                "visit-work-item-amount-\(horse.horseName)-\(workItem.serviceNameSnapshot)"
-                            )
-                    }
+                        workItemLabel(for: workItem, horse: horse)
                     }
                     .accessibilityLabel(
-                    "\(workItem.serviceNameSnapshot), \(formattedAmount(for: workItem))"
-                )
+                        workItemAccessibilityLabel(for: workItem)
+                    )
                     .accessibilityHint("Edit Service")
                     .accessibilityIdentifier(
-                    "visit-work-item-\(horse.horseName)-\(workItem.serviceNameSnapshot)"
+                        "visit-work-item-\(horse.horseName)-\(workItem.serviceNameSnapshot)"
                     )
                 } else {
-                    HStack(alignment: .firstTextBaseline, spacing: SpacingTokens.rowContent) {
-                        VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
-                            Text(workItem.serviceNameSnapshot)
-                                .font(Typography.recordTitle)
-                            if workItem.serviceIsArchived {
-                                Text("Archived")
-                                    .font(Typography.recordMetadata)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        Spacer(minLength: SpacingTokens.rowContent)
-                        Text(formattedAmount(for: workItem))
-                            .font(Typography.recordMetadata)
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                    }
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel(
-                        "\(workItem.serviceNameSnapshot), \(formattedAmount(for: workItem))"
-                    )
+                    workItemLabel(for: workItem, horse: horse)
                 }
             }
         }
 
         if subscription.allowsMutations {
-        Button("Add Service", systemImage: "plus") {
-            guard subscription.allowsMutations else { return }
-            switch model.requestAddService(to: horse.id) {
-            case .createService, .chooseService:
-                addServiceHorse = horse
-            case .serviceAdded:
-                break
+            Button("Add Service", systemImage: "plus") {
+                guard subscription.allowsMutations else { return }
+                switch model.requestAddService(to: horse.id) {
+                case .createService, .chooseService:
+                    addServiceHorse = horse
+                case .serviceAdded:
+                    break
+                }
             }
-        }
-        .accessibilityIdentifier("visit-add-service-\(horse.horseName)")
+            .accessibilityIdentifier("visit-add-service-\(horse.horseName)")
         }
 
         if let subtotal = try? WorkItemRules.subtotal(for: horse.workItems),
@@ -384,6 +347,39 @@ struct VisitEditorView: View {
                 .foregroundStyle(.secondary)
                 .accessibilityIdentifier("visit-work-item-subtotal-\(horse.horseName)")
         }
+    }
+
+    private func workItemLabel(
+        for workItem: WorkItemDraft,
+        horse: VisitHorseDraft
+    ) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: SpacingTokens.rowContent) {
+            VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
+                Text(workItem.serviceNameSnapshot)
+                    .font(Typography.recordTitle)
+                if workItem.serviceIsArchived {
+                    Text("Archived")
+                        .font(Typography.recordMetadata)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer(minLength: SpacingTokens.rowContent)
+            Text(formattedAmount(for: workItem))
+                .font(Typography.recordMetadata)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .accessibilityIdentifier(
+                    "visit-work-item-amount-\(horse.horseName)-\(workItem.serviceNameSnapshot)"
+                )
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            workItemAccessibilityLabel(for: workItem)
+        )
+    }
+
+    private func workItemAccessibilityLabel(for workItem: WorkItemDraft) -> String {
+        "\(workItem.serviceNameSnapshot), \(formattedAmount(for: workItem))"
     }
 
     private func formattedAmount(for workItem: WorkItemDraft) -> String {
