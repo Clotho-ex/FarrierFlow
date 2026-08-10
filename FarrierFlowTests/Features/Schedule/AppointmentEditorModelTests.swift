@@ -324,6 +324,35 @@ struct AppointmentEditorModelTests {
     }
 
     @Test
+    func staleHorseSelectionDoesNotLeakAnAppointmentOrBlockASubsequentSave() throws {
+        let fixture = try makeTwoHorseFixture()
+        let editor = AppointmentEditorModel()
+        editor.load(in: fixture.context)
+        editor.selectBarn(fixture.barn.persistentModelID, in: fixture.context)
+        editor.toggleHorse(fixture.horses[0].persistentModelID)
+        let otherBarn = Barn(name: "South Field")
+        fixture.context.insert(otherBarn)
+        fixture.horses[0].currentBarn = otherBarn
+        otherBarn.horses.append(fixture.horses[0])
+        try DomainGraphValidator.save(fixture.context)
+
+        #expect(editor.save(in: fixture.context) == nil)
+        #expect(editor.alert?.title == "Review Selected Horses")
+        #expect(try fixture.context.fetchCount(FetchDescriptor<Appointment>()) == 0)
+
+        editor.draft.selectedHorseIDs = [fixture.horses[1].persistentModelID]
+        let savedID = try #require(editor.save(in: fixture.context))
+        let appointment = try #require(
+            fixture.context.model(for: savedID) as? Appointment
+        )
+        #expect(try fixture.context.fetchCount(FetchDescriptor<Appointment>()) == 1)
+        #expect(
+            appointment.appointmentHorses.compactMap(\.horse?.persistentModelID)
+                == [fixture.horses[1].persistentModelID]
+        )
+    }
+
+    @Test
     func changingBarnClearsIneligibleSelection() throws {
         let fixture = try makeTwoHorseFixture()
         let otherBarn = Barn(name: "South Field")
