@@ -61,8 +61,17 @@ final class SubscriptionFlowUITests: XCTestCase {
         let more = app.buttons["More"].firstMatch
         let subscription = app.buttons["Subscription"]
         XCTAssertTrue(more.waitForExistence(timeout: 3))
-        XCTAssertTrue(more.isHittable)
-        guard more.isHittable else { return subscription }
+        let waiterResult = XCTWaiter().wait(
+            for: [
+                XCTNSPredicateExpectation(
+                    predicate: NSPredicate(format: "isHittable == true"),
+                    object: more
+                )
+            ],
+            timeout: 3
+        )
+        XCTAssertEqual(waiterResult, .completed)
+        guard waiterResult == .completed else { return subscription }
 
         more.tap()
         XCTAssertTrue(subscription.waitForExistence(timeout: 3))
