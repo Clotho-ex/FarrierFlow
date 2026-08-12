@@ -678,14 +678,11 @@ scope.
 **Files:**
 
 - Create: `FarrierFlow/PrivacyInfo.xcprivacy`
-- Create:
-  `FarrierFlow/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png`
-- Create:
-  `FarrierFlow/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-dark.png`
-- Create:
-  `FarrierFlow/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-tinted.png`
-- Modify:
-  `FarrierFlow/Resources/Assets.xcassets/AppIcon.appiconset/Contents.json`
+- Create: `FarrierFlow/Resources/AppIcon.icon` with Apple Icon Composer
+  (iOS-only Default, Dark, and Mono appearances)
+- Remove the obsolete empty
+  `FarrierFlow/Resources/Assets.xcassets/AppIcon.appiconset`; the Icon Composer
+  document is the sole `AppIcon` build setting input.
 - Create: `docs/release/privacy-policy.md`
 - Create: `docs/release/support.md`
 - Create: `docs/release/app-store-metadata.md`
@@ -734,19 +731,20 @@ The privacy manifest content is exact:
   Re-audit production code for all Apple required-reason API categories before
   retaining the Data Not Collected declaration.
 
-- [ ] **Step 2: Produce and review the three App Icon variants**
+- [ ] **Step 2: Compose and review the Icon Composer document**
 
-  Use the image-generation skill for candidate production assets. Direction:
-  flat Survey Ink background, one high-contrast forward workline mark, no text,
-  no horseshoe, no horse illustration, no western styling, no gradient, no
-  transparency. Review at 1024, 180, 120, 60, and 40 points in Light, Dark, and
-  tinted appearances. Select one family before placing files in the asset set.
+  In `/Applications/Icon Composer.app`, create one iOS-only `AppIcon.icon`
+  document from vector SVG input layers. Use a flat Survey Ink ground and one
+  high-contrast forward workline mark; use no text, horse, horseshoe, western
+  styling, gradient, or baked transparency. Review Default, Dark, and Mono
+  (including tinted customization) at 1024, 180, 120, 60, and 40 points.
 
-- [ ] **Step 3: Wire and validate icon assets**
+- [ ] **Step 3: Wire and validate the Icon Composer asset**
 
-  Add filename keys for all three universal 1024 entries in `Contents.json`.
-  Verify each PNG is 1024×1024, RGB/RGBA without alpha, and visible in an
-  installed simulator build and Xcode asset validation.
+  Keep `ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon` and remove the empty
+  legacy `AppIcon.appiconset`. Verify the installed simulator app uses the
+  Default, Dark, and tinted/Mono icon appearances. Do not hand-author unknown
+  `.icon` internals.
 
 - [ ] **Step 4: Write truthful public release content**
 
@@ -756,8 +754,9 @@ The privacy manifest content is exact:
   the app's explicit record rules; users can contact support for product help.
 
   The support source contains installation requirements, purchase/restore and
-  read-only explanations, local-data/backup warning, camera/photo access help,
-  and a real monitored support contact chosen by the owner.
+  read-only explanations, local-data/backup warning, and camera/photo access
+  help. It remains explicitly unpublished until the owner supplies a real
+  monitored public support contact; do not invent one.
 
   The metadata source contains exact name, subtitle, description, keywords,
   category, age-rating answers, promotional text, review notes, subscription
@@ -767,14 +766,13 @@ The privacy manifest content is exact:
   `https://www.apple.com/legal/internet-services/itunes/dev/stdeula/` and the
   owner-controlled Privacy Policy.
 
-- [ ] **Step 5: Publish public HTTPS pages and verify portal prerequisites**
+- [ ] **Step 5: Record public and portal prerequisites without mutating them**
 
-  Hosting and commercial account changes are external-state actions and require
-  explicit authorization. Publish the approved privacy/support content at
-  owner-controlled HTTPS URLs, verify them without authentication on phone and
-  desktop, then enter them in App Store Connect. Verify Paid Apps Agreement,
-  tax, banking, app record, bundle identifier, version 1.0, and Data Not
-  Collected answers. Do not invent or commit a domain.
+  Website implementation/deployment is a separate project. Record the public
+  Privacy Policy and Support URLs as unmet gates and do not invent a domain.
+  Inspect Paid Apps Agreement, tax, and banking only read-only if safely
+  available; never accept an agreement or enter identity/banking data. Do not
+  mutate App Store Connect metadata or privacy answers.
 
 - [ ] **Step 6: Capture truthful screenshots**
 

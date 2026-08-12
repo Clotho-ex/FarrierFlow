@@ -17,8 +17,10 @@ stores.
 
 ## Active Release — FarrierFlow 1.0 Revenue Launch
 
-**Status:** Approved for implementation planning. Subscription implementation
-has not started.
+**Status:** Units 1–5 are complete and pushed on
+`codex/v1-release-plan`. Unit 6 — Privacy, Icon Composer, and App Store Release
+Materials is active. The release is not complete and remains blocked on the
+remaining public, commercial, candidate, TestFlight, and submission gates.
 
 ### Outcome
 
@@ -68,11 +70,13 @@ features.
   Appointment-to-next-Appointment workflow, unusable Invoice output, incorrect
   subscription access, privacy-disclosure failure, or App Review/submission
   failure.
-- App Icon assets are currently absent.
-- The Disk Space required-reason API used by Photograph storage needs a privacy
-  manifest declaration with reason `E174.1`.
-- Public Privacy Policy and Support URLs and App Store Connect commercial state
-  must be verified before submission.
+- Unit 6 is preparing the App Icon and privacy manifest locally; their final
+  release-binary validation remains required.
+- Public Privacy Policy and Support URLs are not yet available. Website
+  implementation and deployment are a separate project; no domain is inferred
+  here.
+- App Store Connect commercial state, candidate, TestFlight, and submission
+  gates remain unmet.
 
 Low-risk edge-case hardening, feature expansion, and aesthetic polish do not
 block 1.0 once the real owner flow and major failure, relaunch, offline,

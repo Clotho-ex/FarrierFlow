@@ -267,12 +267,17 @@ than a normal shipping workflow requirement.
 
 The following are release blockers, not optional polish:
 
-- Supply complete 1024-point default, dark, and tinted App Icon assets with no
-  alpha channel.
+- Use Apple's current Icon Composer workflow: one iOS-only multilayer
+  `FarrierFlow/Resources/AppIcon.icon` with Default, Dark, and Mono
+  appearances. Xcode generates the required legacy deployment outputs; do not
+  maintain the obsolete three-PNG `AppIcon.appiconset` workflow. The Icon
+  Composer document uses vector input layers and no baked transparency.
 - Add `PrivacyInfo.xcprivacy` declaring the Disk Space required-reason API used
   to check space before writing photographs, with reason `E174.1`.
-- Publish working HTTPS Privacy Policy and Support pages and enter their exact
-  URLs in App Store Connect. FarrierFlow code must not invent a domain.
+- Publish working HTTPS Privacy Policy and Support pages from the separate
+  website project, then enter their exact owner-controlled URLs in App Store
+  Connect. This repository prepares truthful source content only; it must not
+  invent a domain or support contact.
 - Use Apple's Standard Licensed Application End User License Agreement for 1.0
   and include its public URL in App Store metadata and the subscription policy
   presentation; add no custom legal terms without separate review.
