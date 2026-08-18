@@ -14,6 +14,23 @@ nonisolated struct TodayAppointmentSummary: Hashable, Identifiable {
     let serviceLocationName: String
     let serviceLocationAddress: String?
     let horseNames: [String]
+    let state: TodayAppointmentState
+}
+
+nonisolated enum TodayAppointmentState: Hashable {
+    case scheduled
+    case inProgress
+    case completed
+}
+
+nonisolated struct TodayHorseSummary: Equatable {
+    let visibleHorseNames: [String]
+    let remainingHorseCount: Int
+
+    init(horseNames: [String]) {
+        visibleHorseNames = Array(horseNames.prefix(2))
+        remainingHorseCount = max(0, horseNames.count - visibleHorseNames.count)
+    }
 }
 
 nonisolated struct TodayVisitSummary: Hashable {
@@ -60,6 +77,7 @@ final class TodayModel {
 
     func load(in context: ModelContext, now: Date, calendar: Calendar) {
         loadState = .loading
+        alert = nil
         do {
             businessName = try validBusinessName(in: context)
             let appointments = try appointmentSummaries(
@@ -95,17 +113,12 @@ final class TodayModel {
                 remainingAppointments = appointments
             }
 
-            alert = nil
             loadState = .loaded
         } catch {
             businessName = ""
             primaryAction = .scheduleAppointment
             remainingAppointments = []
             loadState = .failed
-            alert = FeatureAlert(
-                title: "Couldn’t Load Today",
-                message: "FarrierFlow couldn’t load your run sheet. Try again."
-            )
         }
     }
 
@@ -156,9 +169,15 @@ final class TodayModel {
                 startDate: appointment.startDate,
                 serviceLocationName: barnName,
                 serviceLocationAddress: TextNormalization.optional(barn.address ?? ""),
-                horseNames: horseNames
+                horseNames: horseNames,
+                state: appointmentState(for: appointment)
             )
         }.sorted(by: appointmentOrder)
+    }
+
+    private func appointmentState(for appointment: Appointment) -> TodayAppointmentState {
+        guard let visit = appointment.visit else { return .scheduled }
+        return visit.completedAt == nil ? .inProgress : .completed
     }
 
     private func activeVisitSummaries(

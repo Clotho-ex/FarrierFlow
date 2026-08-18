@@ -7,6 +7,17 @@ import Testing
 @MainActor
 struct TodayModelTests {
     @Test
+    func initialLoadFailureUsesInlineRecoveryWithoutAlert() throws {
+        let container = try ModelContainerFactory.inMemoryTest()
+        let model = TodayModel()
+
+        model.load(in: container.mainContext, now: .now, calendar: .current)
+
+        #expect(model.loadState == .failed)
+        #expect(model.alert == nil)
+    }
+
+    @Test
     func usesHalfOpenLocalDayAndPromotesOnlyTheFirstAppointment() throws {
         let container = try ModelContainerFactory.inMemoryTest()
         let context = container.mainContext
@@ -106,6 +117,80 @@ struct TodayModelTests {
     }
 
     @Test
+    func remainingAppointmentsExposeTheirVisitState() throws {
+        let container = try ModelContainerFactory.inMemoryTest()
+        let context = container.mainContext
+        let calendar = Calendar(identifier: .gregorian)
+        let day = calendar.startOfDay(for: .now)
+        let firstStart = try #require(calendar.date(byAdding: .hour, value: 8, to: day))
+        let secondStart = try #require(calendar.date(byAdding: .hour, value: 9, to: day))
+        let completedStart = try #require(calendar.date(byAdding: .hour, value: 10, to: day))
+        let now = try #require(calendar.date(byAdding: .hour, value: 12, to: day))
+        _ = ModelFixtures.makeBusinessProfile(in: context)
+        let barn = Barn(name: "North Field")
+        let client = Client(name: "Alex")
+        context.insert(barn)
+        context.insert(client)
+        let horse = Horse(name: "Milo", client: client, currentBarn: barn)
+        context.insert(horse)
+        client.horses.append(horse)
+        barn.horses.append(horse)
+
+        let promotedAppointment = ModelFixtures.makeAppointment(
+            startDate: firstStart,
+            barn: barn,
+            horses: [horse],
+            in: context
+        )
+        _ = ModelFixtures.makeVisit(
+            startedAt: firstStart,
+            appointment: promotedAppointment,
+            in: context
+        )
+
+        let activeAppointment = ModelFixtures.makeAppointment(
+            startDate: secondStart,
+            barn: barn,
+            horses: [horse],
+            in: context
+        )
+        _ = ModelFixtures.makeVisit(
+            startedAt: secondStart,
+            appointment: activeAppointment,
+            in: context
+        )
+
+        let completedAppointment = ModelFixtures.makeAppointment(
+            startDate: completedStart,
+            barn: barn,
+            horses: [horse],
+            in: context
+        )
+        let completedVisit = ModelFixtures.makeVisit(
+            startedAt: completedStart,
+            completedAt: completedStart.addingTimeInterval(1_800),
+            appointment: completedAppointment,
+            in: context
+        )
+        completedVisit.visitHorses[0].outcomeRawValue = VisitOutcome.serviced.rawValue
+        _ = ModelFixtures.makeWorkItem(
+            service: ModelFixtures.makeService(in: context),
+            visitHorse: completedVisit.visitHorses[0],
+            in: context
+        )
+        try DomainGraphValidator.save(context)
+
+        let model = TodayModel()
+        model.load(in: context, now: now, calendar: calendar)
+
+        let stateByAppointment = Dictionary(
+            uniqueKeysWithValues: model.remainingAppointments.map { ($0.id, $0.state) }
+        )
+        #expect(stateByAppointment[activeAppointment.persistentModelID] == .inProgress)
+        #expect(stateByAppointment[completedAppointment.persistentModelID] == .completed)
+    }
+
+    @Test
     func firstClientOutranksContextualServiceAndLocationSetup() throws {
         let container = try ModelContainerFactory.inMemoryTest()
         let context = container.mainContext
@@ -120,5 +205,18 @@ struct TodayModelTests {
         try DomainGraphValidator.save(context)
         model.load(in: context, now: .now, calendar: .current)
         #expect(model.primaryAction == .scheduleAppointment)
+    }
+
+    @Test
+    func horseSummaryKeepsShortListsAndCondensesLongLists() {
+        let shortSummary = TodayHorseSummary(horseNames: ["Iris", "Milo"])
+        #expect(shortSummary.visibleHorseNames == ["Iris", "Milo"])
+        #expect(shortSummary.remainingHorseCount == 0)
+
+        let longSummary = TodayHorseSummary(
+            horseNames: ["Iris", "Milo", "Nova", "Otis", "Poppy"]
+        )
+        #expect(longSummary.visibleHorseNames == ["Iris", "Milo"])
+        #expect(longSummary.remainingHorseCount == 3)
     }
 }

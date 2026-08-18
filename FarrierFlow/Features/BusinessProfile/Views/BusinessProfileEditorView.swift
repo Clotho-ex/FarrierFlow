@@ -104,7 +104,7 @@ struct BusinessProfileEditorView: View {
                 Text("Business")
             } footer: {
                 if mode == .identity {
-                    Text("This name appears on Today and future invoices. Add contact information and defaults later from My Business.")
+                    Text("This name appears on Today and invoices. Add other details later in My Business.")
                 } else {
                     Text("A business or farrier name is required.")
                 }

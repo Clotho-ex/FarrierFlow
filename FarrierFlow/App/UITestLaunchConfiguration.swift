@@ -1,22 +1,34 @@
 #if DEBUG
 import Foundation
 import SwiftData
+import SwiftUI
 
 struct UITestLaunchConfiguration {
     static let storeNameEnvironmentKey = "FARRIERFLOW_UI_TEST_STORE"
     static let cameraUnavailableEnvironmentKey =
         "FARRIERFLOW_UI_TEST_CAMERA_UNAVAILABLE"
     static let scenarioEnvironmentKey = "FARRIERFLOW_UI_TEST_SCENARIO"
+    static let dynamicTypeSizeEnvironmentKey =
+        "FARRIERFLOW_UI_TEST_DYNAMIC_TYPE_SIZE"
 
     let storeURL: URL?
     let forcesCameraUnavailable: Bool
     let scenario: UITestScenario?
+    let dynamicTypeSize: DynamicTypeSize?
 
     init(processInfo: ProcessInfo = .processInfo) {
         forcesCameraUnavailable =
             processInfo.environment[Self.cameraUnavailableEnvironmentKey] == "1"
         scenario = processInfo.environment[Self.scenarioEnvironmentKey]
             .flatMap(UITestScenario.init(rawValue:))
+        dynamicTypeSize = switch processInfo.environment[
+            Self.dynamicTypeSizeEnvironmentKey
+        ] {
+        case "accessibility5":
+            .accessibility5
+        default:
+            nil
+        }
         guard let rawName = processInfo.environment[Self.storeNameEnvironmentKey] else {
             storeURL = nil
             return
@@ -64,6 +76,7 @@ struct UITestLaunchConfiguration {
 
 enum UITestScenario: String {
     case invoiceReady = "invoice-ready"
+    case paymentPending = "payment-pending"
     case nextAppointment = "next-appointment"
     case ownerSetup = "owner-setup"
 }

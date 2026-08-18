@@ -165,7 +165,9 @@ enum PreviewFixtures {
 @MainActor
 enum UITestFixtures {
     private enum SeedError: Error {
+        case clientUnavailable
         case imageEncodingFailed
+        case invoiceDateUnavailable
         case visitHorseUnavailable
     }
 
@@ -179,6 +181,11 @@ enum UITestFixtures {
         switch scenario {
         case .invoiceReady:
             try seedInvoiceReady(
+                in: container,
+                photographRootURL: photographRootURL
+            )
+        case .paymentPending:
+            try seedPaymentPending(
                 in: container,
                 photographRootURL: photographRootURL
             )
@@ -279,6 +286,58 @@ enum UITestFixtures {
             rootURL: photographRootURL,
             in: container
         )
+    }
+
+    private static func seedPaymentPending(
+        in container: ModelContainer,
+        photographRootURL: URL
+    ) throws {
+        try seedInvoiceReady(
+            in: container,
+            photographRootURL: photographRootURL
+        )
+        let context = container.mainContext
+        guard try context.fetchCount(FetchDescriptor<Invoice>()) == 0 else {
+            return
+        }
+        guard let firstInvoiceDate = Calendar(identifier: .gregorian).date(
+            from: DateComponents(
+                timeZone: TimeZone(secondsFromGMT: 0),
+                year: 2026,
+                month: 8,
+                day: 17,
+                hour: 12
+            )
+        ) else {
+            throw SeedError.invoiceDateUnavailable
+        }
+
+        let clients = try context.fetch(
+            FetchDescriptor<Client>(
+                sortBy: [SortDescriptor(\.name, comparator: .localizedStandard)]
+            )
+        )
+        guard !clients.isEmpty else { throw SeedError.clientUnavailable }
+
+        for (index, client) in clients.enumerated() {
+            let choices = try InvoiceEligibilityRules.choices(
+                for: client.persistentModelID,
+                in: context
+            )
+            guard !choices.isEmpty else { continue }
+            _ = try InvoiceGenerationUseCase.generate(
+                InvoiceCreationDraft(
+                    clientID: client.persistentModelID,
+                    selectedVisitIDs: Set(choices.map(\.id)),
+                    invoiceDate: firstInvoiceDate.addingTimeInterval(
+                        TimeInterval(index * 86_400)
+                    ),
+                    dueDate: nil,
+                    note: ""
+                ),
+                in: context
+            )
+        }
     }
 
     private static func seedNextAppointment(

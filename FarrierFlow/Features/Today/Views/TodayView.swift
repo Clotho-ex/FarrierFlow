@@ -4,6 +4,7 @@ import SwiftUI
 struct TodayView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var path = NavigationPath()
     @State private var model = TodayModel()
     @State private var presentedSheet: TodaySheet?
@@ -22,6 +23,9 @@ struct TodayView: View {
                 }
             }
             .navigationTitle("Today")
+            .navigationBarTitleDisplayMode(
+                dynamicTypeSize.isAccessibilitySize ? .inline : .large
+            )
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Schedule Appointment", systemImage: "plus") {
@@ -61,35 +65,52 @@ struct TodayView: View {
 
     private var runSheet: some View {
         List {
-            Section {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(model.businessName)
-                        .font(.headline)
-                    Text(Date.now, format: .dateTime.weekday(.wide).month(.wide).day())
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .accessibilityElement(children: .combine)
+            if dynamicTypeSize.isAccessibilitySize {
+                primaryActionContent
+                identityContent
+            } else {
+                identityContent
+                primaryActionContent
             }
-            .listRowBackground(Color.clear)
-            .listRowSeparator(.hidden)
-
-            primaryActionContent
 
             if !model.remainingAppointments.isEmpty {
-                Section("Schedule") {
-                    ForEach(model.remainingAppointments) { appointment in
+                Section("Today’s Stops") {
+                    ForEach(model.remainingAppointments.indices, id: \.self) { index in
+                        let appointment = model.remainingAppointments[index]
                         NavigationLink(
                             value: TodayRoute.appointment(appointment.id)
                         ) {
-                            TodayAppointmentRow(summary: appointment)
+                            TodayAppointmentRow(
+                                summary: appointment,
+                                isFirst: index == 0,
+                                isLast: index == model.remainingAppointments.count - 1
+                            )
                         }
+                        .listRowSeparator(.hidden)
                     }
                 }
             }
         }
         .listSectionSpacing(.compact)
         .refreshable { reload() }
+    }
+
+    private var identityContent: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(model.businessName)
+                    .font(.headline)
+                Text(
+                    Date.now,
+                    format: .dateTime.weekday(.wide).month(.abbreviated).day()
+                )
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            }
+            .accessibilityElement(children: .combine)
+        }
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
     }
 
     @ViewBuilder
@@ -126,31 +147,38 @@ struct TodayView: View {
                 Button {
                     presentedSheet = .client
                 } label: {
-                    Label("Add First Client", systemImage: "person.badge.plus")
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    TodayPrimaryActionLabel(
+                        title: "Add First Client",
+                        detail: "Create the client record, then attach their horses while scheduling.",
+                        systemImage: "person.badge.plus",
+                        detailAccessibilityIdentifier: "today-add-first-client-context"
+                    )
                 }
                 .accessibilityIdentifier("today-add-first-client")
-                Text("Add an owner once, then attach their horses while scheduling work.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
             }
         case .createInvoice(let candidate):
             Section("Ready to Invoice") {
                 NavigationLink(value: TodayRoute.createInvoice(candidate.clientID)) {
-                    LabeledContent(candidate.clientName) {
-                        Text("Create Invoice")
-                            .foregroundStyle(.secondary)
-                    }
+                    TodayPrimaryActionLabel(
+                        title: "Create Invoice",
+                        detail: "Work complete for \(candidate.clientName) on \(candidate.workDate.formatted(date: .abbreviated, time: .omitted))",
+                        systemImage: "doc.text",
+                        detailAccessibilityIdentifier: "today-create-invoice-context"
+                    )
                 }
+                .accessibilityIdentifier("today-create-invoice-action")
             }
         case .reviewInvoice(let invoice):
             Section("Payment Status") {
                 NavigationLink(value: TodayRoute.invoice(invoice.id)) {
-                    LabeledContent("Invoice \(invoice.number)") {
-                        Text(invoice.clientName)
-                            .foregroundStyle(.secondary)
-                    }
+                    TodayPrimaryActionLabel(
+                        title: "Review Invoice \(invoice.number)",
+                        detail: "\(invoice.clientName), issued \(invoice.invoiceDate.formatted(date: .abbreviated, time: .omitted)), payment pending",
+                        systemImage: "creditcard",
+                        detailAccessibilityIdentifier: "today-review-invoice-context"
+                    )
                 }
+                .accessibilityIdentifier("today-review-invoice-action")
             }
         case .scheduleAppointment:
             Section {
@@ -210,6 +238,86 @@ struct TodayView: View {
     }
 }
 
+private struct TodayPrimaryActionLabel: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    let title: LocalizedStringResource
+    let detail: LocalizedStringResource
+    let systemImage: String
+    let detailAccessibilityIdentifier: String
+
+    @ViewBuilder
+    var body: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .center, spacing: 10) {
+                    TodayPrimaryActionMarker(
+                        systemImage: systemImage,
+                        fillsAvailableHeight: false
+                    )
+                    Text(title)
+                        .font(.headline)
+                }
+                detailText
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
+        } else {
+            HStack(alignment: .top, spacing: 12) {
+                TodayPrimaryActionMarker(
+                    systemImage: systemImage,
+                    fillsAvailableHeight: true
+                )
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.headline)
+                    detailText
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
+        }
+    }
+
+    private var detailText: some View {
+        Text(detail)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier(detailAccessibilityIdentifier)
+    }
+}
+
+private struct TodayPrimaryActionMarker: View {
+    @ScaledMetric(relativeTo: .headline) private var markerSize = 24.0
+
+    let systemImage: String
+    let fillsAvailableHeight: Bool
+
+    var body: some View {
+        ZStack {
+            Rectangle()
+                .frame(width: 1)
+                .frame(
+                    maxHeight: fillsAvailableHeight ? .infinity : markerSize + 10
+                )
+                .foregroundStyle(.tertiary)
+
+            Image(systemName: systemImage)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ColorTokens.interactive)
+                .frame(width: markerSize, height: markerSize)
+                .background(.background, in: Circle())
+        }
+        .frame(width: markerSize)
+        .frame(maxHeight: fillsAvailableHeight ? .infinity : nil)
+        .accessibilityHidden(true)
+    }
+}
+
 private enum TodayRoute: Hashable {
     case appointment(PersistentIdentifier)
     case createInvoice(PersistentIdentifier)
@@ -217,19 +325,141 @@ private enum TodayRoute: Hashable {
 }
 
 private struct TodayAppointmentRow: View {
-    let summary: TodayAppointmentSummary
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
+    let summary: TodayAppointmentSummary
+    let isFirst: Bool
+    let isLast: Bool
+
+    @ViewBuilder
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(summary.startDate, format: .dateTime.hour().minute())
-                .font(.headline)
-                .monospacedDigit()
-            Text(summary.serviceLocationName)
-            Text(summary.horseNames.formatted(.list(type: .and)))
+        if dynamicTypeSize.isAccessibilitySize {
+            accessibilityContent
+        } else {
+            standardContent
+        }
+    }
+
+    private var standardContent: some View {
+        HStack(alignment: .top, spacing: 12) {
+            worklineMarker
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(summary.startDate, format: .dateTime.hour().minute())
+                    .font(.headline)
+                    .monospacedDigit()
+                locationText
+                Label(summary.state.localizedTitle, systemImage: summary.state.systemImage)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Text(summary.horseNames.formatted(.list(type: .and)))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(accessibilityValue)
+    }
+
+    private var accessibilityContent: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 10) {
+                worklineMarker
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(summary.startDate, format: .dateTime.hour().minute())
+                        .font(.headline)
+                        .monospacedDigit()
+                    Text(summary.state.localizedTitle)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            locationText
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(todayHorseSummaryText(summary.horseNames))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(accessibilityValue)
+    }
+
+    private var worklineMarker: some View {
+        TodayWorklineMarker(
+            state: summary.state,
+            isFirst: isFirst,
+            isLast: isLast
+        )
+    }
+
+    private var locationText: some View {
+        Text(summary.serviceLocationName)
+    }
+
+    private var accessibilityLabel: String {
+        "\(summary.startDate.formatted(date: .omitted, time: .shortened)), \(summary.serviceLocationName)"
+    }
+
+    private var accessibilityValue: String {
+        "\(String(localized: summary.state.localizedTitle)), \(summary.horseNames.formatted(.list(type: .and)))"
+    }
+}
+
+private struct TodayWorklineMarker: View {
+    @ScaledMetric(relativeTo: .body) private var markerSize = 20.0
+
+    let state: TodayAppointmentState
+    let isFirst: Bool
+    let isLast: Bool
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            Rectangle()
+                .frame(width: 1)
+                .padding(.top, isFirst ? markerSize / 2 : 0)
+                .padding(.bottom, isLast ? markerSize / 2 : 0)
+
+            Image(systemName: state.systemImage)
+                .font(.caption.weight(.semibold))
+                .frame(width: markerSize, height: markerSize)
+                .background(.background, in: Circle())
+        }
+        .foregroundStyle(.secondary)
+        .frame(width: markerSize)
+        .frame(maxHeight: .infinity)
+        .accessibilityHidden(true)
+    }
+}
+
+private extension TodayAppointmentState {
+    var localizedTitle: LocalizedStringResource {
+        switch self {
+        case .scheduled:
+            "Scheduled"
+        case .inProgress:
+            "In Progress"
+        case .completed:
+            "Work Complete"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .scheduled:
+            "circle"
+        case .inProgress:
+            "circle.lefthalf.filled"
+        case .completed:
+            "checkmark.circle.fill"
+        }
     }
 }
 
@@ -238,6 +468,8 @@ private struct TodayRunSheetBand: View {
         case scheduled(TodayAppointmentSummary)
         case active(TodayVisitSummary)
     }
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let state: State
 
@@ -251,7 +483,7 @@ private struct TodayRunSheetBand: View {
             }
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 22)
+        .padding(.vertical, dynamicTypeSize.isAccessibilitySize ? 16 : 22)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(ColorTokens.surveyInk)
         .foregroundStyle(.white)
@@ -259,15 +491,13 @@ private struct TodayRunSheetBand: View {
 
     private func scheduledContent(_ appointment: TodayAppointmentSummary) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Next Stop")
-                    .font(.headline)
-                Spacer()
-                Text("Scheduled")
-                    .font(.subheadline.weight(.semibold))
-            }
+            statusHeader(title: "Next Stop", status: "Scheduled")
             Text(appointment.startDate, format: .dateTime.hour().minute())
-                .font(.largeTitle.weight(.bold))
+                .font(
+                    dynamicTypeSize.isAccessibilitySize
+                        ? .title2.weight(.bold)
+                        : .largeTitle.weight(.bold)
+                )
                 .monospacedDigit()
             recordDetails(
                 location: appointment.serviceLocationName,
@@ -277,21 +507,15 @@ private struct TodayRunSheetBand: View {
             Label("Open Appointment", systemImage: "arrow.right")
                 .font(.headline)
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            "Next Stop, Scheduled, \(appointment.startDate.formatted(date: .omitted, time: .shortened)), \(appointment.serviceLocationName), \(appointment.serviceLocationAddress ?? ""), \(appointment.horseNames.formatted(.list(type: .and))), Open Appointment"
-        )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Next stop, \(appointment.serviceLocationName)")
+        .accessibilityValue(scheduledAccessibilityValue(appointment))
+        .accessibilityHint("Opens appointment details.")
     }
 
     private func activeContent(_ visit: TodayVisitSummary) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Next Action")
-                    .font(.headline)
-                Spacer()
-                Text("Visit In Progress")
-                    .font(.subheadline.weight(.semibold))
-            }
+            statusHeader(title: "Next Action", status: "Visit In Progress")
             recordDetails(
                 location: visit.serviceLocationName,
                 address: visit.serviceLocationAddress,
@@ -302,16 +526,39 @@ private struct TodayRunSheetBand: View {
                 total: Double(visit.totalHorseCount)
             )
             .tint(.white)
-            Text("\(visit.resolvedHorseCount) of \(visit.totalHorseCount) horses resolved")
+            Text("\(visit.resolvedHorseCount) of \(visit.totalHorseCount) horses recorded")
                 .font(.subheadline)
                 .monospacedDigit()
             Label("Resume Visit", systemImage: "arrow.right")
                 .font(.headline)
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            "Next Action, Visit In Progress, \(visit.serviceLocationName), \(visit.serviceLocationAddress ?? ""), \(visit.horseNames.formatted(.list(type: .and))), \(visit.resolvedHorseCount) of \(visit.totalHorseCount) horses resolved, Resume Visit"
-        )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Visit in progress, \(visit.serviceLocationName)")
+        .accessibilityValue(activeAccessibilityValue(visit))
+        .accessibilityHint("Resumes the visit.")
+    }
+
+    @ViewBuilder
+    private func statusHeader(
+        title: LocalizedStringResource,
+        status: LocalizedStringResource
+    ) -> some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.headline)
+                Text(status)
+                    .font(.subheadline.weight(.semibold))
+            }
+        } else {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title)
+                    .font(.headline)
+                Spacer()
+                Text(status)
+                    .font(.subheadline.weight(.semibold))
+            }
+        }
     }
 
     private func recordDetails(
@@ -327,11 +574,53 @@ private struct TodayRunSheetBand: View {
                     .font(.subheadline)
                     .foregroundStyle(.white.opacity(0.86))
             }
-            Text(horseNames.formatted(.list(type: .and)))
+            Text(todayHorseSummaryText(horseNames))
                 .font(.body)
                 .foregroundStyle(.white.opacity(0.86))
         }
     }
+
+    private func scheduledAccessibilityValue(
+        _ appointment: TodayAppointmentSummary
+    ) -> String {
+        let time = appointment.startDate.formatted(date: .omitted, time: .shortened)
+        let schedule = String(
+            localized: "Scheduled at \(time)",
+            comment: "VoiceOver value for a scheduled appointment time."
+        )
+        return [
+            schedule,
+            appointment.serviceLocationAddress,
+            todayHorseSummaryText(appointment.horseNames),
+        ]
+        .compactMap { $0 }
+        .joined(separator: ", ")
+    }
+
+    private func activeAccessibilityValue(_ visit: TodayVisitSummary) -> String {
+        let progress = String(
+            localized: "\(visit.resolvedHorseCount) of \(visit.totalHorseCount) horses recorded",
+            comment: "VoiceOver progress for horses recorded during the active visit."
+        )
+        return [
+            progress,
+            visit.serviceLocationAddress,
+            todayHorseSummaryText(visit.horseNames),
+        ]
+        .compactMap { $0 }
+        .joined(separator: ", ")
+    }
+
+}
+
+private func todayHorseSummaryText(_ horseNames: [String]) -> String {
+    let summary = TodayHorseSummary(horseNames: horseNames)
+    let visibleNames = summary.visibleHorseNames.formatted(.list(type: .and))
+    guard summary.remainingHorseCount > 0 else { return visibleNames }
+    return String(
+        localized: "\(visibleNames), and \(summary.remainingHorseCount) more horses",
+        comment: "A shortened horse list followed by the number of additional horses."
+    )
 }
 
 private enum TodaySheet: Identifiable {

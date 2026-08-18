@@ -11,8 +11,14 @@ import SwiftUI
 @main
 struct FarrierFlowApp: App {
     private let dependenciesResult: Result<AppDependencies, Error>
+    private let uiTestDynamicTypeSize: DynamicTypeSize?
 
     init() {
+        #if DEBUG
+        uiTestDynamicTypeSize = UITestLaunchConfiguration().dynamicTypeSize
+        #else
+        uiTestDynamicTypeSize = nil
+        #endif
         dependenciesResult = Result {
             #if DEBUG
             let uiTestConfiguration = UITestLaunchConfiguration()
@@ -65,9 +71,21 @@ struct FarrierFlowApp: App {
                 RootView()
                     .modelContainer(dependencies.container)
                     .environment(dependencies.photographLibrary)
+                    .uiTestDynamicTypeSize(uiTestDynamicTypeSize)
             case .failure:
                 ModelContainerFailureView()
             }
+        }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func uiTestDynamicTypeSize(_ size: DynamicTypeSize?) -> some View {
+        if let size {
+            environment(\.dynamicTypeSize, size)
+        } else {
+            self
         }
     }
 }
