@@ -18,9 +18,11 @@ stores.
 ## Active Release — FarrierFlow 1.0 Revenue Launch
 
 **Status:** Units 1–6 are integrated with the current owner workflow on local
-`main`. Unit 7 — Release Candidate, TestFlight, and Submission is active. The
-release is not complete and remains blocked on the remaining commercial,
-candidate, physical-device, TestFlight, and submission gates.
+`main`. Unit 7 — Release Candidate, TestFlight, and Submission is active, and
+the integrated local candidate passed its complete serial Simulator
+verification matrix on 2026-08-19. The release is not complete and remains
+blocked on the remaining commercial, screenshot, physical-device, signed
+archive, TestFlight, and submission gates.
 
 ### Outcome
 
@@ -70,10 +72,18 @@ features.
   Appointment-to-next-Appointment workflow, unusable Invoice output, incorrect
   subscription access, privacy-disclosure failure, or App Review/submission
   failure.
-- Unit 7 passed the local privacy-manifest, string-catalog, and compiled
-  Default/Dark/tinted App Icon gates in iOS 18 and iOS 26 simulator builds. A
-  separately authorized signed archive and Organizer validation remain
-  required.
+- On 2026-08-19, the integrated local `main` candidate rooted at `463b81a`
+  passed the complete serial automated matrix: iOS 18 and iOS 26
+  unit/integration suites each passed 412 tests; the focused iOS 18
+  subscription and first-customer gate passed 6 tests; the expanded full iOS
+  26 UI gate passed 30 tests; both persistent-reopen gates passed 16 tests; and
+  both Simulator builds succeeded. Source and built privacy manifests,
+  string-catalog compilation, StoreKit configuration/product contracts,
+  version/build/deployment metadata, compiled Default/Dark/tintable App Icon
+  renditions, and `git diff --check` passed. The only correction was a
+  test-only, condition-based retry for ignored iOS 18 Today navigation taps;
+  production behavior did not change. A separately authorized signed archive
+  and Organizer validation remain required.
 - The separate website publishes public Privacy Policy and Support pages at
   `https://farrierflow.vercel.app/privacy/` and
   `https://farrierflow.vercel.app/support/`. Both returned HTTP 200 without

@@ -71,8 +71,20 @@ submission.
   persistent-reopen gates passed 16 tests; both simulator builds succeeded;
   and the source and built privacy manifests, string catalog, compiled
   Default/Dark/tinted App Icon renditions, and `git diff --check` passed.
-- [ ] Run the complete serial iOS 18 and iOS 26 release-candidate verification
-  matrix on the integrated local `main` before archiving.
+- [x] On 2026-08-19, run the complete serial release-candidate verification
+  matrix on the integrated local `main` candidate rooted at `463b81a`: the
+  iOS 18 and iOS 26 unit/integration suites each passed 412 tests; the focused
+  iOS 18 subscription and first-customer gate passed 6 tests; the expanded
+  full iOS 26 UI gate passed 30 tests; both persistent-reopen gates passed 16
+  tests; and both Simulator builds succeeded. Source and built privacy
+  manifests, localization compilation, StoreKit JSON/product contracts,
+  version 1.0/build 1/minimum iOS 18 metadata, compiled Default/Dark/tintable
+  App Icon renditions, and `git diff --check` passed. The initial focused iOS
+  18 attempt exposed ignored Today navigation taps in
+  `OwnerSetupUITests`; two independent result bundles retained the correct
+  product data on Today, and a bounded condition-based retry fixed the test
+  synchronization without changing production behavior. The exact selector
+  and complete affected gates then passed.
 - [ ] Capture final App Store screenshots from the shipping candidate, with no
   private customer or account data. The one current sanitized 1206 x 2622
   asset is valid for the 6.3-inch slot, but version 1.0 still has 0 of 10

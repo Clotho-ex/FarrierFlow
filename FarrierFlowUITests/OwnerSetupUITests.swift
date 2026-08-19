@@ -47,8 +47,13 @@ final class OwnerSetupUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 5))
         let addFirstClient = app.buttons["today-add-first-client"]
         XCTAssertTrue(addFirstClient.waitForExistence(timeout: 3))
-        addFirstClient.tap()
-        focusAndType(clientName, in: app.textFields["client-name-field"], app: app)
+        let clientNameField = app.textFields["client-name-field"]
+        guard tapUntilDestinationAppears(
+            addFirstClient,
+            destination: clientNameField,
+            in: app
+        ) else { return }
+        focusAndType(clientName, in: clientNameField, app: app)
         app.buttons["Save"].tap()
 
         let schedule = app.buttons["Schedule Appointment"].firstMatch
@@ -99,11 +104,14 @@ final class OwnerSetupUITests: XCTestCase {
         let scheduledStop = app.buttons["today-run-sheet-scheduled"]
         XCTAssertTrue(scheduledStop.waitForExistence(timeout: 5))
         XCTAssertTrue(accessibilityText(of: scheduledStop).contains(locationAddress))
-        scheduledStop.tap()
         let detailAddress = app.descendants(matching: .any)[
             "appointment-detail-address"
         ]
-        XCTAssertTrue(detailAddress.waitForExistence(timeout: 3))
+        guard tapUntilDestinationAppears(
+            scheduledStop,
+            destination: detailAddress,
+            in: app
+        ) else { return }
         XCTAssertTrue(accessibilityText(of: detailAddress).contains(locationAddress))
         let detailArrivalNotes = app.descendants(matching: .any)[
             "appointment-detail-arrival-notes"
@@ -193,6 +201,23 @@ final class OwnerSetupUITests: XCTestCase {
             return
         }
         element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+    }
+
+    @MainActor
+    private func tapUntilDestinationAppears(
+        _ action: XCUIElement,
+        destination: XCUIElement,
+        in app: XCUIApplication
+    ) -> Bool {
+        for _ in 0..<2 {
+            guard action.waitForExistence(timeout: 3) else { continue }
+            tapAfterBringingIntoView(action, in: app)
+            if destination.waitForExistence(timeout: 3) {
+                return true
+            }
+        }
+        XCTFail("Expected action to open its destination")
+        return false
     }
 
     @MainActor
