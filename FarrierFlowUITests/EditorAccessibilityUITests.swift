@@ -8,8 +8,7 @@ final class EditorAccessibilityUITests: XCTestCase {
             "EditorAccessibility-\(UUID().uuidString)"
         app.launch()
 
-        app.tabBars.buttons["Clients"].tap()
-        XCTAssertTrue(app.navigationBars["Clients"].waitForExistence(timeout: 10))
+        openClients(in: app)
         let addClient = app.buttons["Add Client"].firstMatch
         XCTAssertTrue(addClient.waitForExistence(timeout: 10))
         addClient.tap()
@@ -83,5 +82,16 @@ final class EditorAccessibilityUITests: XCTestCase {
         XCTAssertEqual(selectedHorse.value as? String, "Selected")
         XCTAssertEqual(secondSelectedHorse.value as? String, "Selected")
         XCTAssertEqual(appointmentNotes.value as? String, "Keep this draft")
+    }
+
+    @MainActor
+    private func openClients(in app: XCUIApplication) {
+        for _ in 0..<2 {
+            app.tabBars.buttons["Clients"].tap()
+            if app.navigationBars["Clients"].waitForExistence(timeout: 2) {
+                return
+            }
+        }
+        XCTFail("Clients tab did not open")
     }
 }

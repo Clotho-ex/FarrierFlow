@@ -39,7 +39,12 @@ struct FarrierFlowApp: App {
                                 .appending(
                                     path: PhotographConstants.rootDirectoryName,
                                     directoryHint: .isDirectory
-                                )
+                            )
+                        )
+                    ),
+                    subscriptionAccessModel: SubscriptionAccessModel(
+                        source: UITestSubscriptionEntitlementSource(
+                            access: uiTestConfiguration.subscriptionAccess
                         )
                     )
                 )
@@ -59,6 +64,9 @@ struct FarrierFlowApp: App {
                     fileStore: PhotographFileStore(
                         applicationSupportURL: applicationSupportURL
                     )
+                ),
+                subscriptionAccessModel: SubscriptionAccessModel(
+                    source: StoreKitSubscriptionEntitlementSource()
                 )
             )
         }
@@ -72,6 +80,7 @@ struct FarrierFlowApp: App {
                     .modelContainer(dependencies.container)
                     .environment(dependencies.photographLibrary)
                     .uiTestDynamicTypeSize(uiTestDynamicTypeSize)
+                    .environment(dependencies.subscriptionAccessModel)
             case .failure:
                 ModelContainerFailureView()
             }
@@ -94,4 +103,5 @@ private extension View {
 private struct AppDependencies {
     let container: ModelContainer
     let photographLibrary: PhotographLibrary
+    let subscriptionAccessModel: SubscriptionAccessModel
 }

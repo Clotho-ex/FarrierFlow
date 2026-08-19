@@ -4,6 +4,7 @@ import SwiftUI
 struct ClientDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model = ClientDetailModel()
     @State private var showsEditor = false
     @State private var showsHorseEditor = false
@@ -33,10 +34,12 @@ struct ClientDetailView: View {
                             } description: {
                                 Text("Add this client’s first horse to start scheduling work.")
                             } actions: {
+                                if subscription.allowsMutations {
                                 Button("Add Horse") {
                                     showsHorseEditor = true
                                 }
                                 .buttonStyle(.borderedProminent)
+                                }
                             }
                         } else {
                             ForEach(
@@ -51,7 +54,7 @@ struct ClientDetailView: View {
                             }
                         }
                     }
-                    if model.hasInvoiceableWork {
+                    if model.hasInvoiceableWork, subscription.allowsMutations {
                         Section("Ready to Invoice") {
                             NavigationLink(value: InvoiceRoute.create(clientID)) {
                                 Label("Create Invoice", systemImage: "doc.badge.plus")
@@ -62,6 +65,7 @@ struct ClientDetailView: View {
                 }
                 .navigationTitle(client.name)
                 .toolbar {
+                    if subscription.allowsMutations {
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         Button("Add Horse", systemImage: "plus") {
                             showsHorseEditor = true
@@ -74,6 +78,7 @@ struct ClientDetailView: View {
                         } label: {
                             Label("Actions", systemImage: "ellipsis.circle")
                         }
+                    }
                     }
                 }
                 .sheet(isPresented: $showsEditor, onDismiss: reload) {
@@ -88,6 +93,7 @@ struct ClientDetailView: View {
                     titleVisibility: .visible
                 ) {
                     Button("Delete Client", role: .destructive) {
+                        guard subscription.allowsMutations else { return }
                         if model.delete(in: context) { dismiss() }
                     }
                 }

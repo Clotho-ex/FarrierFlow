@@ -10,11 +10,14 @@ struct UITestLaunchConfiguration {
     static let scenarioEnvironmentKey = "FARRIERFLOW_UI_TEST_SCENARIO"
     static let dynamicTypeSizeEnvironmentKey =
         "FARRIERFLOW_UI_TEST_DYNAMIC_TYPE_SIZE"
+    static let subscriptionAccessEnvironmentKey =
+        "FARRIERFLOW_UI_TEST_SUBSCRIPTION_ACCESS"
 
     let storeURL: URL?
     let forcesCameraUnavailable: Bool
     let scenario: UITestScenario?
     let dynamicTypeSize: DynamicTypeSize?
+    let subscriptionAccess: SubscriptionUITestAccess
 
     init(processInfo: ProcessInfo = .processInfo) {
         forcesCameraUnavailable =
@@ -29,6 +32,10 @@ struct UITestLaunchConfiguration {
         default:
             nil
         }
+        subscriptionAccess = processInfo.environment[
+            Self.subscriptionAccessEnvironmentKey
+        ]
+        .flatMap(SubscriptionUITestAccess.init(rawValue:)) ?? .full
         guard let rawName = processInfo.environment[Self.storeNameEnvironmentKey] else {
             storeURL = nil
             return
@@ -79,5 +86,25 @@ enum UITestScenario: String {
     case paymentPending = "payment-pending"
     case nextAppointment = "next-appointment"
     case ownerSetup = "owner-setup"
+}
+
+nonisolated enum SubscriptionUITestAccess: String, Sendable {
+    case full
+    case readOnly = "read-only"
+}
+
+nonisolated struct UITestSubscriptionEntitlementSource:
+    SubscriptionEntitlementSource {
+    let access: SubscriptionUITestAccess
+
+    func hasCurrentEntitlement(productIDs: Set<String>) async -> Bool {
+        access == .full
+    }
+
+    func updates(productIDs: Set<String>) async -> AsyncStream<Void> {
+        AsyncStream { continuation in
+            continuation.finish()
+        }
+    }
 }
 #endif

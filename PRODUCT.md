@@ -74,6 +74,14 @@ one continuous field workflow rather than separate generic business modules.
   post-completion handoff opens that assistant only after successful Visit
   persistence and editor dismissal. Acceptance, subset persistence, relaunch,
   accessibility, and iOS 18/iOS 26 platform closure are verified.
+- Release 1.0 is a free App Store download with one FarrierFlow Pro
+  auto-renewable subscription group. The approved US launch products are
+  $14.99 monthly and $119.99 yearly, each with a 14-day introductory trial.
+  Active, trial, and billing-grace customers receive full access.
+- Without a current entitlement, existing local records remain permanently
+  readable. The owner may navigate all history, view photographs, and generate,
+  open, print, or share a PDF from an existing Invoice snapshot, but cannot
+  create, edit, delete, complete, or otherwise mutate business records.
 - Owner setup remains distinct from customer records. Client, Horse, Service
   Location, Appointment, Visit, WorkItem, Photograph, and Invoice data continue
   to describe the farrier's customers and work, not a customer-facing app mode.
@@ -85,7 +93,9 @@ one continuous field workflow rather than separate generic business modules.
 - Core business records are local-first and must remain usable without a
   network connection. Standard operating-system device backup is permitted;
   FarrierFlow provides no app-managed backup, synchronization, accounts, or
-  multi-device behavior.
+  multi-device data behavior. StoreKit may restore the subscription entitlement
+  through the App Store, but FarrierFlow data does not synchronize between
+  devices.
 - Invoices have Unpaid or Paid status. Marking an invoice Paid records the
   payment date; payment processing and external integrations are excluded.
 - The application must remain efficient under field conditions and must not
@@ -114,6 +124,9 @@ one continuous field workflow rather than separate generic business modules.
 
 - The repository contains the iPhone-only SwiftUI and SwiftData implementation
   through Slice 5A and completed Slice 7 in `FarrierFlow/`.
+- Slice 8's approved version-1 export format/CSV foundation is present on
+  `main`; the remaining Export implementation is intentionally paused for the
+  1.0 Revenue Launch.
 - The Xcode project declares iOS 18.0 for the app, unit-test, and UI-test
   targets and includes iPhone device support.
 - The approved Slice 2 design is recorded in
@@ -127,6 +140,9 @@ one continuous field workflow rather than separate generic business modules.
 - The approved, completed Slice 7 next-appointment-assistance design is
   recorded in
   `docs/superpowers/specs/2026-08-03-slice-7-next-appointment-assistance-design.md`.
+- The approved first-revenue commercial decisions and proposed implementation
+  contract are recorded in
+  `docs/superpowers/specs/2026-08-10-v1-revenue-release-design.md`.
 - No bundled production customer imagery, logo, customer evidence, testimonials,
   integrations, or operational sample data is present. Preview and UI-test
   fixtures are deterministic development data only. Future product work must
@@ -148,6 +164,8 @@ one continuous field workflow rather than separate generic business modules.
 7. Use behavioral principles only with truthful product state: real progress,
    real unsaved work, real defaults, and real consequences. Never fabricate
    urgency, scarcity, rewards, or loss.
+8. Never hold the owner's existing business history hostage to a subscription.
+   Loss of entitlement removes mutation, not access to locally owned records.
 
 ## Accessibility & Inclusion
 

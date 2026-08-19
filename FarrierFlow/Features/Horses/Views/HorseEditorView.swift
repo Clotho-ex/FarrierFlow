@@ -5,6 +5,7 @@ struct HorseEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
+    @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model: HorseEditorModel
     @State private var presentedSheet: HorseEditorSheet?
     @State private var createdClientID: PersistentIdentifier?
@@ -109,6 +110,7 @@ struct HorseEditorView: View {
                 }
                 loadStateSection
             }
+            .disabled(!subscription.allowsMutations)
             .navigationTitle(model.horseID == nil ? "New Horse" : "Edit Horse")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -117,12 +119,13 @@ struct HorseEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
+                        guard subscription.allowsMutations else { return }
                         if let id = model.save(in: context) {
                             createdHorseID?.wrappedValue = id
                             dismiss()
                         }
                     }
-                    .disabled(!model.canSave)
+                    .disabled(!subscription.allowsMutations || !model.canSave)
                 }
             }
             .onAppear { model.loadChoices(in: context) }

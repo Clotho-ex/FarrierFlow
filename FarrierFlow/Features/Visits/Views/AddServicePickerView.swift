@@ -4,6 +4,7 @@ import SwiftUI
 struct AddServicePickerView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
+    @Environment(SubscriptionAccessModel.self) private var subscription
 
     @Bindable var model: VisitEditorModel
     let visitHorseID: PersistentIdentifier
@@ -37,7 +38,7 @@ struct AddServicePickerView: View {
                 } description: {
                     Text("Add or reactivate a Service before recording work.")
                 } actions: {
-                    if replacingWorkItemID == nil {
+                    if subscription.allowsMutations, replacingWorkItemID == nil {
                         Button("Create Service", systemImage: "plus") {
                             showsServiceEditor = true
                         }
@@ -59,6 +60,7 @@ struct AddServicePickerView: View {
                                 .monospacedDigit()
                         }
                     }
+                    .disabled(!subscription.allowsMutations)
                     .accessibilityLabel("\(service.name), \(formattedAmount(for: service))")
                     .accessibilityHint(replacingWorkItemID == nil ? "Add Service" : "Replace Service")
                     .accessibilityIdentifier("visit-service-option-\(service.name)")
@@ -93,6 +95,7 @@ struct AddServicePickerView: View {
     }
 
     private func select(_ service: ServiceChoice) {
+        guard subscription.allowsMutations else { return }
         let succeeded: Bool
         if let replacingWorkItemID {
             succeeded = model.replaceWorkItem(
@@ -117,6 +120,7 @@ struct AddServicePickerView: View {
     }
 
     private func addCreatedServiceIfNeeded() {
+        guard subscription.allowsMutations else { return }
         guard let createdServiceID else { return }
         self.createdServiceID = nil
 

@@ -5,6 +5,7 @@ struct InvoiceDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
+    @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model: InvoiceDetailModel
     @State private var showsPaidConfirmation = false
     @State private var showsDeleteConfirmation = false
@@ -54,7 +55,7 @@ struct InvoiceDetailView: View {
             }
         }
         .toolbar {
-            if model.canMarkPaid {
+            if subscription.allowsMutations, model.canMarkPaid {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Mark Paid", systemImage: "checkmark.circle") {
                         showsPaidConfirmation = true
@@ -76,7 +77,7 @@ struct InvoiceDetailView: View {
                 .disabled(shareModel.isPreparing)
                 .accessibilityIdentifier("invoice-share-pdf-action")
             }
-            if model.canDelete {
+            if subscription.allowsMutations, model.canDelete {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu("More", systemImage: "ellipsis.circle") {
                         Button("Delete Invoice", systemImage: "trash", role: .destructive) {
@@ -90,6 +91,7 @@ struct InvoiceDetailView: View {
         }
         .confirmationDialog("Mark Invoice Paid?", isPresented: $showsPaidConfirmation, titleVisibility: .visible) {
             Button("Mark Paid") {
+                guard subscription.allowsMutations else { return }
                 model.markPaid(in: context)
             }
             .accessibilityIdentifier("invoice-mark-paid-confirmation")
@@ -98,6 +100,7 @@ struct InvoiceDetailView: View {
         }
         .confirmationDialog("Delete Invoice?", isPresented: $showsDeleteConfirmation, titleVisibility: .visible) {
             Button("Delete Invoice", role: .destructive) {
+                guard subscription.allowsMutations else { return }
                 model.delete(in: context)
                 if model.didDelete { dismiss() }
             }

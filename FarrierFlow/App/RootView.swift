@@ -17,18 +17,17 @@ struct RootView: View {
     )
 
     @Environment(PhotographLibrary.self) private var photographLibrary
+    @Environment(SubscriptionAccessModel.self) private var subscription
     @Environment(\.modelContext) private var context
     @State private var selectedTab = AppTab.today
     @State private var setupModel = OwnerSetupReadinessModel()
-    @State private var presentsInitialSetup = false
-    @State private var resolvedInitialSetup = false
 
     var body: some View {
         Group {
             switch setupModel.loadState {
-            case .loading where !resolvedInitialSetup:
+            case .loading:
                 ProgressView("Loading FarrierFlow…")
-            case .failed where !resolvedInitialSetup:
+            case .failed:
                 ContentUnavailableView {
                     Label("FarrierFlow Unavailable", systemImage: "exclamationmark.circle")
                 } description: {
@@ -36,20 +35,26 @@ struct RootView: View {
                 } actions: {
                     Button("Retry", action: resolveInitialSetup)
                 }
-            default:
-                if presentsInitialSetup {
+            case .loaded:
+                switch SubscriptionRootRules.state(
+                    access: subscription.access,
+                    hasIdentity: setupModel.hasValidIdentity
+                ) {
+                case .loading:
+                    ProgressView("Loading FarrierFlow…")
+                case .subscriptionWelcome:
+                    SubscriptionWelcomeView()
+                case .ownerSetup:
                     OwnerSetupView(model: setupModel) {
-                        presentsInitialSetup = false
                     }
-                } else {
+                case .app:
                     appTabs
                 }
             }
         }
         .task {
-            if !resolvedInitialSetup {
-                resolveInitialSetup()
-            }
+            subscription.start()
+            resolveInitialSetup()
             await reconcilePhotographs()
         }
         .onReceive(
@@ -81,10 +86,6 @@ struct RootView: View {
 
     private func resolveInitialSetup() {
         setupModel.load(in: context)
-        if setupModel.loadState == .loaded {
-            presentsInitialSetup = !setupModel.hasValidIdentity
-            resolvedInitialSetup = true
-        }
     }
 
     private func reconcilePhotographs() async {
@@ -121,8 +122,28 @@ private struct RootPreview: View {
                         )
                     )
                 )
+                .environment(
+                    SubscriptionAccessModel(
+                        source: StaticSubscriptionEntitlementSource(isEntitled: true)
+                    )
+                )
         case .failure:
             ModelContainerFailureView()
+        }
+    }
+}
+
+nonisolated struct StaticSubscriptionEntitlementSource:
+    SubscriptionEntitlementSource {
+    let isEntitled: Bool
+
+    func hasCurrentEntitlement(productIDs: Set<String>) async -> Bool {
+        isEntitled
+    }
+
+    func updates(productIDs: Set<String>) async -> AsyncStream<Void> {
+        AsyncStream { continuation in
+            continuation.finish()
         }
     }
 }

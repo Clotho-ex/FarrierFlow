@@ -9,8 +9,7 @@ final class ConnectedRecordsUITests: XCTestCase {
         let horseName = "Milo"
         let app = launch(storeName: storeName)
 
-        app.tabBars.buttons["Clients"].tap()
-        XCTAssertTrue(app.navigationBars["Clients"].waitForExistence(timeout: 10))
+        openClients(in: app)
         let addClient = app.buttons["Add Client"].firstMatch
         XCTAssertTrue(addClient.waitForExistence(timeout: 10))
         addClient.tap()
@@ -70,8 +69,7 @@ final class ConnectedRecordsUITests: XCTestCase {
         app.tabBars.buttons["Schedule"].tap()
         XCTAssertTrue(app.staticTexts["appointment-row-\(barnName)"].waitForExistence(timeout: 5))
 
-        app.tabBars.buttons["Clients"].tap()
-        XCTAssertTrue(app.navigationBars["Clients"].waitForExistence(timeout: 3))
+        openClients(in: app)
         app.staticTexts["client-row-\(clientName)"].tap()
         XCTAssertTrue(app.staticTexts["horse-row-\(horseName)"].waitForExistence(timeout: 3))
         app.staticTexts["horse-row-\(horseName)"].tap()
@@ -93,13 +91,35 @@ final class ConnectedRecordsUITests: XCTestCase {
     }
 
     @MainActor
+    private func openClients(in app: XCUIApplication) {
+        for _ in 0..<2 {
+            app.tabBars.buttons["Clients"].tap()
+            if app.navigationBars["Clients"].waitForExistence(timeout: 2) {
+                return
+            }
+        }
+        XCTFail("Clients tab did not open")
+    }
+
+    @MainActor
     private func focusAndType(_ text: String, in element: XCUIElement) {
+        XCTAssertTrue(element.waitForExistence(timeout: 3))
+        XCTAssertTrue(element.isHittable)
         element.tap()
-        let focused = expectation(
+        if !waitForKeyboardFocus(in: element) {
+            element.coordinate(
+                withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
+            ).tap()
+        }
+        element.typeText(text)
+    }
+
+    @MainActor
+    private func waitForKeyboardFocus(in element: XCUIElement) -> Bool {
+        let focusExpectation = expectation(
             for: NSPredicate(format: "hasKeyboardFocus == true"),
             evaluatedWith: element
         )
-        wait(for: [focused], timeout: 3)
-        element.typeText(text)
+        return XCTWaiter().wait(for: [focusExpectation], timeout: 2) == .completed
     }
 }

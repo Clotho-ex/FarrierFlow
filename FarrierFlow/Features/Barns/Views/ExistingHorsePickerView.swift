@@ -4,6 +4,7 @@ import SwiftUI
 struct ExistingHorsePickerView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model = ExistingHorsePickerModel()
 
     let destinationBarnID: PersistentIdentifier
@@ -49,7 +50,9 @@ struct ExistingHorsePickerView: View {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
+                    if subscription.allowsMutations {
                     Button("Move") {
+                        guard subscription.allowsMutations else { return }
                         if model.move(to: destinationBarnID, in: context) {
                             dismiss()
                         }
@@ -58,6 +61,7 @@ struct ExistingHorsePickerView: View {
                         model.loadState != .loaded
                             || model.selectedHorseID == nil
                     )
+                    }
                 }
             }
             .onAppear {

@@ -15,6 +15,113 @@ schema stages described in Slices 1 through 3 with one complete first-shipping
 `FarrierFlowSchemaV1`; the app implements no migration from those pre-release
 stores.
 
+## Active Release — FarrierFlow 1.0 Revenue Launch
+
+**Status:** Units 1–6 are integrated with the current owner workflow on local
+`main`. Unit 7 — Release Candidate, TestFlight, and Submission is active. The
+release is not complete and remains blocked on the remaining commercial,
+candidate, physical-device, TestFlight, and submission gates.
+
+### Outcome
+
+Ship the completed core farrier workflow as a free App Store download with a
+monthly or yearly FarrierFlow Pro subscription, begin earning revenue, and
+avoid delaying 1.0 for Export, backup, speculative hardening, or additional
+features.
+
+### Commercial Scope
+
+- One auto-renewable subscription group: **FarrierFlow Pro**.
+- Monthly product
+  `com.farrierflow.yusufcan.FarrierFlow.pro.monthly` at a US launch price of
+  $14.99 per month.
+- Yearly product
+  `com.farrierflow.yusufcan.FarrierFlow.pro.yearly` at a US launch price of
+  $119.99 per year.
+- One 14-day introductory free trial under Apple's subscription-group
+  eligibility rules.
+- Full access for verified active, trial, canceled-but-paid-through, and
+  billing-grace entitlements.
+- Permanent read-only access when no current entitlement exists. Existing
+  records, photographs, history, and PDF generation/sharing from existing
+  Invoice snapshots remain available; every ordinary business-record mutation
+  is unavailable.
+- Native Restore Purchases and Manage Subscription behavior.
+- No FarrierFlow account, server, cloud synchronization, or persisted
+  entitlement state.
+
+### Release Scope
+
+- Start from `origin/main`; keep the unfinished Slice 8 Unit 2 branch preserved
+  and unmerged.
+- Port the confirmed stale-Horse Appointment-save fix independently so a failed
+  new Appointment creates no partial record and a corrected retry can succeed.
+- Add one feature-owned StoreKit entitlement and subscription surface without a
+  generalized Settings architecture.
+- Gate normal production mutation controls while preserving all read-only
+  navigation and existing Invoice PDF sharing.
+- Supply the production App Icon, privacy manifest, public Privacy Policy and
+  Support pages, truthful App Store metadata/screenshots, StoreKit products,
+  Paid Apps Agreement, tax, banking, TestFlight, and submission configuration.
+
+### Release Blockers Only
+
+- Crash, data loss, corrupted or materially false business records, broken
+  Appointment-to-next-Appointment workflow, unusable Invoice output, incorrect
+  subscription access, privacy-disclosure failure, or App Review/submission
+  failure.
+- Unit 7 passed the local privacy-manifest, string-catalog, and compiled
+  Default/Dark/tinted App Icon gates in iOS 18 and iOS 26 simulator builds. A
+  separately authorized signed archive and Organizer validation remain
+  required.
+- The separate website publishes public Privacy Policy and Support pages at
+  `https://farrierflow.vercel.app/privacy/` and
+  `https://farrierflow.vercel.app/support/`. Both returned HTTP 200 without
+  authentication on 2026-08-15, and both verified URLs were entered in App
+  Store Connect on 2026-08-18.
+- On 2026-08-18, App Store Connect saved the prepared subtitle, promotional
+  text, description, keywords, Support URL, Business category, review notes,
+  account-free sign-in setting, and 4+ age rating; published App Privacy as
+  **Data Not Collected**; configured a free United States launch matching both
+  subscriptions; and disabled Mac and Vision Pro availability for the
+  iPhone-only 1.0 scope. Both monthly and yearly product review screenshots
+  were uploaded and both products were added to the version 1.0 draft, where
+  they reported **Ready for Review**. Copyright, exact review contact, Content
+  Rights, final release-behavior confirmation, and App Store product-page
+  screenshots remain incomplete. The current sanitized 1206 x 2622 asset is
+  compatible with the 6.3-inch screenshot slot, but Chrome file-chooser access
+  blocked that upload and version 1.0 still has zero screenshots.
+- TestFlight still had no build on 2026-08-15, so project build 1 remained the
+  first available upload candidate. The Paid Apps Agreement, bank account,
+  both submitted U.S. tax forms, and updated Apple Developer Program License
+  Agreement were confirmed active or accepted on 2026-08-18. App Store
+  Connect's stale agreement-review banner still requires a propagation recheck
+  before upload or submission.
+- Final product-page screenshots and metadata, physical-device acceptance,
+  signed archive, TestFlight, and submission gates remain unmet.
+
+Low-risk edge-case hardening, feature expansion, and aesthetic polish do not
+block 1.0 once the real owner flow and major failure, relaunch, offline,
+subscription, and cancellation paths work reliably.
+
+### Exit Criteria
+
+- A new customer can download the app, start either 14-day trial, complete
+  owner setup, and finish the full core workflow through next Appointment.
+- The same flow works offline after entitlement and data are established.
+- Billing grace retains full access. Expiration, billing retry outside grace,
+  revocation, or no purchase produces read-only access without deleting,
+  hiding, or changing source data.
+- PDFs remain generatable and shareable from existing Invoice snapshots in
+  read-only mode.
+- Restore or renewal returns full access without data migration or relaunch.
+- StoreKit sandbox, focused iOS 18 compatibility, complete iOS 26 release
+  verification, physical-device TestFlight, privacy, accessibility, metadata,
+  and App Store submission gates pass.
+
+The approved contract is recorded in
+`docs/superpowers/specs/2026-08-10-v1-revenue-release-design.md`.
+
 ## Slice 0 — Foundation
 
 **Status:** Complete.
@@ -421,8 +528,10 @@ The complete product and architecture contract is recorded in
 ## Later Slices
 
 Slice numbering records the capability sequence, not a required implementation
-order. Slice 7 is complete. No later slice is active; every later slice still
-requires explicit implementation approval.
+order. Slice 7 is complete. The 1.0 Revenue Launch temporarily supersedes the
+numbered capability order. Export is paused, StoreKit is part of the approved
+release, and every other later slice still requires explicit implementation
+approval.
 
 ### Slice 6 — Payment Processing
 
@@ -457,13 +566,23 @@ The approved implementation contract is recorded in
 
 ### Slice 8 — Export
 
+**Status:** Paused for the 1.0 Revenue Launch. Unit 1 is present on `main`; Unit
+2 and its supporting coordination commits remain preserved on
+`codex/slice-8-unit-2-export-snapshot`. Do not merge or continue the remaining
+units before launch without a new explicit priority decision.
+
 Define user-controlled business-record and media export with explicit privacy,
-format, and failure behavior.
+format, and failure behavior. The approved design remains authoritative when
+work resumes.
 
 ### Slice 9 — StoreKit Subscription
 
-Introduce StoreKit 2 only after entitlement, pricing, restore, grace-period,
-offline, and App Store requirements are approved.
+**Status:** Product design approved as part of the 1.0 Revenue Launch;
+implementation plan awaiting review.
+
+Introduce StoreKit 2 with the exact products, trial, read-only fallback,
+restore, grace-period, offline, privacy, and App Store requirements defined by
+the active release contract. It adds no SwiftData schema or FarrierFlow account.
 
 ### Slice 10 — Optional Backup
 
@@ -479,7 +598,9 @@ defined. CloudKit is not assumed.
   third-party PDF dependencies.
 - Automatic next-appointment creation.
 - Export.
-- StoreKit and subscriptions.
+- Subscription enhancements beyond the approved 1.0 monthly/yearly products,
+  including weekly, lifetime, team, metered, promotional, offer-code, win-back,
+  or server-managed access.
 - Networking, accounts, integrations, CloudKit, synchronization, and backup.
 - Notifications.
 - Archive or generalized soft deletion.

@@ -4,6 +4,7 @@ import SwiftUI
 struct ClientEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model: ClientEditorModel
     @State private var showsMoreDetails: Bool
     private let createdClientID: Binding<PersistentIdentifier?>?
@@ -42,6 +43,7 @@ struct ClientEditorView: View {
                     .accessibilityIdentifier("client-more-details")
                 }
             }
+            .disabled(!subscription.allowsMutations)
             .navigationTitle(model.clientID == nil ? "New Client" : "Edit Client")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -50,12 +52,13 @@ struct ClientEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
+                        guard subscription.allowsMutations else { return }
                         if let id = model.save(in: context) {
                             createdClientID?.wrappedValue = id
                             dismiss()
                         }
                     }
-                    .disabled(!model.canSave)
+                    .disabled(!subscription.allowsMutations || !model.canSave)
                 }
             }
             .alert(item: $model.alert) {

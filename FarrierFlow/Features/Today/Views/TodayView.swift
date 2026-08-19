@@ -3,6 +3,7 @@ import SwiftUI
 
 struct TodayView: View {
     @Environment(\.modelContext) private var context
+    @Environment(SubscriptionAccessModel.self) private var subscription
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var path = NavigationPath()
@@ -27,14 +28,22 @@ struct TodayView: View {
                 dynamicTypeSize.isAccessibilitySize ? .inline : .large
             )
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Schedule Appointment", systemImage: "plus") {
-                        presentedSheet = .appointment
+                if subscription.allowsMutations {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Schedule Appointment", systemImage: "plus") {
+                            presentedSheet = .appointment
+                        }
                     }
                 }
             }
             .navigationDestination(for: TodayRoute.self) { route in
                 destination(for: route)
+            }
+            .navigationDestination(for: SubscriptionRoute.self) { route in
+                switch route {
+                case .store:
+                    SubscriptionView(showsManageSubscriptionButton: true)
+                }
             }
             .sheet(item: $presentedSheet, onDismiss: handleSheetDismissal) { sheet in
                 switch sheet {
@@ -65,6 +74,14 @@ struct TodayView: View {
 
     private var runSheet: some View {
         List {
+            if subscription.access == .readOnly {
+                Section {
+                    SubscriptionReadOnlyNotice {
+                        path.append(SubscriptionRoute.store)
+                    }
+                }
+            }
+
             if dynamicTypeSize.isAccessibilitySize {
                 primaryActionContent
                 identityContent
@@ -119,7 +136,11 @@ struct TodayView: View {
         case .resumeVisit(let visit):
             Section {
                 Button {
-                    presentedSheet = .visit(visit.id)
+                    if subscription.allowsMutations {
+                        presentedSheet = .visit(visit.id)
+                    } else {
+                        path.append(TodayRoute.visit(visit.id))
+                    }
                 } label: {
                     TodayRunSheetBand(state: .active(visit))
                 }
@@ -142,7 +163,7 @@ struct TodayView: View {
                 .listRowSeparator(.hidden)
                 .accessibilityIdentifier("today-run-sheet-scheduled")
             }
-        case .addClient:
+        case .addClient where subscription.allowsMutations:
             Section("First Customer") {
                 Button {
                     presentedSheet = .client
@@ -156,7 +177,7 @@ struct TodayView: View {
                 }
                 .accessibilityIdentifier("today-add-first-client")
             }
-        case .createInvoice(let candidate):
+        case .createInvoice(let candidate) where subscription.allowsMutations:
             Section("Ready to Invoice") {
                 NavigationLink(
                     value: TodayRoute.createInvoice(
@@ -185,7 +206,7 @@ struct TodayView: View {
                 }
                 .accessibilityIdentifier("today-review-invoice-action")
             }
-        case .scheduleAppointment:
+        case .scheduleAppointment where subscription.allowsMutations:
             Section {
                 ContentUnavailableView {
                     Label("No Stops Today", systemImage: "sun.max")
@@ -201,6 +222,8 @@ struct TodayView: View {
             }
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
+        default:
+            EmptyView()
         }
     }
 
@@ -231,6 +254,8 @@ struct TodayView: View {
             }
         case .invoice(let id):
             InvoiceDetailView(invoiceID: id)
+        case .visit(let id):
+            VisitDetailView(visitID: id, container: context.container)
         }
     }
 
@@ -333,6 +358,7 @@ private enum TodayRoute: Hashable {
         visitID: PersistentIdentifier
     )
     case invoice(PersistentIdentifier)
+    case visit(PersistentIdentifier)
 }
 
 private struct TodayAppointmentRow: View {
@@ -475,6 +501,8 @@ private extension TodayAppointmentState {
 }
 
 private struct TodayRunSheetBand: View {
+    @Environment(SubscriptionAccessModel.self) private var subscription
+
     enum State {
         case scheduled(TodayAppointmentSummary)
         case active(TodayVisitSummary)
@@ -540,13 +568,17 @@ private struct TodayRunSheetBand: View {
             Text("\(visit.resolvedHorseCount) of \(visit.totalHorseCount) horses recorded")
                 .font(.subheadline)
                 .monospacedDigit()
-            Label("Resume Visit", systemImage: "arrow.right")
+            Label(activeActionLabel, systemImage: "arrow.right")
                 .font(.headline)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Visit in progress, \(visit.serviceLocationName)")
         .accessibilityValue(activeAccessibilityValue(visit))
-        .accessibilityHint("Resumes the visit.")
+        .accessibilityHint(
+            subscription.allowsMutations
+                ? "Resumes the visit."
+                : "Opens visit details."
+        )
     }
 
     @ViewBuilder
@@ -570,6 +602,10 @@ private struct TodayRunSheetBand: View {
                     .font(.subheadline.weight(.semibold))
             }
         }
+    }
+
+    private var activeActionLabel: String {
+        subscription.allowsMutations ? "Resume Visit" : "View Visit"
     }
 
     private func recordDetails(
@@ -658,6 +694,11 @@ private enum TodaySheet: Identifiable {
     if let container = try? ModelContainerFactory.inMemoryTest() {
         TodayView()
             .modelContainer(container)
+            .environment(
+                SubscriptionAccessModel(
+                    source: StaticSubscriptionEntitlementSource(isEntitled: true)
+                )
+            )
     } else {
         ModelContainerFailureView()
     }

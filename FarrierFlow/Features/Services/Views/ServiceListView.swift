@@ -4,6 +4,7 @@ import SwiftUI
 struct ServiceListView: View {
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
+    @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model = ServiceListModel()
     @State private var showsEditor = false
 
@@ -20,11 +21,13 @@ struct ServiceListView: View {
         }
         .navigationTitle("Services")
         .toolbar {
+            if subscription.allowsMutations {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Add Service", systemImage: "plus") {
                     showsEditor = true
                 }
                 .accessibilityIdentifier("service-add-action")
+            }
             }
         }
         .sheet(isPresented: $showsEditor, onDismiss: reload) {
@@ -41,8 +44,10 @@ struct ServiceListView: View {
             } description: {
                 Text("Add the work you charge for, such as a trim or full set.")
             } actions: {
+                if subscription.allowsMutations {
                 Button("Add Service", systemImage: "plus") {
                     showsEditor = true
+                }
                 }
             }
         } else {

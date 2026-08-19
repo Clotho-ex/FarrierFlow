@@ -1,0 +1,36 @@
+{
+  "fill" : {
+    "solid" : "extended-srgb:0.00000,0.53333,1.00000,1.00000"
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "glass" : false,
+          "image-name" : "farrierflow-icon-workline.svg",
+          "name" : "farrierflow-icon-workline"
+        },
+        {
+          "glass" : false,
+          "image-name" : "farrierflow-icon-ground.svg",
+          "name" : "farrierflow-icon-ground"
+        }
+      ],
+      "lighting" : "combined",
+      "shadow" : {
+        "kind" : "none",
+        "opacity" : 0.5
+      },
+      "specular" : false,
+      "translucency" : {
+        "enabled" : false,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "squares" : [
+      "iOS"
+    ]
+  }
+}

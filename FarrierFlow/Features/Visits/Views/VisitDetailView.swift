@@ -7,6 +7,7 @@ struct VisitDetailView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.locale) private var locale
     @Environment(PhotographLibrary.self) private var photographLibrary
+    @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model: VisitDetailModel
     @State private var nextAppointmentModel: NextAppointmentAssistantModel
     @State private var showsEditor = false
@@ -68,7 +69,7 @@ struct VisitDetailView: View {
                     .accessibilityIdentifier("visit-detail-done")
                 }
             }
-            if model.loadState == .loaded,
+            if subscription.allowsMutations, model.loadState == .loaded,
                (model.editorMode == .inProgress || !model.isCorrectionLocked) {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(model.editorMode == .inProgress ? "Resume Visit" : "Edit") {
@@ -191,7 +192,7 @@ struct VisitDetailView: View {
                 }
             case .loaded:
                 if let projection = nextAppointmentModel.projection {
-                    if projection.options.contains(where: {
+                    if subscription.allowsMutations, projection.options.contains(where: {
                         $0.unavailabilityReason == nil
                     }) {
                         Button("Schedule Next Appointment") {

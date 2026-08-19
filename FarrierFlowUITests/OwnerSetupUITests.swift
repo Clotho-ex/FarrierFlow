@@ -54,14 +54,25 @@ final class OwnerSetupUITests: XCTestCase {
         let schedule = app.buttons["Schedule Appointment"].firstMatch
         XCTAssertTrue(schedule.waitForExistence(timeout: 3))
         schedule.tap()
+        XCTAssertTrue(app.navigationBars["New Appointment"].waitForExistence(timeout: 3))
         let addLocation = app.buttons["appointment-add-service-location"]
         XCTAssertTrue(addLocation.waitForExistence(timeout: 3))
-        addLocation.tap()
+        tapAfterBringingIntoView(addLocation, in: app)
+        XCTAssertTrue(
+            app.navigationBars["New Service Location"].waitForExistence(timeout: 3)
+        )
         focusAndType(locationName, in: app.textFields["barn-name-field"], app: app)
-        app.buttons["barn-more-details"].tap()
-        focusAndType(locationAddress, in: app.textFields["Address"], app: app)
+        let arrivalDetails = app.buttons["barn-more-details"]
+        XCTAssertTrue(arrivalDetails.waitForExistence(timeout: 3))
+        tapAfterBringingIntoView(arrivalDetails, in: app)
+        focusAndType(
+            locationAddress,
+            in: field(withPlaceholder: "Address", in: app),
+            app: app
+        )
         focusAndType(arrivalNotes, in: app.textViews["Contact Notes"], app: app)
         app.navigationBars["New Service Location"].buttons["Save"].tap()
+        XCTAssertTrue(app.navigationBars["New Appointment"].waitForExistence(timeout: 3))
         XCTAssertTrue(
             accessibilityText(of: app.buttons["appointment-barn-picker"])
                 .contains(locationName)
@@ -77,12 +88,14 @@ final class OwnerSetupUITests: XCTestCase {
         app.buttons[clientName].tap()
         app.navigationBars["New Horse"].buttons["Save"].tap()
 
+        XCTAssertTrue(app.navigationBars["New Appointment"].waitForExistence(timeout: 3))
         XCTAssertTrue(
             accessibilityText(of: app.buttons["appointment-barn-picker"])
                 .contains(locationName)
         )
         app.navigationBars["New Appointment"].buttons["Save"].tap()
 
+        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 5))
         let scheduledStop = app.buttons["today-run-sheet-scheduled"]
         XCTAssertTrue(scheduledStop.waitForExistence(timeout: 5))
         XCTAssertTrue(accessibilityText(of: scheduledStop).contains(locationAddress))
@@ -126,15 +139,15 @@ final class OwnerSetupUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Next Appointment"].waitForExistence(timeout: 5))
         app.buttons["Not Now"].tap()
         XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Ready to Invoice"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.buttons.matching(
+        let createInvoice = app.buttons.matching(
             NSPredicate(format: "label CONTAINS %@", "Create Invoice")
-        ).firstMatch.exists)
+        ).firstMatch
+        XCTAssertTrue(createInvoice.waitForExistence(timeout: 3))
 
         app.terminate()
         app.launch()
         XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Ready to Invoice"].waitForExistence(timeout: 3))
+        XCTAssertTrue(createInvoice.waitForExistence(timeout: 3))
     }
 
     @MainActor
@@ -161,6 +174,16 @@ final class OwnerSetupUITests: XCTestCase {
     }
 
     @MainActor
+    private func field(
+        withPlaceholder placeholder: String,
+        in app: XCUIApplication
+    ) -> XCUIElement {
+        app.descendants(matching: .any)
+            .matching(NSPredicate(format: "placeholderValue == %@", placeholder))
+            .firstMatch
+    }
+
+    @MainActor
     private func tapAfterBringingIntoView(
         _ element: XCUIElement,
         in app: XCUIApplication
@@ -180,6 +203,7 @@ final class OwnerSetupUITests: XCTestCase {
         for _ in 0..<5 {
             let visibleFrame = unobscuredFrame(in: app)
             if element.exists,
+               element.isHittable,
                visibleFrame.contains(
                    CGPoint(x: element.frame.midX, y: element.frame.midY)
                ) {
@@ -193,6 +217,7 @@ final class OwnerSetupUITests: XCTestCase {
         }
         let visibleFrame = unobscuredFrame(in: app)
         return element.exists
+            && element.isHittable
             && visibleFrame.contains(
                 CGPoint(x: element.frame.midX, y: element.frame.midY)
             )
@@ -213,19 +238,23 @@ final class OwnerSetupUITests: XCTestCase {
 
     @MainActor
     private func scrollForm(in app: XCUIApplication, upward: Bool) {
-        let form = app.collectionViews.firstMatch
-        if form.exists {
-            if upward {
-                form.swipeUp()
-            } else {
-                form.swipeDown()
-            }
-        } else {
+        let collectionViews = app.collectionViews
+        guard collectionViews.count > 0 else {
             if upward {
                 app.swipeUp()
             } else {
                 app.swipeDown()
             }
+            return
+        }
+
+        let form = collectionViews.element(
+            boundBy: min(1, collectionViews.count - 1)
+        )
+        if upward {
+            form.swipeUp()
+        } else {
+            form.swipeDown()
         }
     }
 

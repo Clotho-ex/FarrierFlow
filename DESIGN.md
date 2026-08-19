@@ -41,6 +41,11 @@ western artifact, veterinary record, or generic SaaS dashboard.
   behavior.
 - Quiet at rest; motion and haptics confirm real state changes only.
 
+Release 1.0 adds a native subscription surface without creating a second visual
+system. Apple's `SubscriptionStoreView` owns localized plan merchandising and
+purchase controls. FarrierFlow supplies only a concise Field Book header and
+truthful workflow explanation.
+
 ## Colors
 
 Use a restrained strategy: semantic iOS neutrals plus one blue-green
@@ -75,6 +80,11 @@ and progress counts where stable alignment improves scanning.
 **The One-Glance Rule.** On every operational screen, the record, its state,
 and the next valid action must be distinguishable without reading all body
 copy.
+
+**The Ownership Rule.** Read-only subscription state must remain calm and
+unambiguous. Today shows one compact notice with a Subscription action; record
+screens continue to emphasize the owner's data rather than repeating warnings.
+Existing Invoice PDF viewing and sharing remain ordinary native actions.
 
 ## Layout
 
@@ -142,6 +152,10 @@ These are functional state indicators, not decorative icon containers.
   toolbars, sheets, alerts, and confirmation dialogs.
 - **Do** respect Dynamic Type, VoiceOver, Reduce Motion, Increased Contrast,
   Light Mode, and Dark Mode from the first composition.
+- **Do** use native StoreKit pricing, recurring-period, trial, restore, policy,
+  and purchase presentation.
+- **Do** preserve complete record navigation and existing document access in
+  read-only mode.
 
 ### Don't:
 
@@ -153,6 +167,8 @@ These are functional state indicators, not decorative icon containers.
   Liquid Glass, decorative icon boxes, or continuous animation.
 - **Don't** fabricate urgency, expiring rewards, streaks, customer evidence,
   operational data, or progress the app cannot prove.
+- **Don't** use countdowns, fake savings, obstructive paywall overlays, repeated
+  renewal warnings, or hidden existing records to pressure a purchase.
 - **Don't** use color alone for status, selection, warnings, or completion.
 - **Don't** hide record-specific truth—Client, Horse, Service Location, Visit
   outcome, performed work, or price—behind an owner-level default.

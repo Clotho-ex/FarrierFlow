@@ -4,6 +4,7 @@ import SwiftUI
 struct BarnDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model = BarnDetailModel()
     @State private var showsEditor = false
     @State private var showsHorseEditor = false
@@ -41,6 +42,7 @@ struct BarnDetailView: View {
                 }
                 .navigationTitle(barn.name)
                 .toolbar {
+                    if subscription.allowsMutations {
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {
                             Button("Add Horse", systemImage: "plus") {
@@ -58,6 +60,7 @@ struct BarnDetailView: View {
                             Label("Actions", systemImage: "ellipsis.circle")
                         }
                     }
+                    }
                 }
                 .sheet(isPresented: $showsEditor, onDismiss: reload) {
                     BarnEditorView(barn: barn)
@@ -74,6 +77,7 @@ struct BarnDetailView: View {
                     titleVisibility: .visible
                 ) {
                     Button("Delete Service Location", role: .destructive) {
+                        guard subscription.allowsMutations else { return }
                         if model.delete(in: context) { dismiss() }
                     }
                 }

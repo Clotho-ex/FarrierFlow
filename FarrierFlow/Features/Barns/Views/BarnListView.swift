@@ -3,6 +3,7 @@ import SwiftData
 
 struct BarnListView: View {
     @Environment(\.modelContext) private var context
+    @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model = BarnListModel()
     @State private var showsEditor = false
 
@@ -13,10 +14,12 @@ struct BarnListView: View {
                     Label("No Service Locations", systemImage: "mappin.and.ellipse")
                 } description: {
                     Text("Add a barn, stable, or customer stop before assigning horses.")
-                } actions: {
+                    } actions: {
+                        if subscription.allowsMutations {
                     Button("Add Service Location", systemImage: "plus") {
                         showsEditor = true
-                    }
+                        }
+                        }
                 }
             } else {
                 List(model.barns, id: \.persistentModelID) { barn in
@@ -28,9 +31,11 @@ struct BarnListView: View {
         }
         .navigationTitle("Service Locations")
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+                if subscription.allowsMutations {
+                ToolbarItem(placement: .topBarTrailing) {
                 Button("Add Service Location", systemImage: "plus") {
                     showsEditor = true
+                }
                 }
             }
         }
