@@ -1,8 +1,8 @@
 # FarrierFlow App Store Metadata Source
 
-**Status:** Local source for owner review. Nothing in this file has been
-entered in App Store Connect. Public Privacy Policy and Support URLs are
-unmet release gates, so this file intentionally contains no invented URL.
+**Status:** Local source for owner review. See the submission checklist for
+dated portal evidence; this file does not by itself prove current App Store
+Connect state.
 
 ## Product identity
 
@@ -121,3 +121,20 @@ account data, debug labels, or test-data disclaimers:
    non-customer data.
 6. Read-only state showing records remain available and the reason for the
    restricted controls.
+
+## Final 6.3-inch screenshot assets
+
+Captured on 2026-08-20 from the integrated release candidate on the iOS 26.5
+iPhone 17 Pro Simulator, using English (U.S.) formatting and deterministic,
+sanitized fictional fixtures:
+
+1. `screenshots/6.3-inch/01-subscription-welcome.jpg`
+2. `screenshots/6.3-inch/02-today-run-sheet.jpg`
+3. `screenshots/6.3-inch/03-schedule.jpg`
+4. `screenshots/6.3-inch/04-horse-history.jpg`
+5. `screenshots/6.3-inch/05-invoice-detail.jpg`
+6. `screenshots/6.3-inch/06-read-only-records.jpg`
+
+Each accepted asset is a 1206 x 2622 RGB JPEG with no alpha channel. Uploading
+the set to App Store Connect remains a separate, explicitly authorized portal
+step.

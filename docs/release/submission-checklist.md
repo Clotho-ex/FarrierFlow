@@ -85,11 +85,13 @@ submission.
   product data on Today, and a bounded condition-based retry fixed the test
   synchronization without changing production behavior. The exact selector
   and complete affected gates then passed.
-- [ ] Capture final App Store screenshots from the shipping candidate, with no
-  private customer or account data. The one current sanitized 1206 x 2622
-  asset is valid for the 6.3-inch slot, but version 1.0 still has 0 of 10
-  iPhone screenshots because Chrome file-chooser access blocked the upload;
-  broader planned product-page coverage also remains unfinished.
+- [x] On 2026-08-20, capture and visually accept the final six-shot App Store
+  product-page set from the integrated release candidate on the iOS 26.5
+  iPhone 17 Pro Simulator. All six local assets use deterministic sanitized
+  fixtures and are 1206 x 2622 RGB JPEGs with no alpha channel.
+- [ ] Upload the accepted six-shot set to App Store Connect. The last live
+  portal check still showed 0 of 10 iPhone screenshots because Chrome
+  file-chooser access blocked the upload; reconfirm that state before acting.
 - [ ] Finish the prepared metadata. On 2026-08-18, the subtitle, promotional
   text, description, keywords, Support URL, Business category, and review notes
   were saved, and **Sign-in required** was cleared for this account-free app.
@@ -97,5 +99,6 @@ submission.
   confirmation remain open.
 - [ ] Archive, upload, and process one signed release candidate.
 - [ ] Complete TestFlight and physical-iPhone acceptance.
-- [ ] Finish the remaining verified metadata and screenshots, then submit the
-  already attached first subscriptions with version 1.0 for review.
+- [ ] Finish the remaining verified metadata, upload the accepted screenshots,
+  then submit the already attached first subscriptions with version 1.0 for
+  review.

@@ -20,9 +20,10 @@ stores.
 **Status:** Units 1–6 are integrated with the current owner workflow on local
 `main`. Unit 7 — Release Candidate, TestFlight, and Submission is active, and
 the integrated local candidate passed its complete serial Simulator
-verification matrix on 2026-08-19. The release is not complete and remains
-blocked on the remaining commercial, screenshot, physical-device, signed
-archive, TestFlight, and submission gates.
+verification matrix on 2026-08-19. The final six-shot 6.3-inch screenshot set
+was captured locally on 2026-08-20. The release is not complete and remains
+blocked on the remaining commercial, screenshot-upload, physical-device,
+signed archive, TestFlight, and submission gates.
 
 ### Outcome
 
@@ -97,18 +98,19 @@ features.
   iPhone-only 1.0 scope. Both monthly and yearly product review screenshots
   were uploaded and both products were added to the version 1.0 draft, where
   they reported **Ready for Review**. Copyright, exact review contact, Content
-  Rights, final release-behavior confirmation, and App Store product-page
-  screenshots remain incomplete. The current sanitized 1206 x 2622 asset is
-  compatible with the 6.3-inch screenshot slot, but Chrome file-chooser access
-  blocked that upload and version 1.0 still has zero screenshots.
+  Rights and final release-behavior confirmation remain incomplete. The final
+  six-shot 1206 x 2622 RGB screenshot set was captured and visually accepted
+  from the integrated candidate on 2026-08-20, but App Store Connect upload
+  remains pending; the last live check showed zero version 1.0 screenshots
+  after Chrome file-chooser access blocked the upload.
 - TestFlight still had no build on 2026-08-15, so project build 1 remained the
   first available upload candidate. The Paid Apps Agreement, bank account,
   both submitted U.S. tax forms, and updated Apple Developer Program License
   Agreement were confirmed active or accepted on 2026-08-18. App Store
   Connect's stale agreement-review banner still requires a propagation recheck
   before upload or submission.
-- Final product-page screenshots and metadata, physical-device acceptance,
-  signed archive, TestFlight, and submission gates remain unmet.
+- Final product-page screenshot upload and metadata, physical-device
+  acceptance, signed archive, TestFlight, and submission gates remain unmet.
 
 Low-risk edge-case hardening, feature expansion, and aesthetic polish do not
 block 1.0 once the real owner flow and major failure, relaunch, offline,
