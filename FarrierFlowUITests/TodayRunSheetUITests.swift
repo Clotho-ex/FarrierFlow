@@ -47,6 +47,47 @@ final class TodayRunSheetUITests: XCTestCase {
     }
 
     @MainActor
+    func testContextualInvoiceActionPreselectsOnlyPromotedVisit() {
+        let app = launch(storeName: "TodayContextualInvoice-\(UUID().uuidString)")
+        defer { app.terminate() }
+
+        let action = app.buttons["today-create-invoice-action"]
+        XCTAssertTrue(action.waitForExistence(timeout: 5))
+        action.tap()
+
+        XCTAssertTrue(app.navigationBars["Create Invoice"].waitForExistence(timeout: 3))
+        let firstVisit = app.buttons["invoice-visit-choice-0"]
+        let secondVisit = app.buttons["invoice-visit-choice-1"]
+        XCTAssertTrue(firstVisit.waitForExistence(timeout: 3))
+        XCTAssertTrue(secondVisit.exists)
+        XCTAssertEqual(firstVisit.value as? String, "Selected")
+        XCTAssertEqual(secondVisit.value as? String, "Not selected")
+        XCTAssertTrue(
+            accessibilityText(
+                of: app.descendants(matching: .any)["invoice-selection-visit-count"]
+            ).contains("1")
+        )
+        XCTAssertTrue(
+            accessibilityText(
+                of: app.descendants(matching: .any)["invoice-selection-total"]
+            ).contains("50")
+        )
+        let generate = app.buttons["invoice-generate-action"]
+        XCTAssertTrue(generate.isEnabled)
+
+        firstVisit.tap()
+        XCTAssertEqual(firstVisit.value as? String, "Not selected")
+        XCTAssertFalse(generate.isEnabled)
+
+        app.navigationBars["Create Invoice"].buttons["Today"].tap()
+        XCTAssertTrue(action.waitForExistence(timeout: 3))
+        action.tap()
+        XCTAssertTrue(firstVisit.waitForExistence(timeout: 3))
+        XCTAssertEqual(firstVisit.value as? String, "Selected")
+        XCTAssertEqual(secondVisit.value as? String, "Not selected")
+    }
+
+    @MainActor
     func testPaymentStatusIncludesInvoiceIssueDate() {
         let app = launch(
             storeName: "TodayPaymentStatus-\(UUID().uuidString)",
@@ -83,5 +124,12 @@ final class TodayRunSheetUITests: XCTestCase {
         }
         app.launch()
         return app
+    }
+
+    @MainActor
+    private func accessibilityText(of element: XCUIElement) -> String {
+        [element.label, element.value as? String]
+            .compactMap { $0 }
+            .joined(separator: " ")
     }
 }

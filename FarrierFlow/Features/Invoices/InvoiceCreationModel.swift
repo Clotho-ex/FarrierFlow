@@ -18,6 +18,7 @@ nonisolated struct InvoiceSelectionSummary: Equatable {
 @Observable
 final class InvoiceCreationModel {
     let clientID: PersistentIdentifier
+    private let initiallySelectedVisitID: PersistentIdentifier?
     var draft: InvoiceCreationDraft?
     private(set) var clientName: String?
     private(set) var visitChoices: [InvoiceVisitChoice] = []
@@ -64,8 +65,12 @@ final class InvoiceCreationModel {
         )
     }
 
-    init(clientID: PersistentIdentifier) {
+    init(
+        clientID: PersistentIdentifier,
+        initiallySelectedVisitID: PersistentIdentifier? = nil
+    ) {
         self.clientID = clientID
+        self.initiallySelectedVisitID = initiallySelectedVisitID
     }
 
     func load(
@@ -104,7 +109,9 @@ final class InvoiceCreationModel {
                 }
                 self.draft = InvoiceCreationDraft(
                     clientID: clientID,
-                    selectedVisitIDs: [],
+                    selectedVisitIDs: initiallySelectedVisitID.map { visitID in
+                        choices.contains(where: { $0.id == visitID }) ? [visitID] : []
+                    } ?? [],
                     invoiceDate: now,
                     dueDate: derivedDueDate,
                     note: hasValidBusinessProfile

@@ -51,6 +51,100 @@ struct InvoiceCreationModelTests {
     }
 
     @Test
+    func initialLoadSelectsOnlyTheEligibleContextualVisit() throws {
+        let graph = try makeCreationGraph(hasBusinessProfile: true)
+        let model = InvoiceCreationModel(
+            clientID: graph.clientID,
+            initiallySelectedVisitID: graph.firstVisitID
+        )
+
+        model.load(
+            in: graph.context,
+            now: Date(timeIntervalSinceReferenceDate: 1_000)
+        )
+
+        #expect(model.draft?.selectedVisitIDs == [graph.firstVisitID])
+        #expect(model.draft?.selectedVisitIDs.contains(graph.secondVisitID) == false)
+        #expect(
+            model.selectionSummary == InvoiceSelectionSummary(
+                visitCount: 1,
+                recordedServiceCount: 1,
+                totalMinorUnits: 12_500
+            )
+        )
+        #expect(model.canGenerate)
+    }
+
+    @Test
+    func reloadDoesNotReapplyContextAfterManualDeselection() throws {
+        let graph = try makeCreationGraph(hasBusinessProfile: true)
+        let model = InvoiceCreationModel(
+            clientID: graph.clientID,
+            initiallySelectedVisitID: graph.firstVisitID
+        )
+        model.load(
+            in: graph.context,
+            now: Date(timeIntervalSinceReferenceDate: 1_000)
+        )
+
+        model.toggleVisit(graph.firstVisitID)
+        model.load(
+            in: graph.context,
+            now: Date(timeIntervalSinceReferenceDate: 2_000)
+        )
+
+        #expect(model.draft?.selectedVisitIDs.isEmpty == true)
+        #expect(model.selectionSummary == nil)
+        #expect(!model.canGenerate)
+    }
+
+    @Test
+    func initialLoadIgnoresAContextualVisitThatIsNoLongerEligible() throws {
+        let graph = try makeCreationGraph(hasBusinessProfile: true)
+        let firstVisit = try #require(
+            graph.context.model(for: graph.firstVisitID) as? Visit
+        )
+        let billedWorkItem = try #require(firstVisit.visitHorses.first?.workItems.first)
+        let profile = try #require(
+            graph.context.fetch(FetchDescriptor<BusinessProfile>()).first
+        )
+        let client = try #require(
+            graph.context.model(for: graph.clientID) as? Client
+        )
+        let invoice = ModelFixtures.makeInvoice(
+            number: 1,
+            client: client,
+            businessProfile: profile,
+            in: graph.context
+        )
+        let invoiceVisit = ModelFixtures.makeInvoiceVisit(
+            invoice: invoice,
+            sourceVisit: firstVisit,
+            in: graph.context
+        )
+        _ = try ModelFixtures.makeInvoiceLineItem(
+            invoiceVisit: invoiceVisit,
+            sourceWorkItem: billedWorkItem,
+            in: graph.context
+        )
+        profile.nextInvoiceNumber = 2
+        try DomainGraphValidator.save(graph.context)
+        let model = InvoiceCreationModel(
+            clientID: graph.clientID,
+            initiallySelectedVisitID: graph.firstVisitID
+        )
+
+        model.load(
+            in: graph.context,
+            now: Date(timeIntervalSinceReferenceDate: 1_000)
+        )
+
+        #expect(model.visitChoices.map(\.id) == [graph.secondVisitID])
+        #expect(model.draft?.selectedVisitIDs.isEmpty == true)
+        #expect(!model.canGenerate)
+    }
+
+    @Test
     func reloadPreservesAnEditedNoteAndClearedDueDateWhileIntersectingSelection() throws {
         let graph = try makeCreationGraph(hasBusinessProfile: true)
         let model = InvoiceCreationModel(clientID: graph.clientID)

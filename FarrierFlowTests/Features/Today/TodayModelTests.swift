@@ -208,6 +208,66 @@ struct TodayModelTests {
     }
 
     @Test
+    func invoiceCandidateCarriesTheExactOldestEligibleVisit() throws {
+        let container = try ModelContainerFactory.inMemoryTest()
+        let context = container.mainContext
+        _ = ModelFixtures.makeBusinessProfile(in: context)
+        let client = Client(name: "Alex")
+        let barn = Barn(name: "North Field")
+        context.insert(client)
+        context.insert(barn)
+        let horse = Horse(name: "Milo", client: client, currentBarn: barn)
+        context.insert(horse)
+        client.horses.append(horse)
+        barn.horses.append(horse)
+        let service = ModelFixtures.makeService(in: context)
+        let firstStart = Date(timeIntervalSinceReferenceDate: 100)
+        let secondStart = Date(timeIntervalSinceReferenceDate: 200)
+        let firstVisit = ModelFixtures.makeVisit(
+            startedAt: firstStart,
+            completedAt: firstStart.addingTimeInterval(50),
+            appointment: ModelFixtures.makeAppointment(
+                startDate: firstStart,
+                barn: barn,
+                horses: [horse],
+                in: context
+            ),
+            in: context
+        )
+        let secondVisit = ModelFixtures.makeVisit(
+            startedAt: secondStart,
+            completedAt: secondStart.addingTimeInterval(50),
+            appointment: ModelFixtures.makeAppointment(
+                startDate: secondStart,
+                barn: barn,
+                horses: [horse],
+                in: context
+            ),
+            in: context
+        )
+        for visit in [firstVisit, secondVisit] {
+            visit.visitHorses[0].outcomeRawValue = VisitOutcome.serviced.rawValue
+            _ = ModelFixtures.makeWorkItem(
+                service: service,
+                visitHorse: visit.visitHorses[0],
+                in: context
+            )
+        }
+        try DomainGraphValidator.save(context)
+        let model = TodayModel()
+
+        model.load(in: context, now: .now, calendar: .current)
+
+        guard case .createInvoice(let candidate) = model.primaryAction else {
+            Issue.record("Expected contextual Invoice creation")
+            return
+        }
+        #expect(candidate.clientID == client.persistentModelID)
+        #expect(candidate.visitID == firstVisit.persistentModelID)
+        #expect(candidate.workDate == firstStart)
+    }
+
+    @Test
     func horseSummaryKeepsShortListsAndCondensesLongLists() {
         let shortSummary = TodayHorseSummary(horseNames: ["Iris", "Milo"])
         #expect(shortSummary.visibleHorseNames == ["Iris", "Milo"])

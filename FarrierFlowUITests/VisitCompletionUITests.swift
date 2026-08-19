@@ -358,6 +358,109 @@ final class VisitCompletionUITests: XCTestCase {
     }
 
     @MainActor
+    func testApplyWorkToHorsesCopiesOneSourceToTwoUntouchedTargetsAndPersists() throws {
+        let graph = makeGraph(prefix: "Batch Work")
+        let thirdHorseName = "Batch Work Third"
+        let serviceName = "Batch Work Trim"
+        let app = launch(storeName: "VisitBatchWork-\(UUID().uuidString)")
+        createService(serviceName, price: "78.50", in: app)
+        createConnectedGraph(
+            graph,
+            in: app,
+            includesSecondaryBarn: false,
+            additionalHorseNames: [thirdHorseName]
+        )
+
+        openAppointment(at: graph.primaryBarnName, in: app)
+        app.buttons["visit-start-action"].tap()
+        select(.serviced, for: graph.servicedHorseName, in: app)
+        addExistingService(serviceName, for: graph.servicedHorseName, in: app)
+
+        let applyWork = app.buttons["visit-apply-work-action"]
+        for _ in 0..<4 {
+            scrollForm(in: app, upward: false)
+        }
+        tapAfterBringingIntoView(applyWork, in: app)
+        XCTAssertTrue(app.navigationBars["Apply Work to Horses"].waitForExistence(timeout: 3))
+        XCTAssertTrue(
+            app.descendants(matching: .any)["visit-batch-summary-\(serviceName)"]
+                .waitForExistence(timeout: 3)
+        )
+        app.navigationBars["Apply Work to Horses"].buttons["Cancel"].tap()
+        for horseName in [graph.notServicedHorseName, thirdHorseName] {
+            XCTAssertTrue(
+                bringIntoView(app.buttons["visit-outcome-\(horseName)"], in: app)
+            )
+            assertOutcome(.pending, for: horseName, in: app)
+        }
+
+        for _ in 0..<4 {
+            scrollForm(in: app, upward: false)
+        }
+        tapAfterBringingIntoView(applyWork, in: app)
+        let secondTarget = app.descendants(matching: .any)[
+            "visit-batch-target-\(graph.notServicedHorseName)"
+        ]
+        let thirdTarget = app.descendants(matching: .any)[
+            "visit-batch-target-\(thirdHorseName)"
+        ]
+        selectBatchTarget(secondTarget, in: app)
+        selectBatchTarget(thirdTarget, in: app)
+
+        let confirm = app.buttons["visit-batch-confirm"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 3))
+        XCTAssertTrue(confirm.label.contains("Apply to 2 Horses"))
+        XCTAssertTrue(confirm.isEnabled)
+        confirm.tap()
+
+        for horseName in [
+            graph.servicedHorseName,
+            graph.notServicedHorseName,
+            thirdHorseName,
+        ] {
+            XCTAssertTrue(
+                bringIntoViewFromTop(
+                    app.buttons["visit-outcome-\(horseName)"],
+                    in: app
+                )
+            )
+            assertOutcome(.serviced, for: horseName, in: app)
+            let workItem = app.buttons["visit-work-item-\(horseName)-\(serviceName)"]
+            XCTAssertTrue(bringIntoView(workItem, in: app))
+            XCTAssertTrue(workItem.waitForExistence(timeout: 3))
+            XCTAssertTrue(accessibilityText(of: workItem).filter(\.isNumber).contains("7850"))
+        }
+        XCTAssertTrue(app.buttons["visit-complete"].isEnabled)
+        XCTAssertFalse(applyWork.exists)
+
+        app.buttons["visit-save-progress"].tap()
+        app.terminate()
+        app.launch()
+
+        openAppointment(at: graph.primaryBarnName, in: app)
+        if app.buttons["visit-resume-action"].waitForExistence(timeout: 2) {
+            app.buttons["visit-resume-action"].tap()
+        }
+        for horseName in [
+            graph.servicedHorseName,
+            graph.notServicedHorseName,
+            thirdHorseName,
+        ] {
+            XCTAssertTrue(
+                bringIntoViewFromTop(
+                    app.buttons["visit-outcome-\(horseName)"],
+                    in: app
+                )
+            )
+            assertOutcome(.serviced, for: horseName, in: app)
+            let workItem = app.buttons["visit-work-item-\(horseName)-\(serviceName)"]
+            XCTAssertTrue(bringIntoView(workItem, in: app))
+            XCTAssertTrue(workItem.waitForExistence(timeout: 3))
+        }
+        XCTAssertTrue(app.buttons["visit-complete"].isEnabled)
+    }
+
+    @MainActor
     func testPendingAndAllNotServicedOutcomesBlockCompletionAndDirtyCancelKeepsEditor() throws {
         let graph = makeGraph(prefix: "Draft")
         let app = launch(
@@ -477,6 +580,34 @@ final class VisitCompletionUITests: XCTestCase {
     }
 
     @MainActor
+    private func selectBatchTarget(
+        _ target: XCUIElement,
+        in app: XCUIApplication
+    ) {
+        XCTAssertTrue(bringIntoView(target, in: app))
+        target.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        let selected = expectation(
+            for: NSPredicate { evaluated, _ in
+                guard let element = evaluated as? XCUIElement else { return false }
+                return (element.value as? String) == "Selected"
+            },
+            evaluatedWith: target
+        )
+        XCTAssertEqual(XCTWaiter().wait(for: [selected], timeout: 5), .completed)
+    }
+
+    @MainActor
+    private func bringIntoViewFromTop(
+        _ element: XCUIElement,
+        in app: XCUIApplication
+    ) -> Bool {
+        for _ in 0..<4 {
+            scrollForm(in: app, upward: false)
+        }
+        return bringIntoView(element, in: app)
+    }
+
+    @MainActor
     private func bringIntoView(
         _ element: XCUIElement,
         in app: XCUIApplication
@@ -537,7 +668,8 @@ final class VisitCompletionUITests: XCTestCase {
     private func createConnectedGraph(
         _ graph: ConnectedGraph,
         in app: XCUIApplication,
-        includesSecondaryBarn: Bool = true
+        includesSecondaryBarn: Bool = true,
+        additionalHorseNames: [String] = []
     ) {
         createClient(graph.clientName, in: app)
         createBarn(graph.primaryBarnName, in: app)
@@ -551,8 +683,14 @@ final class VisitCompletionUITests: XCTestCase {
             in: app
         )
         createHorse(graph.notServicedHorseName, barnName: graph.primaryBarnName, in: app)
+        for horseName in additionalHorseNames {
+            createHorse(horseName, barnName: graph.primaryBarnName, in: app)
+        }
         scheduleAppointment(
-            horseNames: [graph.servicedHorseName, graph.notServicedHorseName],
+            horseNames: [
+                graph.servicedHorseName,
+                graph.notServicedHorseName,
+            ] + additionalHorseNames,
             barnName: graph.primaryBarnName,
             in: app
         )

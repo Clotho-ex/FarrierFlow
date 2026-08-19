@@ -158,7 +158,12 @@ struct TodayView: View {
             }
         case .createInvoice(let candidate):
             Section("Ready to Invoice") {
-                NavigationLink(value: TodayRoute.createInvoice(candidate.clientID)) {
+                NavigationLink(
+                    value: TodayRoute.createInvoice(
+                        clientID: candidate.clientID,
+                        visitID: candidate.visitID
+                    )
+                ) {
                     TodayPrimaryActionLabel(
                         title: "Create Invoice",
                         detail: "Work complete for \(candidate.clientName) on \(candidate.workDate.formatted(date: .abbreviated, time: .omitted))",
@@ -216,8 +221,11 @@ struct TodayView: View {
             AppointmentDetailView(appointmentID: id) {
                 path = NavigationPath()
             }
-        case .createInvoice(let clientID):
-            InvoiceCreationView(clientID: clientID) { invoiceID in
+        case .createInvoice(let clientID, let visitID):
+            InvoiceCreationView(
+                clientID: clientID,
+                initiallySelectedVisitID: visitID
+            ) { invoiceID in
                 if path.count > 0 { path.removeLast() }
                 path.append(TodayRoute.invoice(invoiceID))
             }
@@ -320,7 +328,10 @@ private struct TodayPrimaryActionMarker: View {
 
 private enum TodayRoute: Hashable {
     case appointment(PersistentIdentifier)
-    case createInvoice(PersistentIdentifier)
+    case createInvoice(
+        clientID: PersistentIdentifier,
+        visitID: PersistentIdentifier
+    )
     case invoice(PersistentIdentifier)
 }
 

@@ -1622,6 +1622,78 @@
     },
     "Your visit selection is unchanged. Try again." : {
       "comment" : "Recovery guidance when atomic invoice generation fails."
+    },
+    "Already has a Work Status" : {
+      "comment" : "Batch-work eligibility explanation for a horse whose outcome is no longer Not Started."
+    },
+    "Already has recorded Services" : {
+      "comment" : "Batch-work eligibility explanation for a horse that already has recorded Services."
+    },
+    "Already has Work Notes" : {
+      "comment" : "Batch-work eligibility explanation for a horse that already has Work Notes."
+    },
+    "Apply to 1 Horse" : {
+      "comment" : "Batch-work confirmation action when exactly one target horse is selected."
+    },
+    "Apply to %lld Horses" : {
+      "comment" : "Batch-work confirmation action. The argument is the number of selected target horses."
+    },
+    "Apply To" : {
+      "comment" : "Batch-work sheet section containing target horses."
+    },
+    "Apply Work to Horses" : {
+      "comment" : "Action and sheet title for copying one horse's recorded work to untouched horses."
+    },
+    "Copies recorded Services from one serviced horse to untouched horses." : {
+      "comment" : "VoiceOver hint for opening the batch-work sheet."
+    },
+    "Copy recorded Services and prices to untouched horses." : {
+      "comment" : "Explanation below the action that opens the batch-work sheet."
+    },
+    "Copy Work From" : {
+      "comment" : "Picker label for the source horse in the batch-work sheet."
+    },
+    "Couldn’t Apply Work" : {
+      "comment" : "Alert title when batch work cannot be applied to selected horses."
+    },
+    "Horses with an outcome, Work Notes, or recorded Services are never changed." : {
+      "comment" : "Safety explanation below the batch-work target list."
+    },
+    "Marks the selected horses Serviced and adds independent copies of the recorded Services." : {
+      "comment" : "VoiceOver hint for the batch-work confirmation action."
+    },
+    "No Work Available" : {
+      "comment" : "Unavailable-state title when no horse can provide valid work for a batch copy."
+    },
+    "Not Selected" : {
+      "comment" : "VoiceOver value for an unselected target horse in the batch-work sheet."
+    },
+    "One or more selected horses already has an outcome or recorded work." : {
+      "comment" : "Batch-work validation guidance when a selected target is no longer untouched."
+    },
+    "Record a valid Service for one horse before applying work." : {
+      "comment" : "Unavailable-state guidance when no valid source horse exists for batch work."
+    },
+    "Recorded Work" : {
+      "comment" : "Batch-work sheet section summarizing the source horse's recorded Services and prices."
+    },
+    "Review the Visit details and try again." : {
+      "comment" : "Batch-work recovery guidance when the resulting Visit draft fails validation."
+    },
+    "Select at least one untouched horse." : {
+      "comment" : "Batch-work validation guidance when no eligible target horse is selected."
+    },
+    "Service names and prices are copied exactly. Work Notes and photographs are not copied." : {
+      "comment" : "Safety explanation below the copied-work summary in the batch-work sheet."
+    },
+    "Source Horse" : {
+      "comment" : "Batch-work sheet section containing the serviced horse whose work will be copied."
+    },
+    "The source horse no longer has eligible recorded work." : {
+      "comment" : "Batch-work validation guidance when the selected source becomes invalid."
+    },
+    "Unavailable for batch work" : {
+      "comment" : "Fallback batch-work eligibility explanation for a horse that cannot be selected."
     }
   },
   "version" : "1.1"

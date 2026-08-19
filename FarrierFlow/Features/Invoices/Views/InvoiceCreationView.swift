@@ -12,11 +12,17 @@ struct InvoiceCreationView: View {
 
     init(
         clientID: PersistentIdentifier,
+        initiallySelectedVisitID: PersistentIdentifier? = nil,
         onGenerated: @escaping (PersistentIdentifier) -> Void
     ) {
         self.clientID = clientID
         self.onGenerated = onGenerated
-        _model = State(initialValue: InvoiceCreationModel(clientID: clientID))
+        _model = State(
+            initialValue: InvoiceCreationModel(
+                clientID: clientID,
+                initiallySelectedVisitID: initiallySelectedVisitID
+            )
+        )
     }
 
     var body: some View {

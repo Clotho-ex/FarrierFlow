@@ -61,5 +61,27 @@ final class EditorAccessibilityUITests: XCTestCase {
         XCTAssertTrue(selectedHorse.waitForExistence(timeout: 3))
         XCTAssertEqual(selectedHorse.value as? String, "Selected")
         XCTAssertEqual(appointmentNotes.value as? String, "Keep this draft")
+
+        let addAnotherHorse = app.buttons["appointment-add-horse"]
+        guard addAnotherHorse.waitForExistence(timeout: 3) else {
+            XCTFail("Add Horse should remain available after creating the first horse")
+            return
+        }
+        addAnotherHorse.tap()
+        let secondHorseName = app.textFields["horse-name-field"]
+        XCTAssertTrue(secondHorseName.waitForExistence(timeout: 3))
+        secondHorseName.tap()
+        secondHorseName.typeText("Second Appointment Horse")
+        app.buttons["horse-client-picker"].tap()
+        app.buttons["Accessible Client"].tap()
+        app.navigationBars["New Horse"].buttons["Save"].tap()
+
+        let secondSelectedHorse = app.buttons[
+            "appointment-horse-Second Appointment Horse"
+        ]
+        XCTAssertTrue(secondSelectedHorse.waitForExistence(timeout: 3))
+        XCTAssertEqual(selectedHorse.value as? String, "Selected")
+        XCTAssertEqual(secondSelectedHorse.value as? String, "Selected")
+        XCTAssertEqual(appointmentNotes.value as? String, "Keep this draft")
     }
 }

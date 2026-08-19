@@ -46,6 +46,7 @@ nonisolated struct TodayVisitSummary: Hashable {
 
 nonisolated struct TodayInvoiceCandidate: Hashable {
     let clientID: PersistentIdentifier
+    let visitID: PersistentIdentifier
     let clientName: String
     let workDate: Date
 }
@@ -242,6 +243,7 @@ final class TodayModel {
             }
             return TodayInvoiceCandidate(
                 clientID: client.persistentModelID,
+                visitID: firstChoice.id,
                 clientName: client.name,
                 workDate: firstChoice.visitDate
             )

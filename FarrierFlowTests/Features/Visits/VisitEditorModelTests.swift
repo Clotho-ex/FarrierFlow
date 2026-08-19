@@ -266,6 +266,128 @@ struct VisitEditorModelTests {
     }
 
     @Test
+    func batchWorkChoicesExposeOnlyValidSourcesAndExplainEveryTarget() throws {
+        let graph = try makeVisitGraph()
+        let model = VisitEditorModel(visitID: graph.visitID, in: graph.container)
+        model.load()
+        let milo = try #require(
+            model.draft?.horses.first(where: { $0.horseName == "Milo" })
+        )
+        let scout = try #require(
+            model.draft?.horses.first(where: { $0.horseName == "Scout" })
+        )
+
+        #expect(model.batchWorkSourceChoices.isEmpty)
+        #expect(!model.canApplyWorkToHorses)
+
+        #expect(!model.requestOutcomeChange(for: milo.id, to: .serviced))
+
+        #expect(model.batchWorkSourceChoices.map(\.horseName) == ["Milo"])
+        #expect(model.canApplyWorkToHorses)
+        let eligibleTarget = try #require(
+            model.batchWorkTargetChoices(for: milo.id).first(where: { $0.id == scout.id })
+        )
+        #expect(eligibleTarget.violation == nil)
+
+        #expect(!model.requestOutcomeChange(for: scout.id, to: .notServiced))
+        let ineligibleTarget = try #require(
+            model.batchWorkTargetChoices(for: milo.id).first(where: { $0.id == scout.id })
+        )
+        #expect(ineligibleTarget.violation == .targetMustBePending)
+        #expect(!model.canApplyWorkToHorses)
+    }
+
+    @Test
+    func applyingRecordedWorkPublishesOneAtomicDirtyDraftAndEnablesCompletion() throws {
+        let graph = try makeVisitGraph()
+        let model = VisitEditorModel(visitID: graph.visitID, in: graph.container)
+        model.load()
+        let baseline = try #require(model.draft)
+        let milo = try #require(
+            baseline.horses.first(where: { $0.horseName == "Milo" })
+        )
+        let scout = try #require(
+            baseline.horses.first(where: { $0.horseName == "Scout" })
+        )
+        #expect(!model.requestOutcomeChange(for: milo.id, to: .serviced))
+        let sourceBeforeApply = try #require(
+            model.draft?.horses.first(where: { $0.id == milo.id })
+        )
+
+        #expect(model.applyRecordedWork(from: milo.id, to: [scout.id]))
+
+        let updated = try #require(model.draft)
+        let source = try #require(updated.horses.first(where: { $0.id == milo.id }))
+        let target = try #require(updated.horses.first(where: { $0.id == scout.id }))
+        #expect(source == sourceBeforeApply)
+        #expect(target.outcome == .serviced)
+        #expect(target.workNotes.isEmpty)
+        #expect(target.workItems.map(\.serviceID) == source.workItems.map(\.serviceID))
+        #expect(target.workItems.map(\.amountMinorUnits) == source.workItems.map(\.amountMinorUnits))
+        #expect(target.workItems.map(\.id) != source.workItems.map(\.id))
+        #expect(model.isDirty)
+        #expect(model.canComplete)
+        #expect(model.alert == nil)
+    }
+
+    @Test
+    func invalidOrFailedBatchWorkPreservesTheRecoverableDraft() throws {
+        let graph = try makeVisitGraph()
+        let model = VisitEditorModel(
+            visitID: graph.visitID,
+            in: graph.container,
+            saving: { _, _ in throw VisitEditorTestFailure.unavailable }
+        )
+        model.load()
+        let milo = try #require(
+            model.draft?.horses.first(where: { $0.horseName == "Milo" })
+        )
+        let scout = try #require(
+            model.draft?.horses.first(where: { $0.horseName == "Scout" })
+        )
+        #expect(!model.requestOutcomeChange(for: milo.id, to: .serviced))
+        let beforeInvalidApply = try #require(model.draft)
+
+        #expect(!model.applyRecordedWork(from: milo.id, to: []))
+        #expect(model.draft == beforeInvalidApply)
+        #expect(model.alert?.title == "Couldn’t Apply Work")
+
+        #expect(model.applyRecordedWork(from: milo.id, to: [scout.id]))
+        let batchDraft = try #require(model.draft)
+        #expect(!model.saveProgress())
+        #expect(model.draft == batchDraft)
+        #expect(model.isDirty)
+        #expect(model.alert?.title == "Couldn’t Save Progress")
+    }
+
+    @Test
+    func correctionModeNeverOffersOrAppliesBatchWork() throws {
+        let graph = try makeVisitGraph()
+        try completeVisit(
+            graph: graph,
+            completedAt: Date(timeIntervalSinceReferenceDate: 200)
+        )
+        let model = VisitEditorModel(
+            visitID: graph.visitID,
+            in: graph.container,
+            mode: .correction
+        )
+        model.load()
+        let draft = try #require(model.draft)
+        let sourceID = try #require(
+            draft.horses.first(where: { $0.horseName == "Milo" })?.id
+        )
+        let targetID = try #require(
+            draft.horses.first(where: { $0.horseName == "Scout" })?.id
+        )
+
+        #expect(model.batchWorkSourceChoices.isEmpty)
+        #expect(!model.canApplyWorkToHorses)
+        #expect(!model.applyRecordedWork(from: sourceID, to: [targetID]))
+        #expect(model.draft == draft)
+    }
+
+    @Test
     func servicedNotesRequireConfirmationBeforeAnOutcomeChangeClearsThem() throws {
         let graph = try makeVisitGraph()
         let model = VisitEditorModel(visitID: graph.visitID, in: graph.container)

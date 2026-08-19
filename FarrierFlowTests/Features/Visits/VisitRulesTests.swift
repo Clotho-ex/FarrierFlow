@@ -180,6 +180,163 @@ struct VisitRulesTests {
         #expect(edited != saved)
     }
 
+    @Test
+    func applyingRecordedWorkCopiesEverySnapshotToUntouchedTargetsWithFreshIdentity() throws {
+        var original = try makeDraft(outcomes: [
+            (.serviced, "Source notes stay private"),
+            (.serviced, ""),
+            (.pending, ""),
+        ])
+        let secondService = try #require(original.horses[1].workItems.first)
+        original.horses[0].workItems.append(
+            WorkItemDraft(
+                serviceID: secondService.serviceID,
+                serviceNameSnapshot: secondService.serviceNameSnapshot,
+                amountMinorUnits: 9_125,
+                currencyCode: secondService.currencyCode,
+                serviceIsArchived: secondService.serviceIsArchived
+            )
+        )
+        original.horses[1].outcome = .pending
+        original.horses[1].workItems = []
+        let source = original.horses[0]
+        let targetIDs = [original.horses[1].id, original.horses[2].id]
+
+        let result = VisitRules.applyingRecordedWork(
+            from: source.id,
+            to: targetIDs,
+            in: original
+        )
+        let updated = try #require(try result.get())
+
+        #expect(updated.horses[0] == source)
+        for targetID in targetIDs {
+            let target = try #require(updated.horses.first(where: { $0.id == targetID }))
+            #expect(target.outcome == .serviced)
+            #expect(target.workNotes.isEmpty)
+            #expect(target.workItems.count == source.workItems.count)
+            #expect(target.workItems.map(\.serviceID) == source.workItems.map(\.serviceID))
+            #expect(
+                target.workItems.map(\.serviceNameSnapshot)
+                    == source.workItems.map(\.serviceNameSnapshot)
+            )
+            #expect(
+                target.workItems.map(\.amountMinorUnits)
+                    == source.workItems.map(\.amountMinorUnits)
+            )
+            #expect(target.workItems.allSatisfy { $0.persistentID == nil })
+            #expect(Set(target.workItems.map(\.id)).isDisjoint(with: source.workItems.map(\.id)))
+        }
+        #expect(
+            Set(updated.horses[1].workItems.map(\.id))
+                .isDisjoint(with: updated.horses[2].workItems.map(\.id))
+        )
+        #expect(VisitRules.progressViolation(in: updated) == nil)
+        #expect(VisitRules.completionViolation(in: updated) == nil)
+        #expect(original.horses[1].outcome == .pending)
+        #expect(original.horses[1].workItems.isEmpty)
+    }
+
+    @Test
+    func applyingRecordedWorkRequiresANonemptyUniqueTargetSelectionOutsideTheSource() throws {
+        let draft = try makeDraft(outcomes: [(.serviced, ""), (.pending, "")])
+        let sourceID = draft.horses[0].id
+        let targetID = draft.horses[1].id
+
+        #expect(
+            VisitRules.applyingRecordedWork(from: sourceID, to: [], in: draft)
+                == .failure(.targetSelectionRequired)
+        )
+        #expect(
+            VisitRules.applyingRecordedWork(
+                from: sourceID,
+                to: [targetID, targetID],
+                in: draft
+            ) == .failure(.duplicateTarget)
+        )
+        #expect(
+            VisitRules.applyingRecordedWork(from: sourceID, to: [sourceID], in: draft)
+                == .failure(.sourceSelectedAsTarget)
+        )
+    }
+
+    @Test
+    func applyingRecordedWorkRejectsAnInvalidSource() throws {
+        var draft = try makeDraft(outcomes: [(.serviced, ""), (.pending, "")])
+        let sourceID = draft.horses[0].id
+        let targetID = draft.horses[1].id
+
+        draft.horses[0].outcome = .pending
+        #expect(
+            VisitRules.applyingRecordedWork(from: sourceID, to: [targetID], in: draft)
+                == .failure(.sourceMustBeServiced)
+        )
+
+        draft.horses[0].outcome = .serviced
+        draft.horses[0].workItems = []
+        #expect(
+            VisitRules.applyingRecordedWork(from: sourceID, to: [targetID], in: draft)
+                == .failure(.sourceRequiresRecordedWork)
+        )
+
+        let duplicate = try #require(
+            makeDraft(outcomes: [(.serviced, "")]).horses[0].workItems.first
+        )
+        draft.horses[0].workItems = [duplicate, duplicate]
+        #expect(
+            VisitRules.applyingRecordedWork(from: sourceID, to: [targetID], in: draft)
+                == .failure(.invalidSourceWork(.duplicateService))
+        )
+
+        draft.horses[0].workItems = [
+            WorkItemDraft(
+                serviceID: duplicate.serviceID,
+                serviceNameSnapshot: duplicate.serviceNameSnapshot,
+                amountMinorUnits: duplicate.amountMinorUnits,
+                serviceIsArchived: true
+            ),
+        ]
+        #expect(
+            VisitRules.applyingRecordedWork(from: sourceID, to: [targetID], in: draft)
+                == .failure(.sourceContainsArchivedService)
+        )
+    }
+
+    @Test(arguments: [VisitOutcome.serviced, .notServiced])
+    func applyingRecordedWorkRejectsEveryExplicitTargetOutcome(
+        _ targetOutcome: VisitOutcome
+    ) throws {
+        let draft = try makeDraft(outcomes: [(.serviced, ""), (targetOutcome, "")])
+
+        #expect(
+            VisitRules.applyingRecordedWork(
+                from: draft.horses[0].id,
+                to: [draft.horses[1].id],
+                in: draft
+            ) == .failure(.targetMustBePending)
+        )
+    }
+
+    @Test
+    func applyingRecordedWorkRejectsPendingTargetsWithNotesOrRecordedWork() throws {
+        var draft = try makeDraft(outcomes: [(.serviced, ""), (.pending, "")])
+        let sourceID = draft.horses[0].id
+        let targetID = draft.horses[1].id
+
+        draft.horses[1].workNotes = "Existing target notes"
+        #expect(
+            VisitRules.applyingRecordedWork(from: sourceID, to: [targetID], in: draft)
+                == .failure(.targetHasWorkNotes)
+        )
+
+        draft.horses[1].workNotes = ""
+        draft.horses[1].workItems = draft.horses[0].workItems
+        #expect(
+            VisitRules.applyingRecordedWork(from: sourceID, to: [targetID], in: draft)
+                == .failure(.targetHasRecordedWork)
+        )
+    }
+
     private func makeDraft(
         outcomes: [(VisitOutcome, String)]
     ) throws -> VisitDraft {

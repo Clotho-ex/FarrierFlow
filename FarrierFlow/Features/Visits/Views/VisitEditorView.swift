@@ -9,6 +9,7 @@ struct VisitEditorView: View {
     @State private var model: VisitEditorModel
     @State private var showsDismissConfirmation = false
     @State private var showsDiscardVisitConfirmation = false
+    @State private var showsApplyWork = false
     @State private var addServiceHorse: VisitHorseDraft?
     @State private var workItemEditorTarget: WorkItemEditorTarget?
     @FocusState private var focusedWorkNotesID: PersistentIdentifier?
@@ -207,6 +208,20 @@ struct VisitEditorView: View {
                             .accessibilityIdentifier("visit-completion-requirement")
                     }
                 }
+                if model.canApplyWorkToHorses {
+                    Section {
+                        Button("Apply Work to Horses", systemImage: "rectangle.on.rectangle") {
+                            focusedWorkNotesID = nil
+                            showsApplyWork = true
+                        }
+                        .accessibilityHint(
+                            "Copies recorded Services from one serviced horse to untouched horses."
+                        )
+                        .accessibilityIdentifier("visit-apply-work-action")
+                    } footer: {
+                        Text("Copy recorded Services and prices to untouched horses.")
+                    }
+                }
                 ForEach(draft.horses) { horse in
                     Section(horse.horseName) {
                         VisitHorseOutcomeRow(
@@ -266,6 +281,11 @@ struct VisitEditorView: View {
                     visitHorseID: target.visitHorseID,
                     workItem: target.workItem
                 )
+            }
+            .sheet(isPresented: $showsApplyWork) {
+                NavigationStack {
+                    ApplyVisitWorkView(model: model)
+                }
             }
         } else {
             ContentUnavailableView("Visit Unavailable", systemImage: "exclamationmark.circle")

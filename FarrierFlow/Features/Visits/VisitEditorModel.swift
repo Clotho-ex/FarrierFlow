@@ -25,6 +25,18 @@ nonisolated enum VisitAddServiceRequest: Equatable {
     case serviceAdded
 }
 
+nonisolated struct VisitBatchWorkSourceChoice: Equatable, Identifiable {
+    let id: PersistentIdentifier
+    let horseName: String
+    let workItems: [WorkItemDraft]
+}
+
+nonisolated struct VisitBatchWorkTargetChoice: Equatable, Identifiable {
+    let id: PersistentIdentifier
+    let horseName: String
+    let violation: VisitBatchWorkViolation?
+}
+
 @MainActor
 @Observable
 final class VisitEditorModel {
@@ -76,6 +88,28 @@ final class VisitEditorModel {
     var canSaveCorrection: Bool {
         guard mode == .correction, loadState == .loaded, let draft else { return false }
         return VisitRules.correctionViolation(in: draft) == nil
+    }
+
+    var batchWorkSourceChoices: [VisitBatchWorkSourceChoice] {
+        guard mode == .inProgress, loadState == .loaded, let draft else {
+            return []
+        }
+        return draft.horses.compactMap { horse in
+            guard VisitRules.batchSourceViolation(for: horse) == nil else {
+                return nil
+            }
+            return VisitBatchWorkSourceChoice(
+                id: horse.id,
+                horseName: horse.horseName,
+                workItems: horse.workItems
+            )
+        }
+    }
+
+    var canApplyWorkToHorses: Bool {
+        batchWorkSourceChoices.contains { source in
+            batchWorkTargetChoices(for: source.id).contains { $0.violation == nil }
+        }
     }
 
     init(
@@ -174,6 +208,53 @@ final class VisitEditorModel {
         }
         updatedDraft.horses[index].workNotes = workNotes
         draft = updatedDraft
+    }
+
+    func batchWorkTargetChoices(
+        for sourceID: PersistentIdentifier
+    ) -> [VisitBatchWorkTargetChoice] {
+        guard
+            mode == .inProgress,
+            loadState == .loaded,
+            let draft,
+            draft.horses.contains(where: {
+                $0.id == sourceID && VisitRules.batchSourceViolation(for: $0) == nil
+            })
+        else {
+            return []
+        }
+        return draft.horses.compactMap { horse in
+            guard horse.id != sourceID else { return nil }
+            return VisitBatchWorkTargetChoice(
+                id: horse.id,
+                horseName: horse.horseName,
+                violation: VisitRules.batchTargetViolation(for: horse)
+            )
+        }
+    }
+
+    @discardableResult
+    func applyRecordedWork(
+        from sourceID: PersistentIdentifier,
+        to targetIDs: [PersistentIdentifier]
+    ) -> Bool {
+        guard mode == .inProgress, loadState == .loaded, let draft else {
+            return false
+        }
+
+        switch VisitRules.applyingRecordedWork(
+            from: sourceID,
+            to: targetIDs,
+            in: draft
+        ) {
+        case let .success(updatedDraft):
+            self.draft = updatedDraft
+            alert = nil
+            return true
+        case let .failure(violation):
+            alert = batchWorkAlert(for: violation)
+            return false
+        }
     }
 
     func eligibleServices(
@@ -476,5 +557,31 @@ final class VisitEditorModel {
             title: "Couldn’t Save Progress",
             message: "Your changes are still in the visit. Try saving again."
         )
+    }
+
+    private func batchWorkAlert(
+        for violation: VisitBatchWorkViolation
+    ) -> FeatureAlert {
+        let message: LocalizedStringResource
+        switch violation {
+        case .targetSelectionRequired:
+            message = "Select at least one untouched horse."
+        case .sourceHorseUnavailable,
+             .sourceMustBeServiced,
+             .sourceRequiresRecordedWork,
+             .invalidSourceWork,
+             .sourceContainsArchivedService:
+            message = "The source horse no longer has eligible recorded work."
+        case .duplicateTarget,
+             .sourceSelectedAsTarget,
+             .targetHorseUnavailable,
+             .targetMustBePending,
+             .targetHasWorkNotes,
+             .targetHasRecordedWork:
+            message = "One or more selected horses already has an outcome or recorded work."
+        case .invalidResult:
+            message = "Review the Visit details and try again."
+        }
+        return FeatureAlert(title: "Couldn’t Apply Work", message: message)
     }
 }

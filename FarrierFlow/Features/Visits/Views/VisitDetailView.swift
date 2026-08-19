@@ -4,6 +4,7 @@ import SwiftUI
 struct VisitDetailView: View {
     @Environment(\.calendar) private var calendar
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.locale) private var locale
     @Environment(PhotographLibrary.self) private var photographLibrary
     @State private var model: VisitDetailModel
@@ -114,21 +115,31 @@ struct VisitDetailView: View {
     private var detailList: some View {
         if let detail = model.detail {
             List {
-                Section("Visit") {
-                    LabeledContent {
-                        Text(detail.startedAt, format: .dateTime.month().day().year().hour().minute())
-                    } label: {
-                        Text("Work Date")
+                if dynamicTypeSize.isAccessibilitySize {
+                    Section {
+                        VisitAccessibilityOverview(
+                            startedAt: detail.startedAt,
+                            isCompleted: detail.completedAt != nil,
+                            isCorrectionLocked: detail.isCorrectionLocked
+                        )
                     }
-                    LabeledContent("Status") {
-                        Text(detail.completedAt == nil ? "In Progress" : "Completed")
-                            .accessibilityIdentifier("visit-detail-status")
+                } else {
+                    Section("Visit") {
+                        LabeledContent {
+                            Text(detail.startedAt, format: .dateTime.month().day().year().hour().minute())
+                        } label: {
+                            Text("Work Date")
+                        }
+                        LabeledContent("Status") {
+                            Text(detail.completedAt == nil ? "In Progress" : "Completed")
+                                .accessibilityIdentifier("visit-detail-status")
+                        }
                     }
-                }
-                if detail.isCorrectionLocked {
-                    Section("Invoiced Work") {
-                        Text("This visit has invoiced work and can no longer be corrected.")
-                            .foregroundStyle(.secondary)
+                    if detail.isCorrectionLocked {
+                        Section("Invoiced Work") {
+                            Text("This visit has invoiced work and can no longer be corrected.")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
                 Section("Service Location") {
@@ -389,6 +400,72 @@ struct VisitDetailView: View {
         [
             formattedAmount(workItem.amountMinorUnits),
             workItem.serviceIsArchived == true ? String(localized: "Archived", locale: locale) : nil,
+        ]
+        .compactMap { $0 }
+        .formatted(.list(type: .and).locale(locale))
+    }
+}
+
+private struct VisitAccessibilityOverview: View {
+    @Environment(\.locale) private var locale
+    let startedAt: Date
+    let isCompleted: Bool
+    let isCorrectionLocked: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
+            Text(
+                startedAt,
+                format: .dateTime
+                    .year(.twoDigits)
+                    .month(.twoDigits)
+                    .day(.twoDigits)
+                    .hour()
+                    .minute()
+            )
+            .font(Typography.recordTitle)
+            Text(status)
+                .font(Typography.recordMetadata)
+                .foregroundStyle(.secondary)
+            if isCorrectionLocked {
+                Text(correctionLockMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityIdentifier("visit-detail-accessibility-overview")
+        .accessibilityLabel("Visit")
+        .accessibilityValue(Text(accessibilityValue))
+    }
+
+    private var status: String {
+        isCompleted
+            ? String(localized: "Completed", locale: locale)
+            : String(localized: "In Progress", locale: locale)
+    }
+
+    private var correctionLockMessage: String {
+        String(
+            localized: "This visit has invoiced work and can no longer be corrected.",
+            locale: locale
+        )
+    }
+
+    private var accessibilityValue: String {
+        [
+            startedAt.formatted(
+                .dateTime
+                    .month()
+                    .day()
+                    .year()
+                    .hour()
+                    .minute()
+                    .locale(locale)
+            ),
+            status,
+            isCorrectionLocked ? correctionLockMessage : nil,
         ]
         .compactMap { $0 }
         .formatted(.list(type: .and).locale(locale))

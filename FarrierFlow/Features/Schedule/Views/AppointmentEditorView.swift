@@ -109,33 +109,35 @@ struct AppointmentEditorView: View {
                         } else if model.draft.barnID == nil {
                             Text("Select a service location to choose horses.")
                                 .foregroundStyle(.secondary)
-                        } else if model.eligibleHorses.isEmpty {
-                            Text(
-                                "Add or move a horse to this service location before scheduling an appointment."
-                            )
-                                .foregroundStyle(.secondary)
+                        } else {
+                            if model.eligibleHorses.isEmpty {
+                                Text(
+                                    "Add or move a horse to this service location before scheduling an appointment."
+                                )
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                ForEach(model.eligibleHorses, id: \.persistentModelID) { horse in
+                                    HorseSelectionRow(
+                                        horse: horse,
+                                        isSelected: model.draft.selectedHorseIDs.contains(
+                                            horse.persistentModelID
+                                        )
+                                    ) {
+                                        model.toggleHorse(horse.persistentModelID)
+                                    }
+                                    .accessibilityIdentifier(
+                                        "appointment-horse-\(horse.name)"
+                                    )
+                                }
+                                if model.saveRequirement == .horse {
+                                    Text("Select at least one horse.")
+                                        .font(.footnote.weight(.semibold))
+                                }
+                            }
                             Button("Add Horse", systemImage: "plus") {
                                 showsHorseEditor = true
                             }
                             .accessibilityIdentifier("appointment-add-horse")
-                        } else {
-                            ForEach(model.eligibleHorses, id: \.persistentModelID) { horse in
-                                HorseSelectionRow(
-                                    horse: horse,
-                                    isSelected: model.draft.selectedHorseIDs.contains(
-                                        horse.persistentModelID
-                                    )
-                                ) {
-                                    model.toggleHorse(horse.persistentModelID)
-                                }
-                                .accessibilityIdentifier(
-                                    "appointment-horse-\(horse.name)"
-                                )
-                            }
-                            if model.saveRequirement == .horse {
-                                Text("Select at least one horse.")
-                                    .font(.footnote.weight(.semibold))
-                            }
                         }
                     }
                 }
