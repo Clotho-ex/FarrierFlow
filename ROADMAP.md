@@ -21,9 +21,9 @@ stores.
 `main`. Unit 7 — Release Candidate, TestFlight, and Submission is active, and
 the integrated local candidate passed its complete serial Simulator
 verification matrix on 2026-08-19. The final six-shot 6.3-inch screenshot set
-was captured locally on 2026-08-20. The release is not complete and remains
-blocked on the remaining commercial, screenshot-upload, physical-device,
-signed archive, TestFlight, and submission gates.
+was captured locally and uploaded to App Store Connect on 2026-08-20. The
+release is not complete and remains blocked on the remaining commercial,
+physical-device, signed archive, TestFlight, and submission gates.
 
 ### Outcome
 
@@ -100,17 +100,18 @@ features.
   they reported **Ready for Review**. Copyright, exact review contact, Content
   Rights and final release-behavior confirmation remain incomplete. The final
   six-shot 1206 x 2622 RGB screenshot set was captured and visually accepted
-  from the integrated candidate on 2026-08-20, but App Store Connect upload
-  remains pending; the last live check showed zero version 1.0 screenshots
-  after Chrome file-chooser access blocked the upload.
+  from the integrated candidate on 2026-08-20, then uploaded to the version 1.0
+  iPhone 6.3-inch slot. App Store Connect retained all six after reload in the
+  approved Subscription, Today, Schedule, Horse History, Invoice and read-only
+  sequence with no validation error.
 - TestFlight still had no build on 2026-08-15, so project build 1 remained the
   first available upload candidate. The Paid Apps Agreement, bank account,
   both submitted U.S. tax forms, and updated Apple Developer Program License
   Agreement were confirmed active or accepted on 2026-08-18. App Store
   Connect's stale agreement-review banner still requires a propagation recheck
   before upload or submission.
-- Final product-page screenshot upload and metadata, physical-device
-  acceptance, signed archive, TestFlight, and submission gates remain unmet.
+- Final metadata, physical-device acceptance, signed archive, TestFlight, and
+  submission gates remain unmet.
 
 Low-risk edge-case hardening, feature expansion, and aesthetic polish do not
 block 1.0 once the real owner flow and major failure, relaunch, offline,

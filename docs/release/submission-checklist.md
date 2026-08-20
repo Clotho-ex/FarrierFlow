@@ -89,9 +89,10 @@ submission.
   product-page set from the integrated release candidate on the iOS 26.5
   iPhone 17 Pro Simulator. All six local assets use deterministic sanitized
   fixtures and are 1206 x 2622 RGB JPEGs with no alpha channel.
-- [ ] Upload the accepted six-shot set to App Store Connect. The last live
-  portal check still showed 0 of 10 iPhone screenshots because Chrome
-  file-chooser access blocked the upload; reconfirm that state before acting.
+- [x] On 2026-08-20, upload the accepted six-shot set to the App Store Connect
+  version 1.0 iPhone 6.3-inch slot. The portal retained all six after reload in
+  numbered order—Subscription, Today, Schedule, Horse History, Invoice and
+  read-only records—and reported 6 of 10 screenshots with no validation error.
 - [ ] Finish the prepared metadata. On 2026-08-18, the subtitle, promotional
   text, description, keywords, Support URL, Business category, and review notes
   were saved, and **Sign-in required** was cleared for this account-free app.
@@ -99,6 +100,5 @@ submission.
   confirmation remain open.
 - [ ] Archive, upload, and process one signed release candidate.
 - [ ] Complete TestFlight and physical-iPhone acceptance.
-- [ ] Finish the remaining verified metadata, upload the accepted screenshots,
-  then submit the already attached first subscriptions with version 1.0 for
-  review.
+- [ ] Finish the remaining verified metadata, then submit the already attached
+  first subscriptions with version 1.0 for review.
