@@ -49,7 +49,7 @@ submission.
   have the 14-day introductory offer, and the 16-day All Renewals billing grace
   period is enabled in production and sandbox. On 2026-08-18, upload the
   sanitized 1206 x 2622 review screenshot to both products and add both to the
-  version 1.0 draft submission; each product reported **Ready for Review**.
+  version 1.0 draft submission; each product now reports **Ready for Review**.
 - [x] On 2026-08-18, complete the source-backed age-rating questionnaire; App
   Store Connect calculated and saved a 4+ rating.
 - [x] On 2026-08-18, publish App Privacy as **Data Not Collected** for the final
@@ -57,48 +57,32 @@ submission.
 
 ## Candidate and submission gates (Unit 7 only)
 
-- [x] Integrate Revenue Launch Units 1–6 with the latest owner-workflow changes
-  on local `main`, including the approved Unit 7 launch-synchronization test
-  fixes. No Export Unit 2, backup, account, analytics, or mutation-coordinator
-  work is included.
+- [x] Freeze approved source scope at
+  `d72362322c60c10c3f0bf3d91579d5e8064578f0`; the diff from `origin/main`
+  contains Revenue Launch Units 1–6 and approved documentation, with no Export
+  Unit 2, backup, account, analytics, or mutation-coordinator work.
 - [x] On 2026-08-15, App Store Connect showed **No Builds** in TestFlight and no
-  build attached to version 1.0. Project build number `1` was therefore the
-  first available upload candidate at that check.
-- [x] On 2026-08-15, complete the serial local release verification gates on
-  the pre-integration release branch: iOS 18 and iOS 26 unit/integration suites
-  each passed 396 tests; the focused iOS 18 subscription and first-customer
-  gate passed 6 tests; the full iOS 26 UI gate passed 22 tests; both
-  persistent-reopen gates passed 16 tests; both simulator builds succeeded;
-  and the source and built privacy manifests, string catalog, compiled
-  Default/Dark/tinted App Icon renditions, and `git diff --check` passed.
-- [x] On 2026-08-19, run the complete serial release-candidate verification
-  matrix on the integrated local `main` candidate rooted at `463b81a`: the
-  iOS 18 and iOS 26 unit/integration suites each passed 412 tests; the focused
-  iOS 18 subscription and first-customer gate passed 6 tests; the expanded
-  full iOS 26 UI gate passed 30 tests; both persistent-reopen gates passed 16
-  tests; and both Simulator builds succeeded. Source and built privacy
-  manifests, localization compilation, StoreKit JSON/product contracts,
-  version 1.0/build 1/minimum iOS 18 metadata, compiled Default/Dark/tintable
-  App Icon renditions, and `git diff --check` passed. The initial focused iOS
-  18 attempt exposed ignored Today navigation taps in
-  `OwnerSetupUITests`; two independent result bundles retained the correct
-  product data on Today, and a bounded condition-based retry fixed the test
-  synchronization without changing production behavior. The exact selector
-  and complete affected gates then passed.
-- [x] On 2026-08-20, capture and visually accept the final six-shot App Store
-  product-page set from the integrated release candidate on the iOS 26.5
-  iPhone 17 Pro Simulator. All six local assets use deterministic sanitized
-  fixtures and are 1206 x 2622 RGB JPEGs with no alpha channel.
-- [x] On 2026-08-20, upload the accepted six-shot set to the App Store Connect
-  version 1.0 iPhone 6.3-inch slot. The portal retained all six after reload in
-  numbered order—Subscription, Today, Schedule, Horse History, Invoice and
-  read-only records—and reported 6 of 10 screenshots with no validation error.
-- [ ] Finish the prepared metadata. On 2026-08-18, the subtitle, promotional
-  text, description, keywords, Support URL, Business category, and review notes
-  were saved, and **Sign-in required** was cleared for this account-free app.
-  Copyright, exact review contact, Content Rights, and final release-behavior
-  confirmation remain open.
+  build attached to version 1.0. Project build number `1` is therefore the
+  first available upload candidate.
+- [x] On 2026-08-15, complete the serial local release verification gates:
+  iOS 18 and iOS 26 unit/integration suites each passed 396 tests; the focused
+  iOS 18 subscription and first-customer gate passed 6 tests; the full iOS 26
+  UI gate passed 22 tests; both persistent-reopen gates passed 16 tests; both
+  simulator builds succeeded; and the source and built privacy manifests,
+  string catalog, compiled Default/Dark/tinted App Icon renditions, and
+  `git diff --check` passed.
+- [ ] Capture final App Store screenshots from the shipping candidate, with no
+  private customer or account data. The one current sanitized 1206 x 2622
+  asset is valid for the 6.3-inch slot, but version 1.0 still has 0 of 10
+  iPhone screenshots because Chrome file-chooser access blocked the upload;
+  broader planned product-page coverage also remains unfinished.
+- [ ] Enter the prepared subtitle, promotional text, description, keywords,
+  Support URL, copyright, category, review contact, and review notes. On
+  2026-08-18, the subtitle, promotional text, description, keywords, Support
+  URL, Business category, and review notes were saved, and **Sign-in required**
+  was cleared for this account-free app. Copyright, exact review contact,
+  Content Rights, and final release-behavior confirmation remain open.
 - [ ] Archive, upload, and process one signed release candidate.
 - [ ] Complete TestFlight and physical-iPhone acceptance.
-- [ ] Finish the remaining verified metadata, then submit the already attached
-  first subscriptions with version 1.0 for review.
+- [ ] Finish the remaining verified metadata and screenshots, then submit the
+  already attached first subscriptions with version 1.0 for review.
