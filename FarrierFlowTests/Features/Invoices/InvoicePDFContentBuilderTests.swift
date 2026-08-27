@@ -26,6 +26,7 @@ struct InvoicePDFContentBuilderTests {
         #expect(content.clientName == "Alex Carter")
         #expect(content.clientPhone == "555-0101")
         #expect(content.clientEmail == "alex@example.com")
+        #expect(content.currencyCode == "USD")
         #expect(content.visits.count == 1)
         #expect(content.visits[0].date == graph.visitDate)
         #expect(content.visits[0].location == "North Field")

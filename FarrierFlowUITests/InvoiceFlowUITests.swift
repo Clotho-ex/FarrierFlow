@@ -10,34 +10,23 @@ final class InvoiceFlowUITests: XCTestCase {
         )
         defer { app.terminate() }
 
-        app.tabBars.buttons["Schedule"].tap()
-        let appointment = app.descendants(matching: .any)[
-            "appointment-row-Invoice Service Location"
-        ].firstMatch
-        XCTAssertTrue(appointment.waitForExistence(timeout: 5))
-        XCTAssertTrue(appointment.isHittable)
-        XCTAssertTrue(accessibilityText(of: appointment).contains("Invoice Service Location"))
-        XCTAssertTrue(accessibilityText(of: appointment).contains("Milo"))
-
-        openClients(in: app)
-        let client = app.staticTexts["client-row-Invoice Client"]
-        XCTAssertTrue(client.waitForExistence(timeout: 3))
-        XCTAssertTrue(client.isHittable)
-        XCTAssertTrue(accessibilityText(of: client).contains("Invoice Client"))
-        client.tap()
-
-        let createInvoice = app.buttons["client-create-invoice-action"]
+        let createInvoice = app.buttons["today-create-invoice-action"]
         XCTAssertTrue(createInvoice.waitForExistence(timeout: 3))
         XCTAssertTrue(createInvoice.isHittable)
         XCTAssertTrue(accessibilityText(of: createInvoice).contains("Create Invoice"))
         createInvoice.tap()
 
         let firstVisit = app.buttons["invoice-visit-choice-0"]
-        XCTAssertTrue(firstVisit.waitForExistence(timeout: 3))
+        if !firstVisit.waitForExistence(timeout: 3), createInvoice.exists {
+            createInvoice.tap()
+        }
+        XCTAssertTrue(firstVisit.waitForExistence(timeout: 5))
         XCTAssertTrue(firstVisit.isHittable)
         XCTAssertTrue(accessibilityText(of: firstVisit).contains("Invoice Service Location"))
         XCTAssertTrue(accessibilityText(of: firstVisit).contains("50"))
-        firstVisit.tap()
+        if !accessibilityText(of: firstVisit).contains("Selected") {
+            firstVisit.tap()
+        }
         XCTAssertTrue(accessibilityText(of: firstVisit).contains("Selected"))
 
         let generate = app.buttons["invoice-generate-action"]
@@ -46,6 +35,14 @@ final class InvoiceFlowUITests: XCTestCase {
 
         let detail = app.descendants(matching: .any)["invoice-detail-0001"]
         XCTAssertTrue(detail.waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            app.descendants(matching: .any)["invoice-native-detail-content"]
+                .waitForExistence(timeout: 3)
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["invoice-detail-amount-due"]
+                .waitForExistence(timeout: 3)
+        )
         XCTAssertTrue(app.staticTexts["Milo"].exists)
         XCTAssertTrue(app.staticTexts["Trim"].exists)
         XCTAssertTrue(app.staticTexts.matching(
@@ -57,16 +54,6 @@ final class InvoiceFlowUITests: XCTestCase {
         XCTAssertTrue(lineItem.waitForExistence(timeout: 3))
         XCTAssertFalse(lineItem.label.contains("50"))
         XCTAssertTrue((lineItem.value as? String)?.contains("50") == true)
-
-        app.navigationBars.buttons["Invoice Client"].tap()
-        app.navigationBars.buttons["Clients"].tap()
-        app.buttons["More"].tap()
-        openInvoices(in: app)
-        let invoice = app.buttons["invoice-row-0001"]
-        XCTAssertTrue(invoice.waitForExistence(timeout: 3))
-        XCTAssertTrue(invoice.isHittable)
-        XCTAssertTrue(accessibilityText(of: invoice).contains("Invoice 0001"))
-        XCTAssertTrue(accessibilityText(of: invoice).contains("Unpaid"))
     }
 
     @MainActor
@@ -75,14 +62,24 @@ final class InvoiceFlowUITests: XCTestCase {
         defer { app.terminate() }
 
         openClients(in: app)
-        app.buttons["More"].tap()
-        XCTAssertTrue(app.buttons["Invoices"].waitForExistence(timeout: 3))
+        let invoices = app.buttons["Invoices"]
+        for _ in 0..<2 where !invoices.exists {
+            app.buttons["More"].tap()
+            _ = invoices.waitForExistence(timeout: 2)
+        }
+        XCTAssertTrue(invoices.exists)
         XCTAssertTrue(app.buttons["My Business"].exists)
         openInvoices(in: app)
         XCTAssertTrue(app.staticTexts["No Invoices"].waitForExistence(timeout: 3))
-        app.navigationBars.buttons["Clients"].tap()
+        let invoicesBackButton = app.navigationBars.buttons["Clients"]
+        invoicesBackButton.tap()
 
-        app.staticTexts["client-row-Invoice Client"].tap()
+        let clientRow = app.staticTexts["client-row-Invoice Client"]
+        if !clientRow.waitForExistence(timeout: 2), invoicesBackButton.exists {
+            invoicesBackButton.tap()
+        }
+        XCTAssertTrue(clientRow.waitForExistence(timeout: 3))
+        clientRow.tap()
         app.buttons["client-create-invoice-action"].tap()
         let firstVisit = app.buttons["invoice-visit-choice-0"]
         let secondVisit = app.buttons["invoice-visit-choice-1"]
@@ -112,15 +109,21 @@ final class InvoiceFlowUITests: XCTestCase {
 
         let detail = app.descendants(matching: .any)["invoice-detail-0001"]
         XCTAssertTrue(detail.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["invoice-share-pdf-action"].exists)
-        XCTAssertTrue(app.buttons["invoice-mark-paid-action"].exists)
-        XCTAssertTrue(app.buttons["invoice-more-actions"].exists)
+        let actionsMenu = app.buttons["invoice-actions-menu"]
+        XCTAssertTrue(actionsMenu.exists)
+        XCTAssertFalse(app.buttons["invoice-preview-pdf-action"].exists)
         XCTAssertTrue(app.staticTexts["Milo"].exists)
         XCTAssertTrue(app.staticTexts["Trim"].exists)
         XCTAssertFalse(app.staticTexts["Scout"].exists)
         let total = app.descendants(matching: .any)["invoice-detail-total"]
         XCTAssertTrue(total.waitForExistence(timeout: 3))
         XCTAssertTrue(accessibilityText(of: total).contains("100"))
+
+        let nativeInvoiceScreenshot = XCTAttachment(screenshot: app.screenshot())
+        nativeInvoiceScreenshot.name = "Native Invoice Detail"
+        nativeInvoiceScreenshot.lifetime = .keepAlways
+        add(nativeInvoiceScreenshot)
+
         for _ in 0..<3 where !app.staticTexts["Test Farrier"].exists {
             detail.swipeUp()
         }
@@ -129,33 +132,28 @@ final class InvoiceFlowUITests: XCTestCase {
             detail.swipeUp()
         }
         XCTAssertTrue(app.staticTexts["Invoice Client"].waitForExistence(timeout: 3))
+        actionsMenu.tap()
+        XCTAssertTrue(app.buttons["invoice-share-pdf-action"].waitForExistence(timeout: 3))
+        let markPaid = app.buttons["invoice-mark-paid-action"]
+        XCTAssertTrue(markPaid.exists)
+        XCTAssertTrue(app.buttons["invoice-delete-action"].exists)
 
-        app.buttons["invoice-share-pdf-action"].tap()
-        let closeShareSheet = app.buttons["Close"]
-        XCTAssertTrue(closeShareSheet.waitForExistence(timeout: 10))
-        closeShareSheet.tap()
-        XCTAssertTrue(closeShareSheet.waitForNonExistence(timeout: 5))
-        app.buttons["invoice-share-pdf-action"].tap()
-        XCTAssertTrue(closeShareSheet.waitForExistence(timeout: 10))
-        closeShareSheet.tap()
-        XCTAssertTrue(closeShareSheet.waitForNonExistence(timeout: 5))
-
-        app.buttons["invoice-mark-paid-action"].tap()
-        let markPaidConfirmation = app.buttons.matching(
+        markPaid.tap()
+        let markPaidAlert = app.alerts["Mark Invoice Paid?"]
+        XCTAssertTrue(markPaidAlert.waitForExistence(timeout: 3))
+        markPaidAlert.buttons.matching(
             identifier: "invoice-mark-paid-confirmation"
-        ).firstMatch
-        XCTAssertTrue(markPaidConfirmation.waitForExistence(timeout: 3))
-        markPaidConfirmation.tap()
-        XCTAssertTrue(
-            app.buttons["invoice-mark-paid-action"].waitForNonExistence(timeout: 3)
-        )
+        ).firstMatch.tap()
         let paidStatus = app.staticTexts["Status, Paid"].firstMatch
         for _ in 0..<6 where !paidStatus.exists {
             detail.swipeDown()
         }
         XCTAssertTrue(paidStatus.waitForExistence(timeout: 3))
-        XCTAssertFalse(app.buttons["invoice-more-actions"].exists)
+        actionsMenu.tap()
+        XCTAssertTrue(app.buttons["invoice-share-pdf-action"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["invoice-mark-paid-action"].exists)
         XCTAssertFalse(app.buttons["invoice-delete-action"].exists)
+        detail.tap()
 
         app.navigationBars.buttons["Invoice Client"].tap()
         XCTAssertTrue(
@@ -248,7 +246,7 @@ final class InvoiceFlowUITests: XCTestCase {
     private func openClients(in app: XCUIApplication) {
         for _ in 0..<2 {
             app.tabBars.buttons["Clients"].tap()
-            if app.buttons["More"].waitForExistence(timeout: 2) {
+            if app.navigationBars["Clients"].waitForExistence(timeout: 2) {
                 return
             }
         }

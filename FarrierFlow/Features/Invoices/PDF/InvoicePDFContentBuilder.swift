@@ -14,6 +14,6 @@ enum InvoicePDFContentBuilder {
             })
         }
         guard let total = try? InvoiceDomainRules.checkedTotal(visits.flatMap(\.lineItems).map(\.amountMinorUnits)) else { throw InvoicePDFContentBuilderError.totalUnavailable }
-        return InvoicePDFContent(number: try InvoiceDomainRules.formattedNumber(invoice.number), invoiceDate: invoice.invoiceDate, dueDate: invoice.dueDate, status: status, paidAt: invoice.paidAt, businessName: invoice.businessNameSnapshot, businessPhone: invoice.businessPhoneSnapshot, businessEmail: invoice.businessEmailSnapshot, businessAddress: invoice.businessAddressSnapshot, clientName: invoice.clientNameSnapshot, clientPhone: invoice.clientPhoneSnapshot, clientEmail: invoice.clientEmailSnapshot, visits: visits, totalMinorUnits: total, note: invoice.note)
+        return InvoicePDFContent(number: try InvoiceDomainRules.formattedNumber(invoice.number), invoiceDate: invoice.invoiceDate, dueDate: invoice.dueDate, status: status, paidAt: invoice.paidAt, currencyCode: invoice.currencyCode, businessName: invoice.businessNameSnapshot, businessPhone: invoice.businessPhoneSnapshot, businessEmail: invoice.businessEmailSnapshot, businessAddress: invoice.businessAddressSnapshot, clientName: invoice.clientNameSnapshot, clientPhone: invoice.clientPhoneSnapshot, clientEmail: invoice.clientEmailSnapshot, visits: visits, totalMinorUnits: total, note: invoice.note)
     }
 }

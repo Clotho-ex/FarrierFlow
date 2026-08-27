@@ -97,6 +97,23 @@ struct PhotographFileStoreTests {
     }
 
     @Test
+    func inspectionRecognizesManagedDirectoriesAcrossEquivalentURLRepresentations() throws {
+        let applicationSupport = try TemporaryStoreFixtures.makeDirectory(
+            prefix: "FarrierFlow-Photograph-Equivalent-URLs-"
+        )
+        let root = applicationSupport
+            .appending(path: "Unused", directoryHint: .isDirectory)
+            .appending(path: "..", directoryHint: .isDirectory)
+            .appending(path: PhotographConstants.rootDirectoryName, directoryHint: .isDirectory)
+        let store = PhotographFileStore(rootURL: root)
+        try store.prepareDirectories()
+
+        let inspection = try store.inspectAllEntries()
+
+        #expect(inspection.unknownEntries.isEmpty)
+    }
+
+    @Test
     func prepareRejectsSymbolicLinkManagedDirectory() throws {
         let applicationSupport = try TemporaryStoreFixtures.makeDirectory(
             prefix: "FarrierFlow-Photograph-Symlink-Root-\(UUID().uuidString)-"

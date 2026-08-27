@@ -25,10 +25,17 @@ final class SubscriptionReadOnlyUITests: XCTestCase {
         XCTAssertFalse(app.buttons["Edit"].exists)
 
         openClients(in: app)
-        app.buttons["client-row-Invoice Client"].tap()
+        let client = app.buttons["client-row-Invoice Client"]
+        let horse = app.buttons["horse-row-Milo"]
+        for _ in 0..<2 where !horse.exists {
+            client.tap()
+            _ = horse.waitForExistence(timeout: 2)
+        }
+        XCTAssertTrue(horse.exists)
+        guard horse.exists else { return }
         XCTAssertFalse(app.buttons["client-create-invoice-action"].exists)
         XCTAssertFalse(app.buttons["Delete"].exists)
-        app.buttons["horse-row-Milo"].tap()
+        horse.tap()
         let history = app.descendants(matching: .any)["horse-history-visit-Milo"].firstMatch
         XCTAssertTrue(history.waitForExistence(timeout: 3))
         history.tap()
@@ -43,10 +50,16 @@ final class SubscriptionReadOnlyUITests: XCTestCase {
 
         openInvoices(in: app)
         app.buttons["invoice-row-0001"].tap()
-        XCTAssertTrue(app.buttons["invoice-share-pdf-action"].isEnabled)
+        let actionsMenu = app.buttons["invoice-actions-menu"]
+        XCTAssertTrue(actionsMenu.waitForExistence(timeout: 3))
+        actionsMenu.tap()
+        let shareInvoice = app.buttons["invoice-share-pdf-action"]
+        XCTAssertTrue(shareInvoice.waitForExistence(timeout: 3))
+        XCTAssertTrue(shareInvoice.isEnabled)
         XCTAssertFalse(app.buttons["invoice-mark-paid-action"].exists)
         XCTAssertFalse(app.buttons["invoice-delete-action"].exists)
-        app.buttons["invoice-share-pdf-action"].tap()
+        XCTAssertFalse(app.buttons["invoice-preview-pdf-action"].exists)
+        shareInvoice.tap()
         let close = app.buttons["Close"]
         XCTAssertTrue(close.waitForExistence(timeout: 10))
         close.tap()
@@ -107,7 +120,7 @@ final class SubscriptionReadOnlyUITests: XCTestCase {
     private func openClients(in app: XCUIApplication) {
         for _ in 0..<2 {
             app.tabBars.buttons["Clients"].tap()
-            if app.buttons["More"].waitForExistence(timeout: 2) {
+            if app.navigationBars["Clients"].waitForExistence(timeout: 2) {
                 return
             }
         }

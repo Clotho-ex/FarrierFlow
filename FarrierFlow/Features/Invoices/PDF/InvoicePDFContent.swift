@@ -6,6 +6,7 @@ nonisolated struct InvoicePDFContent: Sendable, Equatable {
     let dueDate: Date?
     let status: InvoiceStatus
     let paidAt: Date?
+    let currencyCode: String
     let businessName: String
     let businessPhone: String?
     let businessEmail: String?

@@ -164,9 +164,15 @@ nonisolated struct PhotographFileStore: Sendable {
     private func inspectCanonicalDirectory(
         into inspection: inout PhotographFileInspection
     ) throws {
+        let operationDirectories = Set(
+            [temporaryDirectoryURL, quarantineDirectoryURL].map {
+                $0.resolvingSymlinksInPath().standardizedFileURL
+            }
+        )
         let entries = try contents(of: rootURL)
         for entry in entries {
-            if entry == temporaryDirectoryURL || entry == quarantineDirectoryURL {
+            let resolvedEntry = entry.resolvingSymlinksInPath().standardizedFileURL
+            if operationDirectories.contains(resolvedEntry) {
                 continue
             }
             guard try isManagedRegularFile(entry),

@@ -14,27 +14,11 @@ struct PhotographThumbnailView: View {
     @State private var reloadToken = 0
 
     var body: some View {
-        ZStack {
-            Color.secondary.opacity(0.12)
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else if item.availability == .unavailable
-                || (loadFinished && protectedDataIsAvailable) {
-                VStack(spacing: SpacingTokens.rowContent) {
-                    Image(systemName: "photo.badge.exclamationmark")
-                    Text("Unavailable")
-                        .font(.caption)
-                }
-                .foregroundStyle(.secondary)
-            } else {
-                ProgressView()
-            }
-        }
-        .aspectRatio(1, contentMode: .fit)
-        .compositingGroup()
-        .clipShape(.rect(cornerRadius: 8))
+        PhotographThumbnailContentView(
+            image: image,
+            showsUnavailableState: item.availability == .unavailable
+                || (loadFinished && protectedDataIsAvailable)
+        )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Photo \(position) of \(total)")
         .accessibilityValue(
@@ -71,5 +55,33 @@ struct PhotographThumbnailView: View {
             protectedDataIsAvailable = true
             reloadToken += 1
         }
+    }
+}
+
+struct PhotographThumbnailContentView: View {
+    let image: UIImage?
+    let showsUnavailableState: Bool
+
+    var body: some View {
+        Color.secondary.opacity(0.12)
+            .aspectRatio(1, contentMode: .fit)
+            .overlay {
+                if let image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else if showsUnavailableState {
+                    VStack(spacing: SpacingTokens.rowContent) {
+                        Image(systemName: "photo.badge.exclamationmark")
+                        Text("Unavailable")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(.secondary)
+                } else {
+                    ProgressView()
+                }
+            }
+            .compositingGroup()
+            .clipShape(.rect(cornerRadius: 8))
     }
 }

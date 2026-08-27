@@ -279,4 +279,15 @@ struct TodayModelTests {
         #expect(longSummary.visibleHorseNames == ["Iris", "Milo"])
         #expect(longSummary.remainingHorseCount == 3)
     }
+
+    @Test
+    func horseSummaryUsesSingularCopyForOneRemainingHorse() {
+        let summary = String(
+            localized: "\("Atlas and Beacon"), and \(1) more horses",
+            locale: Locale(identifier: "en_US"),
+            comment: "A shortened horse list followed by the number of additional horses."
+        )
+
+        #expect(summary == "Atlas and Beacon, and 1 more horse")
+    }
 }
