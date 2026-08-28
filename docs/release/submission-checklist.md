@@ -8,8 +8,9 @@ submission.
 
 - [x] iOS-only multilayer `FarrierFlow/Resources/AppIcon.icon` created in
   Apple Icon Composer with Default, Dark, and Mono appearances.
-- [x] `FarrierFlow/PrivacyInfo.xcprivacy` declares no tracking, no collected
-  data, and the Disk Space required-reason API with `E174.1`.
+- [x] `FarrierFlow/PrivacyInfo.xcprivacy` declares no tracking and retains the
+  Disk Space required-reason API with `E174.1`; built-product inspection must
+  also include RevenueCat's package privacy manifest.
 - [x] Local Privacy Policy, Support, and App Store metadata sources prepared.
 - [x] Required-reason API audit and local build/bundle verification recorded in
   the Unit 6 report.
@@ -49,18 +50,29 @@ submission.
   have the 14-day introductory offer, and the 16-day All Renewals billing grace
   period is enabled in production and sandbox. On 2026-08-18, upload the
   sanitized 1206 x 2622 review screenshot to both products and add both to the
-  version 1.0 draft submission; each product now reports **Ready for Review**.
+  review draft; each product now reports **Ready for Review**. On 2026-08-28,
+  add the required `FarrierFlow Pro` subscription group to the same draft.
 - [x] On 2026-08-18, complete the source-backed age-rating questionnaire; App
   Store Connect calculated and saved a 4+ rating.
-- [x] On 2026-08-18, publish App Privacy as **Data Not Collected** for the final
-  binary and enter the verified Privacy Policy URL.
+- [x] On 2026-08-28, replace the prior **Data Not Collected** answer with Purchase History used
+  for App Functionality and Analytics, not linked to identity and not used for
+  tracking, then republish App Privacy.
+- [x] On 2026-08-28, deploy the RevenueCat disclosure update to the public
+  Privacy Policy and verify the home, Privacy, and Support routes return HTTP
+  200.
+- [x] In RevenueCat, create the Apple app, import both products, attach them to
+  entitlement `pro`, configure the current monthly/yearly Offering, add the App
+  Store In-App Purchase key, supply the public Apple SDK key, and set restore
+  behavior to `Transfer to new App User ID`.
+- [x] Configure RevenueCat's Apple App Store Server Notification URL in App
+  Store Connect and obtain RevenueCat's successful configuration validation.
+- [ ] Confirm server-notification receipt delivery during the real Apple
+  sandbox/TestFlight lifecycle acceptance run.
 
 ## Candidate and submission gates (Unit 7 only)
 
-- [x] Freeze approved source scope at
-  `d72362322c60c10c3f0bf3d91579d5e8064578f0`; the diff from `origin/main`
-  contains Revenue Launch Units 1–6 and approved documentation, with no Export
-  Unit 2, backup, account, analytics, or mutation-coordinator work.
+- [ ] Freeze a new release-candidate source boundary after the RevenueCat and
+  structured-payment implementation is reviewed and committed.
 - [x] On 2026-08-15, App Store Connect showed **No Builds** in TestFlight and no
   build attached to version 1.0. Project build number `1` is therefore the
   first available upload candidate.
@@ -84,5 +96,8 @@ submission.
   Content Rights, and final release-behavior confirmation remain open.
 - [ ] Archive, upload, and process one signed release candidate.
 - [ ] Complete TestFlight and physical-iPhone acceptance.
-- [ ] Finish the remaining verified metadata and screenshots, then submit the
-  already attached first subscriptions with version 1.0 for review.
+- [ ] Finish the remaining verified metadata and screenshots, upload and select
+  the release-candidate build, complete Content Rights and App Review contact
+  information, then add version 1.0 to the draft that already contains both
+  subscriptions and the `FarrierFlow Pro` group. Submit for review only after
+  the excluded sandbox/TestFlight lifecycle acceptance is complete.

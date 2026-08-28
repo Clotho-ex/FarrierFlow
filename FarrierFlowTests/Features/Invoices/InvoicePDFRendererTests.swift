@@ -11,7 +11,7 @@ struct InvoicePDFRendererTests {
             invoiceDate: Date(timeIntervalSinceReferenceDate: 1_000),
             dueDate: Date(timeIntervalSinceReferenceDate: 2_000),
             status: .unpaid,
-            paidAt: nil,
+            payment: nil,
             currencyCode: "USD",
             businessName: "Carter Farrier Service",
             businessPhone: "555-0100",
@@ -75,7 +75,7 @@ struct InvoicePDFRendererTests {
     }
 
     @Test func rendersNarrowMobileReadablePDF() throws {
-        let content = InvoicePDFContent(number: "0001", invoiceDate: .now, dueDate: nil, status: .unpaid, paidAt: nil, currencyCode: "USD", businessName: "Farrier", businessPhone: nil, businessEmail: nil, businessAddress: nil, clientName: "Client", clientPhone: nil, clientEmail: nil, visits: [], totalMinorUnits: 0, note: nil)
+        let content = InvoicePDFContent(number: "0001", invoiceDate: .now, dueDate: nil, status: .unpaid, payment: nil, currencyCode: "USD", businessName: "Farrier", businessPhone: nil, businessEmail: nil, businessAddress: nil, clientName: "Client", clientPhone: nil, clientEmail: nil, visits: [], totalMinorUnits: 0, note: nil)
         let data = try InvoicePDFRenderer().render(content)
         let document = try #require(PDFDocument(data: data))
         let page = try #require(document.page(at: 0))
@@ -86,7 +86,7 @@ struct InvoicePDFRendererTests {
 
     @Test func rendersAllSnapshotFieldsAndOptionalFieldsWhenPresent() throws {
         let content = InvoicePDFContent(
-            number: "0001", invoiceDate: Date(timeIntervalSinceReferenceDate: 1_000), dueDate: Date(timeIntervalSinceReferenceDate: 2_000), status: .paid, paidAt: Date(timeIntervalSinceReferenceDate: 3_000), currencyCode: "USD", businessName: "Farrier Name", businessPhone: "555-0100", businessEmail: "farrier@example.com", businessAddress: "1 Long Street", clientName: "Client Name", clientPhone: "555-0101", clientEmail: "client@example.com", visits: [.init(date: .now, location: "North Field", address: "25 Stable Lane", lineItems: [.init(horseName: "Milo", serviceName: "Full Set", amountMinorUnits: 12_500)])], totalMinorUnits: 12_500, note: "Thank you for your business."
+            number: "0001", invoiceDate: Date(timeIntervalSinceReferenceDate: 1_000), dueDate: Date(timeIntervalSinceReferenceDate: 2_000), status: .paid, payment: .init(amountMinorUnits: 12_500, receivedAt: Date(timeIntervalSinceReferenceDate: 3_000), method: .bankTransfer, otherDescription: nil, reference: "BANK-42"), currencyCode: "USD", businessName: "Farrier Name", businessPhone: "555-0100", businessEmail: "farrier@example.com", businessAddress: "1 Long Street", clientName: "Client Name", clientPhone: "555-0101", clientEmail: "client@example.com", visits: [.init(date: .now, location: "North Field", address: "25 Stable Lane", lineItems: [.init(horseName: "Milo", serviceName: "Full Set", amountMinorUnits: 12_500)])], totalMinorUnits: 12_500, note: "Thank you for your business."
         )
         let data = try InvoicePDFRenderer().render(content)
         let document = try #require(PDFDocument(data: data))
@@ -104,6 +104,8 @@ struct InvoicePDFRendererTests {
             "555-0101",
             "client@example.com",
             "Paid",
+            "Bank Transfer",
+            "BANK-42",
             "North Field",
             "25 Stable Lane",
             "Milo",
@@ -118,7 +120,7 @@ struct InvoicePDFRendererTests {
     }
 
     @Test func omitsAbsentOptionalSnapshotFields() throws {
-        let content = InvoicePDFContent(number: "0001", invoiceDate: .now, dueDate: nil, status: .unpaid, paidAt: nil, currencyCode: "USD", businessName: "Farrier", businessPhone: nil, businessEmail: nil, businessAddress: nil, clientName: "Client", clientPhone: nil, clientEmail: nil, visits: [], totalMinorUnits: 0, note: nil)
+        let content = InvoicePDFContent(number: "0001", invoiceDate: .now, dueDate: nil, status: .unpaid, payment: nil, currencyCode: "USD", businessName: "Farrier", businessPhone: nil, businessEmail: nil, businessAddress: nil, clientName: "Client", clientPhone: nil, clientEmail: nil, visits: [], totalMinorUnits: 0, note: nil)
         let document = try #require(PDFDocument(data: InvoicePDFRenderer().render(content)))
         let text = document.string ?? ""
 
@@ -130,7 +132,7 @@ struct InvoicePDFRendererTests {
 
     @Test func paginatesLargeInvoicesAcrossNarrowPages() throws {
         let lines = (0..<180).map { InvoicePDFContent.LineItem(horseName: "Horse \($0)", serviceName: "Full Set", amountMinorUnits: 12_500) }
-        let content = InvoicePDFContent(number: "0001", invoiceDate: .now, dueDate: nil, status: .unpaid, paidAt: nil, currencyCode: "USD", businessName: "Farrier", businessPhone: nil, businessEmail: nil, businessAddress: nil, clientName: "Client", clientPhone: nil, clientEmail: nil, visits: [.init(date: .now, location: "North Field", address: nil, lineItems: lines)], totalMinorUnits: 2_250_000, note: String(repeating: "Long note. ", count: 80))
+        let content = InvoicePDFContent(number: "0001", invoiceDate: .now, dueDate: nil, status: .unpaid, payment: nil, currencyCode: "USD", businessName: "Farrier", businessPhone: nil, businessEmail: nil, businessAddress: nil, clientName: "Client", clientPhone: nil, clientEmail: nil, visits: [.init(date: .now, location: "North Field", address: nil, lineItems: lines)], totalMinorUnits: 2_250_000, note: String(repeating: "Long note. ", count: 80))
         let data = try InvoicePDFRenderer().render(content)
         let document = try #require(PDFDocument(data: data))
         #expect(document.pageCount > 1)
@@ -151,7 +153,7 @@ struct InvoicePDFRendererTests {
             invoiceDate: .now,
             dueDate: .now,
             status: .unpaid,
-            paidAt: nil,
+            payment: nil,
             currencyCode: "USD",
             businessName: "Carter Farrier Service and Hoof Care",
             businessPhone: nil,
@@ -200,7 +202,7 @@ struct InvoicePDFRendererTests {
             invoiceDate: .now,
             dueDate: nil,
             status: .unpaid,
-            paidAt: nil,
+            payment: nil,
             currencyCode: "USD",
             businessName: "Farrier",
             businessPhone: nil,

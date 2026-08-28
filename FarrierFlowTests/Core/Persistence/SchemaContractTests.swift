@@ -8,7 +8,7 @@ struct SchemaContractTests {
     private let shippingSchema = Schema(versionedSchema: FarrierFlowSchemaV1.self)
 
     @Test
-    func shippingSchemaRegistersExactlyFourteenModels() {
+    func shippingSchemaRegistersExactlyFifteenModels() {
         #expect(Set(shippingSchema.entities.map(\.name)) == [
             "Client",
             "Barn",
@@ -24,6 +24,7 @@ struct SchemaContractTests {
             "Invoice",
             "InvoiceVisit",
             "InvoiceLineItem",
+            "Payment",
         ])
     }
 
@@ -60,6 +61,7 @@ struct SchemaContractTests {
         #expect(try relationship("Visit", "invoiceVisits").inverseName == "sourceVisit")
         #expect(try relationship("InvoiceVisit", "lineItems").inverseName == "invoiceVisit")
         #expect(try relationship("WorkItem", "invoiceLineItem").inverseName == "sourceWorkItem")
+        #expect(try relationship("Invoice", "payments").inverseName == "invoice")
 
         let sourceVisit = try relationship("InvoiceVisit", "sourceVisit")
         #expect(sourceVisit.inverseName == "invoiceVisits")
@@ -88,6 +90,10 @@ struct SchemaContractTests {
         let lineItems = try relationship("InvoiceVisit", "lineItems")
         #expect(lineItems.deleteRule == .cascade)
         #expect(lineItems.minimumModelCount == 1)
+
+        let payments = try relationship("Invoice", "payments")
+        #expect(payments.deleteRule == .cascade)
+        #expect(payments.minimumModelCount == 0)
     }
 
     @Test
@@ -110,6 +116,7 @@ struct SchemaContractTests {
             relationship("InvoiceVisit", "sourceVisit"),
             relationship("InvoiceLineItem", "invoiceVisit"),
             relationship("InvoiceLineItem", "sourceWorkItem"),
+            relationship("Payment", "invoice"),
         ]
 
         for relationship in relationships {

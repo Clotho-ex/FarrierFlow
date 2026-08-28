@@ -1,5 +1,18 @@
 # FarrierFlow 1.0 Revenue Release Implementation Plan
 
+## 2026-08-28 Implementation Amendment
+
+The approved monetization/payment plan supersedes StoreKit entitlement-source,
+`SubscriptionStoreView`, no-third-party, and `Invoice.paidAt` steps below.
+Implementation uses the resolved stable RevenueCat Purchases iOS package, one
+app-owned `SubscriptionClient`, anonymous users, `pro` entitlement, and a native
+SwiftUI Offering paywall. Apple remains processor and the StoreKit file remains
+a product fixture. Structured manual Payment evidence and
+`InvoicePaymentUseCase` replace direct status/payment-date mutation. Export V1
+adds `payments.csv` and removes `paid_at` from invoices. External dashboard,
+server-notification, privacy-portal, website deployment, and sandbox/TestFlight
+steps do not block repository completion.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use
 > `superpowers:subagent-driven-development` (recommended) or
 > `superpowers:executing-plans` to implement this plan task-by-task. Use

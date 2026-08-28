@@ -4,161 +4,189 @@ import Testing
 @Suite("Subscription access model", .serialized)
 @MainActor
 struct SubscriptionAccessModelTests {
-    @Test
-    func verifiedCurrentEntitlementGrantsFullAccess() async {
-        let source = TestSubscriptionEntitlementSource(
-            entitledProductIDs: [SubscriptionProduct.monthly]
-        )
-        let model = SubscriptionAccessModel(source: source)
-
+    @Test func activeProEntitlementGrantsProAccess() async {
+        let client = TestSubscriptionClient(customer: .init(hasActiveProEntitlement: true))
+        let model = SubscriptionAccessModel(client: client)
         await model.refresh()
-
-        #expect(model.access == .full)
+        #expect(model.access == .pro)
         #expect(model.allowsMutations)
     }
 
-    @Test
-    func missingEntitlementIsReadOnly() async {
-        let source = TestSubscriptionEntitlementSource()
-        let model = SubscriptionAccessModel(source: source)
+    @Test func unrelatedEntitlementDoesNotGrantPro() {
+        #expect(!SubscriptionCustomerRules.snapshot(activeEntitlementIDs: ["other"]).hasActiveProEntitlement)
+        #expect(SubscriptionCustomerRules.snapshot(activeEntitlementIDs: ["other", "pro"]).hasActiveProEntitlement)
+    }
 
+    @Test func confirmedInactiveEntitlementGrantsFreeAccess() async {
+        let client = TestSubscriptionClient(customer: .init(hasActiveProEntitlement: false))
+        let model = SubscriptionAccessModel(client: client)
         await model.refresh()
-
-        #expect(model.access == .readOnly)
+        #expect(model.access == .free)
         #expect(!model.allowsMutations)
     }
 
-    @Test
-    func unrelatedProductIdentifiersNeverGrantAccess() async {
-        let source = TestSubscriptionEntitlementSource(
-            entitledProductIDs: ["com.farrierflow.unrelated"]
-        )
-        let model = SubscriptionAccessModel(source: source)
+    @Test func initialCustomerFailureIsUnavailableAndReadOnly() async {
+        let client = TestSubscriptionClient(customerError: TestError.failed)
+        let model = SubscriptionAccessModel(client: client)
+        await model.refresh()
+        #expect(model.access == .unavailable)
+        #expect(!model.allowsMutations)
+        #expect(model.errorMessage != nil)
+    }
 
+    @Test func refreshFailureRetainsLastConfirmedProAccess() async {
+        let client = TestSubscriptionClient(customer: .init(hasActiveProEntitlement: true))
+        let model = SubscriptionAccessModel(client: client)
+        await model.refresh()
+        await client.setCustomerError(TestError.failed)
+        await model.refresh()
+        #expect(model.access == .pro)
+        #expect(model.errorMessage != nil)
+    }
+
+    @Test func validOfferingLoadsAnnualThenMonthly() async {
+        let client = TestSubscriptionClient(customer: .init(hasActiveProEntitlement: false))
+        await client.setPlans([Self.monthly, Self.annual])
+        let model = SubscriptionAccessModel(client: client)
+        await model.refresh()
+        #expect(model.plans.map(\.kind) == [.annual, .monthly])
+        #expect(model.paywallIsAvailable)
+    }
+
+    @Test func missingOrDuplicatePlanMakesPaywallUnavailable() async {
+        let client = TestSubscriptionClient(customer: .init(hasActiveProEntitlement: false))
+        await client.setPlans([Self.monthly, Self.monthly])
+        let model = SubscriptionAccessModel(client: client)
+        await model.refresh()
+        #expect(model.plans.isEmpty)
+        #expect(!model.paywallIsAvailable)
+        #expect(model.errorMessage != nil)
+    }
+
+    @Test func successfulPurchaseUsesReturnedCustomerInfo() async {
+        let client = TestSubscriptionClient(customer: .init(hasActiveProEntitlement: false))
+        await client.setPlans([Self.monthly, Self.annual])
+        await client.setPurchaseResult(.init(customer: .init(hasActiveProEntitlement: true), wasCancelled: false))
+        let model = SubscriptionAccessModel(client: client)
+        await model.refresh()
+        await model.purchase(planID: Self.monthly.id)
+        #expect(model.access == .pro)
+        #expect(model.operation == .idle)
+        #expect(model.errorMessage == nil)
+        #expect(await client.purchasedPlanIDs == [Self.monthly.id])
+    }
+
+    @Test func cancelledPurchaseReturnsToIdleWithoutError() async {
+        let client = TestSubscriptionClient(customer: .init(hasActiveProEntitlement: false))
+        await client.setPlans([Self.monthly, Self.annual])
+        await client.setPurchaseResult(.init(customer: .init(hasActiveProEntitlement: false), wasCancelled: true))
+        let model = SubscriptionAccessModel(client: client)
+        await model.refresh()
+        await model.purchase(planID: Self.annual.id)
+        #expect(model.access == .free)
+        #expect(model.operation == .idle)
+        #expect(model.errorMessage == nil)
+    }
+
+    @Test func purchaseFailureRetainsConfirmedAccessAndShowsError() async {
+        let client = TestSubscriptionClient(customer: .init(hasActiveProEntitlement: false))
+        client.setPlans([Self.monthly, Self.annual])
+        client.setPurchaseError(TestError.failed)
+        let model = SubscriptionAccessModel(client: client)
         await model.refresh()
 
-        #expect(model.access == .readOnly)
+        await model.purchase(planID: Self.monthly.id)
+
+        #expect(model.access == .free)
+        #expect(model.operation == .idle)
+        #expect(model.errorMessage != nil)
     }
 
-    @Test
-    func startCreatesOnlyOneListener() async {
-        let source = TestSubscriptionEntitlementSource(
-            entitledProductIDs: [SubscriptionProduct.yearly]
-        )
-        let model = SubscriptionAccessModel(source: source)
-
-        model.start()
-        model.start()
-
-        await eventually {
-            await source.listenerCount == 1 && model.access == .full
-        }
-
-        #expect(await source.entitlementRequestCount == 1)
+    @Test func restoreGrantsProOnlyFromReturnedCustomerInfo() async {
+        let client = TestSubscriptionClient(customer: .init(hasActiveProEntitlement: false))
+        await client.setRestoreCustomer(.init(hasActiveProEntitlement: true))
+        let model = SubscriptionAccessModel(client: client)
+        await model.refresh()
+        await model.restorePurchases()
+        #expect(model.access == .pro)
+        #expect(model.operation == .idle)
     }
 
-    @Test
-    func updateRefreshesFullAccessToReadOnly() async {
-        let source = TestSubscriptionEntitlementSource(
-            entitledProductIDs: [SubscriptionProduct.monthly]
-        )
-        let model = SubscriptionAccessModel(source: source)
+    @Test func startCreatesOneListenerAndAppliesUpdatesWithoutRefetch() async {
+        let client = TestSubscriptionClient(customer: .init(hasActiveProEntitlement: false))
+        let model = SubscriptionAccessModel(client: client)
         model.start()
+        model.start()
+        await eventually { await client.listenerCount == 1 && model.access == .free }
+        await client.emit(.init(hasActiveProEntitlement: true))
+        await eventually { model.access == .pro }
+        #expect(await client.customerRequestCount == 1)
+    }
 
-        await eventually {
-            await source.listenerCount == 1 && model.access == .full
-        }
-        await source.setEntitledProductIDs([])
-        await source.emitUpdate()
-
-        await eventually { model.access == .readOnly }
+    @Test func updateStreamAppliesExpiration() async {
+        let client = TestSubscriptionClient(customer: .init(hasActiveProEntitlement: true))
+        let model = SubscriptionAccessModel(client: client)
+        model.start()
+        await eventually { model.access == .pro }
+        client.emit(.init(hasActiveProEntitlement: false))
+        await eventually { model.access == .free }
         #expect(!model.allowsMutations)
     }
 
-    @Test
-    func updateRefreshesReadOnlyAccessToFull() async {
-        let source = TestSubscriptionEntitlementSource()
-        let model = SubscriptionAccessModel(source: source)
-        model.start()
+    private static let monthly = SubscriptionPlan(id: "monthly-package", productID: SubscriptionProduct.monthly, kind: .monthly, displayName: "Monthly", localizedPrice: "$14.99", subscriptionPeriod: "month")
+    private static let annual = SubscriptionPlan(id: "annual-package", productID: SubscriptionProduct.yearly, kind: .annual, displayName: "Annual", localizedPrice: "$119.99", subscriptionPeriod: "year")
 
-        await eventually {
-            await source.listenerCount == 1 && model.access == .readOnly
-        }
-        await source.setEntitledProductIDs([SubscriptionProduct.yearly])
-        await source.emitUpdate()
-
-        await eventually { model.access == .full }
-        #expect(model.allowsMutations)
-    }
-
-    @Test
-    func releasingModelCancelsItsListener() async {
-        let source = TestSubscriptionEntitlementSource()
-        var model: SubscriptionAccessModel? = SubscriptionAccessModel(source: source)
-        weak var releasedModel = model
-
-        model?.start()
-        await eventually { await source.listenerCount == 1 }
-        model = nil
-
-        await eventually {
-            let listenerEnded = await source.listenerEnded
-            return releasedModel == nil && listenerEnded
-        }
-        #expect(releasedModel == nil)
-    }
-
-    private func eventually(
-        _ condition: @escaping @MainActor () async -> Bool
-    ) async {
-        for _ in 0..<100 {
-            if await condition() {
-                return
-            }
+    private func eventually(_ condition: @escaping @MainActor () async -> Bool) async {
+        for _ in 0..<200 {
+            if await condition() { return }
             await Task.yield()
         }
         Issue.record("Condition was not met")
     }
 }
 
-private actor TestSubscriptionEntitlementSource: SubscriptionEntitlementSource {
-    private var entitledProductIDs: Set<String>
-    private var continuation: AsyncStream<Void>.Continuation?
+private enum TestError: Error { case failed }
 
-    private(set) var entitlementRequestCount = 0
+@MainActor
+private final class TestSubscriptionClient: SubscriptionClient, @unchecked Sendable {
+    private var customer: SubscriptionCustomerSnapshot
+    private var customerError: Error?
+    private var offeredPlans: [SubscriptionPlan] = []
+    private var purchaseResult = SubscriptionPurchaseResult(customer: .init(hasActiveProEntitlement: false), wasCancelled: false)
+    private var purchaseError: Error?
+    private var restoreCustomer = SubscriptionCustomerSnapshot(hasActiveProEntitlement: false)
+    private var continuation: AsyncStream<SubscriptionCustomerSnapshot>.Continuation?
+    private(set) var customerRequestCount = 0
     private(set) var listenerCount = 0
-    private(set) var listenerEnded = false
+    private(set) var purchasedPlanIDs: [String] = []
 
-    init(entitledProductIDs: Set<String> = []) {
-        self.entitledProductIDs = entitledProductIDs
+    init(customer: SubscriptionCustomerSnapshot = .init(hasActiveProEntitlement: false), customerError: Error? = nil) {
+        self.customer = customer
+        self.customerError = customerError
     }
 
-    func hasCurrentEntitlement(productIDs: Set<String>) async -> Bool {
-        entitlementRequestCount += 1
-        return !entitledProductIDs.intersection(productIDs).isEmpty
+    func customerInfo() async throws -> SubscriptionCustomerSnapshot {
+        customerRequestCount += 1
+        if let customerError { throw customerError }
+        return customer
     }
-
-    func updates(productIDs: Set<String>) async -> AsyncStream<Void> {
-        let (stream, continuation) = AsyncStream<Void>.makeStream()
+    func offerings() async throws -> [SubscriptionPlan] { offeredPlans }
+    func purchase(planID: String) async throws -> SubscriptionPurchaseResult {
+        purchasedPlanIDs.append(planID)
+        if let purchaseError { throw purchaseError }
+        return purchaseResult
+    }
+    func restorePurchases() async throws -> SubscriptionCustomerSnapshot { restoreCustomer }
+    func customerInfoUpdates() async -> AsyncStream<SubscriptionCustomerSnapshot> {
+        let (stream, continuation) = AsyncStream<SubscriptionCustomerSnapshot>.makeStream()
         self.continuation = continuation
         listenerCount += 1
-        continuation.onTermination = { [weak self] _ in
-            Task {
-                await self?.recordListenerEnded()
-            }
-        }
         return stream
     }
-
-    func setEntitledProductIDs(_ productIDs: Set<String>) {
-        entitledProductIDs = productIDs
-    }
-
-    func emitUpdate() {
-        continuation?.yield()
-    }
-
-    private func recordListenerEnded() {
-        listenerEnded = true
-    }
+    func setCustomerError(_ error: Error?) { customerError = error }
+    func setPlans(_ plans: [SubscriptionPlan]) { offeredPlans = plans }
+    func setPurchaseResult(_ result: SubscriptionPurchaseResult) { purchaseResult = result }
+    func setPurchaseError(_ error: Error?) { purchaseError = error }
+    func setRestoreCustomer(_ customer: SubscriptionCustomerSnapshot) { restoreCustomer = customer }
+    func emit(_ customer: SubscriptionCustomerSnapshot) { continuation?.yield(customer) }
 }

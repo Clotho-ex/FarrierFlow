@@ -34,6 +34,9 @@ nonisolated struct InvoicePDFRenderer {
             let invoiceDateLabel = String(localized: "Invoice Date")
             let dueDateLabel = String(localized: "Due Date")
             let paymentDateLabel = String(localized: "Payment Date")
+            let paymentMethodLabel = String(localized: "Payment Method")
+            let paymentReferenceLabel = String(localized: "Payment Reference")
+            let paidAmountLabel = String(localized: "Paid Amount")
             let amountDueLabel = String(localized: "Amount Due")
             let invoiceTotalLabel = String(localized: "Invoice Total")
             let totalLabel = String(localized: "Total")
@@ -262,11 +265,19 @@ nonisolated struct InvoicePDFRenderer {
                         value: dueDate.formatted(date: .abbreviated, time: .omitted)
                     )
                 }
-                if let paidAt = content.paidAt {
+                if let payment = content.payment {
                     drawKeyValue(
                         paymentDateLabel,
-                        value: paidAt.formatted(date: .abbreviated, time: .omitted)
+                        value: payment.receivedAt.formatted(date: .abbreviated, time: .omitted)
                     )
+                    drawKeyValue(paidAmountLabel, value: formattedMoney(payment.amountMinorUnits))
+                    let method = [payment.method.displayName, payment.otherDescription]
+                        .compactMap { $0 }
+                        .joined(separator: ": ")
+                    drawKeyValue(paymentMethodLabel, value: method)
+                    if let reference = payment.reference {
+                        drawKeyValue(paymentReferenceLabel, value: reference)
+                    }
                 }
                 y += 7
             }

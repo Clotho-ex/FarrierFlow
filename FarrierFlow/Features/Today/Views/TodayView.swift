@@ -74,7 +74,7 @@ struct TodayView: View {
 
     private var runSheet: some View {
         List {
-            if subscription.access == .readOnly {
+            if !subscription.allowsMutations, subscription.access != .loading {
                 Section {
                     SubscriptionReadOnlyNotice {
                         path.append(SubscriptionRoute.store)
@@ -696,7 +696,7 @@ private enum TodaySheet: Identifiable {
             .modelContainer(container)
             .environment(
                 SubscriptionAccessModel(
-                    source: StaticSubscriptionEntitlementSource(isEntitled: true)
+                    client: StaticSubscriptionClient(isPro: true)
                 )
             )
     } else {

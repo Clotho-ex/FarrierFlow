@@ -10,7 +10,8 @@ final class SubscriptionFlowUITests: XCTestCase {
         defer { app.terminate() }
 
         XCTAssertTrue(
-            app.otherElements["subscription-welcome"].waitForExistence(timeout: 5)
+            app.descendants(matching: .any)["subscription-welcome"]
+                .waitForExistence(timeout: 5)
         )
         XCTAssertFalse(app.textFields["business-profile-name-field"].exists)
     }
@@ -33,6 +34,67 @@ final class SubscriptionFlowUITests: XCTestCase {
     }
 
     @MainActor
+    func testPaywallShowsLocalizedAnnualAndMonthlyPlansAndPurchasesPro() {
+        let app = launchWelcome(access: "read-only")
+        defer { app.terminate() }
+
+        XCTAssertTrue(app.buttons["subscription-plan-annual"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["$119.99"].exists)
+        XCTAssertTrue(app.buttons["subscription-plan-monthly"].exists)
+        app.buttons["subscription-plan-annual"].tap()
+        XCTAssertTrue(app.textFields["business-profile-name-field"].waitForExistence(timeout: 3))
+    }
+
+    @MainActor
+    func testPurchaseCancellationReturnsToPaywallWithoutError() {
+        let app = launchWelcome(access: "purchase-cancellation")
+        defer { app.terminate() }
+
+        let annual = app.buttons["subscription-plan-annual"]
+        XCTAssertTrue(annual.waitForExistence(timeout: 5))
+        annual.tap()
+        XCTAssertTrue(annual.waitForExistence(timeout: 3))
+        XCTAssertFalse(app.otherElements["subscription-error"].exists)
+    }
+
+    @MainActor
+    func testPurchaseFailureShowsRecoverableError() {
+        let app = launchWelcome(access: "purchase-failure")
+        defer { app.terminate() }
+
+        let monthly = app.buttons["subscription-plan-monthly"]
+        XCTAssertTrue(monthly.waitForExistence(timeout: 5))
+        monthly.tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["subscription-error"]
+                .waitForExistence(timeout: 3)
+        )
+    }
+
+    @MainActor
+    func testRestoreSuccessGrantsPro() {
+        let app = launchWelcome(access: "restore-success")
+        defer { app.terminate() }
+
+        let restore = app.buttons["subscription-restore"]
+        XCTAssertTrue(restore.waitForExistence(timeout: 5))
+        restore.tap()
+        XCTAssertTrue(
+            app.textFields["business-profile-name-field"]
+                .waitForExistence(timeout: 3)
+        )
+    }
+
+    @MainActor
+    func testOutageFailsClosedAndOffersRetry() {
+        let app = launchWelcome(access: "outage")
+        defer { app.terminate() }
+
+        XCTAssertTrue(app.buttons["subscription-retry"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["subscription-plan-annual"].exists)
+    }
+
+    @MainActor
     private func launch(storeName: String, scenario: String? = nil) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] = storeName
@@ -40,6 +102,16 @@ final class SubscriptionFlowUITests: XCTestCase {
         if let scenario {
             app.launchEnvironment["FARRIERFLOW_UI_TEST_SCENARIO"] = scenario
         }
+        app.launch()
+        return app
+    }
+
+    @MainActor
+    private func launchWelcome(access: String) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] = "Subscription-\(UUID().uuidString)"
+        app.launchEnvironment["FARRIERFLOW_UI_TEST_SCENARIO"] = "owner-setup"
+        app.launchEnvironment["FARRIERFLOW_UI_TEST_SUBSCRIPTION_ACCESS"] = access
         app.launch()
         return app
     }

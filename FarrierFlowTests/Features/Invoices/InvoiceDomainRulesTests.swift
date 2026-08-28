@@ -27,36 +27,45 @@ struct InvoiceDomainRulesTests {
     }
 
     @Test
-    func validatesOnlySupportedStatusAndPaymentDatePairs() throws {
-        let paymentDate = Date(timeIntervalSinceReferenceDate: 500)
-
+    func validatesOnlySupportedStatusAndPaymentEvidencePairs() throws {
+        let graph = try InvoiceActionGraph.make()
+        let invoice = try #require(graph.context.model(for: graph.invoiceID) as? Invoice)
         #expect(try InvoiceDomainRules.validatedStatus(
             rawValue: "unpaid",
-            paidAt: nil
+            payments: [],
+            invoiceCurrencyCode: "USD",
+            totalMinorUnits: 12_500
         ) == .unpaid)
-        #expect(try InvoiceDomainRules.validatedStatus(
-            rawValue: "paid",
-            paidAt: paymentDate
-        ) == .paid)
-
-        #expect(throws: InvoiceDomainRuleError.invalidStatus) {
-            _ = try InvoiceDomainRules.validatedStatus(
-                rawValue: "unpaid",
-                paidAt: paymentDate
-            )
-        }
-        #expect(throws: InvoiceDomainRuleError.invalidStatus) {
-            _ = try InvoiceDomainRules.validatedStatus(
-                rawValue: "paid",
-                paidAt: nil
-            )
-        }
         #expect(throws: InvoiceDomainRuleError.invalidStatus) {
             _ = try InvoiceDomainRules.validatedStatus(
                 rawValue: "sent",
-                paidAt: nil
+                payments: [],
+                invoiceCurrencyCode: "USD",
+                totalMinorUnits: 12_500
             )
         }
+        let unattached = Payment(
+            amountMinorUnits: 12_500,
+            currencyCode: "USD",
+            receivedAt: .now,
+            method: .cash,
+            invoice: invoice
+        )
+        #expect(throws: InvoiceDomainRuleError.invalidStatus) {
+            _ = try InvoiceDomainRules.validatedStatus(
+                rawValue: "unpaid",
+                payments: [unattached],
+                invoiceCurrencyCode: "USD",
+                totalMinorUnits: 12_500
+            )
+        }
+        try invoice.recordCompletedPayment(unattached)
+        #expect(try InvoiceDomainRules.validatedStatus(
+            rawValue: "paid",
+            payments: [unattached],
+            invoiceCurrencyCode: "USD",
+            totalMinorUnits: 12_500
+        ) == .paid)
     }
 
     @Test

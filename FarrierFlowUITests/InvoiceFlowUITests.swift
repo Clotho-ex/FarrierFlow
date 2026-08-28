@@ -109,9 +109,7 @@ final class InvoiceFlowUITests: XCTestCase {
 
         let detail = app.descendants(matching: .any)["invoice-detail-0001"]
         XCTAssertTrue(detail.waitForExistence(timeout: 5))
-        let actionsMenu = app.buttons["invoice-actions-menu"]
-        XCTAssertTrue(actionsMenu.exists)
-        XCTAssertFalse(app.buttons["invoice-preview-pdf-action"].exists)
+        XCTAssertTrue(app.buttons["invoice-share-pdf-action"].exists)
         XCTAssertTrue(app.staticTexts["Milo"].exists)
         XCTAssertTrue(app.staticTexts["Trim"].exists)
         XCTAssertFalse(app.staticTexts["Scout"].exists)
@@ -132,27 +130,38 @@ final class InvoiceFlowUITests: XCTestCase {
             detail.swipeUp()
         }
         XCTAssertTrue(app.staticTexts["Invoice Client"].waitForExistence(timeout: 3))
-        actionsMenu.tap()
-        XCTAssertTrue(app.buttons["invoice-share-pdf-action"].waitForExistence(timeout: 3))
         let markPaid = app.buttons["invoice-mark-paid-action"]
-        XCTAssertTrue(markPaid.exists)
+        for _ in 0..<4 where !markPaid.exists { detail.swipeUp() }
+        XCTAssertTrue(markPaid.waitForExistence(timeout: 3))
         XCTAssertTrue(app.buttons["invoice-delete-action"].exists)
 
         markPaid.tap()
-        let markPaidAlert = app.alerts["Mark Invoice Paid?"]
-        XCTAssertTrue(markPaidAlert.waitForExistence(timeout: 3))
-        markPaidAlert.buttons.matching(
-            identifier: "invoice-mark-paid-confirmation"
-        ).firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Record Payment"].waitForExistence(timeout: 3))
+        let method = app.buttons["payment-method-picker"]
+        XCTAssertTrue(method.waitForExistence(timeout: 3))
+        method.tap()
+        app.buttons["Bank Transfer"].tap()
+        let reference = app.textFields["payment-reference"]
+        reference.tap()
+        reference.typeText("BANK-UI-42")
+        app.buttons["payment-confirm"].tap()
         let paidStatus = app.staticTexts["Status, Paid"].firstMatch
         for _ in 0..<6 where !paidStatus.exists {
             detail.swipeDown()
         }
         XCTAssertTrue(paidStatus.waitForExistence(timeout: 3))
-        actionsMenu.tap()
         XCTAssertTrue(app.buttons["invoice-share-pdf-action"].waitForExistence(timeout: 3))
         XCTAssertFalse(app.buttons["invoice-mark-paid-action"].exists)
         XCTAssertFalse(app.buttons["invoice-delete-action"].exists)
+        let methodDetail = app.staticTexts.matching(identifier: "invoice-payment-details")
+            .matching(NSPredicate(format: "label CONTAINS %@", "Bank Transfer"))
+            .firstMatch
+        let referenceDetail = app.staticTexts.matching(identifier: "invoice-payment-details")
+            .matching(NSPredicate(format: "label CONTAINS %@", "BANK-UI-42"))
+            .firstMatch
+        for _ in 0..<4 where !methodDetail.exists { detail.swipeUp() }
+        XCTAssertTrue(methodDetail.waitForExistence(timeout: 3))
+        XCTAssertTrue(referenceDetail.waitForExistence(timeout: 3))
         detail.tap()
 
         app.navigationBars.buttons["Invoice Client"].tap()
@@ -181,6 +190,7 @@ final class InvoiceFlowUITests: XCTestCase {
         app.navigationBars.buttons["Invoices"].tap()
         app.navigationBars.buttons["Clients"].tap()
         app.staticTexts["client-row-Invoice Client"].tap()
+        XCTAssertTrue(app.buttons["client-invoice-0001"].waitForExistence(timeout: 3))
         app.staticTexts["horse-row-Milo"].tap()
         let history = app.descendants(matching: .any)["horse-history-visit-Milo"].firstMatch
         XCTAssertTrue(history.waitForExistence(timeout: 3))
@@ -190,6 +200,26 @@ final class InvoiceFlowUITests: XCTestCase {
                 .waitForExistence(timeout: 3)
         )
         XCTAssertFalse(app.buttons["visit-edit-action"].exists)
+        XCTAssertTrue(app.buttons["visit-invoice-0001"].waitForExistence(timeout: 3))
+        app.buttons["visit-invoice-0001"].tap()
+        let markUnpaid = app.buttons["invoice-mark-unpaid-action"]
+        for _ in 0..<4 where !markUnpaid.exists {
+            app.descendants(matching: .any)["invoice-detail-0001"].swipeUp()
+        }
+        XCTAssertTrue(markUnpaid.waitForExistence(timeout: 3))
+        markUnpaid.tap()
+        let correction = app.alerts["Mark Invoice Unpaid?"]
+        XCTAssertTrue(correction.waitForExistence(timeout: 3))
+        correction.buttons["invoice-mark-unpaid-confirmation"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Status, Unpaid"].waitForExistence(timeout: 3))
+
+        app.terminate()
+        app.launch()
+        openClients(in: app)
+        openInvoices(in: app)
+        let correctedRow = app.buttons["invoice-row-0001"]
+        XCTAssertTrue(correctedRow.waitForExistence(timeout: 5))
+        XCTAssertTrue(accessibilityText(of: correctedRow).contains("Unpaid"))
     }
 
     @MainActor

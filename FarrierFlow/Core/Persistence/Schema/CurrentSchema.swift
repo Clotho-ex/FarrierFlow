@@ -12,3 +12,4 @@ typealias BusinessProfile = FarrierFlowSchemaV1.BusinessProfile
 typealias Invoice = FarrierFlowSchemaV1.Invoice
 typealias InvoiceVisit = FarrierFlowSchemaV1.InvoiceVisit
 typealias InvoiceLineItem = FarrierFlowSchemaV1.InvoiceLineItem
+typealias Payment = FarrierFlowSchemaV1.Payment

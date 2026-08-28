@@ -78,6 +78,10 @@ one continuous field workflow rather than separate generic business modules.
   auto-renewable subscription group. The approved US launch products are
   $14.99 monthly and $119.99 yearly, each with a 14-day introductory trial.
   Active, trial, and billing-grace customers receive full access.
+- Apple remains the subscription payment processor. RevenueCat projects the
+  `pro` entitlement, localized monthly/yearly Offering, purchase, and restore
+  results behind FarrierFlow's application-owned subscription service. Users
+  remain anonymous to RevenueCat; FarrierFlow has no customer account.
 - Without a current entitlement, existing local records remain permanently
   readable. The owner may navigate all history, view photographs, and generate,
   open, print, or share a PDF from an existing Invoice snapshot, but cannot
@@ -93,11 +97,14 @@ one continuous field workflow rather than separate generic business modules.
 - Core business records are local-first and must remain usable without a
   network connection. Standard operating-system device backup is permitted;
   FarrierFlow provides no app-managed backup, synchronization, accounts, or
-  multi-device data behavior. StoreKit may restore the subscription entitlement
-  through the App Store, but FarrierFlow data does not synchronize between
-  devices.
-- Invoices have Unpaid or Paid status. Marking an invoice Paid records the
-  payment date; payment processing and external integrations are excluded.
+  multi-device data behavior. RevenueCat and Apple's StoreKit services require
+  network access to refresh subscription products and receipts, but FarrierFlow
+  business data does not synchronize between devices.
+- Invoices have Unpaid or Paid status. A Paid invoice has exactly one manually
+  recorded Payment matching its full total and currency; returning it to
+  Unpaid removes that evidence. Cash, bank transfer, card, cheque, and Other
+  describe how money was received. FarrierFlow records payments but does not
+  process, settle, reconcile, or refund them.
 - The application must remain efficient under field conditions and must not
   depend on invented interaction patterns.
 

@@ -42,9 +42,11 @@ western artifact, veterinary record, or generic SaaS dashboard.
 - Quiet at rest; motion and haptics confirm real state changes only.
 
 Release 1.0 adds a native subscription surface without creating a second visual
-system. Apple's `SubscriptionStoreView` owns localized plan merchandising and
-purchase controls. FarrierFlow supplies only a concise Field Book header and
-truthful workflow explanation.
+system. FarrierFlow's SwiftUI list projects RevenueCat's current Offering into
+localized annual and monthly plan rows, truthful billed price/period copy,
+purchase progress, restore, retry, legal links, and Apple's native Manage
+Subscription sheet. It does not use a generic vendor paywall or external
+checkout.
 
 ## Colors
 
@@ -152,8 +154,8 @@ These are functional state indicators, not decorative icon containers.
   toolbars, sheets, alerts, and confirmation dialogs.
 - **Do** respect Dynamic Type, VoiceOver, Reduce Motion, Increased Contrast,
   Light Mode, and Dark Mode from the first composition.
-- **Do** use native StoreKit pricing, recurring-period, trial, restore, policy,
-  and purchase presentation.
+- **Do** show RevenueCat-projected StoreKit pricing and recurring periods in
+  native SwiftUI, with restore, policy, retry, and purchase progress.
 - **Do** preserve complete record navigation and existing document access in
   read-only mode.
 

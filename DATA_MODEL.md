@@ -21,10 +21,10 @@ migration stage.
 SwiftData is the local metadata source of truth. Canonical Photograph JPEGs are
 stored in Application Support and resolved only from their UUID. Invoice PDFs
 are generated on demand from persisted snapshots and are not canonical records.
-No model represents payment processing, subscriptions, cloud synchronization,
-or app-managed backup. Release 1.0 entitlement is verified from StoreKit at
-runtime and adds no SwiftData model, field, relationship, schema version, or
-migration. An access-state transition never mutates this graph.
+The Payment model records received-money evidence but does not process payments.
+No model represents subscriptions, cloud synchronization, or app-managed
+backup. RevenueCat entitlement state remains outside SwiftData, and an
+access-state transition never mutates this graph.
 
 ## Relationship Contract
 
@@ -50,6 +50,7 @@ migration. An access-state transition never mutates this graph.
   WorkItem snapshots Service name, USD amount in minor units, and currency.
 - One Invoice belongs to exactly one Client and contains one or more
   InvoiceVisits and InvoiceLineItems.
+- One Paid Invoice owns exactly one Payment; an Unpaid Invoice owns none.
 - A mixed-client Visit may appear in separate Invoices for different Clients.
 - Each source WorkItem may belong to at most one InvoiceLineItem.
 - InvoiceVisit groups one source Visit inside one Invoice and does not own the
@@ -70,7 +71,7 @@ saving.
 
 ## Schema Versions and Migration
 
-`FarrierFlowSchemaV1` is the first shipping schema and registers all 14 current
+`FarrierFlowSchemaV1` is the first shipping schema and registers all 15 current
 models. FarrierFlow has not shipped, so pre-release V1-to-V4 stores are not a
 supported migration source and no migration plan is implemented for them.
 SwiftData supplies model identity. Any schema change after first shipment
@@ -471,13 +472,24 @@ Invoice save, and must remain greater than every issued number.
 
 An Invoice belongs to exactly one Client and stores immutable Client and Business
 Profile name/contact snapshots, number, invoice date, optional due date, optional
-note, currency, status, and optional payment date. Numbers are positive,
-formatted to at least four digits, sequential, and never reused. Status is Unpaid
-or Paid; Paid requires a payment date and cannot be reversed or deleted.
+note, currency, and status. Numbers are positive, formatted to at least four
+digits, sequential, and never reused. Status is Unpaid or Paid and is mutated
+only with its Payment evidence through `InvoicePaymentUseCase`.
 
 An Invoice owns one or more InvoiceVisits by cascade. Its checked total is
 derived from all InvoiceLineItem minor-unit amounts and is never stored as a
 separate mutable value.
+
+## Payment
+
+Payment belongs to exactly one Invoice and is cascade-owned by it. It records a
+UUID, full Invoice amount in minor units, currency, received date, method,
+source, optional Other description, reference, and internal note. Current
+methods are Cash, Bank Transfer, Card, Cheque, and Other. Current source is
+`manual`; the source field leaves room for future provider-confirmed records
+without implying a processor today. An Unpaid Invoice has no Payment. A Paid
+Invoice has exactly one Payment whose inverse, amount, and currency match.
+Internal notes never enter the customer-facing PDF.
 
 ## InvoiceVisit
 
@@ -526,6 +538,8 @@ again only if no remaining InvoiceLineItem references any of its WorkItems.
 | `Photograph.visitHorse` | `VisitHorse.photographs` | Nullify | Deleting a Photograph removes only the inverse; VisitHorse remains |
 | `Client.invoices` | `Invoice.client` | Deny | Client cannot be deleted while Invoice history references it |
 | `Invoice.client` | `Client.invoices` | Nullify | Deleting an eligible unpaid Invoice removes only the inverse; Client remains |
+| `Invoice.payments` | `Payment.invoice` | Cascade | Deleting an eligible unpaid Invoice has no Payment; ownership protects future aggregate cleanup |
+| `Payment.invoice` | `Invoice.payments` | Nullify | Removing recorded Payment evidence clears only its Invoice inverse |
 | `Service.workItems` | `WorkItem.service` | Deny | Service cannot be deleted while historical WorkItems reference it |
 | `VisitHorse.workItems` | `WorkItem.visitHorse` | Cascade | Deleting an owned in-progress VisitHorse deletes its WorkItems |
 | `WorkItem.invoiceLineItem` | `InvoiceLineItem.sourceWorkItem` | Deny | A billed WorkItem cannot be deleted or billed again |
@@ -580,9 +594,11 @@ Domain rules validate relationships that span models:
 - Business Profile count is at most one and its sequence remains ahead of every
   issued Invoice number. Optional duration and due-day defaults are positive
   when present.
-- Invoice snapshots are normalized, status/payment date agree, currencies are
+- Invoice snapshots are normalized, status and Payment evidence agree, currencies are
   consistent, every line belongs to the Invoice Client, checked totals do not
   overflow, and no WorkItem is billed twice.
+- Invoice status and Payment evidence agree; Paid has exactly one inverse-
+  matching full-total Payment and Unpaid has none.
 
 These checks run immediately before persistence even if the interface already
 constrained the selection.

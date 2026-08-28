@@ -54,6 +54,27 @@ struct ClientDetailView: View {
                             }
                         }
                     }
+                    if !model.invoices.isEmpty {
+                        Section("Invoices") {
+                            ForEach(model.invoices) { invoice in
+                                NavigationLink(value: InvoiceRoute.detail(invoice.id)) {
+                                    VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
+                                        HStack {
+                                            Text("Invoice \(invoice.number)")
+                                                .font(Typography.recordTitle)
+                                            Spacer()
+                                            Text(invoice.status.displayName)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        Text(invoice.invoiceDate, format: .dateTime.month().day().year())
+                                            .font(Typography.recordMetadata)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .accessibilityIdentifier("client-invoice-\(invoice.number)")
+                            }
+                        }
+                    }
                     if model.hasInvoiceableWork, subscription.allowsMutations {
                         Section("Ready to Invoice") {
                             NavigationLink(value: InvoiceRoute.create(clientID)) {

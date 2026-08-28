@@ -79,6 +79,14 @@ nonisolated enum DomainGraphViolation: Error, Equatable {
     case invoiceLineItemClientMismatch
     case duplicateInvoiceLineItemSource
     case invoiceTotalOverflow
+    case duplicatePaymentID
+    case paymentMissingInvoice
+    case paymentInvoiceInverseMismatch
+    case paymentAmountInvalid
+    case paymentCurrencyInvalid
+    case paymentMethodInvalid
+    case paymentSourceInvalid
+    case paymentTextNotNormalized
 }
 
 @MainActor
@@ -101,6 +109,7 @@ enum DomainGraphValidator {
         let invoices = try context.fetch(FetchDescriptor<Invoice>())
         let invoiceVisits = try context.fetch(FetchDescriptor<InvoiceVisit>())
         let invoiceLineItems = try context.fetch(FetchDescriptor<InvoiceLineItem>())
+        let payments = try context.fetch(FetchDescriptor<Payment>())
 
         guard businessProfiles.count <= 1 else {
             throw DomainGraphViolation.duplicateBusinessProfile
@@ -170,10 +179,24 @@ enum DomainGraphValidator {
             visitsByInvoice[invoice.persistentModelID, default: []].append(invoiceVisit)
         }
 
+        var paymentIDs = Set<UUID>()
+        var paymentsByInvoice = [PersistentIdentifier: [Payment]]()
+        for payment in payments {
+            guard paymentIDs.insert(payment.id).inserted else {
+                throw DomainGraphViolation.duplicatePaymentID
+            }
+            guard let invoice = payment.invoice else {
+                throw DomainGraphViolation.paymentMissingInvoice
+            }
+            try validate(payment)
+            paymentsByInvoice[invoice.persistentModelID, default: []].append(payment)
+        }
+
         for invoice in invoices {
             try validate(
                 invoice,
-                visits: visitsByInvoice[invoice.persistentModelID, default: []]
+                visits: visitsByInvoice[invoice.persistentModelID, default: []],
+                payments: paymentsByInvoice[invoice.persistentModelID, default: []]
             )
         }
 
@@ -336,7 +359,8 @@ enum DomainGraphValidator {
 
     private static func validate(
         _ invoice: Invoice,
-        visits: [InvoiceVisit]
+        visits: [InvoiceVisit],
+        payments: [Payment]
     ) throws {
         guard let client = invoice.client else {
             throw DomainGraphViolation.invoiceMissingClient
@@ -358,14 +382,6 @@ enum DomainGraphValidator {
         }
         guard invoice.currencyCode == "USD" else {
             throw DomainGraphViolation.invoiceCurrencyInvalid
-        }
-        do {
-            _ = try InvoiceDomainRules.validatedStatus(
-                rawValue: invoice.statusRawValue,
-                paidAt: invoice.paidAt
-            )
-        } catch {
-            throw DomainGraphViolation.invoiceStatusInvalid
         }
         guard !visits.isEmpty else {
             throw DomainGraphViolation.invoiceHasNoVisit
@@ -390,9 +406,55 @@ enum DomainGraphValidator {
             amounts.append(contentsOf: invoiceVisit.lineItems.map(\.amountMinorUnits))
         }
         do {
-            _ = try InvoiceDomainRules.checkedTotal(amounts)
+            let total = try InvoiceDomainRules.checkedTotal(amounts)
+            guard payments.count == invoice.payments.count,
+                  payments.allSatisfy({ $0.invoice === invoice }),
+                  invoice.payments.allSatisfy({ $0.invoice === invoice })
+            else {
+                throw DomainGraphViolation.paymentInvoiceInverseMismatch
+            }
+            _ = try InvoiceDomainRules.validatedStatus(
+                rawValue: invoice.statusRawValue,
+                payments: payments,
+                invoiceCurrencyCode: invoice.currencyCode,
+                totalMinorUnits: total
+            )
         } catch {
-            throw DomainGraphViolation.invoiceTotalOverflow
+            if error is CheckedMoneyTotalError {
+                throw DomainGraphViolation.invoiceTotalOverflow
+            }
+            if let violation = error as? DomainGraphViolation { throw violation }
+            throw DomainGraphViolation.invoiceStatusInvalid
+        }
+    }
+
+    private static func validate(_ payment: Payment) throws {
+        guard let invoice = payment.invoice else {
+            throw DomainGraphViolation.paymentMissingInvoice
+        }
+        guard invoice.payments.contains(where: { $0 === payment }) else {
+            throw DomainGraphViolation.paymentInvoiceInverseMismatch
+        }
+        guard payment.amountMinorUnits >= 0 else {
+            throw DomainGraphViolation.paymentAmountInvalid
+        }
+        guard payment.currencyCode == "USD", payment.currencyCode == invoice.currencyCode else {
+            throw DomainGraphViolation.paymentCurrencyInvalid
+        }
+        guard payment.method != nil else {
+            throw DomainGraphViolation.paymentMethodInvalid
+        }
+        guard payment.source == .manual else {
+            throw DomainGraphViolation.paymentSourceInvalid
+        }
+        guard TextNormalization.optional(payment.reference ?? "") == payment.reference,
+              TextNormalization.optional(payment.note ?? "") == payment.note,
+              ((payment.method == .other
+                && TextNormalization.required(payment.otherDescription ?? "")
+                    == payment.otherDescription)
+                || (payment.method != .other && payment.otherDescription == nil))
+        else {
+            throw DomainGraphViolation.paymentTextNotNormalized
         }
     }
 

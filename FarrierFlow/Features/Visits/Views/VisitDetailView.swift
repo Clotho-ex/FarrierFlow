@@ -143,6 +143,26 @@ struct VisitDetailView: View {
                         }
                     }
                 }
+                if !detail.invoices.isEmpty {
+                    Section("Invoices") {
+                        ForEach(detail.invoices) { invoice in
+                            NavigationLink(value: InvoiceRoute.detail(invoice.id)) {
+                                VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
+                                    HStack {
+                                        Text("Invoice \(invoice.number)")
+                                        Spacer()
+                                        Text(invoice.status.displayName)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Text(invoice.clientName)
+                                        .font(Typography.recordMetadata)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .accessibilityIdentifier("visit-invoice-\(invoice.number)")
+                        }
+                    }
+                }
                 Section("Service Location") {
                     if let barnID = detail.barnID {
                         NavigationLink {

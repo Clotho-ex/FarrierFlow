@@ -7,6 +7,7 @@ import Testing
 struct SubscriptionProductTests {
     @Test
     func productConstantsMatchApprovedContract() {
+        #expect(SubscriptionProduct.proEntitlement == "pro")
         #expect(
             SubscriptionProduct.identifiers == [
                 "com.farrierflow.yusufcan.FarrierFlow.pro.monthly",

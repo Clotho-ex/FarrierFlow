@@ -7,12 +7,14 @@ import SwiftData
 final class ClientDetailModel {
     private(set) var client: Client?
     private(set) var hasInvoiceableWork = false
+    private(set) var invoices: [InvoiceSummary] = []
     var alert: FeatureAlert?
 
     func load(id: PersistentIdentifier, in context: ModelContext) {
         client = context.model(for: id) as? Client
         guard client != nil else {
             hasInvoiceableWork = false
+            invoices = []
             return
         }
         do {
@@ -20,9 +22,18 @@ final class ClientDetailModel {
                 for: id,
                 in: context
             ).isEmpty == false
+            invoices = try client?.invoices.map {
+                try InvoiceProjection.summary(from: $0, locale: .current)
+            }.sorted {
+                if $0.invoiceDate != $1.invoiceDate {
+                    return $0.invoiceDate > $1.invoiceDate
+                }
+                return $0.number.localizedStandardCompare($1.number) == .orderedDescending
+            } ?? []
             alert = nil
         } catch {
             hasInvoiceableWork = false
+            invoices = []
             alert = FeatureAlert(
                 title: "Couldn’t Check Invoice Readiness",
                 message: "The client is still available. Try loading their invoice work again."

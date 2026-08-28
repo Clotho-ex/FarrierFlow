@@ -5,12 +5,13 @@
 FarrierFlow is a local-first, iPhone-only SwiftUI application. Slices 1 through
 5A provide connected records, Visit completion and Horse History,
 VisitHorse-owned photographs, structured Services and WorkItems, immutable
-Invoices, payment status, native PDF sharing, owner setup, and the Run Sheet
+Invoices, structured manual Payment evidence, native PDF sharing, owner setup, and the Run Sheet
 hub. Completed Slice 7 adds transient next-appointment assistance through the
-existing Schedule and Visit boundaries. Release 1.0 adds StoreKit-owned access
-control and native subscription presentation without changing the business
-graph. The app adds no FarrierFlow networking, CloudKit, account, or third-party
-dependency.
+existing Schedule and Visit boundaries. Release 1.0 keeps Apple as processor
+while RevenueCat supplies entitlement, Offering, purchase, and restore state
+behind FarrierFlow's subscription boundary. The app adds no FarrierFlow server,
+CloudKit, account, business-data synchronization, or analytics SDK; RevenueCat
+is its sole third-party package and network service.
 
 The dependency direction is:
 
@@ -79,8 +80,8 @@ only utilities genuinely shared by active features with no clearer domain
 owner. Next-appointment assistance remains Schedule-owned and reuses Visit and
 Appointment routes rather than adding a feature directory. Export currently
 contains only its approved version-1 format and CSV foundation on `main`; its
-remaining implementation is paused for release. Subscription is an approved
-release feature and owns only StoreKit entitlement and purchase presentation.
+remaining implementation is paused for release. Subscription owns the
+RevenueCat adapter and app-owned access/paywall projections.
 Later features such as backup and Settings receive ownership only after each
 capability is active. No empty directory or destination is created for deferred
 work.
@@ -106,7 +107,7 @@ directory.
 `FarrierFlowApp` creates the production `ModelContainer`, one
 `PhotographLibrary`, and one `SubscriptionAccessModel`, then supplies them
 through SwiftUI's environment. The small composition value owns the concrete
-Photograph file store and StoreKit entitlement source; it is neither a mutable
+Photograph file store and RevenueCat subscription client; it is neither a mutable
 global singleton nor a service locator.
 
 `RootView` owns first-run routing, the root `TabView`, and the selected tab.
@@ -153,12 +154,13 @@ read-only mode. A loading entitlement never exposes mutation controls.
 - Services owns the catalog, default prices, active availability, Horse default
   selection, and recorded WorkItem editing inside Visits.
 - BusinessProfile owns the single reusable invoice identity and contact editor.
-- Subscription owns stable StoreKit product identifiers, current-entitlement
-  observation, the native subscription store, Restore Purchases, Manage
-  Subscription, and the Today read-only notice. It owns no business record.
+- Subscription owns stable Apple product identifiers, the RevenueCat `pro`
+  entitlement/Offering adapter, purchase and restore operations, native
+  paywall, Manage Subscription, and the Today read-only notice. It owns no
+  business record and passes no custom App User ID.
 - Invoices owns Client-specific eligibility, atomic generation, immutable
-  projections, list/detail state, payment status, deletion, native PDF rendering,
-  temporary-file lifetime, and sharing.
+  projections, list/detail state, structured manual Payment transitions,
+  deletion, native PDF rendering, temporary-file lifetime, and sharing.
 - Clients owns client list, client detail, and client creation.
 - Horses owns horse list/detail/editor behavior reached from client or
   service-location context.
@@ -217,16 +219,17 @@ Do not mark actor-neutral values `@MainActor` merely because a view consumes
 them. Do not move `ModelContext` across actors. Persistence mutations initiated
 by a feature model occur on the feature model's main-actor context.
 
-`SubscriptionAccessModel` is also `@MainActor @Observable`. A focused Sendable
-entitlement source iterates verified `Transaction.currentEntitlements` and
-listens for relevant `Transaction.updates`. The model publishes only loading,
-full-access, or read-only state. It does not expose StoreKit transactions to
-business features or persist a parallel entitlement Boolean.
+`SubscriptionAccessModel` is also `@MainActor @Observable`. `SubscriptionClient`
+projects RevenueCat CustomerInfo and the current Offering into app-owned values.
+The model publishes loading, free, pro, or unavailable access plus independent
+plan and operation state. It retains the last confirmed access on refresh
+failure, listens for CustomerInfo updates, and exposes no RevenueCat or StoreKit
+objects to business features.
 
 Existing feature views read access state at their mutation-entry boundary.
 They continue passing ordinary actions to their existing feature models only
 while full access is current. Existing feature models, domain rules, and
-SwiftData models do not import StoreKit. An already-open Visit editor also
+SwiftData models do not import RevenueCat or StoreKit. An already-open Visit editor also
 checks access before explicit or background persistence.
 
 The Today hub model fetches and converts cross-feature records into immutable
@@ -259,8 +262,7 @@ must not silently replace a failed durable store with an in-memory store.
 Preview and test fixtures never enter production startup code.
 
 The first shipping store uses `FarrierFlowSchemaV1`, which registers the complete
-14-model graph through Slice 5A. Slice 5A adds only optional
-owner-default scalars to BusinessProfile and no new model. FarrierFlow has not
+15-model graph including Invoice-owned Payment evidence. FarrierFlow has not
 shipped, so pre-release V1-to-V4 stores receive no migration path. Future
 shipping schema changes must preserve the production store identity and require
 an explicitly designed and tested migration.
@@ -269,6 +271,11 @@ Subscription access is not persisted in SwiftData. Entitlement loss, restore,
 renewal, grace, expiration, or revocation cannot add, delete, hide, repair, or
 rewrite any business record or Photograph file. Read-only screens use the same
 container and canonical files as full-access screens.
+
+Invoice Paid/Unpaid mutation is centralized in `InvoicePaymentUseCase`. An
+Unpaid Invoice owns no Payment; a Paid Invoice owns exactly one valid completed
+Payment whose inverse, currency, and amount match the Invoice. The use case
+changes status and evidence atomically and validates the graph before saving.
 
 ## Domain and Persistence Boundaries
 
@@ -357,10 +364,11 @@ demand, and a feature model owns the temporary file until the system share sheet
 finishes. Cleanup is best-effort and idempotent; PDF failure never saves or
 mutates the Invoice.
 
-Mark Paid records status and payment date atomically. Unpaid deletion removes
-only invoice snapshots and their WorkItem billing links. Visit correction is
-available again only when no remaining InvoiceLineItem references any WorkItem
-from that Visit; a Paid reference remains permanent.
+Record Payment creates one full-total manual Payment and changes status to Paid
+in one validated save. Mark as Unpaid deletes that evidence and restores the
+outstanding status in one validated save. Unpaid deletion removes only invoice
+snapshots and their WorkItem billing links. Visit correction is available again
+only when no remaining InvoiceLineItem references any WorkItem from that Visit.
 
 Reads never force-unwrap stored relationships. If corrupted or externally
 invalid persisted data is encountered, views render an unavailable value or
@@ -527,12 +535,13 @@ scheduled and active-Visit Run Sheet projections, promoted-record
 deduplication, accessibility progress semantics, and persistent reopening of
 the revised BusinessProfile fields.
 
-Release 1.0 subscription coverage adds verified-entitlement projection,
-transaction-update transitions, no-profile first launch, existing-data
+Release 1.0 subscription coverage adds RevenueCat CustomerInfo/Offering
+projection, entitlement-update transitions, no-profile first launch, existing-data
 read-only launch, mutation-control gating, editor entitlement loss, invoice PDF
 availability, Restore/Manage presentation, and deterministic full-access UI
-test injection. StoreKit Configuration testing covers trial, renewal, grace,
-billing retry, expiration, restore, and revocation without a production server.
+test injection. The checked-in StoreKit Configuration preserves Apple's product
+contract; deterministic client tests cover purchase outcomes, while Apple
+sandbox/TestFlight remains the production acceptance boundary.
 
 ## Platform Policy
 
@@ -547,18 +556,18 @@ appropriate appearance on each OS.
 
 ## Explicit Non-Goals for Release 1.0
 
-- Networking or server-backed repositories.
+- FarrierFlow-operated networking or server-backed repositories.
 - CloudKit synchronization or backup.
 - A dependency-injection framework or global service container.
-- Third-party packages or a third-party design system.
+- Third-party packages beyond RevenueCat, or a third-party design system.
 - A generalized repository, global coordinator, or event bus.
 - Unscheduled Visit horses, cancellation, no-show, or rescheduling state.
 - Taxes, discounts, partial payments, payment processing, overdue automation,
   recurring billing, statements, custom numbering, invoice theming, accounting
   integrations, or notifications.
-- Subscription accounts, server receipt validation, persisted entitlement
-  state, weekly or lifetime products, writable free limits, team plans, and
-  third-party billing.
+- Subscription accounts, custom server receipt validation, persisted
+  entitlement state, weekly or lifetime products, writable free limits, team
+  plans, and non-Apple billing.
 - Completion of the remaining Slice 8 Export units before revenue launch.
 - Background tasks, external draft files, or per-change autosave.
 - Completed Visit deletion or historical-date correction.

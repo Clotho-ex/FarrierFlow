@@ -18,7 +18,9 @@ struct InvoicePDFContentBuilderTests {
         #expect(content.invoiceDate == graph.invoiceDate)
         #expect(content.dueDate == graph.dueDate)
         #expect(content.status == .paid)
-        #expect(content.paidAt == graph.paidAt)
+        #expect(content.payment?.receivedAt == graph.paidAt)
+        #expect(content.payment?.method == .bankTransfer)
+        #expect(content.payment?.reference == "BANK-42")
         #expect(content.businessName == "Carter Farrier Service")
         #expect(content.businessPhone == "555-0100")
         #expect(content.businessEmail == "office@example.com")
@@ -47,7 +49,7 @@ struct InvoicePDFContentBuilderTests {
         )
 
         #expect(content.dueDate == nil)
-        #expect(content.paidAt == nil)
+        #expect(content.payment == nil)
         #expect(content.businessPhone == nil)
         #expect(content.businessEmail == nil)
         #expect(content.businessAddress == nil)
@@ -149,8 +151,6 @@ struct InvoicePDFContentBuilderTests {
             invoiceDate: invoiceDate,
             dueDate: dueDate,
             note: includeOptionalValues ? "Thank you." : nil,
-            status: status,
-            paidAt: paidAt,
             in: context
         )
         let invoiceVisit = ModelFixtures.makeInvoiceVisit(
@@ -164,6 +164,16 @@ struct InvoicePDFContentBuilderTests {
             in: context
         )
         try DomainGraphValidator.save(context)
+        if status == .paid {
+            try InvoicePaymentUseCase.recordPayment(
+                invoiceID: invoice.persistentModelID,
+                method: .bankTransfer,
+                receivedAt: try #require(paidAt),
+                reference: "BANK-42",
+                note: "Internal only",
+                in: context
+            )
+        }
         return Graph(
             container: container,
             context: context,

@@ -41,9 +41,10 @@ struct ExportCSVProjectorTests {
         #expect(tables[8].rows[0] == [.raw("photograph-000001"), .raw("01234567-89ab-cdef-0123-456789abcdef"), .raw("2024-08-30T06:40:00.123456Z"), .raw("2024-08-30T02:40:00.123456-04:00"), .raw("1200"), .raw("900"), .raw("42"), .raw("visit-horse-000001"), .raw("available"), .raw("Photographs/01234567-89ab-cdef-0123-456789abcdef.jpg")])
         #expect(tables[9].rows[0] == [.raw("service-000001"), .userText("Trim"), .raw("12500"), .raw("USD"), .raw("$\u{00A0}125.00"), .raw("false")])
         #expect(tables[10].rows[0] == [.raw("work-item-000001"), .userText("Trim"), .raw("12500"), .raw("USD"), .raw("$\u{00A0}125.00"), .raw("service-000001"), .raw("visit-horse-000001"), .empty])
-        #expect(tables[11].rows[0] == [.raw("invoice-000001"), .raw("7"), .raw("2024-08-30T06:40:00.123456Z"), .raw("2024-08-30T02:40:00.123456-04:00"), .empty, .empty, .empty, .raw("paid"), .raw("2024-08-30T06:40:00.123456Z"), .raw("2024-08-30T02:40:00.123456-04:00"), .userText("Client"), .empty, .empty, .userText("Farrier = Co"), .empty, .empty, .empty, .raw("USD"), .raw("client-000001"), .raw("Invoices/Invoice-0007.pdf")])
-        #expect(tables[12].rows[0] == [.raw("invoice-visit-000001"), .raw("2024-08-30T06:40:00.123456Z"), .raw("2024-08-30T02:40:00.123456-04:00"), .userText("North Field"), .empty, .raw("invoice-000001"), .raw("visit-000001")])
-        #expect(tables[13].rows[0] == [.raw("invoice-line-item-000001"), .userText("Milo"), .userText("Trim"), .raw("12500"), .raw("USD"), .raw("$\u{00A0}125.00"), .raw("invoice-visit-000001"), .raw("work-item-000001")])
+        #expect(tables[11].rows[0] == [.raw("invoice-000001"), .raw("7"), .raw("2024-08-30T06:40:00.123456Z"), .raw("2024-08-30T02:40:00.123456-04:00"), .empty, .empty, .empty, .raw("paid"), .userText("Client"), .empty, .empty, .userText("Farrier = Co"), .empty, .empty, .empty, .raw("USD"), .raw("client-000001"), .raw("Invoices/Invoice-0007.pdf")])
+        #expect(tables[12].rows[0] == [.raw("payment-000001"), .raw("invoice-000001"), .raw("manual"), .raw("bankTransfer"), .raw("12500"), .raw("USD"), .raw("$\u{00A0}125.00"), .raw("2024-08-30T06:40:00.123456Z"), .raw("2024-08-30T02:40:00.123456-04:00"), .empty, .userText("BANK-42"), .userText("Internal")])
+        #expect(tables[13].rows[0] == [.raw("invoice-visit-000001"), .raw("2024-08-30T06:40:00.123456Z"), .raw("2024-08-30T02:40:00.123456-04:00"), .userText("North Field"), .empty, .raw("invoice-000001"), .raw("visit-000001")])
+        #expect(tables[14].rows[0] == [.raw("invoice-line-item-000001"), .userText("Milo"), .userText("Trim"), .raw("12500"), .raw("USD"), .raw("$\u{00A0}125.00"), .raw("invoice-visit-000001"), .raw("work-item-000001")])
 
         let encodedClients = try #require(String(data: ExportCSVWriter().encode(tables[1]), encoding: .utf8))
         #expect(encodedClients.contains("'=formula"))
@@ -52,12 +53,12 @@ struct ExportCSVProjectorTests {
     @Test func emitsHeaderOnlyTablesForAnEmptySnapshot() throws {
         let empty = ExportSnapshot(
             context: Self.context,
-            businessProfiles: [], clients: [], serviceLocations: [], horses: [], appointments: [], appointmentHorses: [], visits: [], visitHorses: [], photographs: [], services: [], workItems: [], invoices: [], invoiceVisits: [], invoiceLineItems: [], invoiceDocuments: []
+            businessProfiles: [], clients: [], serviceLocations: [], horses: [], appointments: [], appointmentHorses: [], visits: [], visitHorses: [], photographs: [], services: [], workItems: [], invoices: [], payments: [], invoiceVisits: [], invoiceLineItems: [], invoiceDocuments: []
         )
 
         let tables = try ExportCSVProjector.tables(from: empty, photographResults: [:])
 
-        #expect(tables.count == 14)
+        #expect(tables.count == 15)
         #expect(tables.allSatisfy { $0.rows.isEmpty })
     }
 
@@ -81,7 +82,7 @@ struct ExportCSVProjectorTests {
             photographResults: [Self.photographUUID: .unavailable]
         )
 
-        #expect(tables[11].rows[0][19] == .raw("Invoices/Invoice-0042.pdf"))
+        #expect(tables[11].rows[0][17] == .raw("Invoices/Invoice-0042.pdf"))
     }
 
     @Test func projectsUnavailablePhotographsAndRejectsInvalidExportValues() throws {
@@ -149,7 +150,7 @@ struct ExportCSVProjectorTests {
     }
 
     private static func snapshot(outcome: String = "serviced", status: String = "paid", currencyCode: String = "USD", minorUnits: Int64 = 12_500, nextInvoiceNumber: Int64 = 7, invoiceNumber: Int64 = 7) throws -> ExportSnapshot {
-        let businessProfile = try id(.businessProfile), client = try id(.client), location = try id(.serviceLocation), horse = try id(.horse), appointment = try id(.appointment), appointmentHorse = try id(.appointmentHorse), visit = try id(.visit), visitHorse = try id(.visitHorse), photograph = try id(.photograph), service = try id(.service), workItem = try id(.workItem), invoice = try id(.invoice), invoiceVisit = try id(.invoiceVisit), invoiceLineItem = try id(.invoiceLineItem)
+        let businessProfile = try id(.businessProfile), client = try id(.client), location = try id(.serviceLocation), horse = try id(.horse), appointment = try id(.appointment), appointmentHorse = try id(.appointmentHorse), visit = try id(.visit), visitHorse = try id(.visitHorse), photograph = try id(.photograph), service = try id(.service), workItem = try id(.workItem), invoice = try id(.invoice), payment = try id(.payment), invoiceVisit = try id(.invoiceVisit), invoiceLineItem = try id(.invoiceLineItem)
         return .init(
             context: context,
             businessProfiles: [.init(id: businessProfile, name: "Farrier = Co", phone: "555-0100", email: nil, address: nil, defaultInvoiceNote: nil, defaultAppointmentDurationMinutes: 45, defaultInvoiceDueDays: nil, nextInvoiceNumber: nextInvoiceNumber)],
@@ -163,7 +164,8 @@ struct ExportCSVProjectorTests {
             photographs: [.init(id: photograph, photographID: photographUUID, createdAt: date, pixelWidth: 1200, pixelHeight: 900, byteCount: 42, visitHorseID: visitHorse)],
             services: [.init(id: service, name: "Trim", defaultAmountMinorUnits: minorUnits, currencyCode: currencyCode, isArchived: false)],
             workItems: [.init(id: workItem, serviceNameSnapshot: "Trim", amountMinorUnits: minorUnits, currencyCode: currencyCode, serviceID: service, visitHorseID: visitHorse, invoiceLineItemID: nil)],
-            invoices: [.init(id: invoice, number: invoiceNumber, invoiceDate: date, dueDate: nil, note: nil, statusRawValue: status, paidAt: date, clientNameSnapshot: "Client", clientPhoneSnapshot: nil, clientEmailSnapshot: nil, businessNameSnapshot: "Farrier = Co", businessPhoneSnapshot: nil, businessEmailSnapshot: nil, businessAddressSnapshot: nil, currencyCode: currencyCode, clientID: client)],
+            invoices: [.init(id: invoice, number: invoiceNumber, invoiceDate: date, dueDate: nil, note: nil, statusRawValue: status, clientNameSnapshot: "Client", clientPhoneSnapshot: nil, clientEmailSnapshot: nil, businessNameSnapshot: "Farrier = Co", businessPhoneSnapshot: nil, businessEmailSnapshot: nil, businessAddressSnapshot: nil, currencyCode: currencyCode, clientID: client)],
+            payments: [.init(id: payment, invoiceID: invoice, sourceRawValue: "manual", methodRawValue: "bankTransfer", amountMinorUnits: minorUnits, currencyCode: currencyCode, receivedAt: date, otherDescription: nil, reference: "BANK-42", note: "Internal")],
             invoiceVisits: [.init(id: invoiceVisit, visitDateSnapshot: date, serviceLocationNameSnapshot: "North Field", serviceLocationAddressSnapshot: nil, invoiceID: invoice, sourceVisitID: visit)],
             invoiceLineItems: [.init(id: invoiceLineItem, horseNameSnapshot: "Milo", serviceNameSnapshot: "Trim", amountMinorUnits: minorUnits, currencyCode: currencyCode, invoiceVisitID: invoiceVisit, sourceWorkItemID: workItem)],
             invoiceDocuments: []

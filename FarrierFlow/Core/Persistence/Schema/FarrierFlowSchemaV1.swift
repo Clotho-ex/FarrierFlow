@@ -19,6 +19,7 @@ nonisolated enum FarrierFlowSchemaV1: VersionedSchema {
             Invoice.self,
             InvoiceVisit.self,
             InvoiceLineItem.self,
+            Payment.self,
         ]
     }
 }

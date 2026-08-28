@@ -30,8 +30,7 @@ final class VisitHistoryAccessibilityUITests: XCTestCase {
         let serviceLocation = app.descendants(matching: .any)[
             "visit-detail-service-location-snapshot"
         ].firstMatch
-        XCTAssertTrue(serviceLocation.waitForExistence(timeout: 3))
-        XCTAssertTrue(serviceLocation.isHittable)
+        XCTAssertTrue(bringIntoView(serviceLocation, in: app))
         XCTAssertTrue(
             accessibilityText(of: serviceLocation).contains(
                 "Invoice Service Location"
@@ -146,6 +145,7 @@ final class VisitHistoryAccessibilityUITests: XCTestCase {
         return element.exists && element.isHittable
     }
 
+    @MainActor
     private func accessibilityText(of element: XCUIElement) -> String {
         [element.label, element.value as? String]
             .compactMap { $0 }

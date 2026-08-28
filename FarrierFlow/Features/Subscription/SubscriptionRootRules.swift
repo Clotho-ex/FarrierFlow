@@ -13,9 +13,9 @@ nonisolated enum SubscriptionRootRules {
         switch access {
         case .loading:
             .loading
-        case .readOnly:
+        case .free, .unavailable:
             hasIdentity ? .app(readOnly: true) : .subscriptionWelcome
-        case .full:
+        case .pro:
             hasIdentity ? .app(readOnly: false) : .ownerSetup
         }
     }

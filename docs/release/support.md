@@ -1,9 +1,8 @@
 # FarrierFlow Support Source
 
-**Publication status:** Not publishable yet. A real monitored public support
-contact and an owner-controlled public HTTPS Support URL are both required
-before release. This source deliberately contains neither a placeholder email
-address nor an invented domain.
+**Publication status:** Repository source updated for the public Support URL at
+`https://farrierflow.vercel.app/support/`. Reconfirm that its published contact
+is monitored and can reply before submission.
 
 ## Using FarrierFlow
 
@@ -24,6 +23,19 @@ remain available in read-only mode. Ordinary business-record and photograph
 changes are unavailable until access is restored. Manage billing through the
 native App Store subscription controls.
 
+FarrierFlow uses anonymous RevenueCat subscription records; restoring after
+reinstall transfers the Apple purchase to the new anonymous App User ID under
+the configured restore policy.
+
+## Recording customer payments
+
+An Unpaid Invoice can be marked Paid by selecting Cash, Bank Transfer, Card,
+Cheque, or Other, confirming the full Invoice amount, and recording the received
+date. Reference and internal note are optional. Mark as Unpaid removes that
+recorded evidence and makes the Invoice outstanding again. FarrierFlow records
+payments already received; it does not charge a card, move money, issue a
+refund, or reconcile a bank account.
+
 ## Local data and photographs
 
 FarrierFlow stores records and photographs on the device. Keep the device
@@ -37,8 +49,7 @@ prompted. If access was previously denied, open iPhone Settings, select
 FarrierFlow, and allow Camera access; the app also explains when a camera is
 unavailable.
 
-## Release blocker
+## Release check
 
-Before this page is published, the owner must provide and approve a real
-monitored public contact. Until then, do not enter a Support URL in App Store
-Connect and do not direct customers to a fabricated address.
+Before submission, confirm the public Support page is reachable and its
+published contact is monitored and can send replies.

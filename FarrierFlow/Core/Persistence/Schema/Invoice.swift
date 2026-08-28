@@ -8,8 +8,7 @@ extension FarrierFlowSchemaV1 {
         private(set) var invoiceDate: Date
         private(set) var dueDate: Date?
         private(set) var note: String?
-        var statusRawValue: String
-        var paidAt: Date?
+        private(set) var statusRawValue: String
         private(set) var clientNameSnapshot: String
         private(set) var clientPhoneSnapshot: String?
         private(set) var clientEmailSnapshot: String?
@@ -27,13 +26,14 @@ extension FarrierFlowSchemaV1 {
         )
         var invoiceVisits: [InvoiceVisit] = []
 
+        @Relationship(deleteRule: .cascade, inverse: \Payment.invoice)
+        private(set) var payments: [Payment] = []
+
         init(
             number: Int64,
             invoiceDate: Date,
             dueDate: Date? = nil,
             note: String? = nil,
-            statusRawValue: String = "unpaid",
-            paidAt: Date? = nil,
             clientNameSnapshot: String,
             clientPhoneSnapshot: String? = nil,
             clientEmailSnapshot: String? = nil,
@@ -48,8 +48,7 @@ extension FarrierFlowSchemaV1 {
             self.invoiceDate = invoiceDate
             self.dueDate = dueDate
             self.note = note
-            self.statusRawValue = statusRawValue
-            self.paidAt = paidAt
+            statusRawValue = InvoiceStatus.unpaid.rawValue
             self.clientNameSnapshot = clientNameSnapshot
             self.clientPhoneSnapshot = clientPhoneSnapshot
             self.clientEmailSnapshot = clientEmailSnapshot
@@ -59,6 +58,31 @@ extension FarrierFlowSchemaV1 {
             self.businessAddressSnapshot = businessAddressSnapshot
             self.currencyCode = currencyCode
             self.client = client
+        }
+
+        func recordCompletedPayment(_ payment: Payment) throws {
+            guard statusRawValue == InvoiceStatus.unpaid.rawValue else {
+                throw InvoicePaymentError.invoiceAlreadyPaid
+            }
+            guard payment.invoice === self,
+                  payments.isEmpty || (payments.count == 1 && payments.first === payment)
+            else {
+                throw InvoicePaymentError.invalidPaymentEvidence
+            }
+            if payments.isEmpty {
+                payments.append(payment)
+            }
+            statusRawValue = InvoiceStatus.paid.rawValue
+        }
+
+        func removeCompletedPayment() throws -> Payment {
+            guard statusRawValue == InvoiceStatus.paid.rawValue, payments.count == 1,
+                  let payment = payments.first else {
+                throw InvoicePaymentError.invoiceAlreadyUnpaid
+            }
+            payments.removeAll()
+            statusRawValue = InvoiceStatus.unpaid.rawValue
+            return payment
         }
     }
 }

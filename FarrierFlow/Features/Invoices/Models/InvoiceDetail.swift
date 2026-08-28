@@ -8,7 +8,7 @@ nonisolated struct InvoiceDetail: Equatable {
     let dueDate: Date?
     let note: String?
     let status: InvoiceStatus
-    let paidAt: Date?
+    let payment: PaymentDetail?
     let businessName: String
     let businessPhone: String?
     let businessEmail: String?
@@ -18,6 +18,18 @@ nonisolated struct InvoiceDetail: Equatable {
     let clientEmail: String?
     let visits: [InvoiceVisitDetail]
     let total: MoneyAvailability
+    let currencyCode: String
+}
+
+nonisolated struct PaymentDetail: Equatable {
+    let amountMinorUnits: Int64
+    let currencyCode: String
+    let receivedAt: Date
+    let method: PaymentMethod
+    let source: PaymentRecordSource
+    let otherDescription: String?
+    let reference: String?
+    let note: String?
 }
 
 nonisolated struct InvoiceVisitDetail: Identifiable, Equatable {

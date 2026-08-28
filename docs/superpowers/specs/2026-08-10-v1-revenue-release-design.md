@@ -1,5 +1,26 @@
 # FarrierFlow 1.0 — Revenue Release Design
 
+## 2026-08-28 Monetization and Payment Tracking Amendment
+
+This amendment supersedes StoreKit-as-entitlement-authority and binary
+payment-date sections below. Apple remains processor, while RevenueCat supplies
+anonymous CustomerInfo, the `pro` entitlement, current monthly/yearly Offering,
+purchase, restore, and update state behind FarrierFlow's `SubscriptionClient`.
+FarrierFlow uses a native SwiftUI paywall and keeps every existing Pro mutation
+gate and read-only route. The checked-in StoreKit configuration remains the
+Apple product contract.
+
+Invoice Paid state is backed by exactly one full-total, matching-currency
+manual Payment; Unpaid owns none. `InvoicePaymentUseCase` exclusively performs
+Paid/Unpaid transitions and atomic evidence creation/removal. Supported methods
+are Cash, Bank Transfer, Card, Cheque, and Other. This records received money;
+it does not process payments, partial payments, refunds, or reconciliation.
+
+RevenueCat uses anonymous App User IDs with `Transfer to new App User ID`
+restore behavior. App Privacy must disclose Purchase History for App
+Functionality and Analytics, not linked to identity and not used for tracking
+under the current anonymous/no-customer-attributes implementation.
+
 **Status:** Commercial decisions approved; implementation contract awaiting
 review
 

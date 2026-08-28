@@ -36,6 +36,7 @@ nonisolated struct VisitDetail: Equatable {
     let barnID: PersistentIdentifier?
     let horses: [VisitHorseResult]
     let total: MoneyAvailability
+    let invoices: [InvoiceSummary]
     let isCorrectionLocked: Bool
 }
 
@@ -144,6 +145,20 @@ final class VisitDetailModel {
             return lhs.id < rhs.id
         }
 
+        var invoiceIDs = Set<PersistentIdentifier>()
+        let invoices = try visit.invoiceVisits.compactMap { invoiceVisit -> InvoiceSummary? in
+            guard invoiceVisit.sourceVisit === visit, let invoice = invoiceVisit.invoice,
+                  invoice.invoiceVisits.contains(where: { $0 === invoiceVisit })
+            else {
+                throw VisitDetailLoadError.invalidVisit
+            }
+            guard invoiceIDs.insert(invoice.persistentModelID).inserted else { return nil }
+            return try InvoiceProjection.summary(from: invoice, locale: locale)
+        }.sorted {
+            if $0.invoiceDate != $1.invoiceDate { return $0.invoiceDate > $1.invoiceDate }
+            return $0.number.localizedStandardCompare($1.number) == .orderedDescending
+        }
+
         return VisitDetail(
             visitID: visitID,
             startedAt: visit.startedAt,
@@ -153,6 +168,7 @@ final class VisitDetailModel {
             barnID: visit.barn?.persistentModelID,
             horses: horses,
             total: try CheckedMoneyTotal.projectedTotal(horses.map(\.subtotal)),
+            invoices: invoices,
             isCorrectionLocked: InvoiceDomainRules.isCorrectionLocked(visit)
         )
     }

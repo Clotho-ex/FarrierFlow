@@ -124,7 +124,7 @@ private struct RootPreview: View {
                 )
                 .environment(
                     SubscriptionAccessModel(
-                        source: StaticSubscriptionEntitlementSource(isEntitled: true)
+                        client: StaticSubscriptionClient(isPro: true)
                     )
                 )
         case .failure:
@@ -133,18 +133,31 @@ private struct RootPreview: View {
     }
 }
 
-nonisolated struct StaticSubscriptionEntitlementSource:
-    SubscriptionEntitlementSource {
-    let isEntitled: Bool
+@MainActor
+struct StaticSubscriptionClient: SubscriptionClient {
+    let isPro: Bool
 
-    func hasCurrentEntitlement(productIDs: Set<String>) async -> Bool {
-        isEntitled
+    func customerInfo() async throws -> SubscriptionCustomerSnapshot {
+        .init(hasActiveProEntitlement: isPro)
     }
 
-    func updates(productIDs: Set<String>) async -> AsyncStream<Void> {
-        AsyncStream { continuation in
-            continuation.finish()
-        }
+    func offerings() async throws -> [SubscriptionPlan] {
+        [
+            .init(id: "annual", productID: SubscriptionProduct.yearly, kind: .annual, displayName: "Annual", localizedPrice: "$119.99", subscriptionPeriod: "year"),
+            .init(id: "monthly", productID: SubscriptionProduct.monthly, kind: .monthly, displayName: "Monthly", localizedPrice: "$14.99", subscriptionPeriod: "month"),
+        ]
+    }
+
+    func purchase(planID: String) async throws -> SubscriptionPurchaseResult {
+        .init(customer: .init(hasActiveProEntitlement: isPro), wasCancelled: false)
+    }
+
+    func restorePurchases() async throws -> SubscriptionCustomerSnapshot {
+        .init(hasActiveProEntitlement: isPro)
+    }
+
+    func customerInfoUpdates() async -> AsyncStream<SubscriptionCustomerSnapshot> {
+        AsyncStream { $0.finish() }
     }
 }
 

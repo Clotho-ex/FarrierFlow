@@ -145,8 +145,6 @@ enum ModelFixtures {
         invoiceDate: Date = Date(timeIntervalSinceReferenceDate: 500),
         dueDate: Date? = Date(timeIntervalSinceReferenceDate: 600),
         note: String? = "Thank you.",
-        status: InvoiceStatus = .unpaid,
-        paidAt: Date? = nil,
         in context: ModelContext
     ) -> Invoice {
         let invoice = Invoice(
@@ -154,8 +152,6 @@ enum ModelFixtures {
             invoiceDate: invoiceDate,
             dueDate: dueDate,
             note: note,
-            statusRawValue: status.rawValue,
-            paidAt: paidAt,
             clientNameSnapshot: client.name,
             clientPhoneSnapshot: client.phone,
             clientEmailSnapshot: client.email,

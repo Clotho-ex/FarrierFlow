@@ -1,5 +1,28 @@
 # StoreKit Configuration
 
+## RevenueCat production overlay
+
+`FarrierFlow.storekit` remains the checked-in Apple product-contract fixture;
+production purchases are performed by RevenueCat. The project resolves the
+stable `RevenueCat` package product (not `RevenueCatUI`) and reads the public
+Apple SDK key from `RevenueCatPublicSDKKey`, generated from the
+`REVENUECAT_PUBLIC_SDK_KEY` build setting. The repository stores no dashboard
+credential or secret.
+
+Resolution on 2026-08-28 selected stable Purchases iOS `5.87.1` (revision
+`b65cae4f227be800c57cb9700dbd94f2aa5409b2`) after querying current upstream
+tags and resolving with Xcode 26.6 / Swift 6.3.3 for the iOS 18 deployment
+target. `Package.resolved` is the exact reproducibility record.
+
+Production setup was completed on 2026-08-28: the RevenueCat Apple app uses the
+existing bundle ID; both products are attached to entitlement `pro`; the
+current Offering contains one monthly and one annual package; the App Store
+In-App Purchase key and public Apple SDK key are configured; anonymous App User
+IDs remain; restore behavior remains `Transfer to new App User ID`; and
+RevenueCat validates the Apple App Store Server Notification URL as correctly
+configured. Receipt-delivery acceptance still depends on the separately
+scheduled Apple sandbox/TestFlight lifecycle run.
+
 ## Local Xcode configuration
 
 `FarrierFlow/Resources/FarrierFlow.storekit` is the checked-in StoreKit

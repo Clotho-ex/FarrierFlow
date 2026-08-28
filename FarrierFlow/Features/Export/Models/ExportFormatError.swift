@@ -4,6 +4,8 @@ nonisolated enum ExportFormatError: Error, Equatable {
     case invalidExportRecordOrdinal(Int)
     case unsupportedVisitOutcome(String)
     case unsupportedInvoiceStatus(String)
+    case unsupportedPaymentSource(String)
+    case unsupportedPaymentMethod(String)
     case unsupportedCurrencyCode(String)
     case invalidMonetaryValue(Int64)
     case missingPhotographResult(UUID)

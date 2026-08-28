@@ -83,7 +83,7 @@ struct ClientDraftAndModelTests {
         let visitHorse = try #require(visit.visitHorses.first)
         visitHorse.outcomeRawValue = VisitOutcome.serviced.rawValue
         let service = ModelFixtures.makeService(in: context)
-        _ = ModelFixtures.makeWorkItem(
+        let workItem = ModelFixtures.makeWorkItem(
             service: service,
             visitHorse: visitHorse,
             in: context
@@ -93,5 +93,30 @@ struct ClientDraftAndModelTests {
         model.load(id: client.persistentModelID, in: context)
 
         #expect(model.hasInvoiceableWork)
+
+        let profile = ModelFixtures.makeBusinessProfile(nextInvoiceNumber: 2, in: context)
+        let invoice = ModelFixtures.makeInvoice(
+            number: 1,
+            client: client,
+            businessProfile: profile,
+            in: context
+        )
+        let invoiceVisit = ModelFixtures.makeInvoiceVisit(
+            invoice: invoice,
+            sourceVisit: visit,
+            in: context
+        )
+        _ = try ModelFixtures.makeInvoiceLineItem(
+            invoiceVisit: invoiceVisit,
+            sourceWorkItem: workItem,
+            in: context
+        )
+        try DomainGraphValidator.save(context)
+
+        model.load(id: client.persistentModelID, in: context)
+
+        #expect(!model.hasInvoiceableWork)
+        #expect(model.invoices.map(\.number) == ["0001"])
+        #expect(model.invoices.map(\.status) == [.unpaid])
     }
 }

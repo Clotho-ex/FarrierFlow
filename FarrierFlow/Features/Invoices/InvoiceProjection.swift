@@ -4,24 +4,36 @@ import SwiftData
 @MainActor
 enum InvoiceProjection {
     static func summary(from invoice: Invoice, locale: Locale) throws -> InvoiceSummary {
+        let total = total(for: invoice)
+        guard case .available(let totalMinorUnits) = total else {
+            throw CheckedMoneyTotalError.overflow
+        }
         let status = try InvoiceDomainRules.validatedStatus(
             rawValue: invoice.statusRawValue,
-            paidAt: invoice.paidAt
+            payments: invoice.payments,
+            invoiceCurrencyCode: invoice.currencyCode,
+            totalMinorUnits: totalMinorUnits
         )
         return InvoiceSummary(
             id: invoice.persistentModelID,
             number: try InvoiceDomainRules.formattedNumber(invoice.number),
             clientName: invoice.clientNameSnapshot,
             invoiceDate: invoice.invoiceDate,
-            total: total(for: invoice),
+            total: total,
             status: status
         )
     }
 
     static func detail(from invoice: Invoice, locale: Locale) throws -> InvoiceDetail {
+        let total = total(for: invoice)
+        guard case .available(let totalMinorUnits) = total else {
+            throw CheckedMoneyTotalError.overflow
+        }
         let status = try InvoiceDomainRules.validatedStatus(
             rawValue: invoice.statusRawValue,
-            paidAt: invoice.paidAt
+            payments: invoice.payments,
+            invoiceCurrencyCode: invoice.currencyCode,
+            totalMinorUnits: totalMinorUnits
         )
         let visits = InvoiceDomainRules.orderedVisits(
             invoice.invoiceVisits,
@@ -53,7 +65,7 @@ enum InvoiceProjection {
             dueDate: invoice.dueDate,
             note: invoice.note,
             status: status,
-            paidAt: invoice.paidAt,
+            payment: try invoice.payments.first.map(paymentDetail),
             businessName: invoice.businessNameSnapshot,
             businessPhone: invoice.businessPhoneSnapshot,
             businessEmail: invoice.businessEmailSnapshot,
@@ -62,7 +74,24 @@ enum InvoiceProjection {
             clientPhone: invoice.clientPhoneSnapshot,
             clientEmail: invoice.clientEmailSnapshot,
             visits: visits,
-            total: total(for: invoice)
+            total: total,
+            currencyCode: invoice.currencyCode
+        )
+    }
+
+    private static func paymentDetail(_ payment: Payment) throws -> PaymentDetail {
+        guard let method = payment.method, let source = payment.source else {
+            throw InvoiceDomainRuleError.invalidStatus
+        }
+        return PaymentDetail(
+            amountMinorUnits: payment.amountMinorUnits,
+            currencyCode: payment.currencyCode,
+            receivedAt: payment.receivedAt,
+            method: method,
+            source: source,
+            otherDescription: payment.otherDescription,
+            reference: payment.reference,
+            note: payment.note
         )
     }
 

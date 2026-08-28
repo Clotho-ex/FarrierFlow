@@ -203,6 +203,9 @@ struct VisitDetailModelTests {
         #expect(model.editorMode == .correction)
         #expect(model.isCorrectionLocked)
         #expect(model.detail?.isCorrectionLocked == true)
+        #expect(model.detail?.invoices.map(\.number) == ["0001"])
+        #expect(model.detail?.invoices.map(\.clientName) == [client.name])
+        #expect(model.detail?.invoices.map(\.status) == [.unpaid])
     }
 
     @Test

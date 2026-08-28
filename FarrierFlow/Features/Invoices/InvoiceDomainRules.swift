@@ -10,17 +10,39 @@ nonisolated enum InvoiceDomainRuleError: Error, Equatable {
 enum InvoiceDomainRules {
     static func validatedStatus(
         rawValue: String,
-        paidAt: Date?
+        payments: [Payment],
+        invoiceCurrencyCode: String,
+        totalMinorUnits: Int64
     ) throws -> InvoiceStatus {
         guard let status = InvoiceStatus(rawValue: rawValue) else {
             throw InvoiceDomainRuleError.invalidStatus
         }
-        switch (status, paidAt) {
-        case (.unpaid, nil), (.paid, .some):
-            return status
-        case (.unpaid, .some), (.paid, nil):
+        switch status {
+        case .unpaid:
+            guard payments.isEmpty else {
+                throw InvoiceDomainRuleError.invalidStatus
+            }
+        case .paid:
+            guard payments.count == 1, let payment = payments.first,
+                  payment.amountMinorUnits == totalMinorUnits,
+                  payment.currencyCode == invoiceCurrencyCode,
+                  payment.invoice?.payments.contains(where: { $0 === payment }) == true,
+                  payment.method != nil,
+                  payment.source == .manual,
+                  TextNormalization.optional(payment.reference ?? "") == payment.reference,
+                  TextNormalization.optional(payment.note ?? "") == payment.note,
+                  ((payment.method == .other
+                    && TextNormalization.required(payment.otherDescription ?? "")
+                        == payment.otherDescription)
+                    || (payment.method != .other && payment.otherDescription == nil))
+            else {
+                throw InvoiceDomainRuleError.invalidStatus
+            }
+        }
+        guard totalMinorUnits >= 0 else {
             throw InvoiceDomainRuleError.invalidStatus
         }
+        return status
     }
 
     static func formattedNumber(_ number: Int64) throws -> String {

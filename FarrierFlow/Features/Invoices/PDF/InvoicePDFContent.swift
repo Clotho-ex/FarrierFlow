@@ -5,7 +5,7 @@ nonisolated struct InvoicePDFContent: Sendable, Equatable {
     let invoiceDate: Date
     let dueDate: Date?
     let status: InvoiceStatus
-    let paidAt: Date?
+    let payment: PaymentContent?
     let currencyCode: String
     let businessName: String
     let businessPhone: String?
@@ -17,6 +17,14 @@ nonisolated struct InvoicePDFContent: Sendable, Equatable {
     let visits: [VisitGroup]
     let totalMinorUnits: Int64
     let note: String?
+
+    nonisolated struct PaymentContent: Sendable, Equatable {
+        let amountMinorUnits: Int64
+        let receivedAt: Date
+        let method: PaymentMethod
+        let otherDescription: String?
+        let reference: String?
+    }
 
     nonisolated struct VisitGroup: Sendable, Equatable {
         let date: Date

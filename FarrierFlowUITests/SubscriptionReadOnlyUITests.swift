@@ -39,9 +39,11 @@ final class SubscriptionReadOnlyUITests: XCTestCase {
         let history = app.descendants(matching: .any)["horse-history-visit-Milo"].firstMatch
         XCTAssertTrue(history.waitForExistence(timeout: 3))
         history.tap()
-        app.buttons.matching(
+        let hoofPhotos = app.buttons.matching(
             NSPredicate(format: "label CONTAINS %@", "Hoof Photos")
-        ).firstMatch.tap()
+        ).firstMatch
+        XCTAssertTrue(bringIntoView(hoofPhotos, in: app))
+        hoofPhotos.tap()
         let thumbnail = app.buttons["Photo 1 of 1"]
         XCTAssertTrue(thumbnail.waitForExistence(timeout: 3))
         thumbnail.tap()
@@ -50,9 +52,6 @@ final class SubscriptionReadOnlyUITests: XCTestCase {
 
         openInvoices(in: app)
         app.buttons["invoice-row-0001"].tap()
-        let actionsMenu = app.buttons["invoice-actions-menu"]
-        XCTAssertTrue(actionsMenu.waitForExistence(timeout: 3))
-        actionsMenu.tap()
         let shareInvoice = app.buttons["invoice-share-pdf-action"]
         XCTAssertTrue(shareInvoice.waitForExistence(timeout: 3))
         XCTAssertTrue(shareInvoice.isEnabled)
@@ -135,5 +134,19 @@ final class SubscriptionReadOnlyUITests: XCTestCase {
         XCTAssertTrue(invoices.waitForExistence(timeout: 3))
         invoices.tap()
         XCTAssertTrue(app.navigationBars["Invoices"].waitForExistence(timeout: 3))
+    }
+
+    @MainActor
+    private func bringIntoView(
+        _ element: XCUIElement,
+        in app: XCUIApplication
+    ) -> Bool {
+        for _ in 0..<10 {
+            if element.exists, element.isHittable {
+                return true
+            }
+            app.swipeUp()
+        }
+        return element.exists && element.isHittable
     }
 }

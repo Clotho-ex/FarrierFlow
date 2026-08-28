@@ -61,7 +61,8 @@ FarrierFlow Pro is available as an auto-renewable monthly or yearly
 subscription. If access is unavailable, existing records, photographs,
 history, and existing Invoice PDF generation and sharing stay available in
 read-only mode. Manage or restore App Store purchases through the app's native
-StoreKit controls.
+controls. Record full customer Invoice payments by date and method; FarrierFlow
+does not process those payments.
 
 ## Promotional text
 
@@ -87,26 +88,27 @@ and invoices on iPhone.
 
 ## App Privacy source
 
-Proposed App Privacy answer: **Data Not Collected**. Reconfirm against the
-final binary, public policy, and App Store Connect questionnaire before
-submission. The current manifest declares no tracking, no tracking domains,
-and no collected data types; it declares the Disk Space required-reason API
-with reason `E174.1`.
+RevenueCat requires **Purchases > Purchase History** with purposes **App
+Functionality** and **Analytics**. Select **not linked to identity** and **not
+used for tracking** because FarrierFlow configures anonymous RevenueCat App User
+IDs and supplies no identifying customer attributes or advertising integration.
+Reconfirm against the final binary and implementation before submission. The
+FarrierFlow manifest retains Disk Space required-reason `E174.1`.
 
 ## Review notes source
 
-FarrierFlow is local-first and has no FarrierFlow account or developer-operated
-server. A verified current App Store entitlement provides full access; without
-one, existing records remain readable and ordinary mutations are disabled. No
-login or local Xcode StoreKit configuration is required or supplied for App
-Review. Submit the monthly and yearly products with version 1.0 so App Review
-can evaluate the production App Store purchase and restore path.
+FarrierFlow is local-first and has no FarrierFlow account. RevenueCat projects
+the Apple-processed `pro` entitlement; without it, existing records remain
+readable and ordinary mutations are disabled. No login or local Xcode StoreKit
+configuration is required or supplied for App Review. Submit the monthly and
+yearly products with version 1.0 so App Review can evaluate purchase and restore.
 
 ## Required public links
 
-- Privacy Policy: **Unmet gate — owner-controlled HTTPS URL not supplied.**
-- Support: **Unmet gate — monitored public support contact and HTTPS URL not
-  supplied.**
+- Privacy Policy: `https://farrierflow.vercel.app/privacy/` — RevenueCat
+  disclosure published and verified on 2026-08-28.
+- Support: `https://farrierflow.vercel.app/support/` — reconfirm the published
+  monitored contact before submission.
 
 ## Screenshot shot list
 

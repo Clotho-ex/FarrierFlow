@@ -30,10 +30,14 @@ nonisolated enum ExportCSVProjector {
                 return [id(record.id), text(record.serviceNameSnapshot), integer(record.amountMinorUnits), raw(record.currencyCode), raw(display), id(record.serviceID), id(record.visitHorseID), id(record.invoiceLineItemID)]
             }),
             table(11, try snapshot.invoices.map { record in
-                [id(record.id), integer(record.number)] + dates(record.invoiceDate, context: context) + dates(record.dueDate, context: context) + [text(record.note), raw(try invoiceStatus(record.statusRawValue))] + dates(record.paidAt, context: context) + [text(record.clientNameSnapshot), text(record.clientPhoneSnapshot), text(record.clientEmailSnapshot), text(record.businessNameSnapshot), text(record.businessPhoneSnapshot), text(record.businessEmailSnapshot), text(record.businessAddressSnapshot), raw(try currency(record.currencyCode)), id(record.clientID), raw(ExportFormatV1.invoicePDFRelativePath(number: record.number))]
+                [id(record.id), integer(record.number)] + dates(record.invoiceDate, context: context) + dates(record.dueDate, context: context) + [text(record.note), raw(try invoiceStatus(record.statusRawValue)), text(record.clientNameSnapshot), text(record.clientPhoneSnapshot), text(record.clientEmailSnapshot), text(record.businessNameSnapshot), text(record.businessPhoneSnapshot), text(record.businessEmailSnapshot), text(record.businessAddressSnapshot), raw(try currency(record.currencyCode)), id(record.clientID), raw(ExportFormatV1.invoicePDFRelativePath(number: record.number))]
             }),
-            table(12, snapshot.invoiceVisits.map { [id($0.id)] + dates($0.visitDateSnapshot, context: context) + [text($0.serviceLocationNameSnapshot), text($0.serviceLocationAddressSnapshot), id($0.invoiceID), id($0.sourceVisitID)] }),
-            table(13, try snapshot.invoiceLineItems.map { record in
+            table(12, try snapshot.payments.map { record in
+                let display = try moneyDisplay(record.amountMinorUnits, currencyCode: record.currencyCode, localeIdentifier: context.localeIdentifier)
+                return [id(record.id), id(record.invoiceID), raw(try paymentSource(record.sourceRawValue)), raw(try paymentMethod(record.methodRawValue)), integer(record.amountMinorUnits), raw(try currency(record.currencyCode)), raw(display)] + dates(record.receivedAt, context: context) + [text(record.otherDescription), text(record.reference), text(record.note)]
+            }),
+            table(13, snapshot.invoiceVisits.map { [id($0.id)] + dates($0.visitDateSnapshot, context: context) + [text($0.serviceLocationNameSnapshot), text($0.serviceLocationAddressSnapshot), id($0.invoiceID), id($0.sourceVisitID)] }),
+            table(14, try snapshot.invoiceLineItems.map { record in
                 let display = try moneyDisplay(record.amountMinorUnits, currencyCode: record.currencyCode, localeIdentifier: context.localeIdentifier)
                 return [id(record.id), text(record.horseNameSnapshot), text(record.serviceNameSnapshot), integer(record.amountMinorUnits), raw(record.currencyCode), raw(display), id(record.invoiceVisitID), id(record.sourceWorkItemID)]
             }),
@@ -66,6 +70,20 @@ nonisolated enum ExportCSVProjector {
 
     private static func invoiceStatus(_ value: String) throws -> String {
         guard ["unpaid", "paid"].contains(value) else { throw ExportFormatError.unsupportedInvoiceStatus(value) }
+        return value
+    }
+
+    private static func paymentSource(_ value: String) throws -> String {
+        guard PaymentRecordSource(rawValue: value) != nil else {
+            throw ExportFormatError.unsupportedPaymentSource(value)
+        }
+        return value
+    }
+
+    private static func paymentMethod(_ value: String) throws -> String {
+        guard PaymentMethod(rawValue: value) != nil else {
+            throw ExportFormatError.unsupportedPaymentMethod(value)
+        }
         return value
     }
 

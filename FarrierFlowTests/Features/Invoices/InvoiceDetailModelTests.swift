@@ -24,6 +24,32 @@ struct InvoiceDetailModelTests {
         #expect(detail.visits[0].lineItems.map(\.serviceName) == ["Trim"])
     }
 
+    @Test
+    func paidDetailProjectsStructuredPaymentEvidence() throws {
+        let graph = try makeGraph()
+        let receivedAt = Date(timeIntervalSinceReferenceDate: 700)
+        try InvoicePaymentUseCase.recordPayment(
+            invoiceID: graph.invoiceID,
+            method: .bankTransfer,
+            receivedAt: receivedAt,
+            reference: "BANK-42",
+            note: "Internal only",
+            in: graph.context
+        )
+        let model = InvoiceDetailModel(invoiceID: graph.invoiceID)
+
+        model.load(in: graph.context, locale: Locale(identifier: "en_US"))
+
+        let payment = try #require(model.detail?.payment)
+        #expect(model.detail?.status == .paid)
+        #expect(payment.amountMinorUnits == 12_500)
+        #expect(payment.receivedAt == receivedAt)
+        #expect(payment.method == .bankTransfer)
+        #expect(payment.source == .manual)
+        #expect(payment.reference == "BANK-42")
+        #expect(payment.note == "Internal only")
+    }
+
     private func makeGraph() throws -> InvoiceDetailGraph {
         let container = try ModelContainerFactory.inMemoryTest()
         let context = container.mainContext

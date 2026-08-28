@@ -56,17 +56,16 @@ final class InvoiceDetailModel {
         }
     }
 
-    func markPaid(now: Date = .now, in context: ModelContext) {
+    func markUnpaid(in context: ModelContext) {
         do {
-            try InvoiceStatusUseCase.markPaid(
+            try InvoicePaymentUseCase.markUnpaid(
                 invoiceID: invoiceID,
-                paidAt: now,
                 in: context
             )
             load(in: context)
         } catch {
             alert = FeatureAlert(
-                title: "Couldn’t Mark Invoice Paid",
+                title: "Couldn’t Mark Invoice Unpaid",
                 message: "The invoice remains unchanged. Try again."
             )
         }

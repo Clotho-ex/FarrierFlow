@@ -17,10 +17,10 @@ stores.
 
 ## Active Release — FarrierFlow 1.0 Revenue Launch
 
-**Status:** Units 1–6 are complete and pushed on
-`codex/v1-release-plan`. Unit 7 — Release Candidate, TestFlight, and Submission
-is active. The release is not complete and remains blocked on the remaining
-commercial, candidate, physical-device, TestFlight, and submission gates.
+**Status:** The repository implementation includes RevenueCat-backed
+subscription access and structured manual payment tracking. RevenueCat/App
+Store configuration, updated App Privacy, public-policy deployment,
+physical-device TestFlight acceptance, and submission remain external gates.
 
 ### Outcome
 
@@ -46,7 +46,8 @@ features.
   records, photographs, history, and PDF generation/sharing from existing
   Invoice snapshots remain available; every ordinary business-record mutation
   is unavailable.
-- Native Restore Purchases and Manage Subscription behavior.
+- RevenueCat purchase/restore with anonymous App User IDs, `pro` entitlement,
+  monthly/yearly current Offering, and Apple's Manage Subscription behavior.
 - No FarrierFlow account, server, cloud synchronization, or persisted
   entitlement state.
 
@@ -56,8 +57,10 @@ features.
   and unmerged.
 - Port the confirmed stale-Horse Appointment-save fix independently so a failed
   new Appointment creates no partial record and a corrected retry can succeed.
-- Add one feature-owned StoreKit entitlement and subscription surface without a
+- Keep one feature-owned subscription service, backed by RevenueCat, without a
   generalized Settings architecture.
+- Record full Invoice payments manually with structured method/date/reference
+  evidence; do not add a payment processor.
 - Gate normal production mutation controls while preserving all read-only
   navigation and existing Invoice PDF sharing.
 - Supply the production App Icon, privacy manifest, public Privacy Policy and
@@ -81,8 +84,9 @@ features.
   Store Connect on 2026-08-18.
 - On 2026-08-18, App Store Connect saved the prepared subtitle, promotional
   text, description, keywords, Support URL, Business category, review notes,
-  account-free sign-in setting, and 4+ age rating; published App Privacy as
-  **Data Not Collected**; configured a free United States launch matching both
+  account-free sign-in setting, and 4+ age rating; the prior App Privacy answer
+  **Data Not Collected** must be replaced with RevenueCat Purchase History for
+  App Functionality and Analytics; configured a free United States launch matching both
   subscriptions; and disabled Mac and Vision Pro availability for the
   iPhone-only 1.0 scope. Both monthly and yearly product review screenshots
   were uploaded and both products were added to the version 1.0 draft, where
@@ -115,7 +119,7 @@ subscription, and cancellation paths work reliably.
 - PDFs remain generatable and shareable from existing Invoice snapshots in
   read-only mode.
 - Restore or renewal returns full access without data migration or relaunch.
-- StoreKit sandbox, focused iOS 18 compatibility, complete iOS 26 release
+- RevenueCat plus Apple sandbox, focused iOS 18 compatibility, complete iOS 26 release
   verification, physical-device TestFlight, privacy, accessibility, metadata,
   and App Store submission gates pass.
 
@@ -533,12 +537,12 @@ numbered capability order. Export is paused, StoreKit is part of the approved
 release, and every other later slice still requires explicit implementation
 approval.
 
-### Slice 6 — Payment Processing
+### Slice 6 — Payment Tracking
 
-Unpaid/Paid status and payment date shipped in Slice 5. Any future payment
-collection or processing requires a separate product, privacy, failure, and App
-Store decision and remains deferred. It is not the active implementation
-candidate.
+**Status:** Implemented locally. Paid status is supported by one full-total
+manual Payment record; reversal removes the evidence and returns the Invoice to
+Unpaid. Payment processing, partial payments, refunds, reconciliation, and
+provider integrations remain deferred.
 
 ### Slice 7 — Next Appointment Assistance
 
@@ -575,14 +579,14 @@ Define user-controlled business-record and media export with explicit privacy,
 format, and failure behavior. The approved design remains authoritative when
 work resumes.
 
-### Slice 9 — StoreKit Subscription
+### Slice 9 — RevenueCat Subscription
 
-**Status:** Product design approved as part of the 1.0 Revenue Launch;
-implementation plan awaiting review.
+**Status:** Implemented locally; production dashboard and sandbox/TestFlight
+acceptance remain external.
 
-Introduce StoreKit 2 with the exact products, trial, read-only fallback,
-restore, grace-period, offline, privacy, and App Store requirements defined by
-the active release contract. It adds no SwiftData schema or FarrierFlow account.
+Apple remains processor. RevenueCat owns receipt/entitlement service behavior
+behind `SubscriptionClient`; FarrierFlow owns access/paywall projections. The
+integration uses anonymous App User IDs and adds no FarrierFlow account.
 
 ### Slice 10 — Optional Backup
 

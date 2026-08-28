@@ -91,18 +91,57 @@ enum UITestScenario: String {
 nonisolated enum SubscriptionUITestAccess: String, Sendable {
     case full
     case readOnly = "read-only"
+    case purchaseCancellation = "purchase-cancellation"
+    case purchaseFailure = "purchase-failure"
+    case restoreSuccess = "restore-success"
+    case outage
+    case updatePro = "update-pro"
 }
 
-nonisolated struct UITestSubscriptionEntitlementSource:
-    SubscriptionEntitlementSource {
-    let access: SubscriptionUITestAccess
+nonisolated private enum SubscriptionUITestError: Error { case expected }
 
-    func hasCurrentEntitlement(productIDs: Set<String>) async -> Bool {
-        access == .full
+@MainActor
+struct UITestSubscriptionClient: SubscriptionClient {
+    let configuration: UITestLaunchConfiguration
+
+    func customerInfo() async throws -> SubscriptionCustomerSnapshot {
+        if configuration.subscriptionAccess == .outage {
+            throw SubscriptionUITestError.expected
+        }
+        return .init(hasActiveProEntitlement: configuration.subscriptionAccess == .full)
     }
 
-    func updates(productIDs: Set<String>) async -> AsyncStream<Void> {
-        AsyncStream { continuation in
+    func offerings() async throws -> [SubscriptionPlan] {
+        if configuration.subscriptionAccess == .outage {
+            throw SubscriptionUITestError.expected
+        }
+        return [
+            .init(id: "annual", productID: SubscriptionProduct.yearly, kind: .annual, displayName: "Annual", localizedPrice: "$119.99", subscriptionPeriod: "year"),
+            .init(id: "monthly", productID: SubscriptionProduct.monthly, kind: .monthly, displayName: "Monthly", localizedPrice: "$14.99", subscriptionPeriod: "month"),
+        ]
+    }
+
+    func purchase(planID: String) async throws -> SubscriptionPurchaseResult {
+        switch configuration.subscriptionAccess {
+        case .purchaseCancellation:
+            .init(customer: .init(hasActiveProEntitlement: false), wasCancelled: true)
+        case .purchaseFailure:
+            throw SubscriptionUITestError.expected
+        default:
+            .init(customer: .init(hasActiveProEntitlement: true), wasCancelled: false)
+        }
+    }
+
+    func restorePurchases() async throws -> SubscriptionCustomerSnapshot {
+        .init(hasActiveProEntitlement: true)
+    }
+
+    func customerInfoUpdates() async -> AsyncStream<SubscriptionCustomerSnapshot> {
+        let emitsPro = configuration.subscriptionAccess == .updatePro
+        return AsyncStream { continuation in
+            if emitsPro {
+                continuation.yield(.init(hasActiveProEntitlement: true))
+            }
             continuation.finish()
         }
     }

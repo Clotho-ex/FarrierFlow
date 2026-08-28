@@ -57,10 +57,18 @@ struct InvoiceActionGraph {
         let visitHorse = try #require(visit.visitHorses.first)
         visitHorse.outcomeRawValue = VisitOutcome.serviced.rawValue
         let workItem = ModelFixtures.makeWorkItem(service: service, visitHorse: visitHorse, in: context)
-        let invoice = ModelFixtures.makeInvoice(number: 1, client: client, businessProfile: profile, status: status, paidAt: status == .paid ? Date(timeIntervalSinceReferenceDate: 500) : nil, in: context)
+        let invoice = ModelFixtures.makeInvoice(number: 1, client: client, businessProfile: profile, in: context)
         let invoiceVisit = ModelFixtures.makeInvoiceVisit(invoice: invoice, sourceVisit: visit, in: context)
         _ = try ModelFixtures.makeInvoiceLineItem(invoiceVisit: invoiceVisit, sourceWorkItem: workItem, in: context)
         try DomainGraphValidator.save(context)
+        if status == .paid {
+            try InvoicePaymentUseCase.recordPayment(
+                invoiceID: invoice.persistentModelID,
+                method: .cash,
+                receivedAt: Date(timeIntervalSinceReferenceDate: 500),
+                in: context
+            )
+        }
         return Self(container: container, context: context, invoiceID: invoice.persistentModelID, visitID: visit.persistentModelID, workItemID: workItem.persistentModelID)
     }
 }

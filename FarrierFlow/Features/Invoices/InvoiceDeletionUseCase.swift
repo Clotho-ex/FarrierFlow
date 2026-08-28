@@ -18,7 +18,11 @@ enum InvoiceDeletionUseCase {
             }
             guard try InvoiceDomainRules.validatedStatus(
                 rawValue: invoice.statusRawValue,
-                paidAt: invoice.paidAt
+                payments: invoice.payments,
+                invoiceCurrencyCode: invoice.currencyCode,
+                totalMinorUnits: try InvoiceDomainRules.checkedTotal(
+                    invoice.invoiceVisits.flatMap(\.lineItems).map(\.amountMinorUnits)
+                )
             ) == .unpaid else {
                 throw InvoiceDeletionError.invoicePaid
             }

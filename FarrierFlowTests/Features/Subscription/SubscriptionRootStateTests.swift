@@ -5,10 +5,12 @@ import Testing
 struct SubscriptionRootStateTests {
     @Test(arguments: [
         (SubscriptionAccess.loading, false, SubscriptionRootState.loading),
-        (.readOnly, false, .subscriptionWelcome),
-        (.full, false, .ownerSetup),
-        (.readOnly, true, .app(readOnly: true)),
-        (.full, true, .app(readOnly: false)),
+        (.free, false, .subscriptionWelcome),
+        (.pro, false, .ownerSetup),
+        (.unavailable, false, .subscriptionWelcome),
+        (.free, true, .app(readOnly: true)),
+        (.unavailable, true, .app(readOnly: true)),
+        (.pro, true, .app(readOnly: false)),
     ])
     func rootState(
         access: SubscriptionAccess,

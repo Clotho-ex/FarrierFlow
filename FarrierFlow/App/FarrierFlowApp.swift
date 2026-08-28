@@ -43,9 +43,7 @@ struct FarrierFlowApp: App {
                         )
                     ),
                     subscriptionAccessModel: SubscriptionAccessModel(
-                        source: UITestSubscriptionEntitlementSource(
-                            access: uiTestConfiguration.subscriptionAccess
-                        )
+                        client: UITestSubscriptionClient(configuration: uiTestConfiguration)
                     )
                 )
             }
@@ -65,11 +63,17 @@ struct FarrierFlowApp: App {
                         applicationSupportURL: applicationSupportURL
                     )
                 ),
-                subscriptionAccessModel: SubscriptionAccessModel(
-                    source: StoreKitSubscriptionEntitlementSource()
-                )
+                subscriptionAccessModel: SubscriptionAccessModel(client: Self.subscriptionClient())
             )
         }
+    }
+
+    @MainActor
+    private static func subscriptionClient() -> any SubscriptionClient {
+        guard let key = try? RevenueCatConfiguration.publicSDKKey() else {
+            return UnavailableSubscriptionClient()
+        }
+        return RevenueCatSubscriptionClient(publicSDKKey: key)
     }
 
     var body: some Scene {

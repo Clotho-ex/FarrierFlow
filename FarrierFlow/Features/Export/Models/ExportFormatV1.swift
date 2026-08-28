@@ -22,7 +22,8 @@ nonisolated enum ExportFormatV1 {
         .init(relativePath: "Data/photographs.csv", columns: ["export_id", "photograph_uuid", "created_at_utc", "created_at_local", "pixel_width", "pixel_height", "byte_count", "visit_horse_id", "file_status", "file_name"]),
         .init(relativePath: "Data/services.csv", columns: ["export_id", "name", "default_amount_minor_units", "currency_code", "default_amount_display", "is_archived"]),
         .init(relativePath: "Data/work-items.csv", columns: ["export_id", "service_name_snapshot", "amount_minor_units", "currency_code", "amount_display", "service_id", "visit_horse_id", "invoice_line_item_id"]),
-        .init(relativePath: "Data/invoices.csv", columns: ["export_id", "number", "invoice_date_utc", "invoice_date_local", "due_date_utc", "due_date_local", "note", "status", "paid_at_utc", "paid_at_local", "client_name_snapshot", "client_phone_snapshot", "client_email_snapshot", "business_name_snapshot", "business_phone_snapshot", "business_email_snapshot", "business_address_snapshot", "currency_code", "client_id", "pdf_file_name"]),
+        .init(relativePath: "Data/invoices.csv", columns: ["export_id", "number", "invoice_date_utc", "invoice_date_local", "due_date_utc", "due_date_local", "note", "status", "client_name_snapshot", "client_phone_snapshot", "client_email_snapshot", "business_name_snapshot", "business_phone_snapshot", "business_email_snapshot", "business_address_snapshot", "currency_code", "client_id", "pdf_file_name"]),
+        .init(relativePath: "Data/payments.csv", columns: ["export_id", "invoice_id", "source", "method", "amount_minor_units", "currency_code", "amount_display", "received_at_utc", "received_at_local", "other_description", "reference", "internal_note"]),
         .init(relativePath: "Data/invoice-visits.csv", columns: ["export_id", "visit_date_snapshot_utc", "visit_date_snapshot_local", "service_location_name_snapshot", "service_location_address_snapshot", "invoice_id", "source_visit_id"]),
         .init(relativePath: "Data/invoice-line-items.csv", columns: ["export_id", "horse_name_snapshot", "service_name_snapshot", "amount_minor_units", "currency_code", "amount_display", "invoice_visit_id", "source_work_item_id"]),
     ]
@@ -41,6 +42,7 @@ nonisolated enum ExportEntity: String, Sendable, CaseIterable {
     case service
     case workItem = "work-item"
     case invoice
+    case payment
     case invoiceVisit = "invoice-visit"
     case invoiceLineItem = "invoice-line-item"
 }

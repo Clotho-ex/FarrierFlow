@@ -2,7 +2,7 @@ import SwiftData
 import SwiftUI
 
 private enum InvoiceActionConfirmation {
-    case markPaid
+    case markUnpaid
     case delete
 }
 
@@ -15,6 +15,8 @@ struct InvoiceDetailView: View {
     @State private var actionConfirmation: InvoiceActionConfirmation?
     @State private var shareModel = InvoicePDFShareModel()
     @State private var pdfPreparationTask: Task<Void, Never>?
+    @State private var paymentModel: PaymentRecordingModel?
+    @State private var showsPaymentSheet = false
 
     let invoiceID: PersistentIdentifier
 
@@ -60,59 +62,41 @@ struct InvoiceDetailView: View {
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Menu("Invoice Actions", systemImage: "ellipsis.circle") {
-                    Button("Share Invoice", systemImage: "square.and.arrow.up") {
-                        preparePDF()
-                    }
-                    .disabled(shareModel.isPreparing)
-                    .accessibilityIdentifier("invoice-share-pdf-action")
-
-                    if subscription.allowsMutations, model.canMarkPaid {
-                        Button("Mark Paid", systemImage: "checkmark.circle") {
-                            actionConfirmation = .markPaid
-                        }
-                        .accessibilityIdentifier("invoice-mark-paid-action")
-                    }
-
-                    if subscription.allowsMutations, model.canDelete {
-                        Divider()
-                        Button("Delete Invoice", systemImage: "trash", role: .destructive) {
-                            actionConfirmation = .delete
-                        }
-                        .accessibilityIdentifier("invoice-delete-action")
-                    }
+                Button("Share Invoice", systemImage: "square.and.arrow.up") {
+                    preparePDF()
                 }
-                .accessibilityIdentifier("invoice-actions-menu")
-                .alert(
-                    actionConfirmationTitle,
-                    isPresented: actionConfirmationPresented,
-                    presenting: actionConfirmation
-                ) { confirmation in
-                    switch confirmation {
-                    case .markPaid:
-                        Button("Mark Paid") {
-                            guard subscription.allowsMutations else { return }
-                            model.markPaid(in: context)
-                        }
-                        .accessibilityIdentifier("invoice-mark-paid-confirmation")
-                        Button("Cancel", role: .cancel) { }
-                    case .delete:
-                        Button("Delete Invoice", role: .destructive) {
-                            guard subscription.allowsMutations else { return }
-                            model.delete(in: context)
-                            if model.didDelete { dismiss() }
-                        }
-                        .accessibilityIdentifier("invoice-delete-confirmation")
-                        Button("Cancel", role: .cancel) { }
-                    }
-                } message: { confirmation in
-                    switch confirmation {
-                    case .markPaid:
-                        Text("This records today’s payment date and cannot be undone.")
-                    case .delete:
-                        Text("Recorded work stays in FarrierFlow and can be added to another invoice.")
-                    }
+                .disabled(shareModel.isPreparing)
+                .accessibilityIdentifier("invoice-share-pdf-action")
+            }
+        }
+        .alert(
+            actionConfirmationTitle,
+            isPresented: actionConfirmationPresented,
+            presenting: actionConfirmation
+        ) { confirmation in
+            switch confirmation {
+            case .markUnpaid:
+                Button("Mark as Unpaid", role: .destructive) {
+                    guard subscription.allowsMutations else { return }
+                    model.markUnpaid(in: context)
                 }
+                .accessibilityIdentifier("invoice-mark-unpaid-confirmation")
+                Button("Cancel", role: .cancel) { }
+            case .delete:
+                Button("Delete Invoice", role: .destructive) {
+                    guard subscription.allowsMutations else { return }
+                    model.delete(in: context)
+                    if model.didDelete { dismiss() }
+                }
+                .accessibilityIdentifier("invoice-delete-confirmation")
+                Button("Cancel", role: .cancel) { }
+            }
+        } message: { confirmation in
+            switch confirmation {
+            case .markUnpaid:
+                Text("This removes the recorded payment and makes the invoice outstanding again.")
+            case .delete:
+                Text("Recorded work stays in FarrierFlow and can be added to another invoice.")
             }
         }
         .alert(item: $model.alert) {
@@ -135,6 +119,13 @@ struct InvoiceDetailView: View {
                 }
             }
         }
+        .sheet(isPresented: $showsPaymentSheet, onDismiss: reload) {
+            if let paymentModel {
+                PaymentRecordingView(model: paymentModel) {
+                    showsPaymentSheet = false
+                }
+            }
+        }
         .task(id: invoiceID, reload)
         .onDisappear(perform: cancelPDFPreparation)
     }
@@ -153,9 +144,11 @@ struct InvoiceDetailView: View {
                 InvoiceMetadataSection(
                     invoiceDate: detail.invoiceDate,
                     dueDate: detail.dueDate,
-                    paidAt: detail.paidAt,
                     locale: locale
                 )
+                if let payment = detail.payment {
+                    InvoicePaymentSection(payment: payment)
+                }
                 InvoiceContactSection(
                     title: "Bill To",
                     name: detail.clientName,
@@ -180,6 +173,9 @@ struct InvoiceDetailView: View {
                     email: detail.businessEmail,
                     address: detail.businessAddress
                 )
+                if subscription.allowsMutations {
+                    invoiceActions(detail)
+                }
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 28)
@@ -187,6 +183,35 @@ struct InvoiceDetailView: View {
         }
         .background(Color(uiColor: .systemBackground))
         .accessibilityIdentifier("invoice-detail-\(detail.number)")
+    }
+
+    @ViewBuilder
+    private func invoiceActions(_ detail: InvoiceDetail) -> some View {
+        if detail.status == .unpaid, case .available(let amount) = detail.total {
+            Button("Mark as Paid") {
+                paymentModel = PaymentRecordingModel(
+                    invoiceID: invoiceID,
+                    amountMinorUnits: amount,
+                    currencyCode: detail.currencyCode
+                )
+                showsPaymentSheet = true
+            }
+            .buttonStyle(.borderedProminent)
+            .frame(maxWidth: .infinity)
+            .accessibilityIdentifier("invoice-mark-paid-action")
+
+            Button("Delete Invoice", role: .destructive) {
+                actionConfirmation = .delete
+            }
+            .frame(maxWidth: .infinity)
+            .accessibilityIdentifier("invoice-delete-action")
+        } else if detail.status == .paid {
+            Button("Mark as Unpaid", role: .destructive) {
+                actionConfirmation = .markUnpaid
+            }
+            .frame(maxWidth: .infinity)
+            .accessibilityIdentifier("invoice-mark-unpaid-action")
+        }
     }
 
     private func formattedTotal(_ total: MoneyAvailability) -> String {
@@ -223,8 +248,8 @@ struct InvoiceDetailView: View {
 
     private var actionConfirmationTitle: LocalizedStringKey {
         switch actionConfirmation {
-        case .markPaid:
-            "Mark Invoice Paid?"
+        case .markUnpaid:
+            "Mark Invoice Unpaid?"
         case .delete:
             "Delete Invoice?"
         case nil:
@@ -321,7 +346,6 @@ private struct InvoiceDetailHeader: View {
 private struct InvoiceMetadataSection: View {
     let invoiceDate: Date
     let dueDate: Date?
-    let paidAt: Date?
     let locale: Locale
 
     var body: some View {
@@ -330,10 +354,6 @@ private struct InvoiceMetadataSection: View {
             if let dueDate {
                 Divider()
                 metadataRow("Due Date", date: dueDate)
-            }
-            if let paidAt {
-                Divider()
-                metadataRow("Payment Date", date: paidAt)
             }
         }
         .padding(.vertical, 4)
@@ -347,6 +367,103 @@ private struct InvoiceMetadataSection: View {
                 .fontWeight(.semibold)
                 .foregroundStyle(.secondary)
         }
+    }
+}
+
+private struct InvoicePaymentSection: View {
+    @Environment(\.locale) private var locale
+    let payment: PaymentDetail
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Payment")
+                .font(.headline)
+            LabeledContent("Paid Amount", value: formattedAmount)
+            LabeledContent("Payment Date") {
+                Text(payment.receivedAt, format: .dateTime.month(.abbreviated).day().year().locale(locale))
+            }
+            LabeledContent("Method", value: methodDescription)
+            if let reference = payment.reference {
+                LabeledContent("Reference", value: reference)
+            }
+            if let note = payment.note {
+                LabeledContent("Internal Note", value: note)
+            }
+        }
+        .accessibilityIdentifier("invoice-payment-details")
+    }
+
+    private var formattedAmount: String {
+        MoneyFormatter.usd(minorUnits: payment.amountMinorUnits, locale: locale)
+            ?? String(localized: "Unavailable", locale: locale)
+    }
+
+    private var methodDescription: String {
+        [payment.method.displayName, payment.otherDescription]
+            .compactMap { $0 }
+            .joined(separator: ": ")
+    }
+}
+
+private struct PaymentRecordingView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.locale) private var locale
+    @Environment(\.modelContext) private var context
+    @Bindable var model: PaymentRecordingModel
+    let onRecorded: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Payment") {
+                    Picker("Payment Method", selection: $model.draft.method) {
+                        Text("Choose Method").tag(PaymentMethod?.none)
+                        ForEach(PaymentMethod.allCases, id: \.self) { method in
+                            Text(method.displayName).tag(Optional(method))
+                        }
+                    }
+                    .accessibilityIdentifier("payment-method-picker")
+                    LabeledContent("Amount", value: formattedAmount)
+                        .accessibilityIdentifier("payment-amount")
+                    DatePicker("Date", selection: $model.draft.receivedAt, displayedComponents: .date)
+                        .accessibilityIdentifier("payment-date")
+                    if model.draft.method == .other {
+                        TextField("Describe Payment Method", text: $model.draft.otherDescription)
+                            .accessibilityIdentifier("payment-other-description")
+                    }
+                }
+                Section("Details") {
+                    TextField("Reference (Optional)", text: $model.draft.reference)
+                        .accessibilityIdentifier("payment-reference")
+                    TextField("Internal Note (Optional)", text: $model.draft.note, axis: .vertical)
+                        .lineLimit(2...5)
+                        .accessibilityIdentifier("payment-note")
+                }
+            }
+            .navigationTitle("Record Payment")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Confirm Payment") {
+                        model.confirm(in: context)
+                        if model.didRecord { onRecorded() }
+                    }
+                    .disabled(!model.canConfirm)
+                    .accessibilityIdentifier("payment-confirm")
+                }
+            }
+            .alert(item: $model.alert) {
+                Alert(title: Text($0.title), message: Text($0.message))
+            }
+        }
+    }
+
+    private var formattedAmount: String {
+        MoneyFormatter.usd(minorUnits: model.draft.amountMinorUnits, locale: locale)
+            ?? String(localized: "Unavailable", locale: locale)
     }
 }
 
