@@ -76,7 +76,7 @@ struct TodayView: View {
         List {
             if !subscription.allowsMutations, subscription.access != .loading {
                 Section {
-                    SubscriptionReadOnlyNotice {
+                    SubscriptionReadOnlyNotice(access: subscription.access) {
                         path.append(SubscriptionRoute.store)
                     }
                 }

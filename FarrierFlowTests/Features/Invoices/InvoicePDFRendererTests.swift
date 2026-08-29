@@ -224,4 +224,79 @@ struct InvoicePDFRendererTests {
             #expect(text.contains(marker))
         }
     }
+
+    @Test func paginatesLongPaymentMetadataAndKeepsFollowingContentInBounds() throws {
+        let otherMarkers = (0..<80).map { String(format: "PAYMENT-OTHER-MARKER-%03d", $0) }
+        let referenceMarkers = (0..<80).map {
+            String(format: "PAYMENT-REFERENCE-MARKER-%03d", $0)
+        }
+        let content = InvoicePDFContent(
+            number: "0148",
+            invoiceDate: Date(timeIntervalSinceReferenceDate: 1_000),
+            dueDate: nil,
+            status: .paid,
+            payment: .init(
+                amountMinorUnits: 12_500,
+                receivedAt: Date(timeIntervalSinceReferenceDate: 2_000),
+                method: .other,
+                otherDescription: otherMarkers.joined(separator: "\n"),
+                reference: referenceMarkers.joined(separator: "\n")
+            ),
+            currencyCode: "USD",
+            businessName: "Carter Farrier Service",
+            businessPhone: nil,
+            businessEmail: nil,
+            businessAddress: nil,
+            clientName: "PAYMENT-PAGINATION-CLIENT",
+            clientPhone: nil,
+            clientEmail: nil,
+            visits: [
+                .init(
+                    date: Date(timeIntervalSinceReferenceDate: 3_000),
+                    location: "PAYMENT-PAGINATION-LOCATION",
+                    address: nil,
+                    lineItems: [
+                        .init(
+                            horseName: "PAYMENT-PAGINATION-HORSE",
+                            serviceName: "PAYMENT-PAGINATION-SERVICE",
+                            amountMinorUnits: 12_500
+                        ),
+                    ]
+                ),
+            ],
+            totalMinorUnits: 12_500,
+            note: nil
+        )
+
+        let document = try #require(PDFDocument(data: InvoicePDFRenderer().render(content)))
+        let text = document.string ?? ""
+        #expect(document.pageCount > 1)
+
+        func requireInBounds(_ expected: String) throws {
+            let selection = try #require(
+                document.findString(expected, withOptions: []).first,
+                "Missing visible PDF text: \(expected)"
+            )
+            let page = try #require(selection.pages.first)
+            #expect(
+                page.bounds(for: .mediaBox).contains(selection.bounds(for: page)),
+                "PDF text escaped its page: \(expected)"
+            )
+        }
+
+        for marker in otherMarkers + referenceMarkers {
+            #expect(text.contains(marker))
+        }
+        for expected in [
+            "PAYMENT-OTHER-MARKER-079",
+            "PAYMENT-REFERENCE-MARKER-079",
+            "Bill To",
+            "PAYMENT-PAGINATION-CLIENT",
+            "PAYMENT-PAGINATION-LOCATION",
+            "PAYMENT-PAGINATION-HORSE",
+            "PAYMENT-PAGINATION-SERVICE",
+        ] {
+            try requireInBounds(expected)
+        }
+    }
 }

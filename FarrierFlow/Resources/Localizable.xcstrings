@@ -813,6 +813,9 @@
     "FarrierFlow couldn’t open its local records. Close the app and try again." : {
 
     },
+    "FarrierFlow couldn’t verify your subscription. Try again." : {
+
+    },
     "Finish Business Setup" : {
 
     },
@@ -990,6 +993,9 @@
       "comment" : "Progress label while the Service catalog loads."
     },
     "Loading Setup…" : {
+
+    },
+    "Loading Subscription Plans…" : {
 
     },
     "Loading Visit…" : {
@@ -1551,6 +1557,9 @@
     "Subscription Required" : {
 
     },
+    "Subscription Status Unavailable" : {
+
+    },
     "Subtotal" : {
       "comment" : "Checked subtotal of one horse's WorkItems in the Visit editor."
     },
@@ -1877,6 +1886,9 @@
       "comment" : "Error explanation when saving Visit progress or a completed correction fails."
     },
     "Your existing records remain available. Subscribe to make changes." : {
+
+    },
+    "Your existing records remain available read only. Try again from Subscription." : {
 
     },
     "Your field book, ready once" : {

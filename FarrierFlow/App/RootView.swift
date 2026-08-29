@@ -44,6 +44,8 @@ struct RootView: View {
                     ProgressView("Loading FarrierFlow…")
                 case .subscriptionWelcome:
                     SubscriptionWelcomeView()
+                case .subscriptionUnavailable:
+                    SubscriptionWelcomeView()
                 case .ownerSetup:
                     OwnerSetupView(model: setupModel) {
                     }

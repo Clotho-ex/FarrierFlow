@@ -257,18 +257,20 @@ final class TodayModel {
     private func unpaidInvoiceSummaries(
         in context: ModelContext
     ) throws -> [TodayUnpaidInvoiceSummary] {
-        let unpaid = InvoiceStatus.unpaid.rawValue
         return try context.fetch(
             FetchDescriptor<Invoice>(
-                predicate: #Predicate { $0.statusRawValue == unpaid },
                 sortBy: [SortDescriptor(\.invoiceDate)]
             )
-        ).map {
-            TodayUnpaidInvoiceSummary(
+        ).compactMap {
+            let summary = try InvoiceProjection.summary(from: $0, locale: .current)
+            guard summary.status == .unpaid else {
+                return nil
+            }
+            return TodayUnpaidInvoiceSummary(
                 id: $0.persistentModelID,
                 number: $0.number,
-                clientName: $0.clientNameSnapshot,
-                invoiceDate: $0.invoiceDate
+                clientName: summary.clientName,
+                invoiceDate: summary.invoiceDate
             )
         }.sorted { left, right in
             if left.invoiceDate != right.invoiceDate {

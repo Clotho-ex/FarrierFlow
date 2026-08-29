@@ -19,8 +19,10 @@ stores.
 
 **Status:** The repository implementation includes RevenueCat-backed
 subscription access and structured manual payment tracking. RevenueCat/App
-Store configuration, updated App Privacy, public-policy deployment,
-physical-device TestFlight acceptance, and submission remain external gates.
+Store product configuration, App Privacy, server notifications, and the public
+Privacy Policy are complete. Physical-device sandbox/TestFlight acceptance,
+release-candidate upload, remaining listing material, and submission remain
+external gates.
 
 ### Outcome
 
@@ -81,16 +83,18 @@ features.
   `https://farrierflow.vercel.app/privacy/` and
   `https://farrierflow.vercel.app/support/`. Both returned HTTP 200 without
   authentication on 2026-08-15, and both verified URLs were entered in App
-  Store Connect on 2026-08-18.
+  Store Connect on 2026-08-18. The RevenueCat Purchase History disclosure was
+  deployed and verified on 2026-08-28.
 - On 2026-08-18, App Store Connect saved the prepared subtitle, promotional
   text, description, keywords, Support URL, Business category, review notes,
-  account-free sign-in setting, and 4+ age rating; the prior App Privacy answer
-  **Data Not Collected** must be replaced with RevenueCat Purchase History for
-  App Functionality and Analytics; configured a free United States launch matching both
-  subscriptions; and disabled Mac and Vision Pro availability for the
+  account-free sign-in setting, and 4+ age rating; configured a free United
+  States launch matching both subscriptions; and disabled Mac and Vision Pro availability for the
   iPhone-only 1.0 scope. Both monthly and yearly product review screenshots
   were uploaded and both products were added to the version 1.0 draft, where
-  they report **Ready for Review**. Copyright, exact review contact, Content
+  they report **Ready for Review**. On 2026-08-28, App Privacy was republished
+  with RevenueCat Purchase History for App Functionality and Analytics, not
+  linked to identity and not used for tracking; the `FarrierFlow Pro` group was
+  also added to the draft. Copyright, exact review contact, Content
   Rights, final release-behavior confirmation, and App Store product-page
   screenshots remain incomplete. The current sanitized 1206 x 2622 asset is
   compatible with the 6.3-inch screenshot slot, but Chrome file-chooser access
@@ -581,8 +585,8 @@ work resumes.
 
 ### Slice 9 — RevenueCat Subscription
 
-**Status:** Implemented locally; production dashboard and sandbox/TestFlight
-acceptance remain external.
+**Status:** Implemented locally; production RevenueCat/App Store configuration
+is complete. Sandbox/TestFlight purchase-lifecycle acceptance remains external.
 
 Apple remains processor. RevenueCat owns receipt/entitlement service behavior
 behind `SubscriptionClient`; FarrierFlow owns access/paywall projections. The

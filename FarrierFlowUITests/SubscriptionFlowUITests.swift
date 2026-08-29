@@ -95,10 +95,30 @@ final class SubscriptionFlowUITests: XCTestCase {
     }
 
     @MainActor
-    private func launch(storeName: String, scenario: String? = nil) -> XCUIApplication {
+    func testOutageWithExistingProfileDoesNotClaimSubscriptionIsRequired() {
+        let app = launch(
+            storeName: "SubscriptionOutage-\(UUID().uuidString)",
+            access: "outage"
+        )
+        defer { app.terminate() }
+
+        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            app.staticTexts["Subscription Status Unavailable"]
+                .waitForExistence(timeout: 3)
+        )
+        XCTAssertFalse(app.staticTexts["Subscription Required"].exists)
+    }
+
+    @MainActor
+    private func launch(
+        storeName: String,
+        scenario: String? = nil,
+        access: String = "read-only"
+    ) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] = storeName
-        app.launchEnvironment["FARRIERFLOW_UI_TEST_SUBSCRIPTION_ACCESS"] = "read-only"
+        app.launchEnvironment["FARRIERFLOW_UI_TEST_SUBSCRIPTION_ACCESS"] = access
         if let scenario {
             app.launchEnvironment["FARRIERFLOW_UI_TEST_SCENARIO"] = scenario
         }

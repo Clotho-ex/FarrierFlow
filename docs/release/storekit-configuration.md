@@ -5,9 +5,9 @@
 `FarrierFlow.storekit` remains the checked-in Apple product-contract fixture;
 production purchases are performed by RevenueCat. The project resolves the
 stable `RevenueCat` package product (not `RevenueCatUI`) and reads the public
-Apple SDK key from `RevenueCatPublicSDKKey`, generated from the
-`REVENUECAT_PUBLIC_SDK_KEY` build setting. The repository stores no dashboard
-credential or secret.
+Apple SDK key from `RevenueCatPublicSDKKey`, processed by
+`FarrierFlow/Info.plist` from the `REVENUECAT_PUBLIC_SDK_KEY` build setting. The
+repository stores no dashboard credential or secret.
 
 Resolution on 2026-08-28 selected stable Purchases iOS `5.87.1` (revision
 `b65cae4f227be800c57cb9700dbd94f2aa5409b2`) after querying current upstream

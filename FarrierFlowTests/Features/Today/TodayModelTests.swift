@@ -268,6 +268,29 @@ struct TodayModelTests {
     }
 
     @Test
+    func invalidUnpaidInvoicePaymentEvidenceFailsTheTodayLoad() throws {
+        let graph = try InvoiceActionGraph.make()
+        let invoice = try #require(graph.context.model(for: graph.invoiceID) as? Invoice)
+        let workItem = try #require(graph.context.model(for: graph.workItemID) as? WorkItem)
+        graph.context.insert(Payment(
+            amountMinorUnits: workItem.amountMinorUnits,
+            currencyCode: "USD",
+            receivedAt: .now,
+            method: .cash,
+            invoice: invoice
+        ))
+        try graph.context.save()
+        #expect(invoice.statusRawValue == InvoiceStatus.unpaid.rawValue)
+        #expect(invoice.payments.count == 1)
+
+        let model = TodayModel()
+        model.load(in: graph.context, now: .now, calendar: .current)
+
+        #expect(model.loadState == .failed)
+        #expect(model.primaryAction == .scheduleAppointment)
+    }
+
+    @Test
     func horseSummaryKeepsShortListsAndCondensesLongLists() {
         let shortSummary = TodayHorseSummary(horseNames: ["Iris", "Milo"])
         #expect(shortSummary.visibleHorseNames == ["Iris", "Milo"])

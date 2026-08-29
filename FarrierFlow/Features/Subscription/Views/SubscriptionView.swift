@@ -27,6 +27,26 @@ struct SubscriptionView: View {
                         .foregroundStyle(.green)
                         .accessibilityIdentifier("subscription-active-pro")
                 }
+            } else if subscription.access == .unavailable {
+                Section {
+                    ContentUnavailableView {
+                        Label(
+                            "Subscription Status Unavailable",
+                            systemImage: "wifi.exclamationmark"
+                        )
+                    } description: {
+                        Text("FarrierFlow couldn’t verify your subscription. Try again.")
+                    } actions: {
+                        Button("Retry") { Task { await subscription.refresh() } }
+                            .accessibilityIdentifier("subscription-retry")
+                    }
+                }
+            } else if subscription.planLoadState == .loading {
+                Section {
+                    ProgressView("Loading Subscription Plans…")
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .accessibilityIdentifier("subscription-plans-loading")
+                }
             } else if subscription.paywallIsAvailable {
                 Section {
                     ForEach(subscription.plans) { plan in
@@ -56,7 +76,8 @@ struct SubscriptionView: View {
                 }
             }
 
-            if let errorMessage = subscription.errorMessage {
+            if let errorMessage = subscription.errorMessage,
+               subscription.access != .unavailable {
                 Section {
                     Text(errorMessage)
                         .foregroundStyle(.secondary)
@@ -99,7 +120,9 @@ struct SubscriptionView: View {
         }
         .manageSubscriptionsSheet(isPresented: $presentsManageSubscriptions)
         .task {
-            if subscription.plans.isEmpty { await subscription.refresh() }
+            if subscription.planLoadState == .loading {
+                await subscription.refresh()
+            }
         }
     }
 

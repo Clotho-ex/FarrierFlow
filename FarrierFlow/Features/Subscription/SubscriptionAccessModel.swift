@@ -6,14 +6,18 @@ import Synchronization
 final class SubscriptionAccessModel {
     private let client: any SubscriptionClient
     private nonisolated let observationTask = Mutex<Task<Void, Never>?>(nil)
+    @ObservationIgnored private var refreshTask: Task<Void, Never>?
 
     private(set) var access: SubscriptionAccess = .loading
     private(set) var plans: [SubscriptionPlan] = []
+    private(set) var planLoadState: SubscriptionPlanLoadState = .loading
     private(set) var operation: SubscriptionOperation = .idle
     private(set) var errorMessage: String?
 
     var allowsMutations: Bool { access.allowsMutations }
-    var paywallIsAvailable: Bool { plans.count == 2 }
+    var paywallIsAvailable: Bool {
+        planLoadState == .available && plans.count == 2
+    }
 
     init(client: any SubscriptionClient) {
         self.client = client
@@ -23,8 +27,8 @@ final class SubscriptionAccessModel {
         guard observationTask.withLock({ $0 == nil }) else { return }
         let client = client
         let task = Task { [weak self, client] in
-            await self?.refresh()
             let updates = await client.customerInfoUpdates()
+            await self?.refresh()
             for await snapshot in updates {
                 guard !Task.isCancelled else { return }
                 self?.apply(snapshot)
@@ -34,14 +38,34 @@ final class SubscriptionAccessModel {
     }
 
     func refresh() async {
+        if let refreshTask {
+            await refreshTask.value
+            return
+        }
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.performRefresh()
+        }
+        refreshTask = task
+        await task.value
+        refreshTask = nil
+    }
+
+    private func performRefresh() async {
+        let verificationFailed: Bool
         do {
             apply(try await client.customerInfo())
             errorMessage = nil
+            verificationFailed = false
         } catch {
             if access == .loading { access = .unavailable }
             errorMessage = "FarrierFlow couldn’t verify your subscription. Try again."
+            verificationFailed = true
         }
         await reloadOfferings()
+        if verificationFailed {
+            errorMessage = "FarrierFlow couldn’t verify your subscription. Try again."
+        }
     }
 
     func purchase(planID: String) async {
@@ -74,10 +98,13 @@ final class SubscriptionAccessModel {
     }
 
     private func reloadOfferings() async {
+        planLoadState = .loading
         do {
             plans = try SubscriptionPlanRules.validated(try await client.offerings())
+            planLoadState = .available
         } catch {
             plans = []
+            planLoadState = .unavailable
             errorMessage = "Subscription plans are unavailable. Try again."
         }
     }

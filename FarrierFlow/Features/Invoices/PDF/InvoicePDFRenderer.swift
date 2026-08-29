@@ -232,26 +232,73 @@ nonisolated struct InvoicePDFRenderer {
                 let keyWidth: CGFloat = 142
                 let valueWidth = contentWidth - keyWidth
                 let keyHeight = textHeight(key, font: label, width: keyWidth)
-                let valueHeight = textHeight(value, font: regular, width: valueWidth)
-                let rowHeight = max(keyHeight, valueHeight)
-                drawText(
-                    key,
-                    in: CGRect(x: margin, y: y, width: keyWidth, height: rowHeight),
-                    font: label,
-                    color: secondaryInk
+                let rowSpacing: CGFloat = 8
+                let attributedValue = NSAttributedString(
+                    string: value,
+                    attributes: attributes(regular, alignment: .right)
                 )
-                drawText(
-                    value,
-                    in: CGRect(
-                        x: margin + keyWidth,
-                        y: y,
-                        width: valueWidth,
-                        height: rowHeight
-                    ),
-                    font: regular,
-                    alignment: .right
-                )
-                y += rowHeight + 8
+                let framesetter = CTFramesetterCreateWithAttributedString(attributedValue)
+                let fullRange = NSRange(location: 0, length: attributedValue.length)
+                var remainingRange = fullRange
+
+                while remainingRange.length > 0 {
+                    let minimumRowHeight = max(keyHeight, ceil(regular.lineHeight))
+                    if y + minimumRowHeight + rowSpacing > contentBottom {
+                        startPage()
+                        continue
+                    }
+                    var fittedRange = CFRange()
+                    let fittedSize = CTFramesetterSuggestFrameSizeWithConstraints(
+                        framesetter,
+                        CFRange(
+                            location: remainingRange.location,
+                            length: remainingRange.length
+                        ),
+                        nil,
+                        CGSize(
+                            width: valueWidth,
+                            height: contentBottom - y - rowSpacing - 1
+                        ),
+                        &fittedRange
+                    )
+                    guard fittedRange.length > 0 else {
+                        startPage()
+                        continue
+                    }
+                    let fragmentRange = NSRange(
+                        location: fittedRange.location,
+                        length: fittedRange.length
+                    )
+                    let fragment = (value as NSString).substring(with: fragmentRange)
+                    let availableRowHeight = contentBottom - y - rowSpacing
+                    let valueHeight = min(availableRowHeight, ceil(fittedSize.height))
+                    let rowHeight = max(keyHeight, valueHeight)
+                    drawText(
+                        key,
+                        in: CGRect(x: margin, y: y, width: keyWidth, height: rowHeight),
+                        font: label,
+                        color: secondaryInk
+                    )
+                    drawText(
+                        fragment,
+                        in: CGRect(
+                            x: margin + keyWidth,
+                            y: y,
+                            width: valueWidth,
+                            height: rowHeight
+                        ),
+                        font: regular,
+                        alignment: .right
+                    )
+                    y += rowHeight + rowSpacing
+                    remainingRange = NSRange(
+                        location: NSMaxRange(fragmentRange),
+                        length: NSMaxRange(fullRange) - NSMaxRange(fragmentRange)
+                    )
+                    if remainingRange.length > 0 {
+                        startPage()
+                    }
+                }
             }
 
             func drawMetadata() {
@@ -283,25 +330,35 @@ nonisolated struct InvoicePDFRenderer {
             }
 
             func drawBillTo() {
+                let detailHeights = [content.clientPhone, content.clientEmail]
+                    .compactMap { $0 }
+                    .map { textHeight($0, font: secondary, width: contentWidth) }
+                let nameHeight = textHeight(
+                    content.clientName,
+                    font: horseFont,
+                    width: contentWidth
+                )
+                let billToHeight = 21 + nameHeight + 5
+                    + detailHeights.reduce(0) { $0 + $1 + 3 } + 13
+                if y + billToHeight > contentBottom {
+                    startPage()
+                }
                 drawText(
                     billToLabel,
                     in: CGRect(x: margin, y: y, width: contentWidth, height: 18),
                     font: emphasis
                 )
                 y += 21
-                let nameHeight = textHeight(
-                    content.clientName,
-                    font: horseFont,
-                    width: contentWidth
-                )
                 drawText(
                     content.clientName,
                     in: CGRect(x: margin, y: y, width: contentWidth, height: nameHeight),
                     font: horseFont
                 )
                 y += nameHeight + 5
-                for detail in [content.clientPhone, content.clientEmail].compactMap({ $0 }) {
-                    let detailHeight = textHeight(detail, font: secondary, width: contentWidth)
+                for (detail, detailHeight) in zip(
+                    [content.clientPhone, content.clientEmail].compactMap { $0 },
+                    detailHeights
+                ) {
                     drawText(
                         detail,
                         in: CGRect(x: margin, y: y, width: contentWidth, height: detailHeight),

@@ -14,3 +14,9 @@ nonisolated enum SubscriptionOperation: Equatable, Sendable {
     case purchasing(planID: String)
     case restoring
 }
+
+nonisolated enum SubscriptionPlanLoadState: Equatable, Sendable {
+    case loading
+    case available
+    case unavailable
+}

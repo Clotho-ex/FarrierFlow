@@ -4,6 +4,41 @@ import Testing
 @Suite("Invoice payment mutation boundary")
 struct InvoicePaymentMutationBoundaryTests {
     @Test
+    func openPaymentSheetRequiresLiveSubscriptionAccessToConfirm() throws {
+        let files = try swiftSources()
+        let invoiceDetail = try #require(
+            files["Features/Invoices/Views/InvoiceDetailView.swift"]
+        )
+        let paymentAndFollowingViews = try #require(
+            invoiceDetail
+                .split(separator: "private struct PaymentRecordingView", maxSplits: 1)
+                .last
+        )
+        let paymentView = try #require(
+            paymentAndFollowingViews
+                .split(separator: "private struct InvoiceContactSection", maxSplits: 1)
+                .first
+        )
+        let compactSource = paymentView.filter { !$0.isWhitespace }
+
+        #expect(
+            compactSource.contains(
+                "@Environment(SubscriptionAccessModel.self)privatevarsubscription"
+            )
+        )
+        #expect(
+            compactSource.contains(
+                "guardsubscription.allowsMutationselse{return}"
+            )
+        )
+        #expect(
+            compactSource.contains(
+                ".disabled(!subscription.allowsMutations||!model.canConfirm)"
+            )
+        )
+    }
+
+    @Test
     func productionCallersCannotBypassPaymentUseCase() throws {
         let files = try swiftSources()
         let aggregatePath = "Core/Persistence/Schema/Invoice.swift"

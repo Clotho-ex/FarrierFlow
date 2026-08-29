@@ -33,9 +33,22 @@
 		C2E75D6B30164201008B005F /* FarrierFlowUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FarrierFlowUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		F10000000000000000000004 /* Exceptions for "FarrierFlow" folder in "FarrierFlow" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = C2E75D4F301641FF008B005F /* FarrierFlow */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		C2E75D52301641FF008B005F /* FarrierFlow */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				F10000000000000000000004 /* Exceptions for "FarrierFlow" folder in "FarrierFlow" target */,
+			);
 			path = FarrierFlow;
 			sourceTree = "<group>";
 		};
@@ -288,8 +301,8 @@
 				DEVELOPMENT_TEAM = 5SN9TWDXQ4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = FarrierFlow/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take hoof photographs for visit records.";
-				INFOPLIST_KEY_RevenueCatPublicSDKKey = "$(REVENUECAT_PUBLIC_SDK_KEY)";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -330,8 +343,8 @@
 				DEVELOPMENT_TEAM = 5SN9TWDXQ4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = FarrierFlow/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take hoof photographs for visit records.";
-				INFOPLIST_KEY_RevenueCatPublicSDKKey = "$(REVENUECAT_PUBLIC_SDK_KEY)";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

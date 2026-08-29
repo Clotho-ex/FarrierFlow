@@ -409,6 +409,7 @@ private struct PaymentRecordingView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
+    @Environment(SubscriptionAccessModel.self) private var subscription
     @Bindable var model: PaymentRecordingModel
     let onRecorded: () -> Void
 
@@ -448,10 +449,11 @@ private struct PaymentRecordingView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Confirm Payment") {
+                        guard subscription.allowsMutations else { return }
                         model.confirm(in: context)
                         if model.didRecord { onRecorded() }
                     }
-                    .disabled(!model.canConfirm)
+                    .disabled(!subscription.allowsMutations || !model.canConfirm)
                     .accessibilityIdentifier("payment-confirm")
                 }
             }

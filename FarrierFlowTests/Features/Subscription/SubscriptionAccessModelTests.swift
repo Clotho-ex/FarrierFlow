@@ -50,6 +50,31 @@ struct SubscriptionAccessModelTests {
         let model = SubscriptionAccessModel(client: client)
         await model.refresh()
         #expect(model.plans.map(\.kind) == [.annual, .monthly])
+        #expect(model.planLoadState == .available)
+        #expect(model.paywallIsAvailable)
+    }
+
+    @Test func concurrentRefreshKeepsPlansLoadingAndMakesOneOfferingsRequest() async {
+        let client = TestSubscriptionClient(customer: .init(hasActiveProEntitlement: false))
+        client.setPlans([Self.monthly, Self.annual])
+        client.suspendOfferings()
+        let model = SubscriptionAccessModel(client: client)
+
+        let firstRefresh = Task { await model.refresh() }
+        await eventually { client.offeringsRequestCount == 1 }
+        #expect(model.access == .free)
+        #expect(model.planLoadState == .loading)
+
+        let secondRefresh = Task { await model.refresh() }
+        await Task.yield()
+        await Task.yield()
+        #expect(client.offeringsRequestCount == 1)
+
+        client.resumeOfferings()
+        await firstRefresh.value
+        await secondRefresh.value
+
+        #expect(model.planLoadState == .available)
         #expect(model.paywallIsAvailable)
     }
 
@@ -59,6 +84,7 @@ struct SubscriptionAccessModelTests {
         let model = SubscriptionAccessModel(client: client)
         await model.refresh()
         #expect(model.plans.isEmpty)
+        #expect(model.planLoadState == .unavailable)
         #expect(!model.paywallIsAvailable)
         #expect(model.errorMessage != nil)
     }
@@ -156,7 +182,10 @@ private final class TestSubscriptionClient: SubscriptionClient, @unchecked Senda
     private var purchaseError: Error?
     private var restoreCustomer = SubscriptionCustomerSnapshot(hasActiveProEntitlement: false)
     private var continuation: AsyncStream<SubscriptionCustomerSnapshot>.Continuation?
+    private var suspendsOfferings = false
+    private var offeringsContinuations: [CheckedContinuation<[SubscriptionPlan], Error>] = []
     private(set) var customerRequestCount = 0
+    private(set) var offeringsRequestCount = 0
     private(set) var listenerCount = 0
     private(set) var purchasedPlanIDs: [String] = []
 
@@ -170,7 +199,13 @@ private final class TestSubscriptionClient: SubscriptionClient, @unchecked Senda
         if let customerError { throw customerError }
         return customer
     }
-    func offerings() async throws -> [SubscriptionPlan] { offeredPlans }
+    func offerings() async throws -> [SubscriptionPlan] {
+        offeringsRequestCount += 1
+        guard suspendsOfferings else { return offeredPlans }
+        return try await withCheckedThrowingContinuation { continuation in
+            offeringsContinuations.append(continuation)
+        }
+    }
     func purchase(planID: String) async throws -> SubscriptionPurchaseResult {
         purchasedPlanIDs.append(planID)
         if let purchaseError { throw purchaseError }
@@ -185,6 +220,15 @@ private final class TestSubscriptionClient: SubscriptionClient, @unchecked Senda
     }
     func setCustomerError(_ error: Error?) { customerError = error }
     func setPlans(_ plans: [SubscriptionPlan]) { offeredPlans = plans }
+    func suspendOfferings() { suspendsOfferings = true }
+    func resumeOfferings() {
+        suspendsOfferings = false
+        let continuations = offeringsContinuations
+        offeringsContinuations.removeAll()
+        for continuation in continuations {
+            continuation.resume(returning: offeredPlans)
+        }
+    }
     func setPurchaseResult(_ result: SubscriptionPurchaseResult) { purchaseResult = result }
     func setPurchaseError(_ error: Error?) { purchaseError = error }
     func setRestoreCustomer(_ customer: SubscriptionCustomerSnapshot) { restoreCustomer = customer }

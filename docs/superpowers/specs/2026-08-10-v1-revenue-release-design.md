@@ -21,8 +21,9 @@ restore behavior. App Privacy must disclose Purchase History for App
 Functionality and Analytics, not linked to identity and not used for tracking
 under the current anonymous/no-customer-attributes implementation.
 
-**Status:** Commercial decisions approved; implementation contract awaiting
-review
+**Status:** Approved and implemented at repository commit `7d7f44b`; production
+RevenueCat configuration is complete. Sandbox/TestFlight purchase-lifecycle
+acceptance remains external.
 
 **Date:** 2026-08-10
 

@@ -83,6 +83,18 @@ submission.
   simulator builds succeeded; and the source and built privacy manifests,
   string catalog, compiled Default/Dark/tinted App Icon renditions, and
   `git diff --check` passed.
+- [x] On 2026-08-29, revalidate the completed RevenueCat and structured-payment
+  implementation from source boundary `7d7f44b`: iOS 18 and iOS 26 each passed
+  436 discovered unit/integration tests representing 507 parameterized test
+  executions; the focused iOS 18 subscription/payment/relaunch gate passed 3
+  UI tests; the full iOS 26 UI target passed 36 tests; and the explicit
+  schema, persistent-reopen, invoice-generation, and invoice-payment gate
+  passed 34 tests. Both simulator builds succeeded after verifying that the
+  processed app Info.plist contains the configured RevenueCat public Apple SDK
+  key. RevenueCat 5.87.1 was confirmed as the current stable, non-prerelease
+  release and remains resolved exactly in `Package.resolved`. Localization,
+  source and built privacy manifests, StoreKit product contracts, credential
+  and mutation-boundary scans, and `git diff --check` passed.
 - [ ] Capture final App Store screenshots from the shipping candidate, with no
   private customer or account data. The one current sanitized 1206 x 2622
   asset is valid for the 6.3-inch slot, but version 1.0 still has 0 of 10

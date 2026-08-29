@@ -3,11 +3,19 @@ import Testing
 
 @Suite("Subscription root state")
 struct SubscriptionRootStateTests {
+    @Test
+    func unavailableAccessWithoutIdentityDoesNotPresentAFreeSubscriptionConclusion() {
+        #expect(
+            SubscriptionRootRules.state(access: .unavailable, hasIdentity: false)
+                != .subscriptionWelcome
+        )
+    }
+
     @Test(arguments: [
         (SubscriptionAccess.loading, false, SubscriptionRootState.loading),
         (.free, false, .subscriptionWelcome),
         (.pro, false, .ownerSetup),
-        (.unavailable, false, .subscriptionWelcome),
+        (.unavailable, false, .subscriptionUnavailable),
         (.free, true, .app(readOnly: true)),
         (.unavailable, true, .app(readOnly: true)),
         (.pro, true, .app(readOnly: false)),
