@@ -83,6 +83,7 @@ struct NextAppointmentAssistantView: View {
                     Text("Work Date")
                 }
             }
+            .listRowBackground(ColorTokens.surface)
 
             Section("Appointment") {
                 DatePicker(
@@ -98,29 +99,33 @@ struct NextAppointmentAssistantView: View {
                 if !projection.hasFollowUpSuggestion {
                     Text("No selected Horse has a follow-up suggestion. Choose any available start.")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ColorTokens.textSecondary)
                 }
             }
+            .listRowBackground(ColorTokens.surface)
 
             Section("Horses") {
                 ForEach(projection.options) { option in
                     horseRow(option)
                 }
             }
+            .listRowBackground(ColorTokens.surface)
 
             if subscription.allowsMutations, hasSelectableHorse(in: projection) {
                 Section {
                     Button("Continue") {
                         editorSeed = model.makeSeed()
                     }
-                    .buttonStyle(.borderedProminent)
+                    .farrierFlowPrimaryAction()
                     .controlSize(.large)
                     .frame(maxWidth: .infinity)
                     .disabled(model.makeSeed() == nil)
                     .accessibilityIdentifier("next-appointment-continue")
                 }
+                .listRowBackground(ColorTokens.surface)
             }
         }
+        .farrierFlowScrollBackground()
     }
 
     @ViewBuilder
@@ -161,11 +166,11 @@ struct NextAppointmentAssistantView: View {
                 .font(Typography.recordTitle)
             Text(outcomeText(option.outcome))
                 .font(Typography.recordMetadata)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ColorTokens.textSecondary)
             if option.outcome == .serviced, let weeks = option.intervalWeeks {
                 Text("Interval: \(AppointmentIntervalFormatter.string(weeks: weeks, locale: locale))")
                     .font(Typography.recordMetadata)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ColorTokens.textSecondary)
             }
             if let suggestedStart = option.suggestedStart {
                 LabeledContent {
@@ -181,12 +186,12 @@ struct NextAppointmentAssistantView: View {
                       option.unavailabilityReason == nil {
                 Text("Suggestion unavailable")
                     .font(Typography.recordMetadata)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ColorTokens.textSecondary)
             }
             if let reason = option.unavailabilityReason {
                 Text(unavailabilityText(reason, option: option))
                     .font(Typography.recordMetadata)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ColorTokens.textSecondary)
             }
         }
     }

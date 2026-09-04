@@ -19,6 +19,7 @@ struct ServiceListView: View {
                 catalogContent
             }
         }
+        .farrierFlowScreenBackground()
         .navigationTitle("Services")
         .toolbar {
             if subscription.allowsMutations {
@@ -62,27 +63,32 @@ struct ServiceListView: View {
                         }
                         Text("Some services may not be current. Try loading again.")
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ColorTokens.textSecondary)
                     }
+                    .listRowBackground(ColorTokens.surface)
                 }
 
                 if model.activeServices.isEmpty {
                     Section("Active") {
                         Text("No active services. Reactivate an archived service or add a new one.")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ColorTokens.textSecondary)
                     }
+                    .listRowBackground(ColorTokens.surface)
                 } else {
                     Section("Active") {
                         serviceRows(model.activeServices)
                     }
+                    .listRowBackground(ColorTokens.surface)
                 }
 
                 if !model.archivedServices.isEmpty {
                     Section("Archived") {
                         serviceRows(model.archivedServices)
                     }
+                    .listRowBackground(ColorTokens.surface)
                 }
             }
+            .farrierFlowScrollBackground()
         }
     }
 
@@ -99,7 +105,7 @@ struct ServiceListView: View {
     @ViewBuilder
     private func serviceRows(_ services: [Service]) -> some View {
         ForEach(services, id: \.persistentModelID) { service in
-            NavigationLink(value: ServiceRoute.detail(service.persistentModelID)) {
+            RecordNavigationLink(value: ServiceRoute.detail(service.persistentModelID)) {
                 ServiceRow(service: service)
             }
         }

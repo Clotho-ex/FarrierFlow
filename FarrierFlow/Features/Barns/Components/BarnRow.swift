@@ -10,7 +10,7 @@ struct BarnRow: View {
             if let address = barn.address {
                 Text(address)
                     .font(Typography.recordMetadata)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ColorTokens.textSecondary)
             }
         }
         .accessibilityElement(children: .combine)

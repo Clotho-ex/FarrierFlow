@@ -14,11 +14,14 @@ struct OwnerSetupReadinessModelTests {
         model.load(in: context)
         #expect(model.loadState == .loaded)
         #expect(!model.hasValidIdentity)
+        #expect(!model.hasExistingBusinessData)
+        #expect(!model.hasEstablishedWorkspace)
 
         _ = ModelFixtures.makeBusinessProfile(name: "Carter Farrier", in: context)
         try DomainGraphValidator.save(context)
         model.load(in: context)
         #expect(model.hasValidIdentity)
+        #expect(model.hasEstablishedWorkspace)
     }
 
     @Test
@@ -33,5 +36,21 @@ struct OwnerSetupReadinessModelTests {
 
         #expect(model.loadState == .loaded)
         #expect(!model.hasValidIdentity)
+    }
+
+    @Test
+    func existingBusinessRecordsEstablishAWorkspaceWithoutAValidProfile() throws {
+        let container = try ModelContainerFactory.inMemoryTest()
+        let context = container.mainContext
+        context.insert(ModelFixtures.makeClient())
+        try DomainGraphValidator.save(context)
+        let model = OwnerSetupReadinessModel()
+
+        model.load(in: context)
+
+        #expect(model.loadState == .loaded)
+        #expect(!model.hasValidIdentity)
+        #expect(model.hasExistingBusinessData)
+        #expect(model.hasEstablishedWorkspace)
     }
 }

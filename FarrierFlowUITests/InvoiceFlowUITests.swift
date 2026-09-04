@@ -74,7 +74,7 @@ final class InvoiceFlowUITests: XCTestCase {
         let invoicesBackButton = app.navigationBars.buttons["Clients"]
         invoicesBackButton.tap()
 
-        let clientRow = app.staticTexts["client-row-Invoice Client"]
+        let clientRow = app.buttons["client-row-Invoice Client"]
         if !clientRow.waitForExistence(timeout: 2), invoicesBackButton.exists {
             invoicesBackButton.tap()
         }
@@ -134,6 +134,9 @@ final class InvoiceFlowUITests: XCTestCase {
         for _ in 0..<4 where !markPaid.exists { detail.swipeUp() }
         XCTAssertTrue(markPaid.waitForExistence(timeout: 3))
         XCTAssertTrue(app.buttons["invoice-delete-action"].exists)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["invoice-first-payment-hint"].exists
+        )
 
         markPaid.tap()
         XCTAssertTrue(app.navigationBars["Record Payment"].waitForExistence(timeout: 3))
@@ -189,9 +192,9 @@ final class InvoiceFlowUITests: XCTestCase {
 
         app.navigationBars.buttons["Invoices"].tap()
         app.navigationBars.buttons["Clients"].tap()
-        app.staticTexts["client-row-Invoice Client"].tap()
+        app.buttons["client-row-Invoice Client"].tap()
         XCTAssertTrue(app.buttons["client-invoice-0001"].waitForExistence(timeout: 3))
-        app.staticTexts["horse-row-Milo"].tap()
+        app.buttons["horse-row-Milo"].tap()
         let history = app.descendants(matching: .any)["horse-history-visit-Milo"].firstMatch
         XCTAssertTrue(history.waitForExistence(timeout: 3))
         history.tap()
@@ -212,6 +215,9 @@ final class InvoiceFlowUITests: XCTestCase {
         XCTAssertTrue(correction.waitForExistence(timeout: 3))
         correction.buttons["invoice-mark-unpaid-confirmation"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Status, Unpaid"].waitForExistence(timeout: 3))
+        XCTAssertFalse(
+            app.descendants(matching: .any)["invoice-first-payment-hint"].exists
+        )
 
         app.terminate()
         app.launch()
@@ -228,8 +234,8 @@ final class InvoiceFlowUITests: XCTestCase {
         defer { app.terminate() }
 
         openClients(in: app)
-        app.staticTexts["client-row-Invoice Client"].tap()
-        app.staticTexts["horse-row-Milo"].tap()
+        app.buttons["client-row-Invoice Client"].tap()
+        app.buttons["horse-row-Milo"].tap()
         let history = app.descendants(matching: .any)["horse-history-visit-Milo"].firstMatch
         XCTAssertTrue(history.waitForExistence(timeout: 3))
         history.tap()

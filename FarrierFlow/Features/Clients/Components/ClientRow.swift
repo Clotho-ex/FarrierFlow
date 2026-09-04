@@ -10,7 +10,7 @@ struct ClientRow: View {
             if let phone = client.phone {
                 Text(phone)
                     .font(Typography.recordMetadata)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ColorTokens.textSecondary)
             }
         }
         .accessibilityElement(children: .combine)

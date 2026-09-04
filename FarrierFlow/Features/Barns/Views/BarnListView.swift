@@ -23,12 +23,15 @@ struct BarnListView: View {
                 }
             } else {
                 List(model.barns, id: \.persistentModelID) { barn in
-                    NavigationLink(value: BarnRoute.detail(barn.persistentModelID)) {
+                    RecordNavigationLink(value: BarnRoute.detail(barn.persistentModelID)) {
                         BarnRow(barn: barn)
                     }
+                    .listRowBackground(ColorTokens.surface)
                 }
+                .farrierFlowScrollBackground()
             }
         }
+        .farrierFlowScreenBackground()
         .navigationTitle("Service Locations")
         .toolbar {
                 if subscription.allowsMutations {

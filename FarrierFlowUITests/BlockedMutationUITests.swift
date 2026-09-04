@@ -16,7 +16,7 @@ final class BlockedMutationUITests: XCTestCase {
         createBarn(firstBarn, in: app)
         createBarn(secondBarn, in: app)
         app.navigationBars.buttons["Clients"].tap()
-        app.staticTexts["client-row-\(clientName)"].tap()
+        app.buttons["client-row-\(clientName)"].tap()
         createHorse(horseName, barnName: firstBarn, in: app)
         scheduleAppointment(horseName: horseName, barnName: firstBarn, in: app)
 
@@ -25,9 +25,15 @@ final class BlockedMutationUITests: XCTestCase {
         XCTAssertTrue(
             horseRow.waitForExistence(timeout: 3)
         )
-        horseRow.tap()
+        guard tapUntilDestinationAppears(
+            horseRow,
+            destination: app.buttons["Edit"]
+        ) else { return }
 
-        app.buttons["Edit"].tap()
+        guard tapUntilDestinationAppears(
+            app.buttons["Edit"],
+            destination: app.buttons["horse-barn-picker"]
+        ) else { return }
         app.buttons["horse-barn-picker"].tap()
         app.buttons[secondBarn].tap()
         app.buttons["Save"].tap()
@@ -43,17 +49,32 @@ final class BlockedMutationUITests: XCTestCase {
         XCTAssertTrue(app.alerts["Can’t Delete Horse"].waitForExistence(timeout: 3))
         app.alerts.buttons["OK"].tap()
 
-        app.navigationBars.buttons[clientName].tap()
+        guard tapUntilDestinationAppears(
+            app.navigationBars.buttons[clientName],
+            destination: app.buttons["Actions"]
+        ) else { return }
         app.buttons["Actions"].tap()
         app.buttons["Delete"].tap()
         app.buttons["Delete Client"].tap()
         XCTAssertTrue(app.alerts["Can’t Delete Client"].waitForExistence(timeout: 3))
         app.alerts.buttons["OK"].tap()
 
-        app.navigationBars.buttons["Clients"].tap()
-        app.buttons["More"].tap()
-        app.buttons["Service Locations"].tap()
-        app.staticTexts["barn-row-\(firstBarn)"].tap()
+        guard tapUntilDestinationAppears(
+            app.navigationBars.buttons["Clients"],
+            destination: app.buttons["More"]
+        ) else { return }
+        guard tapUntilDestinationAppears(
+            app.buttons["More"],
+            destination: app.buttons["Service Locations"]
+        ) else { return }
+        guard tapUntilDestinationAppears(
+            app.buttons["Service Locations"],
+            destination: app.buttons["barn-row-\(firstBarn)"]
+        ) else { return }
+        guard tapUntilDestinationAppears(
+            app.buttons["barn-row-\(firstBarn)"],
+            destination: app.buttons["Actions"]
+        ) else { return }
         app.buttons["Actions"].tap()
         app.buttons["Delete"].tap()
         app.buttons["Delete Service Location"].tap()
@@ -62,9 +83,15 @@ final class BlockedMutationUITests: XCTestCase {
         )
         app.alerts.buttons["OK"].tap()
 
-        app.tabBars.buttons["Schedule"].tap()
-        XCTAssertTrue(app.staticTexts["appointment-row-\(firstBarn)"].waitForExistence(timeout: 3))
-        app.staticTexts["appointment-row-\(firstBarn)"].tap()
+        guard tapUntilDestinationAppears(
+            app.tabBars.buttons["Schedule"],
+            destination: app.navigationBars["Schedule"]
+        ) else { return }
+        XCTAssertTrue(app.buttons["appointment-row-\(firstBarn)"].waitForExistence(timeout: 3))
+        guard tapUntilDestinationAppears(
+            app.buttons["appointment-row-\(firstBarn)"],
+            destination: app.buttons["Delete"]
+        ) else { return }
         app.buttons["Delete"].tap()
         app.buttons["Delete Appointment"].firstMatch.tap()
         XCTAssertTrue(
@@ -75,18 +102,39 @@ final class BlockedMutationUITests: XCTestCase {
     @MainActor
     private func createClient(_ name: String, in app: XCUIApplication) {
         let addClient = app.buttons["Add Client"].firstMatch
-        for _ in 0..<2 {
+        for _ in 0..<2 where !app.navigationBars["Clients"].exists {
             app.tabBars.buttons["Clients"].tap()
-            if addClient.waitForExistence(timeout: 5) {
-                break
+            _ = app.navigationBars["Clients"].waitForExistence(timeout: 5)
+        }
+        XCTAssertTrue(app.navigationBars["Clients"].exists)
+        XCTAssertTrue(addClient.waitForExistence(timeout: 10))
+        guard addClient.exists else { return }
+        let nameField = app.textFields["client-name-field"]
+        for _ in 0..<2 where !nameField.exists {
+            addClient.tap()
+            _ = nameField.waitForExistence(timeout: 5)
+        }
+        XCTAssertTrue(nameField.exists)
+        guard nameField.exists else { return }
+        XCTAssertTrue(app.navigationBars["New Client"].waitForExistence(timeout: 5))
+        guard focusAndType(name, in: nameField) else { return }
+        app.buttons["Save"].tap()
+    }
+
+    @MainActor
+    private func tapUntilDestinationAppears(
+        _ action: XCUIElement,
+        destination: XCUIElement
+    ) -> Bool {
+        for _ in 0..<2 {
+            guard action.waitForExistence(timeout: 5) else { continue }
+            action.tap()
+            if destination.waitForExistence(timeout: 5) {
+                return true
             }
         }
-        XCTAssertTrue(addClient.waitForExistence(timeout: 5))
-        guard addClient.exists else { return }
-        addClient.tap()
-        app.textFields["client-name-field"].tap()
-        app.textFields["client-name-field"].typeText(name)
-        app.buttons["Save"].tap()
+        XCTFail("Expected action to open its destination")
+        return false
     }
 
     @MainActor
@@ -94,17 +142,32 @@ final class BlockedMutationUITests: XCTestCase {
         if !app.navigationBars["Service Locations"].exists {
             let more = app.buttons["More"].firstMatch
             XCTAssertTrue(more.waitForExistence(timeout: 10))
-            more.tap()
             let serviceLocations = app.buttons["Service Locations"].firstMatch
-            XCTAssertTrue(serviceLocations.waitForExistence(timeout: 10))
-            serviceLocations.tap()
+            for _ in 0..<2 where !serviceLocations.exists {
+                more.tap()
+                _ = serviceLocations.waitForExistence(timeout: 5)
+            }
+            XCTAssertTrue(serviceLocations.exists)
+            for _ in 0..<2 where !app.navigationBars["Service Locations"].exists {
+                serviceLocations.tap()
+                _ = app.navigationBars["Service Locations"]
+                    .waitForExistence(timeout: 5)
+            }
         }
         XCTAssertTrue(app.navigationBars["Service Locations"].waitForExistence(timeout: 10))
         let addServiceLocation = app.buttons["Add Service Location"].firstMatch
         XCTAssertTrue(addServiceLocation.waitForExistence(timeout: 10))
-        addServiceLocation.tap()
-        app.textFields["barn-name-field"].tap()
-        app.textFields["barn-name-field"].typeText(name)
+        let nameField = app.textFields["barn-name-field"]
+        for _ in 0..<2 where !nameField.exists {
+            addServiceLocation.tap()
+            _ = nameField.waitForExistence(timeout: 5)
+        }
+        XCTAssertTrue(nameField.exists)
+        guard nameField.exists else { return }
+        XCTAssertTrue(
+            app.navigationBars["New Service Location"].waitForExistence(timeout: 5)
+        )
+        guard focusAndType(name, in: nameField) else { return }
         app.buttons["Save"].tap()
     }
 
@@ -117,11 +180,41 @@ final class BlockedMutationUITests: XCTestCase {
         let addHorse = app.buttons["Add Horse"].firstMatch
         XCTAssertTrue(addHorse.waitForExistence(timeout: 3))
         addHorse.tap()
-        app.textFields["horse-name-field"].tap()
-        app.textFields["horse-name-field"].typeText(name)
+        XCTAssertTrue(app.navigationBars["New Horse"].waitForExistence(timeout: 5))
+        guard focusAndType(name, in: app.textFields["horse-name-field"]) else { return }
         app.buttons["horse-barn-picker"].tap()
         app.buttons[barnName].tap()
         app.buttons["Save"].tap()
+    }
+
+    @MainActor
+    private func focusAndType(_ text: String, in element: XCUIElement) -> Bool {
+        XCTAssertTrue(element.waitForExistence(timeout: 3))
+        XCTAssertTrue(element.isHittable)
+        for attempt in 0..<3 {
+            if attempt == 0 {
+                element.tap()
+            } else {
+                element.coordinate(
+                    withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
+                ).tap()
+            }
+            if waitForKeyboardFocus(in: element) {
+                element.typeText(text)
+                return true
+            }
+        }
+        XCTFail("Text field did not receive keyboard focus")
+        return false
+    }
+
+    @MainActor
+    private func waitForKeyboardFocus(in element: XCUIElement) -> Bool {
+        let focusExpectation = expectation(
+            for: NSPredicate(format: "hasKeyboardFocus == true"),
+            evaluatedWith: element
+        )
+        return XCTWaiter().wait(for: [focusExpectation], timeout: 2) == .completed
     }
 
     @MainActor

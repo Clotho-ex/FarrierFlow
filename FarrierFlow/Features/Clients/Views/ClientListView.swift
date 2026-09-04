@@ -25,12 +25,15 @@ struct ClientListView: View {
                     }
                 } else {
                     List(model.clients, id: \.persistentModelID) { client in
-                        NavigationLink(value: ClientRoute.detail(client.persistentModelID)) {
+                        RecordNavigationLink(value: ClientRoute.detail(client.persistentModelID)) {
                             ClientRow(client: client)
                         }
+                        .listRowBackground(ColorTokens.surface)
                     }
+                    .farrierFlowScrollBackground()
                 }
             }
+            .farrierFlowScreenBackground()
             .navigationTitle("Clients")
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
@@ -61,6 +64,7 @@ struct ClientListView: View {
                     } label: {
                         Label("More", systemImage: "ellipsis.circle")
                     }
+                    .tint(ColorTokens.textSecondary)
                 }
             }
             .navigationDestination(for: ClientRoute.self) { route in
@@ -98,7 +102,11 @@ struct ClientListView: View {
             .navigationDestination(for: SubscriptionRoute.self) { route in
                 switch route {
                 case .store:
-                    SubscriptionView(showsManageSubscriptionButton: true)
+                    SubscriptionView(
+                        presentation: .standard(
+                            showsManageSubscriptionButton: true
+                        )
+                    )
                 }
             }
             .navigationDestination(for: InvoiceRoute.self) { route in

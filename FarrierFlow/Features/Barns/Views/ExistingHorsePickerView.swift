@@ -15,8 +15,10 @@ struct ExistingHorsePickerView: View {
                 ForEach(model.horses, id: \.persistentModelID) { horse in
                     HorseRow(horse: horse)
                         .tag(horse.persistentModelID)
+                        .listRowBackground(ColorTokens.surface)
                 }
             }
+            .farrierFlowScrollBackground()
             .overlay {
                 if model.loadState == .loading {
                     ProgressView("Loading horses…")
@@ -48,6 +50,7 @@ struct ExistingHorsePickerView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .tint(ColorTokens.textSecondary)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if subscription.allowsMutations {

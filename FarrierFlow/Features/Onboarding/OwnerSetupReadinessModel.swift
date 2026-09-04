@@ -13,6 +13,11 @@ nonisolated enum OwnerSetupLoadState: Equatable {
 final class OwnerSetupReadinessModel {
     private(set) var loadState: OwnerSetupLoadState = .loading
     private(set) var hasValidIdentity = false
+    private(set) var hasExistingBusinessData = false
+
+    var hasEstablishedWorkspace: Bool {
+        hasValidIdentity || hasExistingBusinessData
+    }
 
     func load(in context: ModelContext) {
         loadState = .loading
@@ -22,11 +27,24 @@ final class OwnerSetupReadinessModel {
             let profiles = try context.fetch(profileDescriptor)
             let profile = profiles.count == 1 ? profiles.first : nil
             hasValidIdentity = profile.map(Self.isValidIdentity) ?? false
+            hasExistingBusinessData = try Self.hasExistingBusinessData(in: context)
             loadState = .loaded
         } catch {
             hasValidIdentity = false
+            hasExistingBusinessData = false
             loadState = .failed
         }
+    }
+
+    private static func hasExistingBusinessData(in context: ModelContext) throws -> Bool {
+        try context.fetchCount(FetchDescriptor<Client>()) > 0
+            || context.fetchCount(FetchDescriptor<Barn>()) > 0
+            || context.fetchCount(FetchDescriptor<Horse>()) > 0
+            || context.fetchCount(FetchDescriptor<Appointment>()) > 0
+            || context.fetchCount(FetchDescriptor<Visit>()) > 0
+            || context.fetchCount(FetchDescriptor<Service>()) > 0
+            || context.fetchCount(FetchDescriptor<Invoice>()) > 0
+            || context.fetchCount(FetchDescriptor<Payment>()) > 0
     }
 
     private static func isValidIdentity(_ profile: BusinessProfile) -> Bool {

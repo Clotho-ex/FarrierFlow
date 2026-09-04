@@ -11,48 +11,63 @@ final class ConnectedRecordsUITests: XCTestCase {
 
         openClients(in: app)
         let addClient = app.buttons["Add Client"].firstMatch
-        XCTAssertTrue(addClient.waitForExistence(timeout: 10))
-        addClient.tap()
         let clientNameField = app.textFields["client-name-field"]
-        XCTAssertTrue(clientNameField.waitForExistence(timeout: 3))
+        guard tapUntilDestinationAppears(
+            addClient,
+            destination: clientNameField
+        ) else { return }
         focusAndType(clientName, in: clientNameField)
         app.buttons["Save"].tap()
-        XCTAssertTrue(app.staticTexts["client-row-\(clientName)"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["client-row-\(clientName)"].waitForExistence(timeout: 3))
 
         let more = app.buttons["More"].firstMatch
-        XCTAssertTrue(more.waitForExistence(timeout: 10))
-        more.tap()
         let serviceLocations = app.buttons["Service Locations"].firstMatch
-        XCTAssertTrue(serviceLocations.waitForExistence(timeout: 10))
-        serviceLocations.tap()
-        XCTAssertTrue(app.navigationBars["Service Locations"].waitForExistence(timeout: 10))
+        guard tapUntilDestinationAppears(
+            more,
+            destination: serviceLocations
+        ) else { return }
+        guard tapUntilDestinationAppears(
+            serviceLocations,
+            destination: app.navigationBars["Service Locations"]
+        ) else { return }
         let addServiceLocation = app.buttons["Add Service Location"].firstMatch
-        XCTAssertTrue(addServiceLocation.waitForExistence(timeout: 10))
-        addServiceLocation.tap()
         let barnNameField = app.textFields["barn-name-field"]
-        XCTAssertTrue(barnNameField.waitForExistence(timeout: 3))
+        guard tapUntilDestinationAppears(
+            addServiceLocation,
+            destination: barnNameField
+        ) else { return }
         focusAndType(barnName, in: barnNameField)
         app.buttons["Save"].tap()
-        XCTAssertTrue(app.staticTexts["barn-row-\(barnName)"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["barn-row-\(barnName)"].waitForExistence(timeout: 3))
         app.navigationBars.buttons["Clients"].tap()
 
-        app.staticTexts["client-row-\(clientName)"].tap()
+        guard tapUntilDestinationAppears(
+            app.buttons["client-row-\(clientName)"],
+            destination: app.buttons["Add Horse"].firstMatch
+        ) else { return }
         let addHorse = app.buttons["Add Horse"].firstMatch
-        XCTAssertTrue(addHorse.waitForExistence(timeout: 10))
-        addHorse.tap()
         let horseNameField = app.textFields["horse-name-field"]
-        XCTAssertTrue(horseNameField.waitForExistence(timeout: 3))
+        guard tapUntilDestinationAppears(
+            addHorse,
+            destination: horseNameField
+        ) else { return }
         focusAndType(horseName, in: horseNameField)
         app.buttons["horse-barn-picker"].tap()
         app.buttons[barnName].tap()
         app.buttons["Save"].tap()
-        XCTAssertTrue(app.staticTexts["horse-row-\(horseName)"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["horse-row-\(horseName)"].waitForExistence(timeout: 3))
 
-        app.tabBars.buttons["Today"].tap()
+        let today = app.tabBars.buttons["Today"]
+        for _ in 0..<2 where !app.navigationBars["Today"].exists {
+            today.tap()
+            _ = app.navigationBars["Today"].waitForExistence(timeout: 3)
+        }
+        XCTAssertTrue(app.navigationBars["Today"].exists)
         let addAppointment = app.buttons["Schedule Appointment"].firstMatch
-        XCTAssertTrue(addAppointment.waitForExistence(timeout: 10))
-        addAppointment.tap()
-        XCTAssertTrue(app.buttons["appointment-barn-picker"].waitForExistence(timeout: 3))
+        guard tapUntilDestinationAppears(
+            addAppointment,
+            destination: app.buttons["appointment-barn-picker"]
+        ) else { return }
         app.buttons["appointment-barn-picker"].tap()
         let barnOptions = app.buttons.matching(identifier: barnName)
         XCTAssertTrue(barnOptions.firstMatch.waitForExistence(timeout: 10))
@@ -62,17 +77,24 @@ final class ConnectedRecordsUITests: XCTestCase {
         app.buttons["appointment-horse-\(horseName)"].tap()
         app.buttons["Save"].tap()
         app.tabBars.buttons["Schedule"].tap()
-        XCTAssertTrue(app.staticTexts["appointment-row-\(barnName)"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["appointment-row-\(barnName)"].waitForExistence(timeout: 3))
 
         app.terminate()
         app.launch()
-        app.tabBars.buttons["Schedule"].tap()
-        XCTAssertTrue(app.staticTexts["appointment-row-\(barnName)"].waitForExistence(timeout: 5))
+        let schedule = app.tabBars.buttons["Schedule"]
+        for _ in 0..<2 where !app.navigationBars["Schedule"].exists {
+            schedule.tap()
+            _ = app.navigationBars["Schedule"].waitForExistence(timeout: 5)
+        }
+        XCTAssertTrue(app.navigationBars["Schedule"].exists)
+        XCTAssertTrue(
+            app.buttons["appointment-row-\(barnName)"].waitForExistence(timeout: 10)
+        )
 
         openClients(in: app)
-        app.staticTexts["client-row-\(clientName)"].tap()
-        XCTAssertTrue(app.staticTexts["horse-row-\(horseName)"].waitForExistence(timeout: 3))
-        app.staticTexts["horse-row-\(horseName)"].tap()
+        app.buttons["client-row-\(clientName)"].tap()
+        XCTAssertTrue(app.buttons["horse-row-\(horseName)"].waitForExistence(timeout: 3))
+        app.buttons["horse-row-\(horseName)"].tap()
         XCTAssertTrue(
             app.descendants(matching: .any)["horse-detail-client"]
                 .waitForExistence(timeout: 3)
@@ -112,6 +134,22 @@ final class ConnectedRecordsUITests: XCTestCase {
             ).tap()
         }
         element.typeText(text)
+    }
+
+    @MainActor
+    private func tapUntilDestinationAppears(
+        _ action: XCUIElement,
+        destination: XCUIElement
+    ) -> Bool {
+        for _ in 0..<2 {
+            guard action.waitForExistence(timeout: 5) else { continue }
+            action.tap()
+            if destination.waitForExistence(timeout: 5) {
+                return true
+            }
+        }
+        XCTFail("Expected action to open its destination")
+        return false
     }
 
     @MainActor

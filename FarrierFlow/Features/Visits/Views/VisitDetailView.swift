@@ -124,6 +124,7 @@ struct VisitDetailView: View {
                             isCorrectionLocked: detail.isCorrectionLocked
                         )
                     }
+                    .listRowBackground(ColorTokens.surface)
                 } else {
                     Section("Visit") {
                         LabeledContent {
@@ -133,39 +134,48 @@ struct VisitDetailView: View {
                         }
                         LabeledContent("Status") {
                             Text(detail.completedAt == nil ? "In Progress" : "Completed")
+                                .foregroundStyle(detail.completedAt == nil ? ColorTokens.brandActionText : ColorTokens.success)
                                 .accessibilityIdentifier("visit-detail-status")
                         }
                     }
+                    .listRowBackground(ColorTokens.surface)
                     if detail.isCorrectionLocked {
                         Section("Invoiced Work") {
                             Text("This visit has invoiced work and can no longer be corrected.")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(ColorTokens.textSecondary)
                         }
+                        .listRowBackground(ColorTokens.surface)
                     }
                 }
                 if !detail.invoices.isEmpty {
                     Section("Invoices") {
                         ForEach(detail.invoices) { invoice in
-                            NavigationLink(value: InvoiceRoute.detail(invoice.id)) {
+                            RecordNavigationLink(value: InvoiceRoute.detail(invoice.id)) {
                                 VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
-                                    HStack {
-                                        Text("Invoice \(invoice.number)")
-                                        Spacer()
-                                        Text(invoice.status.displayName)
-                                            .foregroundStyle(.secondary)
-                                    }
+                                    Text("Invoice \(invoice.number)")
+                                        .font(Typography.recordTitle)
                                     Text(invoice.clientName)
                                         .font(Typography.recordMetadata)
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(ColorTokens.textSecondary)
+                                    if dynamicTypeSize.isAccessibilitySize {
+                                        Text(invoice.status.displayName)
+                                            .font(Typography.recordMetadata)
+                                            .foregroundStyle(invoice.status == .paid ? ColorTokens.success : ColorTokens.textSecondary)
+                                    }
                                 }
                             }
+                            .badge(
+                                dynamicTypeSize.isAccessibilitySize ? nil : Text(invoice.status.displayName)
+                                    .foregroundStyle(invoice.status == .paid ? ColorTokens.success : ColorTokens.textSecondary)
+                            )
                             .accessibilityIdentifier("visit-invoice-\(invoice.number)")
                         }
                     }
+                    .listRowBackground(ColorTokens.surface)
                 }
                 Section("Service Location") {
                     if let barnID = detail.barnID {
-                        NavigationLink {
+                        RecordNavigationLink {
                             BarnDetailView(barnID: barnID)
                         } label: {
                             locationSnapshot(detail)
@@ -174,6 +184,7 @@ struct VisitDetailView: View {
                         locationSnapshot(detail)
                     }
                 }
+                .listRowBackground(ColorTokens.surface)
                 Section("Horses") {
                     ForEach(detail.horses) { horse in
                         VisitHorseResultRow(horse: horse)
@@ -182,14 +193,17 @@ struct VisitDetailView: View {
                         hoofPhotographsLink(for: horse)
                     }
                 }
+                .listRowBackground(ColorTokens.surface)
                 if detail.completedAt != nil {
                     Section("Visit Total") {
                         LabeledContent("Total", value: totalText(for: detail.total))
                             .accessibilityIdentifier("visit-detail-total")
                     }
+                    .listRowBackground(ColorTokens.surface)
                     nextAppointmentSection
                 }
             }
+            .farrierFlowScrollBackground()
         } else {
             ContentUnavailableView("Visit Unavailable", systemImage: "exclamationmark.circle")
         }
@@ -206,7 +220,7 @@ struct VisitDetailView: View {
                 }
             case .failed:
                 Text("Next Appointment Unavailable")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ColorTokens.textSecondary)
                 Button("Retry") {
                     reloadNextAppointmentProjection()
                 }
@@ -230,6 +244,7 @@ struct VisitDetailView: View {
                 }
             }
         }
+        .listRowBackground(ColorTokens.surface)
     }
 
     private func loadVisitDetail() {
@@ -297,7 +312,7 @@ struct VisitDetailView: View {
             if let address = detail.serviceLocationAddressSnapshot {
                 Text(address)
                     .font(Typography.recordMetadata)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ColorTokens.textSecondary)
             }
         }
         .accessibilityElement(children: .combine)
@@ -325,10 +340,10 @@ struct VisitDetailView: View {
             if !horse.workItems.isEmpty {
                 Text("Services")
                     .font(Typography.recordMetadata)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ColorTokens.textSecondary)
                 ForEach(horse.workItems) { workItem in
                     if let serviceID = workItem.serviceID {
-                        NavigationLink {
+                        RecordNavigationLink {
                             ServiceDetailView(serviceID: serviceID)
                         } label: {
                             workItemRow(workItem)
@@ -347,7 +362,7 @@ struct VisitDetailView: View {
                 if horse.subtotal == .unavailable {
                     Text("No recorded services")
                         .font(Typography.recordMetadata)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ColorTokens.textSecondary)
                         .accessibilityIdentifier("visit-detail-no-recorded-services-\(horse.horseName)")
                 }
             }
@@ -363,12 +378,12 @@ struct VisitDetailView: View {
                 Spacer(minLength: SpacingTokens.rowContent)
                 Text(formattedAmount(workItem.amountMinorUnits))
                     .font(Typography.recordMetadata)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ColorTokens.textSecondary)
             }
             if workItem.serviceIsArchived == true {
                 Text("Archived")
                     .font(Typography.recordMetadata)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ColorTokens.textSecondary)
             }
         }
         .accessibilityElement(children: .combine)
@@ -377,7 +392,7 @@ struct VisitDetailView: View {
     }
 
     private func hoofPhotographsLink(for horse: VisitHorseResult) -> some View {
-        NavigationLink {
+        RecordNavigationLink {
             PhotographCollectionDestination(
                 visitHorseID: horse.id,
                 horseName: horse.horseName
@@ -392,6 +407,7 @@ struct VisitDetailView: View {
                 )
             }
         }
+        .accessibilityIdentifier("visit-result-photographs-\(horse.horseName)")
     }
 
     private func subtotalText(for subtotal: MoneyAvailability) -> String {
@@ -447,11 +463,11 @@ private struct VisitAccessibilityOverview: View {
             .font(Typography.recordTitle)
             Text(status)
                 .font(Typography.recordMetadata)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ColorTokens.textSecondary)
             if isCorrectionLocked {
                 Text(correctionLockMessage)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ColorTokens.textSecondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

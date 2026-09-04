@@ -6,27 +6,24 @@ struct InvoiceRow: View {
     let summary: InvoiceSummary
 
     var body: some View {
-        Group {
+        VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
+            invoiceIdentity
+            Text(formattedTotal)
+                .font(Typography.recordTitle)
             if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
-                    invoiceIdentity
-                    totalAndStatus
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
-                HStack(
-                    alignment: .firstTextBaseline,
-                    spacing: SpacingTokens.rowContent
-                ) {
-                    invoiceIdentity
-                    Spacer(minLength: SpacingTokens.rowContent)
-                    totalAndStatus
-                }
+                Text(summary.status.displayName)
+                    .font(Typography.recordMetadata)
+                    .foregroundStyle(summary.status == .paid ? ColorTokens.success : ColorTokens.textSecondary)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
-        .accessibilityValue("\(formattedTotal), \(statusText)")
+        .accessibilityValue(
+            dynamicTypeSize.isAccessibilitySize
+                ? "\(formattedTotal), \(summary.status.displayName)"
+                : formattedTotal
+        )
         .accessibilityIdentifier("invoice-row-\(summary.number)")
     }
 
@@ -36,27 +33,16 @@ struct InvoiceRow: View {
                 .font(Typography.recordTitle)
             Text(summary.clientName)
                 .font(Typography.recordMetadata)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ColorTokens.textSecondary)
             Text(
                 summary.invoiceDate,
                 format: .dateTime.month(.abbreviated).day().year()
             )
             .font(Typography.recordMetadata)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(ColorTokens.textSecondary)
         }
-    }
-
-    private var totalAndStatus: some View {
-        VStack(
-            alignment: dynamicTypeSize.isAccessibilitySize ? .leading : .trailing,
-            spacing: SpacingTokens.rowContent
-        ) {
-            Text(formattedTotal)
-                .font(Typography.recordTitle)
-            Text(statusText)
-                .font(Typography.recordMetadata)
-                .foregroundStyle(.secondary)
-        }
+        .multilineTextAlignment(.leading)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private var accessibilityLabel: String {
@@ -77,9 +63,5 @@ struct InvoiceRow: View {
         case .unavailable:
             String(localized: "Unavailable", locale: locale)
         }
-    }
-
-    private var statusText: String {
-        summary.status == .paid ? String(localized: "Paid") : String(localized: "Unpaid")
     }
 }

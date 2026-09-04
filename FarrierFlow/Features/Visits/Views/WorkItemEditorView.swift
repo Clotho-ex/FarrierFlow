@@ -35,9 +35,9 @@ struct WorkItemEditorView: View {
                     if workItem.serviceIsArchived {
                         Text("Archived")
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ColorTokens.textSecondary)
                     }
-                    NavigationLink("Replace Service") {
+                    RecordNavigationLink {
                         AddServicePickerView(
                             model: model,
                             visitHorseID: visitHorseID,
@@ -45,9 +45,12 @@ struct WorkItemEditorView: View {
                             excludingServiceID: workItem.serviceID,
                             onSuccessfulReplacement: { dismiss() }
                         )
+                    } label: {
+                        Text("Replace Service")
                     }
                     .accessibilityIdentifier("visit-replace-service")
                 }
+                .listRowBackground(ColorTokens.surface)
 
                 Section("Amount") {
                     TextField("Price", text: $priceInput)
@@ -57,32 +60,37 @@ struct WorkItemEditorView: View {
                         .accessibilityIdentifier("work-item-price-field")
                     Text("Enter a U.S. dollar amount with up to two decimal places.")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ColorTokens.textSecondary)
                     if !priceInput.isEmpty, !model.isValidPriceInput(priceInput) {
                         Text("Enter a valid U.S. dollar amount.")
                             .font(.footnote)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(ColorTokens.destructive)
                     } else {
                         Text(currentFormattedAmount)
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ColorTokens.textSecondary)
                             .monospacedDigit()
                     }
                 }
+                .listRowBackground(ColorTokens.surface)
 
                 Section {
                     Button("Remove Service", role: .destructive) {
                         showsRemoveConfirmation = true
                     }
+                    .foregroundStyle(ColorTokens.destructive)
                     .accessibilityIdentifier("visit-remove-service")
                 }
+                .listRowBackground(ColorTokens.surface)
             }
+            .farrierFlowScrollBackground()
             .disabled(!subscription.allowsMutations)
             .navigationTitle("Edit Service")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .tint(ColorTokens.textSecondary)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {

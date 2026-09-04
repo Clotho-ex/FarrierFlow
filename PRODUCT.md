@@ -61,12 +61,15 @@ one continuous field workflow rather than separate generic business modules.
   every still-uninvoiced WorkItem belonging to that Client, snapshots all
   financial and display content, and generates a native US Letter PDF for the
   system share sheet.
-- Slice 5A introduces first-run owner setup and replaces the passive Today list
-  with an action-led hub. First run asks only for a business or farrier name,
-  then opens Today. Contact information, operating defaults, Services, and
-  Service Locations stay available in their contextual features; new
-  Appointment and Invoice drafts reuse saved defaults without hiding
-  record-specific truth.
+- Release onboarding extends Slice 5A's owner setup into a short first-run
+  sequence: required business identity, a concise workflow briefing, then the
+  existing RevenueCat Offering. The briefing communicates the connected Appointment to Payment workflow
+  at a glance without adding a tutorial step. Completion and the current step
+  are versioned outside the business graph so interruption can resume safely.
+  Existing valid workspaces bypass the sequence.
+- Contact information, operating defaults, Services, and Service Locations stay
+  available in their contextual features; new Appointment and Invoice drafts
+  reuse saved defaults without hiding record-specific truth.
 - Slice 7 next-appointment assistance is complete. It calculates suggestions
   from current Visit and Horse truth, presents a
   dismissible assistant from completed Visit detail, and seeds the ordinary
@@ -123,6 +126,9 @@ one continuous field workflow rather than separate generic business modules.
 - Distinction should come from a restrained accent palette, field-specific copy,
   excellent hierarchy, a continuous workline, horse photography, careful
   spacing, strong activation and empty states, and subtle haptics.
+- First-use guidance remains small and contextual: an actionable empty Today,
+  a one-use completed-work invoice explanation, and a one-use manual-payment
+  explanation that never implies FarrierFlow processed customer money.
 - Preserve native platform behavior. Avoid custom navigation, custom tab bars,
   glass cards, gradients, excessive corner radii, card-on-card layouts,
   decorative icons, oversized headings, and invented interaction patterns.

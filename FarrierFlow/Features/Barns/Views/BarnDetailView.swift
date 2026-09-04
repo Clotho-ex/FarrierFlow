@@ -26,6 +26,7 @@ struct BarnDetailView: View {
                                 LabeledContent("Contact Notes", value: contactNotes)
                             }
                         }
+                        .listRowBackground(ColorTokens.surface)
                     }
                     Section("Horses") {
                         ForEach(
@@ -34,12 +35,14 @@ struct BarnDetailView: View {
                             },
                             id: \.persistentModelID
                         ) { horse in
-                            NavigationLink(value: ClientRoute.horse(horse.persistentModelID)) {
+                            RecordNavigationLink(value: ClientRoute.horse(horse.persistentModelID)) {
                                 HorseRow(horse: horse)
                             }
                         }
                     }
+                    .listRowBackground(ColorTokens.surface)
                 }
+                .farrierFlowScrollBackground()
                 .navigationTitle(barn.name)
                 .toolbar {
                     if subscription.allowsMutations {
@@ -53,12 +56,14 @@ struct BarnDetailView: View {
                             }
                             Divider()
                             Button("Edit", systemImage: "pencil") { showsEditor = true }
+                                .tint(ColorTokens.textSecondary)
                             Button("Delete", systemImage: "trash", role: .destructive) {
                                 showsDeleteConfirmation = true
                             }
                         } label: {
                             Label("Actions", systemImage: "ellipsis.circle")
                         }
+                        .tint(ColorTokens.textSecondary)
                     }
                     }
                 }

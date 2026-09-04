@@ -35,7 +35,7 @@ struct InvoiceLineItemRow: View {
                 .font(Typography.recordTitle)
             Text(lineItem.serviceName)
                 .font(Typography.recordMetadata)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ColorTokens.textSecondary)
         }
     }
 

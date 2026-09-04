@@ -26,6 +26,17 @@ No model represents subscriptions, cloud synchronization, or app-managed
 backup. RevenueCat entitlement state remains outside SwiftData, and an
 access-state transition never mutates this graph.
 
+First-run onboarding state also remains outside SwiftData. Versioned completion,
+the current incomplete step, and the seen state for the first-invoice and
+first-payment hints are small `UserDefaults` preferences. They never identify a
+customer, confer Pro access, mutate business records, or require a schema
+migration. Existing stores with one valid BusinessProfile and no onboarding
+preference are treated as already configured.
+
+The removed Workflow presentation remains recognizable only as a legacy
+same-version preference value so interrupted installations can resume safely;
+it adds no model or migration.
+
 ## Relationship Contract
 
 - A client can own multiple horses.

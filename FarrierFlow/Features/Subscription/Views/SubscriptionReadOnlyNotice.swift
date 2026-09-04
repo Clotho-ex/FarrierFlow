@@ -11,7 +11,7 @@ struct SubscriptionReadOnlyNotice: View {
                     .font(.headline)
                 Text(message)
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ColorTokens.textSecondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }

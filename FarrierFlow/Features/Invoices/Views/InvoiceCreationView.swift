@@ -69,6 +69,7 @@ struct InvoiceCreationView: View {
             Section("Client") {
                 Text(model.clientName ?? "")
             }
+            .listRowBackground(ColorTokens.surface)
             Section {
                 Button("Select All", action: model.selectAll)
                     .disabled(model.visitChoices.isEmpty)
@@ -84,13 +85,14 @@ struct InvoiceCreationView: View {
                 }
                 if model.visitChoices.isEmpty {
                     Text("No completed, uninvoiced work is available for this client.")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ColorTokens.textSecondary)
                 }
             } header: {
                 Text("Completed Visits")
             } footer: {
                 Text("Selecting a visit includes all eligible recorded work for this client.")
             }
+            .listRowBackground(ColorTokens.surface)
             Section("Selection Summary") {
                 LabeledContent("Visits") {
                     Text(model.selectionSummary?.visitCount ?? 0, format: .number)
@@ -106,16 +108,18 @@ struct InvoiceCreationView: View {
                 }
                 .accessibilityIdentifier("invoice-selection-total")
             }
+            .listRowBackground(ColorTokens.surface)
             if !model.hasValidBusinessProfile {
                 Section("Finish Business Setup") {
-                    NavigationLink {
+                    RecordNavigationLink {
                         BusinessProfileEditorView(onSaved: reload)
                     } label: {
                         Label("Set Up My Business", systemImage: "person.text.rectangle")
                     }
                     Text("Add a business or farrier name before generating an invoice.")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ColorTokens.textSecondary)
                 }
+                .listRowBackground(ColorTokens.surface)
             }
             if let draft = model.draft {
                 Section("Invoice") {
@@ -132,6 +136,7 @@ struct InvoiceCreationView: View {
                         DatePicker("Due Date", selection: dueDateBinding, displayedComponents: .date)
                     }
                 }
+                .listRowBackground(ColorTokens.surface)
                 Section("Note") {
                     TextField(
                         "Invoice Note",
@@ -141,8 +146,10 @@ struct InvoiceCreationView: View {
                         .lineLimit(3...6)
                         .focused($isNoteFocused)
                 }
+                .listRowBackground(ColorTokens.surface)
             }
         }
+        .farrierFlowScrollBackground()
         .disabled(!subscription.allowsMutations)
         .scrollDismissesKeyboard(.interactively)
     }

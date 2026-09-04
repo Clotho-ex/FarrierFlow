@@ -109,10 +109,10 @@ final class NextAppointmentFlowUITests: XCTestCase {
            bringIntoView(app.buttons["schedule-next-appointment"], in: app) {
             return
         }
-        let client = app.staticTexts["client-row-\(clientName)"]
+        let client = app.buttons["client-row-\(clientName)"]
         XCTAssertTrue(client.waitForExistence(timeout: 5))
         client.tap()
-        let horse = app.staticTexts["horse-row-\(horseName)"]
+        let horse = app.buttons["horse-row-\(horseName)"]
         XCTAssertTrue(horse.waitForExistence(timeout: 5))
         horse.tap()
         let history = app.descendants(matching: .any)[
@@ -263,7 +263,7 @@ final class NextAppointmentFlowUITests: XCTestCase {
 
     @MainActor
     private func appointmentRows(in app: XCUIApplication) -> XCUIElementQuery {
-        app.staticTexts.matching(identifier: "appointment-row-\(barnName)")
+        app.buttons.matching(identifier: "appointment-row-\(barnName)")
     }
 
     @MainActor

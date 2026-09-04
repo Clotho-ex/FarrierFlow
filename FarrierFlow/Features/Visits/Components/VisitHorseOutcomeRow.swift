@@ -16,7 +16,7 @@ struct VisitHorseOutcomeRow: View {
                 VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
                     Text("Work Status")
                         .font(Typography.recordMetadata)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ColorTokens.textSecondary)
                     outcomePicker
                         .labelsHidden()
                         .pickerStyle(.inline)
@@ -34,7 +34,7 @@ struct VisitHorseOutcomeRow: View {
             VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
                 Text("Work Notes")
                     .font(Typography.recordMetadata)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ColorTokens.textSecondary)
                 TextEditor(text: $workNotes)
                     .frame(minHeight: 88)
                     .focused($focusedWorkNotesID, equals: horse.id)

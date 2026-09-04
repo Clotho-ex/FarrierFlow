@@ -5,6 +5,7 @@
 //  Created by Yusufcan Var on 26.07.2026.
 //
 
+import Foundation
 import OSLog
 import SwiftData
 import SwiftUI
@@ -21,6 +22,13 @@ struct RootView: View {
     @Environment(\.modelContext) private var context
     @State private var selectedTab = AppTab.today
     @State private var setupModel = OwnerSetupReadinessModel()
+    @State private var onboarding: OnboardingExperienceModel
+
+    init(onboardingDefaults: UserDefaults = .standard) {
+        _onboarding = State(
+            initialValue: OnboardingExperienceModel(defaults: onboardingDefaults)
+        )
+    }
 
     var body: some View {
         Group {
@@ -36,24 +44,33 @@ struct RootView: View {
                     Button("Retry", action: resolveInitialSetup)
                 }
             case .loaded:
-                switch SubscriptionRootRules.state(
-                    access: subscription.access,
-                    hasIdentity: setupModel.hasValidIdentity
-                ) {
-                case .loading:
-                    ProgressView("Loading FarrierFlow…")
-                case .subscriptionWelcome:
-                    SubscriptionWelcomeView()
-                case .subscriptionUnavailable:
-                    SubscriptionWelcomeView()
-                case .ownerSetup:
-                    OwnerSetupView(model: setupModel) {
+                if onboarding.step != .completed {
+                    OnboardingFlowView(
+                        model: onboarding,
+                        setupModel: setupModel
+                    )
+                } else {
+                    switch SubscriptionRootRules.state(
+                        access: subscription.access,
+                        hasIdentity: setupModel.hasValidIdentity,
+                        hasExistingBusinessData: setupModel.hasExistingBusinessData
+                    ) {
+                    case .loading:
+                        ProgressView("Loading FarrierFlow…")
+                    case .subscriptionWelcome:
+                        SubscriptionWelcomeView()
+                    case .subscriptionUnavailable:
+                        SubscriptionWelcomeView()
+                    case .ownerSetup:
+                        OwnerSetupView(model: setupModel) { }
+                    case .app:
+                        appTabs
                     }
-                case .app:
-                    appTabs
                 }
             }
         }
+        .navigationLinkIndicatorVisibility(.hidden)
+        .environment(onboarding)
         .task {
             subscription.start()
             resolveInitialSetup()
@@ -88,6 +105,12 @@ struct RootView: View {
 
     private func resolveInitialSetup() {
         setupModel.load(in: context)
+        if setupModel.loadState == .loaded {
+            onboarding.resolve(
+                hasValidBusinessProfile: setupModel.hasValidIdentity,
+                hasExistingBusinessData: setupModel.hasExistingBusinessData
+            )
+        }
     }
 
     private func reconcilePhotographs() async {
@@ -145,8 +168,8 @@ struct StaticSubscriptionClient: SubscriptionClient {
 
     func offerings() async throws -> [SubscriptionPlan] {
         [
-            .init(id: "annual", productID: SubscriptionProduct.yearly, kind: .annual, displayName: "Annual", localizedPrice: "$119.99", subscriptionPeriod: "year"),
-            .init(id: "monthly", productID: SubscriptionProduct.monthly, kind: .monthly, displayName: "Monthly", localizedPrice: "$14.99", subscriptionPeriod: "month"),
+            .init(id: "annual", productID: SubscriptionProduct.yearly, kind: .annual, displayName: "Annual", localizedPrice: "$119.99", price: Decimal(string: "119.99"), currencyCode: "USD", subscriptionPeriod: "year", introductoryTrial: .init(duration: 2, unit: .week)),
+            .init(id: "monthly", productID: SubscriptionProduct.monthly, kind: .monthly, displayName: "Monthly", localizedPrice: "$14.99", price: Decimal(string: "14.99"), currencyCode: "USD", subscriptionPeriod: "month", introductoryTrial: .init(duration: 2, unit: .week)),
         ]
     }
 

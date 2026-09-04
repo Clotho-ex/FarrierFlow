@@ -71,6 +71,11 @@ submission.
 
 ## Candidate and submission gates (Unit 7 only)
 
+- [x] On 2026-08-29, revalidated the final release-onboarding source: adaptive launch screen,
+  fresh and interrupted first-run flow, existing-workspace compatibility,
+  Offering-authoritative trial copy, Pro skip/purchase/restore handoff,
+  read-only recovery, contextual hints, relaunch, accessibility XXXL,
+  localization, iOS 18/iOS 26 builds, and final diff audit.
 - [ ] Freeze a new release-candidate source boundary after the RevenueCat and
   structured-payment implementation is reviewed and committed.
 - [x] On 2026-08-15, App Store Connect showed **No Builds** in TestFlight and no

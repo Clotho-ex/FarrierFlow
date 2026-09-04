@@ -12,7 +12,7 @@ struct HorseSelectionRow: View {
                 Spacer()
                 if isSelected {
                     Image(systemName: "checkmark")
-                        .foregroundStyle(ColorTokens.interactive)
+                        .foregroundStyle(ColorTokens.brandActionText)
                 }
             }
             .contentShape(.rect)

@@ -5,6 +5,7 @@
 //  Created by Yusufcan Var on 26.07.2026.
 //
 
+import Foundation
 import SwiftData
 import SwiftUI
 
@@ -12,12 +13,16 @@ import SwiftUI
 struct FarrierFlowApp: App {
     private let dependenciesResult: Result<AppDependencies, Error>
     private let uiTestDynamicTypeSize: DynamicTypeSize?
+    private let uiTestColorScheme: ColorScheme?
 
     init() {
         #if DEBUG
-        uiTestDynamicTypeSize = UITestLaunchConfiguration().dynamicTypeSize
+        let uiTestConfiguration = UITestLaunchConfiguration()
+        uiTestDynamicTypeSize = uiTestConfiguration.dynamicTypeSize
+        uiTestColorScheme = uiTestConfiguration.colorScheme
         #else
         uiTestDynamicTypeSize = nil
+        uiTestColorScheme = nil
         #endif
         dependenciesResult = Result {
             #if DEBUG
@@ -44,7 +49,8 @@ struct FarrierFlowApp: App {
                     ),
                     subscriptionAccessModel: SubscriptionAccessModel(
                         client: UITestSubscriptionClient(configuration: uiTestConfiguration)
-                    )
+                    ),
+                    onboardingDefaults: uiTestConfiguration.onboardingDefaults
                 )
             }
             #endif
@@ -63,7 +69,8 @@ struct FarrierFlowApp: App {
                         applicationSupportURL: applicationSupportURL
                     )
                 ),
-                subscriptionAccessModel: SubscriptionAccessModel(client: Self.subscriptionClient())
+                subscriptionAccessModel: SubscriptionAccessModel(client: Self.subscriptionClient()),
+                onboardingDefaults: .standard
             )
         }
     }
@@ -78,16 +85,23 @@ struct FarrierFlowApp: App {
 
     var body: some Scene {
         WindowGroup {
-            switch dependenciesResult {
-            case .success(let dependencies):
-                RootView()
-                    .modelContainer(dependencies.container)
-                    .environment(dependencies.photographLibrary)
-                    .uiTestDynamicTypeSize(uiTestDynamicTypeSize)
-                    .environment(dependencies.subscriptionAccessModel)
-            case .failure:
-                ModelContainerFailureView()
+            Group {
+                switch dependenciesResult {
+                case .success(let dependencies):
+                    RootView(onboardingDefaults: dependencies.onboardingDefaults)
+                        .modelContainer(dependencies.container)
+                        .environment(dependencies.photographLibrary)
+                        .uiTestDynamicTypeSize(uiTestDynamicTypeSize)
+                        .uiTestColorScheme(uiTestColorScheme)
+                        .environment(dependencies.subscriptionAccessModel)
+                case .failure:
+                    ModelContainerFailureView()
+                }
             }
+            .fontDesign(.rounded)
+            .foregroundStyle(ColorTokens.textPrimary)
+            .tint(ColorTokens.brandActionText)
+            .farrierFlowScreenBackground()
         }
     }
 }
@@ -101,6 +115,15 @@ private extension View {
             self
         }
     }
+
+    @ViewBuilder
+    func uiTestColorScheme(_ colorScheme: ColorScheme?) -> some View {
+        if let colorScheme {
+            preferredColorScheme(colorScheme)
+        } else {
+            self
+        }
+    }
 }
 
 @MainActor
@@ -108,4 +131,5 @@ private struct AppDependencies {
     let container: ModelContainer
     let photographLibrary: PhotographLibrary
     let subscriptionAccessModel: SubscriptionAccessModel
+    let onboardingDefaults: UserDefaults
 }

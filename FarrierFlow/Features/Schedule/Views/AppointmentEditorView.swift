@@ -39,11 +39,11 @@ struct AppointmentEditorView: View {
                         )
                         Text("The service location and horses are fixed after work starts.")
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ColorTokens.textSecondary)
                     } else if model.loadState == .loaded {
                         if model.barns.isEmpty {
                             Text("Add a service location before scheduling an appointment.")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(ColorTokens.textSecondary)
                             Button("Add Service Location", systemImage: "plus") {
                                 showsBarnEditor = true
                             }
@@ -79,7 +79,7 @@ struct AppointmentEditorView: View {
                             "Suggested start based on the horses’ appointment intervals. You can change it."
                         )
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ColorTokens.textSecondary)
                     }
                     DisclosureGroup(
                         "More Details",
@@ -93,7 +93,7 @@ struct AppointmentEditorView: View {
                         if model.appliedOwnerDurationDefault {
                             Text("Your typical appointment duration was prefilled. You can change or clear it.")
                                 .font(.footnote)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(ColorTokens.textSecondary)
                         }
                         appointmentRequirementGuidance
                         TextEditor(text: $model.draft.notes)
@@ -102,6 +102,7 @@ struct AppointmentEditorView: View {
                     }
                     .accessibilityIdentifier("appointment-more-details")
                 }
+                .listRowBackground(ColorTokens.surface)
                 loadStateSection
                 if model.loadState == .loaded {
                     Section("Horses") {
@@ -109,13 +110,13 @@ struct AppointmentEditorView: View {
                             Text(model.lockedHorseNames.formatted(.list(type: .and)))
                         } else if model.draft.barnID == nil {
                             Text("Select a service location to choose horses.")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(ColorTokens.textSecondary)
                         } else {
                             if model.eligibleHorses.isEmpty {
                                 Text(
                                     "Add or move a horse to this service location before scheduling an appointment."
                                 )
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(ColorTokens.textSecondary)
                             } else {
                                 ForEach(model.eligibleHorses, id: \.persistentModelID) { horse in
                                     HorseSelectionRow(
@@ -141,14 +142,17 @@ struct AppointmentEditorView: View {
                             .accessibilityIdentifier("appointment-add-horse")
                         }
                     }
+                    .listRowBackground(ColorTokens.surface)
                 }
             }
+            .farrierFlowScrollBackground()
             .disabled(!subscription.allowsMutations)
             .navigationTitle(model.appointmentID == nil ? "New Appointment" : "Edit Appointment")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .tint(ColorTokens.textSecondary)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
@@ -215,6 +219,7 @@ struct AppointmentEditorView: View {
                     Text("Loading records…")
                 }
             }
+            .listRowBackground(ColorTokens.surface)
         case .failed:
             Section {
                 ContentUnavailableView {
@@ -227,6 +232,7 @@ struct AppointmentEditorView: View {
                     }
                 }
             }
+            .listRowBackground(ColorTokens.surface)
         case .loaded:
             EmptyView()
         }

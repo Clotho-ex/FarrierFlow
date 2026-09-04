@@ -2,6 +2,7 @@ import SwiftData
 import SwiftUI
 
 struct InvoiceListView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
     @State private var model = InvoiceListModel()
@@ -17,6 +18,7 @@ struct InvoiceListView: View {
                 content
             }
         }
+        .farrierFlowScreenBackground()
         .navigationTitle("Invoices")
         .alert(item: $model.alert) {
             Alert(title: Text($0.title), message: Text($0.message))
@@ -34,10 +36,16 @@ struct InvoiceListView: View {
             }
         } else {
             List(model.summaries) { summary in
-                NavigationLink(value: InvoiceRoute.detail(summary.id)) {
+                RecordNavigationLink(value: InvoiceRoute.detail(summary.id)) {
                     InvoiceRow(summary: summary)
                 }
+                .badge(
+                    dynamicTypeSize.isAccessibilitySize ? nil : Text(summary.status.displayName)
+                        .foregroundStyle(summary.status == .paid ? ColorTokens.success : ColorTokens.textSecondary)
+                )
+                .listRowBackground(ColorTokens.surface)
             }
+            .farrierFlowScrollBackground()
         }
     }
 

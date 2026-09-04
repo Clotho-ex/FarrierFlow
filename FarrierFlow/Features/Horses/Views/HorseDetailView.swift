@@ -49,22 +49,33 @@ struct HorseDetailView: View {
                         )
                         .accessibilityIdentifier("horse-detail-default-service")
                     }
+                    .listRowBackground(ColorTokens.surface)
                     if let safetyNotes = horse.safetyNotes {
                         Section("Safety Notes") {
-                            Text(safetyNotes)
+                            Label {
+                                Text(safetyNotes)
+                                    .foregroundStyle(ColorTokens.textPrimary)
+                            } icon: {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundStyle(ColorTokens.warning)
+                            }
                                 .accessibilityLabel("Safety Notes, \(safetyNotes)")
                         }
+                        .listRowBackground(ColorTokens.surface)
                     }
                     historySection
                 }
+                .farrierFlowScrollBackground()
                 .navigationTitle(horse.name)
                 .toolbar {
                     if subscription.allowsMutations {
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         Button("Edit", systemImage: "pencil") { showsEditor = true }
+                            .tint(ColorTokens.textSecondary)
                         Button("Delete", systemImage: "trash", role: .destructive) {
                             showsDeleteConfirmation = true
                         }
+                        .tint(ColorTokens.destructive)
                     }
                     }
                 }
@@ -129,12 +140,13 @@ struct HorseDetailView: View {
                 }
             }
         }
+        .listRowBackground(ColorTokens.surface)
     }
 
     @ViewBuilder
     private var historyRows: some View {
         ForEach(model.history) { entry in
-            NavigationLink(value: ClientRoute.visit(entry.visitID)) {
+            RecordNavigationLink(value: ClientRoute.visit(entry.visitID)) {
                 HorseHistoryRow(entry: entry)
             }
             .accessibilityIdentifier("horse-history-visit-\(entry.horseName)")

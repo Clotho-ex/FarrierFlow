@@ -17,7 +17,7 @@ struct HorseRow: View {
                 .font(Typography.recordTitle)
             Text("\(clientName) · \(barnName)")
                 .font(Typography.recordMetadata)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ColorTokens.textSecondary)
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("horse-row-\(horse.name)")

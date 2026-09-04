@@ -45,6 +45,12 @@ final class VisitHistoryAccessibilityUITests: XCTestCase {
             "visit-result-Milo"
         ].firstMatch
         XCTAssertTrue(bringIntoView(horseResult, in: app))
+        XCTAssertTrue(accessibilityText(of: horseResult).contains("Serviced"))
+        XCTAssertLessThan(horseResult.frame.height, app.frame.height)
+        let resultScreenshot = XCTAttachment(screenshot: app.screenshot())
+        resultScreenshot.name = "Visit result accessibility XXXL"
+        resultScreenshot.lifetime = .keepAlways
+        add(resultScreenshot)
     }
 
     @MainActor

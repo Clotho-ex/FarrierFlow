@@ -22,6 +22,185 @@ struct SubscriptionProductTests {
         )
     }
 
+    @Test(arguments: [
+        (SubscriptionTrial(duration: 1, unit: .day), "1 day free"),
+        (SubscriptionTrial(duration: 14, unit: .day), "14 days free"),
+        (SubscriptionTrial(duration: 2, unit: .week), "2 weeks free"),
+        (SubscriptionTrial(duration: 1, unit: .month), "1 month free"),
+        (SubscriptionTrial(duration: 1, unit: .year), "1 year free"),
+    ])
+    func trialDescriptionUsesProjectedDuration(
+        trial: SubscriptionTrial,
+        expected: String
+    ) {
+        #expect(String(localized: trial.localizedCallout) == expected)
+    }
+
+    @Test
+    func annualSavingsUsesAuthoritativeNumericPrices() {
+        let monthly = SubscriptionPlan(
+            id: "monthly",
+            productID: SubscriptionProduct.monthly,
+            kind: .monthly,
+            displayName: "Monthly",
+            localizedPrice: "$14.99",
+            price: Decimal(string: "14.99")!,
+            currencyCode: "USD",
+            subscriptionPeriod: "month"
+        )
+        let annual = SubscriptionPlan(
+            id: "annual",
+            productID: SubscriptionProduct.yearly,
+            kind: .annual,
+            displayName: "Yearly",
+            localizedPrice: "$119.99",
+            price: Decimal(string: "119.99")!,
+            currencyCode: "USD",
+            subscriptionPeriod: "year"
+        )
+
+        #expect(
+            SubscriptionSavingsRules.annualSavingsPercentage(
+                monthly: monthly,
+                annual: annual
+            ) == 33
+        )
+    }
+
+    @Test
+    func annualSavingsRequiresComparableCurrencyAndPositiveSavings() {
+        let monthly = SubscriptionPlan(
+            id: "monthly",
+            productID: SubscriptionProduct.monthly,
+            kind: .monthly,
+            displayName: "Monthly",
+            localizedPrice: "$10.00",
+            price: 10,
+            currencyCode: "USD",
+            subscriptionPeriod: "month"
+        )
+        let differentCurrencyAnnual = SubscriptionPlan(
+            id: "annual",
+            productID: SubscriptionProduct.yearly,
+            kind: .annual,
+            displayName: "Yearly",
+            localizedPrice: "€80.00",
+            price: 80,
+            currencyCode: "EUR",
+            subscriptionPeriod: "year"
+        )
+        let noSavingsAnnual = SubscriptionPlan(
+            id: "annual-expensive",
+            productID: SubscriptionProduct.yearly,
+            kind: .annual,
+            displayName: "Yearly",
+            localizedPrice: "$120.00",
+            price: 120,
+            currencyCode: "USD",
+            subscriptionPeriod: "year"
+        )
+
+        #expect(
+            SubscriptionSavingsRules.annualSavingsPercentage(
+                monthly: monthly,
+                annual: differentCurrencyAnnual
+            ) == nil
+        )
+        #expect(
+            SubscriptionSavingsRules.annualSavingsPercentage(
+                monthly: monthly,
+                annual: noSavingsAnnual
+            ) == nil
+        )
+    }
+
+    @Test
+    func onboardingPurchaseUsesOnlyASelectedAvailablePlan() {
+        let monthly = SubscriptionPlan(
+            id: "monthly",
+            productID: SubscriptionProduct.monthly,
+            kind: .monthly,
+            displayName: "Monthly",
+            localizedPrice: "$14.99",
+            subscriptionPeriod: "month"
+        )
+
+        #expect(
+            OnboardingSubscriptionDecisionRules.purchasePlanID(
+                selectedPlanID: monthly.id,
+                availablePlans: [monthly]
+            ) == monthly.id
+        )
+    }
+
+    @Test
+    func onboardingPurchaseCannotFallBackToReadOnlyWithoutAValidSelection() {
+        let monthly = SubscriptionPlan(
+            id: "monthly",
+            productID: SubscriptionProduct.monthly,
+            kind: .monthly,
+            displayName: "Monthly",
+            localizedPrice: "$14.99",
+            subscriptionPeriod: "month"
+        )
+
+        #expect(
+            OnboardingSubscriptionDecisionRules.purchasePlanID(
+                selectedPlanID: nil,
+                availablePlans: [monthly]
+            ) == nil
+        )
+        #expect(
+            OnboardingSubscriptionDecisionRules.purchasePlanID(
+                selectedPlanID: "stale-plan",
+                availablePlans: [monthly]
+            ) == nil
+        )
+    }
+
+    @Test
+    func eligibleTrialDrivesExplicitPurchaseCopy() {
+        let annual = SubscriptionPlan(
+            id: "annual",
+            productID: SubscriptionProduct.yearly,
+            kind: .annual,
+            displayName: "Yearly",
+            localizedPrice: "$119.99",
+            subscriptionPeriod: "year",
+            introductoryTrial: .init(duration: 2, unit: .week)
+        )
+
+        #expect(
+            String(localized: SubscriptionPurchaseCopy.actionTitle(for: annual))
+                == "Start 2-Week Free Trial"
+        )
+        #expect(
+            String(localized: SubscriptionPurchaseCopy.disclosure(for: annual))
+                == "2 weeks free, then $119.99/year. Cancel anytime."
+        )
+    }
+
+    @Test
+    func ineligiblePlanUsesSubscribeAndAccurateRenewalCopy() {
+        let monthly = SubscriptionPlan(
+            id: "monthly",
+            productID: SubscriptionProduct.monthly,
+            kind: .monthly,
+            displayName: "Monthly",
+            localizedPrice: "$14.99",
+            subscriptionPeriod: "month"
+        )
+
+        #expect(
+            String(localized: SubscriptionPurchaseCopy.actionTitle(for: monthly))
+                == "Subscribe"
+        )
+        #expect(
+            String(localized: SubscriptionPurchaseCopy.disclosure(for: monthly))
+                == "$14.99/month. Renews automatically. Cancel anytime."
+        )
+    }
+
     @Test
     func storeKitConfigurationMatchesApprovedProductContract() throws {
         let configurationURL = sourceRootURL

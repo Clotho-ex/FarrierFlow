@@ -10,26 +10,26 @@ struct HorseHistoryRow: View {
                 .font(Typography.recordTitle)
             Text(entry.serviceLocationName)
                 .font(Typography.recordMetadata)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ColorTokens.textSecondary)
             Text(entry.outcome.localizedTitle)
                 .font(Typography.recordMetadata)
             if entry.hasWorkNotes {
                 Text("Work Notes")
                     .font(Typography.recordMetadata)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ColorTokens.textSecondary)
             }
             if entry.outcome == .serviced {
                 if let workItemCount = entry.workItemCount {
                     Text(String(localized: "Services: \(workItemCount)"))
                         .font(Typography.recordMetadata)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ColorTokens.textSecondary)
                 }
                 LabeledContent("Subtotal", value: subtotalText)
                     .font(Typography.recordMetadata)
                 if entry.subtotal == .unavailable {
                     Text("No recorded services")
                         .font(Typography.recordMetadata)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ColorTokens.textSecondary)
                 }
             }
         }

@@ -134,7 +134,7 @@ final class VisitCompletionUITests: XCTestCase {
 
         app.tabBars.buttons["Schedule"].tap()
         XCTAssertEqual(
-            app.staticTexts
+            app.buttons
                 .matching(identifier: "appointment-row-\(graph.primaryBarnName)")
                 .count,
             1
@@ -280,7 +280,13 @@ final class VisitCompletionUITests: XCTestCase {
             assertsSelection: false,
             in: app
         )
-        app.buttons["Clear Recorded Work"].tap()
+        let clearWorkConfirmation = app.sheets["Clear Recorded Work?"]
+        XCTAssertTrue(clearWorkConfirmation.waitForExistence(timeout: 3))
+        for _ in 0..<2 where clearWorkConfirmation.exists {
+            clearWorkConfirmation.buttons["Clear Recorded Work"].tap()
+            if clearWorkConfirmation.waitForNonExistence(timeout: 3) { break }
+        }
+        XCTAssertFalse(clearWorkConfirmation.exists)
         XCTAssertTrue(padRow.waitForNonExistence(timeout: 3))
         XCTAssertTrue(
             app.buttons["visit-add-service-\(graph.servicedHorseName)"]
@@ -381,15 +387,20 @@ final class VisitCompletionUITests: XCTestCase {
             scrollForm(in: app, upward: false)
         }
         tapAfterBringingIntoView(applyWork, in: app)
-        XCTAssertTrue(app.navigationBars["Apply Work to Horses"].waitForExistence(timeout: 3))
+        let applyWorkNavigationBar = app.navigationBars["Apply Work to Horses"]
+        XCTAssertTrue(applyWorkNavigationBar.waitForExistence(timeout: 3))
         XCTAssertTrue(
             app.descendants(matching: .any)["visit-batch-summary-\(serviceName)"]
                 .waitForExistence(timeout: 3)
         )
-        app.navigationBars["Apply Work to Horses"].buttons["Cancel"].tap()
+        applyWorkNavigationBar.buttons["Cancel"].tap()
+        XCTAssertTrue(applyWorkNavigationBar.waitForNonExistence(timeout: 5))
         for horseName in [graph.notServicedHorseName, thirdHorseName] {
             XCTAssertTrue(
-                bringIntoView(app.buttons["visit-outcome-\(horseName)"], in: app)
+                bringIntoViewFromTop(
+                    app.buttons["visit-outcome-\(horseName)"],
+                    in: app
+                )
             )
             assertOutcome(.pending, for: horseName, in: app)
         }
@@ -535,7 +546,7 @@ final class VisitCompletionUITests: XCTestCase {
         XCTAssertTrue(app.buttons["visit-start-action"].waitForExistence(timeout: 3))
         app.navigationBars.buttons["Today"].tap()
         XCTAssertTrue(
-            app.staticTexts["appointment-row-\(graph.primaryBarnName)"].exists
+            app.buttons["appointment-row-\(graph.primaryBarnName)"].exists
                 || app.buttons["today-run-sheet-scheduled"].waitForExistence(timeout: 3)
         )
     }
@@ -577,6 +588,22 @@ final class VisitCompletionUITests: XCTestCase {
             return
         }
         element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+    }
+
+    @MainActor
+    private func tapUntilDestinationAppears(
+        _ action: XCUIElement,
+        destination: XCUIElement
+    ) -> Bool {
+        for _ in 0..<2 {
+            guard action.waitForExistence(timeout: 5) else { continue }
+            action.tap()
+            if destination.waitForExistence(timeout: 5) {
+                return true
+            }
+        }
+        XCTFail("Expected action to open its destination")
+        return false
     }
 
     @MainActor
@@ -707,10 +734,13 @@ final class VisitCompletionUITests: XCTestCase {
         }
         XCTAssertTrue(addClient.waitForExistence(timeout: 3))
         guard addClient.exists else { return }
-        addClient.tap()
-        focusAndType(name, in: app.textFields["client-name-field"])
-        app.buttons["Save"].tap()
-        XCTAssertTrue(app.staticTexts["client-row-\(name)"].waitForExistence(timeout: 3))
+        let nameField = app.textFields["client-name-field"]
+        guard tapUntilDestinationAppears(addClient, destination: nameField) else { return }
+        focusAndType(name, in: nameField)
+        let clientRow = app.buttons["client-row-\(name)"]
+        guard tapUntilDestinationAppears(app.buttons["Save"], destination: clientRow) else {
+            return
+        }
     }
 
     @MainActor
@@ -728,43 +758,45 @@ final class VisitCompletionUITests: XCTestCase {
             }
             XCTAssertTrue(serviceLocations.waitForExistence(timeout: 3))
             guard serviceLocations.exists else { return }
-            serviceLocations.tap()
-            XCTAssertTrue(
-                app.navigationBars["Service Locations"].waitForExistence(timeout: 3)
-            )
-            guard app.navigationBars["Service Locations"].exists else { return }
+            guard tapUntilDestinationAppears(
+                serviceLocations,
+                destination: app.navigationBars["Service Locations"]
+            ) else { return }
         }
         let addServiceLocation = app.buttons["Add Service Location"].firstMatch
         XCTAssertTrue(addServiceLocation.waitForExistence(timeout: 3))
         let nameField = app.textFields["barn-name-field"]
-        for _ in 0..<2 {
-            addServiceLocation.tap()
-            if nameField.waitForExistence(timeout: 2) {
-                break
-            }
+        guard tapUntilDestinationAppears(addServiceLocation, destination: nameField) else {
+            return
         }
-        XCTAssertTrue(nameField.waitForExistence(timeout: 3))
-        guard nameField.exists else { return }
         focusAndType(name, in: nameField)
-        app.buttons["Save"].tap()
-        XCTAssertTrue(app.staticTexts["barn-row-\(name)"].waitForExistence(timeout: 3))
+        let barnRow = app.buttons["barn-row-\(name)"]
+        guard tapUntilDestinationAppears(app.buttons["Save"], destination: barnRow) else {
+            return
+        }
     }
 
     @MainActor
     private func openClient(_ name: String, in app: XCUIApplication) {
-        let clientRow = app.staticTexts["client-row-\(name)"]
+        let clientRow = app.buttons["client-row-\(name)"]
         if app.navigationBars["Service Locations"].exists {
             let clientsBackButton = app.navigationBars["Service Locations"].buttons["Clients"]
             XCTAssertTrue(clientsBackButton.waitForExistence(timeout: 3))
             clientsBackButton.tap()
             XCTAssertTrue(clientRow.waitForExistence(timeout: 5))
             guard clientRow.exists else { return }
-            clientRow.tap()
+            _ = tapUntilDestinationAppears(
+                clientRow,
+                destination: app.buttons["Add Horse"].firstMatch
+            )
             return
         }
         for _ in 0..<2 {
             if clientRow.waitForExistence(timeout: 2) {
-                clientRow.tap()
+                _ = tapUntilDestinationAppears(
+                    clientRow,
+                    destination: app.buttons["Add Horse"].firstMatch
+                )
                 return
             }
             let clientsBackButton = app.navigationBars.buttons["Clients"]
@@ -786,23 +818,22 @@ final class VisitCompletionUITests: XCTestCase {
         let addHorse = app.buttons["Add Horse"].firstMatch
         XCTAssertTrue(addHorse.waitForExistence(timeout: 3))
         let nameField = app.textFields["horse-name-field"]
-        for _ in 0..<2 {
-            addHorse.tap()
-            if nameField.waitForExistence(timeout: 2) {
-                break
-            }
-        }
-        XCTAssertTrue(nameField.waitForExistence(timeout: 3))
-        guard nameField.exists else { return }
+        guard tapUntilDestinationAppears(addHorse, destination: nameField) else { return }
         focusAndType(name, in: nameField)
-        app.buttons["horse-barn-picker"].tap()
+        let barnPicker = app.buttons["horse-barn-picker"]
         let barnOptions = app.buttons.matching(identifier: barnName)
-        XCTAssertTrue(barnOptions.firstMatch.waitForExistence(timeout: 3))
+        guard tapUntilDestinationAppears(
+            barnPicker,
+            destination: barnOptions.firstMatch
+        ) else { return }
         XCTAssertGreaterThan(barnOptions.count, 0)
         guard barnOptions.count > 0 else { return }
         barnOptions.element(boundBy: barnOptions.count - 1).tap()
-        app.navigationBars["New Horse"].buttons["Save"].tap()
-        XCTAssertTrue(app.staticTexts["horse-row-\(name)"].waitForExistence(timeout: 3))
+        let horseRow = app.buttons["horse-row-\(name)"]
+        guard tapUntilDestinationAppears(
+            app.navigationBars["New Horse"].buttons["Save"],
+            destination: horseRow
+        ) else { return }
     }
 
     @MainActor
@@ -816,15 +847,31 @@ final class VisitCompletionUITests: XCTestCase {
         }
         XCTAssertTrue(more.waitForExistence(timeout: 3))
         guard more.exists else { return }
-        more.tap()
         let services = app.buttons["Services"].firstMatch
-        XCTAssertTrue(services.waitForExistence(timeout: 3))
-        services.tap()
-        app.buttons["service-add-action"].tap()
-        focusAndType(name, in: app.textFields["service-name-field"])
+        for _ in 0..<2 where !services.exists {
+            more.tap()
+            _ = services.waitForExistence(timeout: 5)
+        }
+        XCTAssertTrue(services.exists)
+        guard services.exists else { return }
+        let addService = app.buttons["service-add-action"]
+        for _ in 0..<2 where !addService.exists {
+            services.tap()
+            _ = addService.waitForExistence(timeout: 5)
+        }
+        XCTAssertTrue(addService.exists)
+        guard addService.exists else { return }
+        let serviceNameField = app.textFields["service-name-field"]
+        for _ in 0..<2 where !serviceNameField.exists {
+            addService.tap()
+            _ = serviceNameField.waitForExistence(timeout: 5)
+        }
+        XCTAssertTrue(serviceNameField.exists)
+        guard serviceNameField.exists else { return }
+        focusAndType(name, in: serviceNameField)
         focusAndType(price, in: app.textFields["service-price-field"])
         app.buttons["Save"].tap()
-        XCTAssertTrue(app.staticTexts["service-row-\(name)"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["service-row-\(name)"].waitForExistence(timeout: 3))
         app.navigationBars.buttons["Clients"].tap()
     }
 
@@ -843,8 +890,14 @@ final class VisitCompletionUITests: XCTestCase {
         }
         XCTAssertTrue(addAppointment.waitForExistence(timeout: 3))
         guard addAppointment.exists else { return }
-        addAppointment.tap()
-        app.buttons["appointment-barn-picker"].tap()
+        let barnPicker = app.buttons["appointment-barn-picker"]
+        for _ in 0..<2 where !barnPicker.exists {
+            addAppointment.tap()
+            _ = barnPicker.waitForExistence(timeout: 5)
+        }
+        XCTAssertTrue(barnPicker.exists)
+        guard barnPicker.exists else { return }
+        barnPicker.tap()
         let barnOptions = app.buttons.matching(identifier: barnName)
         XCTAssertTrue(barnOptions.firstMatch.waitForExistence(timeout: 3))
         XCTAssertGreaterThan(barnOptions.count, 0)
@@ -863,12 +916,11 @@ final class VisitCompletionUITests: XCTestCase {
             XCTAssertTrue(accessibilityText(of: horseButton).contains("Selected"))
         }
         app.buttons["Save"].tap()
-        let appointmentRow = app.staticTexts["appointment-row-\(barnName)"]
-        let promotedAppointment = app.buttons["today-run-sheet-scheduled"]
-        XCTAssertTrue(
-            appointmentRow.waitForExistence(timeout: 3)
-                || promotedAppointment.waitForExistence(timeout: 3)
-        )
+        // The next half-hour can fall tomorrow, outside the Today run sheet.
+        app.tabBars.buttons["Schedule"].tap()
+        XCTAssertTrue(app.navigationBars["Schedule"].waitForExistence(timeout: 3))
+        let appointmentRow = app.buttons["appointment-row-\(barnName)"]
+        XCTAssertTrue(appointmentRow.waitForExistence(timeout: 3))
     }
 
     @MainActor
@@ -882,24 +934,51 @@ final class VisitCompletionUITests: XCTestCase {
         }
         let activeVisit = app.buttons["today-run-sheet-active"]
         if activeVisit.waitForExistence(timeout: 2) {
-            activeVisit.tap()
+            guard tapUntilAppointmentDetailAppears(activeVisit, in: app) else { return }
             return
         }
         let promotedAppointment = app.buttons["today-run-sheet-scheduled"]
         if promotedAppointment.waitForExistence(timeout: 2) {
-            promotedAppointment.tap()
+            guard tapUntilAppointmentDetailAppears(promotedAppointment, in: app) else {
+                return
+            }
             return
         }
-        let appointment = app.staticTexts["appointment-row-\(barnName)"]
+        app.tabBars.buttons["Schedule"].tap()
+        XCTAssertTrue(app.navigationBars["Schedule"].waitForExistence(timeout: 3))
+        let appointment = app.buttons["appointment-row-\(barnName)"]
         if appointment.waitForExistence(timeout: 3) {
-            appointment.tap()
+            guard tapUntilAppointmentDetailAppears(appointment, in: app) else { return }
             return
         }
         let scheduleRow = app.buttons.matching(
             NSPredicate(format: "label CONTAINS %@", barnName)
         ).firstMatch
         XCTAssertTrue(scheduleRow.waitForExistence(timeout: 3))
-        scheduleRow.tap()
+        guard scheduleRow.exists else { return }
+        _ = tapUntilAppointmentDetailAppears(scheduleRow, in: app)
+    }
+
+    @MainActor
+    private func tapUntilAppointmentDetailAppears(
+        _ appointment: XCUIElement,
+        in app: XCUIApplication
+    ) -> Bool {
+        for _ in 0..<2 {
+            guard bringIntoView(appointment, in: app) else { continue }
+            appointment.coordinate(
+                withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
+            ).tap()
+            if app.buttons["visit-start-action"].waitForExistence(timeout: 2)
+                || app.buttons["visit-resume-action"].waitForExistence(timeout: 2)
+                || app.buttons["visit-view-action"].waitForExistence(timeout: 2)
+                || app.buttons["visit-save-progress"].waitForExistence(timeout: 2)
+            {
+                return true
+            }
+        }
+        XCTFail("Expected appointment to open its detail")
+        return false
     }
 
     @MainActor
@@ -911,15 +990,15 @@ final class VisitCompletionUITests: XCTestCase {
         if app.descendants(matching: .any)["horse-detail-service-location"].exists {
             return
         }
-        let existingHorse = app.staticTexts["horse-row-\(horseName)"]
+        let existingHorse = app.buttons["horse-row-\(horseName)"]
         if existingHorse.exists {
             existingHorse.tap()
             return
         }
-        let client = app.staticTexts["client-row-\(clientName)"]
+        let client = app.buttons["client-row-\(clientName)"]
         XCTAssertTrue(client.waitForExistence(timeout: 3))
         client.tap()
-        let horse = app.staticTexts["horse-row-\(horseName)"]
+        let horse = app.buttons["horse-row-\(horseName)"]
         XCTAssertTrue(horse.waitForExistence(timeout: 3))
         horse.tap()
     }

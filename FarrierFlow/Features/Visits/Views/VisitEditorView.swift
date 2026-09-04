@@ -55,6 +55,7 @@ struct VisitEditorView: View {
                     Button("Cancel") {
                         requestDismissal()
                     }
+                    .tint(ColorTokens.textSecondary)
                 }
                 if subscription.allowsMutations, model.mode == .inProgress, model.loadState == .loaded {
                     ToolbarItem(placement: .topBarTrailing) {
@@ -65,6 +66,7 @@ struct VisitEditorView: View {
                         } label: {
                             Label("Actions", systemImage: "ellipsis.circle")
                         }
+                        .tint(ColorTokens.textSecondary)
                         .accessibilityIdentifier("visit-actions-menu")
                     }
                 }
@@ -76,6 +78,7 @@ struct VisitEditorView: View {
                             model.saveProgress()
                         }
                         .accessibilityIdentifier("visit-save-progress")
+                        .tint(ColorTokens.textSecondary)
                         .disabled(!model.canSaveProgress)
                         Spacer()
                         Button("Complete Visit") {
@@ -86,7 +89,7 @@ struct VisitEditorView: View {
                                 dismiss()
                             }
                         }
-                        .buttonStyle(.borderedProminent)
+                        .farrierFlowPrimaryAction()
                         .accessibilityIdentifier("visit-complete")
                         .disabled(!model.canComplete)
                     }
@@ -202,17 +205,19 @@ struct VisitEditorView: View {
                 if model.isDirty {
                     Section {
                         Text("Unsaved Changes")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ColorTokens.textSecondary)
                             .accessibilityIdentifier("visit-unsaved-state")
                     }
+                    .listRowBackground(ColorTokens.surface)
                 }
                 if model.mode == .inProgress,
                    let completionBlocker = model.completionBlocker {
                     Section("Complete Visit") {
                         Text(completionGuidance(for: completionBlocker))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ColorTokens.textSecondary)
                             .accessibilityIdentifier("visit-completion-requirement")
                     }
+                    .listRowBackground(ColorTokens.surface)
                 }
                 if model.canApplyWorkToHorses {
                     Section {
@@ -227,6 +232,7 @@ struct VisitEditorView: View {
                     } footer: {
                         Text("Copy recorded Services and prices to untouched horses.")
                     }
+                    .listRowBackground(ColorTokens.surface)
                 }
                 ForEach(draft.horses) { horse in
                     Section(horse.horseName) {
@@ -261,7 +267,7 @@ struct VisitEditorView: View {
                         if horse.outcome != .notServiced {
                             visitWorkItems(for: horse)
                         }
-                        NavigationLink {
+                        RecordNavigationLink {
                             PhotographCollectionView(
                                 visitHorseID: horse.id,
                                 horseName: horse.horseName,
@@ -275,8 +281,10 @@ struct VisitEditorView: View {
                         }
                         .accessibilityIdentifier("visit-photographs-\(horse.horseName)")
                     }
+                    .listRowBackground(ColorTokens.surface)
                 }
             }
+            .farrierFlowScrollBackground()
             .scrollDismissesKeyboard(.interactively)
             .sheet(item: $addServiceHorse) { horse in
                 NavigationStack {
@@ -315,11 +323,11 @@ struct VisitEditorView: View {
     private func visitWorkItems(for horse: VisitHorseDraft) -> some View {
         Text("Services")
             .font(Typography.recordMetadata)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(ColorTokens.textSecondary)
 
         if horse.workItems.isEmpty {
             Text("No Recorded Services")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ColorTokens.textSecondary)
                 .accessibilityIdentifier("visit-work-items-empty-\(horse.horseName)")
         } else {
             ForEach(horse.workItems) { workItem in
@@ -368,7 +376,7 @@ struct VisitEditorView: View {
         } else {
             Text("Subtotal Unavailable")
                 .font(Typography.recordMetadata)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ColorTokens.textSecondary)
                 .accessibilityIdentifier("visit-work-item-subtotal-\(horse.horseName)")
         }
     }
@@ -384,13 +392,13 @@ struct VisitEditorView: View {
                 if workItem.serviceIsArchived {
                     Text("Archived")
                         .font(Typography.recordMetadata)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ColorTokens.textSecondary)
                 }
             }
             Spacer(minLength: SpacingTokens.rowContent)
             Text(formattedAmount(for: workItem))
                 .font(Typography.recordMetadata)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ColorTokens.textSecondary)
                 .monospacedDigit()
                 .accessibilityIdentifier(
                     "visit-work-item-amount-\(horse.horseName)-\(workItem.serviceNameSnapshot)"

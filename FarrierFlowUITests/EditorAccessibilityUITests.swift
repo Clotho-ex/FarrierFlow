@@ -8,6 +8,7 @@ final class EditorAccessibilityUITests: XCTestCase {
             "EditorAccessibility-\(UUID().uuidString)"
         app.launch()
 
+        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 5))
         openClients(in: app)
         let addClient = app.buttons["Add Client"].firstMatch
         XCTAssertTrue(addClient.waitForExistence(timeout: 10))
@@ -48,7 +49,7 @@ final class EditorAccessibilityUITests: XCTestCase {
         )
         app.buttons["appointment-add-horse"].tap()
         app.buttons["horse-more-details"].tap()
-        XCTAssertTrue(app.textViews["Safety Notes"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.textViews["Additional Notes"].waitForExistence(timeout: 3))
         let horseName = app.textFields["horse-name-field"]
         XCTAssertTrue(horseName.waitForExistence(timeout: 3))
         horseName.tap()

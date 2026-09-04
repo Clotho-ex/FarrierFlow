@@ -56,7 +56,7 @@ struct AddServicePickerView: View {
                             Spacer(minLength: SpacingTokens.rowContent)
                             Text(formattedAmount(for: service))
                                 .font(Typography.recordMetadata)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(ColorTokens.textSecondary)
                                 .monospacedDigit()
                         }
                     }
@@ -64,9 +64,12 @@ struct AddServicePickerView: View {
                     .accessibilityLabel("\(service.name), \(formattedAmount(for: service))")
                     .accessibilityHint(replacingWorkItemID == nil ? "Add Service" : "Replace Service")
                     .accessibilityIdentifier("visit-service-option-\(service.name)")
+                    .listRowBackground(ColorTokens.surface)
                 }
+                .farrierFlowScrollBackground()
             }
         }
+        .farrierFlowScreenBackground()
         .navigationTitle(replacingWorkItemID == nil ? "Add Service" : "Replace Service")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showsServiceEditor, onDismiss: addCreatedServiceIfNeeded) {

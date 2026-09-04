@@ -29,7 +29,9 @@ struct InvoiceVisitSelectionRow: View {
     private func selectionAndVisit(includesSubtotal: Bool) -> some View {
         HStack(alignment: .top, spacing: SpacingTokens.rowContent) {
             Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                .foregroundStyle(
+                    isSelected ? ColorTokens.brandPrimary : ColorTokens.textSecondary
+                )
                 .imageScale(.large)
             VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
                 Text(
@@ -39,7 +41,7 @@ struct InvoiceVisitSelectionRow: View {
                 .font(Typography.recordTitle)
                 Text(choice.serviceLocationName)
                     .font(Typography.recordMetadata)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ColorTokens.textSecondary)
                 if includesSubtotal {
                     subtotalText
                 }
@@ -50,7 +52,7 @@ struct InvoiceVisitSelectionRow: View {
     private var subtotalText: some View {
         Text(subtotal)
             .font(Typography.recordMetadata)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(ColorTokens.textSecondary)
     }
 
     private var accessibilityLabel: String {

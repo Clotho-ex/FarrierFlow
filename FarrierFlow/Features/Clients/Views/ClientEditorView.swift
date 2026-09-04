@@ -42,13 +42,16 @@ struct ClientEditorView: View {
                     }
                     .accessibilityIdentifier("client-more-details")
                 }
+                .listRowBackground(ColorTokens.surface)
             }
+            .farrierFlowScrollBackground()
             .disabled(!subscription.allowsMutations)
             .navigationTitle(model.clientID == nil ? "New Client" : "Edit Client")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .tint(ColorTokens.textSecondary)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {

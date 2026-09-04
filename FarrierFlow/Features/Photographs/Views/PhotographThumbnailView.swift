@@ -63,7 +63,7 @@ struct PhotographThumbnailContentView: View {
     let showsUnavailableState: Bool
 
     var body: some View {
-        Color.secondary.opacity(0.12)
+        ColorTokens.surfaceElevated
             .aspectRatio(1, contentMode: .fit)
             .overlay {
                 if let image {
@@ -76,7 +76,7 @@ struct PhotographThumbnailContentView: View {
                         Text("Unavailable")
                             .font(.caption)
                     }
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ColorTokens.textSecondary)
                 } else {
                     ProgressView()
                 }

@@ -10,6 +10,8 @@ struct UITestLaunchConfiguration {
     static let scenarioEnvironmentKey = "FARRIERFLOW_UI_TEST_SCENARIO"
     static let dynamicTypeSizeEnvironmentKey =
         "FARRIERFLOW_UI_TEST_DYNAMIC_TYPE_SIZE"
+    static let colorSchemeEnvironmentKey =
+        "FARRIERFLOW_UI_TEST_COLOR_SCHEME"
     static let subscriptionAccessEnvironmentKey =
         "FARRIERFLOW_UI_TEST_SUBSCRIPTION_ACCESS"
 
@@ -17,7 +19,14 @@ struct UITestLaunchConfiguration {
     let forcesCameraUnavailable: Bool
     let scenario: UITestScenario?
     let dynamicTypeSize: DynamicTypeSize?
+    let colorScheme: ColorScheme?
     let subscriptionAccess: SubscriptionUITestAccess
+
+    var onboardingDefaults: UserDefaults {
+        guard let storeURL else { return .standard }
+        let suiteName = "FarrierFlow.UITests.\(storeURL.deletingPathExtension().lastPathComponent)"
+        return UserDefaults(suiteName: suiteName) ?? .standard
+    }
 
     init(processInfo: ProcessInfo = .processInfo) {
         forcesCameraUnavailable =
@@ -29,6 +38,16 @@ struct UITestLaunchConfiguration {
         ] {
         case "accessibility5":
             .accessibility5
+        default:
+            nil
+        }
+        colorScheme = switch processInfo.environment[
+            Self.colorSchemeEnvironmentKey
+        ] {
+        case "dark":
+            .dark
+        case "light":
+            .light
         default:
             nil
         }
@@ -94,6 +113,7 @@ nonisolated enum SubscriptionUITestAccess: String, Sendable {
     case purchaseCancellation = "purchase-cancellation"
     case purchaseFailure = "purchase-failure"
     case restoreSuccess = "restore-success"
+    case noTrial = "no-trial"
     case outage
     case updatePro = "update-pro"
 }
@@ -115,9 +135,33 @@ struct UITestSubscriptionClient: SubscriptionClient {
         if configuration.subscriptionAccess == .outage {
             throw SubscriptionUITestError.expected
         }
+        let trial: SubscriptionTrial? = configuration.subscriptionAccess == .noTrial
+            ? nil
+            : .init(duration: 2, unit: .week)
         return [
-            .init(id: "annual", productID: SubscriptionProduct.yearly, kind: .annual, displayName: "Annual", localizedPrice: "$119.99", subscriptionPeriod: "year"),
-            .init(id: "monthly", productID: SubscriptionProduct.monthly, kind: .monthly, displayName: "Monthly", localizedPrice: "$14.99", subscriptionPeriod: "month"),
+            .init(
+                id: "annual",
+                productID: SubscriptionProduct.yearly,
+                kind: .annual,
+                displayName: "Annual",
+                localizedPrice: "$119.99",
+                localizedMonthlyEquivalent: "$10.00",
+                price: Decimal(string: "119.99"),
+                currencyCode: "USD",
+                subscriptionPeriod: "year",
+                introductoryTrial: trial
+            ),
+            .init(
+                id: "monthly",
+                productID: SubscriptionProduct.monthly,
+                kind: .monthly,
+                displayName: "Monthly",
+                localizedPrice: "$14.99",
+                price: Decimal(string: "14.99"),
+                currencyCode: "USD",
+                subscriptionPeriod: "month",
+                introductoryTrial: trial
+            ),
         ]
     }
 

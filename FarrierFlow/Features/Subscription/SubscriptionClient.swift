@@ -24,13 +24,136 @@ nonisolated enum SubscriptionPlanKind: Sendable, Equatable {
     case annual
 }
 
+nonisolated enum SubscriptionTrialUnit: Sendable, Equatable {
+    case day
+    case week
+    case month
+    case year
+}
+
+nonisolated struct SubscriptionTrial: Sendable, Equatable {
+    let duration: Int
+    let unit: SubscriptionTrialUnit
+
+    var localizedCallout: LocalizedStringResource {
+        switch unit {
+        case .day:
+            "\(duration) days free"
+        case .week:
+            "\(duration) weeks free"
+        case .month:
+            "\(duration) months free"
+        case .year:
+            "\(duration) years free"
+        }
+    }
+}
+
 nonisolated struct SubscriptionPlan: Sendable, Equatable, Identifiable {
     let id: String
     let productID: String
     let kind: SubscriptionPlanKind
     let displayName: String
     let localizedPrice: String
+    let localizedMonthlyEquivalent: String?
+    let price: Decimal?
+    let currencyCode: String?
     let subscriptionPeriod: String
+    let introductoryTrial: SubscriptionTrial?
+
+    init(
+        id: String,
+        productID: String,
+        kind: SubscriptionPlanKind,
+        displayName: String,
+        localizedPrice: String,
+        localizedMonthlyEquivalent: String? = nil,
+        price: Decimal? = nil,
+        currencyCode: String? = nil,
+        subscriptionPeriod: String,
+        introductoryTrial: SubscriptionTrial? = nil
+    ) {
+        self.id = id
+        self.productID = productID
+        self.kind = kind
+        self.displayName = displayName
+        self.localizedPrice = localizedPrice
+        self.localizedMonthlyEquivalent = localizedMonthlyEquivalent
+        self.price = price
+        self.currencyCode = currencyCode
+        self.subscriptionPeriod = subscriptionPeriod
+        self.introductoryTrial = introductoryTrial
+    }
+}
+
+nonisolated enum SubscriptionSavingsRules {
+    static func annualSavingsPercentage(
+        monthly: SubscriptionPlan,
+        annual: SubscriptionPlan
+    ) -> Int? {
+        guard
+            monthly.kind == .monthly,
+            annual.kind == .annual,
+            let monthlyPrice = monthly.price,
+            let annualPrice = annual.price,
+            monthlyPrice > 0,
+            annualPrice > 0,
+            let monthlyCurrency = monthly.currencyCode,
+            monthlyCurrency == annual.currencyCode
+        else {
+            return nil
+        }
+
+        let annualizedMonthlyPrice = monthlyPrice * 12
+        guard annualPrice < annualizedMonthlyPrice else { return nil }
+
+        let savings = ((annualizedMonthlyPrice - annualPrice) / annualizedMonthlyPrice) * 100
+        return Int(NSDecimalNumber(decimal: savings).doubleValue.rounded())
+    }
+}
+
+nonisolated enum OnboardingSubscriptionDecisionRules {
+    static func purchasePlanID(
+        selectedPlanID: String?,
+        availablePlans: [SubscriptionPlan]
+    ) -> String? {
+        guard
+            let selectedPlanID,
+            availablePlans.contains(where: { $0.id == selectedPlanID })
+        else {
+            return nil
+        }
+        return selectedPlanID
+    }
+}
+
+nonisolated enum SubscriptionPurchaseCopy {
+    static func actionTitle(
+        for plan: SubscriptionPlan
+    ) -> LocalizedStringResource {
+        guard let trial = plan.introductoryTrial else {
+            return "Subscribe"
+        }
+        switch trial.unit {
+        case .day:
+            return "Start \(trial.duration)-Day Free Trial"
+        case .week:
+            return "Start \(trial.duration)-Week Free Trial"
+        case .month:
+            return "Start \(trial.duration)-Month Free Trial"
+        case .year:
+            return "Start \(trial.duration)-Year Free Trial"
+        }
+    }
+
+    static func disclosure(
+        for plan: SubscriptionPlan
+    ) -> LocalizedStringResource {
+        if let trial = plan.introductoryTrial {
+            return "\(trial.localizedCallout), then \(plan.localizedPrice)/\(plan.subscriptionPeriod). Cancel anytime."
+        }
+        return "\(plan.localizedPrice)/\(plan.subscriptionPeriod). Renews automatically. Cancel anytime."
+    }
 }
 
 nonisolated struct SubscriptionPurchaseResult: Sendable, Equatable {

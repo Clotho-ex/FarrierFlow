@@ -31,6 +31,7 @@ struct PhotographCollectionView: View {
 
     var body: some View {
         content
+            .farrierFlowScreenBackground()
             .overlay {
                 if model.isProcessing {
                     ProgressView("Processing Photo…")
@@ -173,7 +174,7 @@ struct PhotographCollectionView: View {
                        model.availableCount >= PhotographConstants.maximumPhotographsPerVisitHorse {
                         Text("This horse has 16 photos. Delete one before adding another.")
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ColorTokens.textSecondary)
                             .padding(.horizontal)
                             .accessibilityIdentifier("photograph-limit-message")
                     }
@@ -201,7 +202,7 @@ struct PhotographCollectionView: View {
                     .font(.subheadline.weight(.semibold))
                 loadFailureMessage
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ColorTokens.textSecondary)
             }
             Spacer()
             Button("Retry") {
@@ -320,10 +321,11 @@ private struct PhotographGridItemView: View {
             HStack {
                 Text(item.createdAt, format: .dateTime.month().day().year())
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ColorTokens.textSecondary)
                 Spacer()
                 if let onDelete {
                     Button("Delete", systemImage: "trash", role: .destructive, action: onDelete)
+                        .foregroundStyle(ColorTokens.destructive)
                         .labelStyle(.iconOnly)
                         .frame(minWidth: 44, minHeight: 44)
                 }

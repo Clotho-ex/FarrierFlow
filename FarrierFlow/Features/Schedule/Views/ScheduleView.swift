@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct ScheduleView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var path = NavigationPath()
@@ -28,19 +29,30 @@ struct ScheduleView: View {
                         ForEach(model.sections) { section in
                             Section(section.dayStart.formatted(date: .complete, time: .omitted)) {
                                 ForEach(section.appointments, id: \.persistentModelID) { appointment in
-                                    NavigationLink(
+                                    RecordNavigationLink(
                                         value: ScheduleRoute.detail(
                                             appointment.persistentModelID
                                         )
                                     ) {
                                         AppointmentRow(appointment: appointment)
                                     }
+                                    .badge(dynamicTypeSize.isAccessibilitySize ? nil : appointment.visit.map { visit in
+                                        Text(visit.completedAt == nil ? "In Progress" : "Completed")
+                                            .foregroundStyle(
+                                                visit.completedAt == nil
+                                                    ? ColorTokens.brandActionText
+                                                    : ColorTokens.success
+                                            )
+                                    })
                                 }
                             }
+                            .listRowBackground(ColorTokens.surface)
                         }
                     }
+                    .farrierFlowScrollBackground()
                 }
             }
+            .farrierFlowScreenBackground()
             .navigationTitle("Schedule")
             .toolbar {
                 if subscription.allowsMutations {

@@ -42,6 +42,10 @@ FarrierFlow/
 ├── Core/
 │   ├── DesignSystem/
 │   │   ├── ColorTokens.swift
+│   │   ├── FarrierFlowSurface.swift
+│   │   ├── StatusBadge.swift
+│   │   ├── RecordNavigationLink.swift
+│   │   ├── ElevationTokens.swift
 │   │   ├── SpacingTokens.swift
 │   │   └── Typography.swift
 │   ├── Persistence/
@@ -104,16 +108,68 @@ directory.
 
 ## App Composition
 
+`ColorTokens` owns the adaptive app palette, including Light, Dark, and
+Increased Contrast resolution. Feature views use semantic roles rather than
+RGB literals. The global accent and launch assets mirror the appropriate brand
+and canvas values for system rendering before SwiftUI starts. Native navigation,
+materials, alerts, destructive roles, pressed states, and disabled behavior stay
+system-owned. `farrierFlowPrimaryAction()` keeps native prominent-button geometry
+and supplies a contrast-safe foreground; `StatusBadge` pairs semantic color with
+text and a symbol in the invoice detail header. List-row statuses use native
+`.badge(Text(...))`, with plain inline status text at accessibility sizes to preserve
+record width; no custom row-heading or badge-placement component is needed.
+`RootView` hides navigation-link disclosure indicators through the native
+environment modifier. `RecordNavigationLink` also supports iOS 18, whose List
+rendering ignores that modifier: the visible label uses a transparent native link
+behind it, with the native link retained as its accessibility representation.
+Existing values, destinations, and navigation paths are preserved. Invoice PDF
+colors remain a separate print-only boundary.
+Dynamic color and elevation providers are explicitly nonisolated: SwiftUI may
+resolve UIKit colors on its asynchronous renderer. They capture only immutable
+values and read the supplied traits; no app state or UI work belongs there.
+
 `FarrierFlowApp` creates the production `ModelContainer`, one
 `PhotographLibrary`, and one `SubscriptionAccessModel`, then supplies them
 through SwiftUI's environment. The small composition value owns the concrete
 Photograph file store and RevenueCat subscription client; it is neither a mutable
 global singleton nor a service locator.
 
-`RootView` owns first-run routing, the root `TabView`, and the selected tab.
-When no valid BusinessProfile exists, it presents owner setup before exposing
-the operational tabs. After the required identity step succeeds, it opens on
-Today and contains three tabs:
+`RootView` owns one deterministic first-run router, the root `TabView`, and the
+selected tab. `OnboardingExperienceModel` persists a versioned completion
+marker, current incomplete step, and two first-use hint flags in `UserDefaults`;
+none of that state belongs to SwiftData or changes entitlement. A fresh install
+sees Business, Briefing, and Subscription before the operational tabs. Briefing
+and Subscription are represented by a typed native `NavigationStack` path above
+the Business root.
+Resolving a persisted step reconstructs every preceding route, while popping a
+route persists the newly active step without deleting already-saved domain
+data. A same-version legacy Workflow marker from an interrupted build is
+normalized to Business when identity is invalid or Briefing when identity is
+valid. The old Welcome marker normalizes to Business, the new Briefing marker
+uses its own raw value, and the onboarding version remains `1`.
+
+Business, Briefing, and Subscription render their centered onboarding hero inside a
+native `ScrollView`. iOS 18 scroll geometry toggles only the centered toolbar
+title as the hero leaves the viewport; the `NavigationStack`, back button,
+interactive pop gesture, toolbar material, safe areas, and route persistence
+remain system-owned. Briefing has no runtime splash or artificial delay.
+Business Continue, Briefing Continue, and onboarding Subscription Continue use the
+same native prominent button treatment without adding custom label height;
+all three onboarding screens share the adaptive brand background, including
+their safe-area action regions. The shared pinned-title scroll surface also
+keeps the navigation bar on that background, while form controls use a raised
+brand-toned surface. `FarrierFlowApp` applies the San Francisco Rounded design
+at the root, while semantic text styles and monospaced numeric overrides remain
+owned by their views. None participates in routing or completion state beyond
+sending its existing action. Briefing's workflow context is one equal-weight
+vertical semantic sequence whose grouped accessibility labels announce each
+stage's purpose and ordered position. Its entire visual hierarchy reveals from
+top to bottom, with light haptics synchronized only to the four workflow rows.
+Reduce Motion exposes all content immediately and suppresses those automatic
+haptics. Continue actions and subscription selection use SwiftUI's native
+sensory-feedback modifiers without influencing routing state. Business keeps
+its hero and identity form in one vertically balanced scroll composition that
+can still move for the keyboard or Dynamic Type.
 
 1. Today
 2. Schedule
@@ -122,22 +178,45 @@ Today and contains three tabs:
 Each tab owns a separate `NavigationStack` and path. Switching tabs therefore
 does not discard navigation state or combine unrelated routes.
 
-Owner setup is resumable from persisted truth and derives solely from the
-single BusinessProfile. First run asks for its required name, then opens Today.
+Owner setup applies an onboarding-only name preflight before reusing the single
+BusinessProfile validation and save boundary. The preflight permits letters,
+numbers, and spaces and rejects a conservative whole-word English vulgarity
+set; the ordinary full Business Profile editor and previously valid business
+records retain their existing rules. An
+interrupted launch resumes from its small persisted step marker and preserves
+saved identity. A valid profile does not skip an explicitly resumed Business
+route, because that route may have been reached by native back navigation. A
+workspace with valid identity and no legacy completion marker is intentionally
+treated as completed compatibility state. Stale or mismatched interrupted
+markers restart safely at Business.
 Service, Service Location, customer-record, contact, and owner-default setup
 remain owned by their contextual features and never block identity completion.
 
-`RootView` resolves subscription access and owner-setup readiness independently.
-A verified entitlement with no BusinessProfile opens the existing owner setup.
-No entitlement and no BusinessProfile opens the Subscription welcome surface.
-No entitlement with an existing BusinessProfile opens the ordinary tabs in
-read-only mode. A loading entitlement never exposes mutation controls.
+`RootView` resolves subscription access, onboarding, and owner-setup readiness
+independently. Onboarding reads `SubscriptionAccessModel` only when choosing
+whether to skip or present the existing paywall. Pro completes that handoff;
+Free and Unavailable can continue into the existing safe read-only app, and
+Retry remains available. Onboarding identity saving is the sole narrow setup
+exception to ordinary Pro mutation gates; operational business mutations remain
+Pro-only.
+
+The RevenueCat adapter also projects each StoreKit product's numeric price and
+currency code alongside its localized display price. The localized string stays
+authoritative for display; a pure rule compares twelve monthly prices with the
+yearly price only when both positive values share a currency, then exposes a
+rounded savings percentage. Onboarding selects the available yearly plan by
+default, falling back to monthly when yearly is unavailable. Continue resolves
+to read-only when selection is absent or stale, and to the existing purchase
+operation only for a currently available selected plan. Trial,
+renewal, cancellation, restore, retry, and legal behavior remain projected from
+the existing subscription boundary.
 
 ## Route and Presentation Ownership
 
-- Onboarding owns only first-run identity gating. It calls the existing
-  BusinessProfile validation and persistence boundary; it does not retain
-  Services or Barns feature models or duplicate their domain rules.
+- Onboarding owns first-run presentation and its small non-domain preferences.
+  It calls existing BusinessProfile and subscription boundaries; it does not
+  retain Services or Barns feature models, determine entitlement, or duplicate
+  domain rules.
 - Today owns the action-led Run Sheet hub, ranked next-action projection,
   chronological appointment workline, setup-readiness projection, and
   Today-specific routes. Its promoted Appointment or Visit summary replaces

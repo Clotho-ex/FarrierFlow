@@ -42,6 +42,8 @@ final class RevenueCatSubscriptionClient: SubscriptionClient, @unchecked Sendabl
         else {
             throw SubscriptionPlanValidationError.invalidOffering
         }
+        let introEligibility = await purchases
+            .checkTrialOrIntroDiscountEligibility(packages: packages)
         let plans = try packages.map { package in
             guard let kind = SubscriptionProduct.kind(
                 for: package.storeProduct.productIdentifier
@@ -58,9 +60,17 @@ final class RevenueCatSubscriptionClient: SubscriptionClient, @unchecked Sendabl
                 kind: kind,
                 displayName: package.storeProduct.localizedTitle,
                 localizedPrice: package.localizedPriceString,
+                localizedMonthlyEquivalent: kind == .annual
+                    ? package.storeProduct.localizedPricePerMonth
+                    : nil,
+                price: package.storeProduct.price,
+                currencyCode: package.storeProduct.currencyCode,
                 subscriptionPeriod: kind == .monthly
                     ? String(localized: "month")
-                    : String(localized: "year")
+                    : String(localized: "year"),
+                introductoryTrial: introEligibility[package]?.status.isEligible == true
+                    ? trial(from: package.storeProduct.introductoryDiscount)
+                    : nil
             )
         }
         let validated = try SubscriptionPlanRules.validated(plans)
@@ -101,5 +111,26 @@ final class RevenueCatSubscriptionClient: SubscriptionClient, @unchecked Sendabl
         SubscriptionCustomerRules.snapshot(
             activeEntitlementIDs: Set(customerInfo.entitlements.active.keys)
         )
+    }
+
+    private func trial(
+        from discount: StoreProductDiscount?
+    ) -> SubscriptionTrial? {
+        guard let discount, discount.paymentMode == .freeTrial else { return nil }
+        let period = discount.subscriptionPeriod
+        let (duration, overflow) = period.value.multipliedReportingOverflow(
+            by: discount.numberOfPeriods
+        )
+        guard !overflow, duration > 0 else { return nil }
+        let unit: SubscriptionTrialUnit?
+        switch period.unit {
+        case .day: unit = .day
+        case .week: unit = .week
+        case .month: unit = .month
+        case .year: unit = .year
+        @unknown default: unit = nil
+        }
+        guard let unit else { return nil }
+        return SubscriptionTrial(duration: duration, unit: unit)
     }
 }

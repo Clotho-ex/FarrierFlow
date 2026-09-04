@@ -6,7 +6,7 @@ description: A native field book for running an independent farrier business.
 <!-- SEED: established with the user before implementation; re-run $impeccable document once there's code to capture the actual tokens and components. -->
 <!--
 THESIS: FarrierFlow turns one continuous service cycle into a legible field workline; it refuses both blank form stacks and generic card dashboards.
-OWN-WORLD: Native iOS surfaces, Survey Ink action fields, ruled alignment, compact metadata, generous action spacing, and flat tonal hierarchy.
+OWN-WORLD: Warm native iOS surfaces, precise orange actions, ruled alignment, compact metadata, generous action spacing, and flat tonal hierarchy.
 STORY: The farrier sets up the business once, sees the next truthful action, completes work in sequence, and retains connected history.
 FIRST VIEWPORT: Business identity and date lead into a state-adaptive Run Sheet. Next Stop or active Visit owns one edge-to-edge action field; remaining work continues chronologically below.
 FORM: Field Book world with approved Run Sheet synthesis of Next Stop Band and Active Work; surface seed 6dbeb15b. Both rolls were degraded and supplied no catalog challengers.
@@ -48,18 +48,79 @@ purchase progress, restore, retry, legal links, and Apple's native Manage
 Subscription sheet. It does not use a generic vendor paywall or external
 checkout.
 
+Release onboarding is a concise Field Briefing: required Business identity, a
+calm workflow briefing, then Subscription. The briefing carries the workflow in one
+vertical Appointment-to-Payment workline. Every stage has equal visual weight:
+Neutral icons and a thin connecting line carry the relationship, while
+primary titles and short secondary benefits keep the sequence useful without
+making it a tutorial. A centered brand lockup and muted two-line field headline
+establish hierarchy above the leading-aligned workline, with deliberate space
+separating product identity from workflow context. Business, Briefing, and
+Subscription share one adaptive Field Book background: warm cream in Light
+Mode and warm charcoal in Dark Mode. Raised identity controls use a related
+tonal surface; no onboarding action sits on a separate material strip.
+Business Continue, Briefing Continue, and onboarding Subscription Continue use the
+same native prominent control without extra label height, so platform sizing,
+states, and interaction remain consistent.
+
+Business presents its centered hero and identity form as one vertically balanced
+composition: ownership prompt, short trust-led reason, focused field, and centered
+invoice/change-later guidance. The form remains the visual center of gravity
+rather than splitting the screen into unrelated empty regions.
+Its hero scrolls away into a standard inline navigation title. Subscription uses
+the same title behavior, one capsule Monthly/Yearly selector, and one raised
+detail panel that changes billing/value context without inventing entitlement
+differences. Yearly is selected by default and may show only StoreKit-derived
+savings and monthly-equivalent values. The native
+Continue action retains a truthful trial or renewal disclosure immediately
+below it. The selected billing segment uses `brandTint` with readable
+`brandActionText`; solid orange is reserved for the purchase CTA. Brand orange
+marks only focus, selection, and the primary action. Business and Subscription
+enter with a short Reduce-Motion-safe fade and rise. Briefing uses one authored
+top-to-bottom reveal: mark, product name,
+supporting line, workline title, then each workline stage. Only those four
+workline arrivals produce a light haptic; native Continue and plan-selection
+interactions use restrained confirmation and selection feedback. Reduce Motion
+reveals content immediately and suppresses automatic haptics. The system launch
+screen contains only the app mark on a matching adaptive background. There is
+no progress bar, animated splash, carousel, feature grid, or success screen.
+
+## Record and Status Alignment
+
+List rows use SwiftUI `.badge(Text(...))` for status, without custom status
+containers or decorative status symbols. Native layout owns trailing badge placement.
+At accessibility text sizes, use plain status text below the record instead so a
+trailing badge cannot squeeze its label into a narrow column. Paid/completed text
+may use semantic green; ordinary
+unpaid/pending labels use readable secondary text without an extra warning
+treatment. Actual warning callouts retain amber. Hide navigation-link disclosure
+indicators app-wide with `RecordNavigationLink`, using the native visibility
+modifier on iOS 26 and a shared compatibility treatment on iOS 18. Retain native
+NavigationLink interaction, accessibility, and back navigation. Keep supporting record text
+leading-aligned. Invoice detail amounts and captions share a trailing edge in
+two-column layouts and a leading edge when stacked.
+
 ## Colors
 
-Use a restrained strategy: semantic iOS neutrals plus one blue-green
-**Survey Ink** accent. The existing Accent Color asset is the starting primary
-and remains subject to implementation-time contrast validation. System red,
-orange, and green communicate destructive, warning, and success states only;
-they are not brand decoration.
+Use the centralized `ColorTokens` palette: `#BF5700` brand actions, warm cream
+`#F4F0EB` canvases, `#FAF8F5` surfaces, and `#24211E` readable ink. Dark Mode
+uses warm charcoal `#171513` / `#211E1B` / `#2A2622` and `#E06C12` actions.
+Green means paid or completed, amber means attention, red means failed or
+destructive, and blue-gray is reserved for neutral system information.
 
-**The Ink Rarity Rule.** Survey Ink identifies the primary action, current
-selection, and active progress. Today may spend it on one edge-to-edge Run
-Sheet action field for a current-day Appointment or active Visit. It must not
-tint every label, icon, divider, or container.
+**The Orange Rarity Rule.** Orange identifies the primary action, current
+selection, and active progress. Today uses a quiet brand tint for its promoted
+action, not a saturated orange field. Ordinary icons, metadata, cards, and
+dividers remain neutral. Small action text uses the darker brand shade on
+light surfaces; solid primary actions retain `#BF5700`. Never communicate
+important state through color alone.
+
+Primary-button labels are white in Light Mode and warm ink in Dark Mode;
+disabled labels use a neutral readable foreground with native disabled surfaces.
+Small orange action text uses `brandActionText` (`#8F4100` / `#E57820`), not
+the solid-button fill, to maintain contrast on tinted surfaces. Dark semantic
+tints are opaque so their contrast does not change when nested in a selected
+control. The print-only invoice renderer keeps its separate document palette.
 
 **The Daylight Rule.** Primary content and actions must remain immediately
 legible in Light Mode, Dark Mode, and Increased Contrast. Never place essential
@@ -67,13 +128,15 @@ text on a photographic or low-contrast tinted field.
 
 ## Typography
 
-Use the San Francisco system family and semantic SwiftUI text styles. The
-Field Book character comes from disciplined hierarchy and alignment, not a
-custom typeface. Use monospaced digits only for times, invoice numbers, money,
-and progress counts where stable alignment improves scanning.
+Use the San Francisco system family with the Rounded design applied at the app
+root and semantic SwiftUI text styles throughout. The Field Book character comes
+from disciplined hierarchy and alignment, not a custom typeface. Use monospaced
+digits only for times, invoice numbers, money, and progress counts where stable
+alignment improves scanning.
 
 - `largeTitle` and `title`: screen identity only; never oversized dashboard
-  display text.
+  display text. Onboarding may use a centered scaled `largeTitle` hero that
+  hands off to the native inline navigation title when scrolled.
 - `title2` and `headline`: next action, record name, and section priority.
 - `body` and `callout`: instructions, values, and operational detail.
 - `subheadline`, `footnote`, and `caption`: metadata and secondary explanation;
@@ -118,10 +181,12 @@ points.
 ## Elevation & Depth
 
 FarrierFlow is flat by default. Use native grouped backgrounds, separators,
-selection, toolbar materials, sheets, and navigation depth. Do not add custom
-drop shadows, floating glass cards, bevels, or paper textures. A sheet may feel
-elevated because iOS presents it that way; content does not manufacture a
-second elevation system inside it.
+selection, toolbar materials, sheets, and navigation depth. One adaptive Field
+Book elevation token is reserved for genuinely raised custom surfaces: the
+onboarding identity field, Pro selector and detail panel, and transient
+operation or retry overlays. Native lists, forms, Today content, rows, and
+ordinary controls remain shadow-free. Do not add floating glass cards, bevels,
+or paper textures.
 
 **The Native Depth Rule.** Navigation and system presentation create depth.
 Content hierarchy uses spacing, type, tone, and rules.
@@ -136,6 +201,12 @@ photographs must not each become rounded cards.
 Progress marks and the workline use precise circles, rules, and aligned edges.
 These are functional state indicators, not decorative icon containers.
 
+Onboarding uses borders only when they communicate a real decision or grouping:
+the Business field focus state and the selected Pro period. The compact Pro
+selector, its single changing detail panel, and the identity field use the one
+adaptive elevation token to separate them from the continuous Field Book
+background without introducing nested cards or glass.
+
 ## Do's and Don'ts
 
 ### Do:
@@ -146,7 +217,8 @@ These are functional state indicators, not decorative icon containers.
 - **Do** lead each state with one next valid action and keep alternate actions
   native and secondary.
 - **Do** use a truthful progress count or workline when completion has defined
-  steps.
+  steps. Welcome may name Appointment, Visit, Invoice, and Payment once in a
+  concise statement; it is context, not interactive progress.
 - **Do** save reusable owner defaults once and visibly show when a field is
   using one.
 - **Do** use real hoof photographs only in their approved VisitHorse context.

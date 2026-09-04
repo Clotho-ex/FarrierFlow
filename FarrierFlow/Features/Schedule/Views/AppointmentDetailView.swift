@@ -66,6 +66,7 @@ struct AppointmentDetailView: View {
                             LabeledContent("Notes", value: notes)
                         }
                     }
+                    .listRowBackground(ColorTokens.surface)
                     Section("Horses") {
                         ForEach(appointment.appointmentHorses, id: \.persistentModelID) { join in
                             if let horse = join.horse {
@@ -83,37 +84,45 @@ struct AppointmentDetailView: View {
                                             )
                                     )
                                         .font(Typography.recordMetadata)
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(ColorTokens.textSecondary)
                                     if let phone = horse.client?.phone {
                                         Text(phone)
                                             .font(Typography.recordMetadata)
-                                            .foregroundStyle(.secondary)
+                                            .foregroundStyle(ColorTokens.textSecondary)
                                     }
                                     if let safetyNotes = horse.safetyNotes {
-                                        Label(safetyNotes, systemImage: "exclamationmark.triangle")
-                                            .font(Typography.recordMetadata)
-                                            .foregroundStyle(.orange)
+                                        Label {
+                                            Text(safetyNotes)
+                                                .foregroundStyle(ColorTokens.textPrimary)
+                                        } icon: {
+                                            Image(systemName: "exclamationmark.triangle.fill")
+                                                .foregroundStyle(ColorTokens.warning)
+                                        }
+                                        .font(Typography.recordMetadata)
                                     }
                                 }
                             } else {
                                 Text("Horse unavailable")
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(ColorTokens.textSecondary)
                             }
                         }
                     }
+                    .listRowBackground(ColorTokens.surface)
                     if appointment.visit == nil, subscription.allowsMutations {
                         Section {
                             Button("Start Visit") {
                                 guard subscription.allowsMutations else { return }
                                 model.startVisit(in: context.container)
                             }
-                            .buttonStyle(.borderedProminent)
+                            .farrierFlowPrimaryAction()
                             .controlSize(.large)
                             .frame(maxWidth: .infinity)
                             .accessibilityIdentifier("visit-start-action")
                         }
+                        .listRowBackground(ColorTokens.surface)
                     }
                 }
+                .farrierFlowScrollBackground()
                 .navigationTitle(
                     appointment.barn?.name
                         ?? String(localized: "Appointment", locale: locale)
@@ -136,9 +145,11 @@ struct AppointmentDetailView: View {
                         }
                         if subscription.allowsMutations {
                         Button("Edit", systemImage: "pencil") { showsEditor = true }
+                            .tint(ColorTokens.textSecondary)
                         Button("Delete", systemImage: "trash", role: .destructive) {
                             showsDeleteConfirmation = true
                         }
+                        .tint(ColorTokens.destructive)
                         .accessibilityIdentifier("appointment-delete-action")
                         }
                     }

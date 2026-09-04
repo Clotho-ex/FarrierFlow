@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ClientDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model = ClientDetailModel()
@@ -27,6 +28,7 @@ struct ClientDetailView: View {
                             LabeledContent("Notes", value: notes)
                         }
                     }
+                    .listRowBackground(ColorTokens.surface)
                     Section("Horses") {
                         if client.horses.isEmpty {
                             ContentUnavailableView {
@@ -38,7 +40,7 @@ struct ClientDetailView: View {
                                 Button("Add Horse") {
                                     showsHorseEditor = true
                                 }
-                                .buttonStyle(.borderedProminent)
+                                .farrierFlowPrimaryAction()
                                 }
                             }
                         } else {
@@ -48,42 +50,50 @@ struct ClientDetailView: View {
                                 },
                                 id: \.persistentModelID
                             ) { horse in
-                                NavigationLink(value: ClientRoute.horse(horse.persistentModelID)) {
+                                RecordNavigationLink(value: ClientRoute.horse(horse.persistentModelID)) {
                                     HorseRow(horse: horse)
                                 }
                             }
                         }
                     }
+                    .listRowBackground(ColorTokens.surface)
                     if !model.invoices.isEmpty {
                         Section("Invoices") {
                             ForEach(model.invoices) { invoice in
-                                NavigationLink(value: InvoiceRoute.detail(invoice.id)) {
+                                RecordNavigationLink(value: InvoiceRoute.detail(invoice.id)) {
                                     VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
-                                        HStack {
-                                            Text("Invoice \(invoice.number)")
-                                                .font(Typography.recordTitle)
-                                            Spacer()
-                                            Text(invoice.status.displayName)
-                                                .foregroundStyle(.secondary)
-                                        }
+                                        Text("Invoice \(invoice.number)")
+                                            .font(Typography.recordTitle)
                                         Text(invoice.invoiceDate, format: .dateTime.month().day().year())
                                             .font(Typography.recordMetadata)
-                                            .foregroundStyle(.secondary)
+                                            .foregroundStyle(ColorTokens.textSecondary)
+                                        if dynamicTypeSize.isAccessibilitySize {
+                                            Text(invoice.status.displayName)
+                                                .font(Typography.recordMetadata)
+                                                .foregroundStyle(invoice.status == .paid ? ColorTokens.success : ColorTokens.textSecondary)
+                                        }
                                     }
                                 }
+                                .badge(
+                                    dynamicTypeSize.isAccessibilitySize ? nil : Text(invoice.status.displayName)
+                                        .foregroundStyle(invoice.status == .paid ? ColorTokens.success : ColorTokens.textSecondary)
+                                )
                                 .accessibilityIdentifier("client-invoice-\(invoice.number)")
                             }
                         }
+                        .listRowBackground(ColorTokens.surface)
                     }
                     if model.hasInvoiceableWork, subscription.allowsMutations {
                         Section("Ready to Invoice") {
-                            NavigationLink(value: InvoiceRoute.create(clientID)) {
+                            RecordNavigationLink(value: InvoiceRoute.create(clientID)) {
                                 Label("Create Invoice", systemImage: "doc.badge.plus")
                             }
                             .accessibilityIdentifier("client-create-invoice-action")
                         }
+                        .listRowBackground(ColorTokens.surface)
                     }
                 }
+                .farrierFlowScrollBackground()
                 .navigationTitle(client.name)
                 .toolbar {
                     if subscription.allowsMutations {
@@ -93,12 +103,14 @@ struct ClientDetailView: View {
                         }
                         Menu {
                             Button("Edit", systemImage: "pencil") { showsEditor = true }
+                                .tint(ColorTokens.textSecondary)
                             Button("Delete", systemImage: "trash", role: .destructive) {
                                 showsDeleteConfirmation = true
                             }
                         } label: {
                             Label("Actions", systemImage: "ellipsis.circle")
                         }
+                        .tint(ColorTokens.textSecondary)
                     }
                     }
                 }

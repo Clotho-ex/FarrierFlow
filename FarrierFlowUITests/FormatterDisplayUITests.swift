@@ -26,14 +26,14 @@ final class FormatterDisplayUITests: XCTestCase {
         app.buttons["Save"].tap()
         app.navigationBars.buttons["Clients"].tap()
 
-        app.staticTexts["client-row-\(clientName)"].tap()
+        app.buttons["client-row-\(clientName)"].tap()
         app.buttons["Add Horse"].firstMatch.tap()
         app.textFields["horse-name-field"].tap()
         app.textFields["horse-name-field"].typeText(horseName)
         app.buttons["horse-barn-picker"].tap()
         app.buttons[barnName].tap()
         app.buttons["Save"].tap()
-        app.staticTexts["horse-row-\(horseName)"].tap()
+        app.buttons["horse-row-\(horseName)"].tap()
 
         let interval = app.descendants(matching: .any)[
             "horse-detail-appointment-interval"
@@ -62,7 +62,7 @@ final class FormatterDisplayUITests: XCTestCase {
         durationField.typeText(String(Int.max))
         app.buttons["Save"].tap()
         app.tabBars.buttons["Schedule"].tap()
-        app.staticTexts["appointment-row-\(barnName)"].tap()
+        app.buttons["appointment-row-\(barnName)"].tap()
 
         let duration = app.descendants(matching: .any)[
             "appointment-detail-expected-duration"

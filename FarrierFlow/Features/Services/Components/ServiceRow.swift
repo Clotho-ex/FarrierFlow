@@ -17,7 +17,7 @@ struct ServiceRow: View {
                 .font(Typography.recordTitle)
             Text(amount)
                 .font(Typography.recordMetadata)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ColorTokens.textSecondary)
         }
         .accessibilityElement(children: .combine)
         .accessibilityValue(service.isArchived ? "Archived" : "Active")

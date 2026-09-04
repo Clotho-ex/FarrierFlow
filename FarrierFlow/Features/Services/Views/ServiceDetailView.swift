@@ -21,6 +21,7 @@ struct ServiceDetailView: View {
                         LabeledContent("Default Price", value: formattedAmount(for: service))
                         LabeledContent("Status", value: service.isArchived ? "Archived" : "Active")
                     }
+                    .listRowBackground(ColorTokens.surface)
                     if !service.horsesUsingAsDefault.isEmpty {
                         Section("Horse Defaults") {
                             ForEach(
@@ -29,19 +30,22 @@ struct ServiceDetailView: View {
                                 },
                                 id: \.persistentModelID
                             ) { horse in
-                                NavigationLink(value: ClientRoute.horse(horse.persistentModelID)) {
+                                RecordNavigationLink(value: ClientRoute.horse(horse.persistentModelID)) {
                                     HorseRow(horse: horse)
                                 }
                             }
                         }
+                        .listRowBackground(ColorTokens.surface)
                     }
                 }
+                .farrierFlowScrollBackground()
                 .navigationTitle(service.name)
                 .toolbar {
                     if subscription.allowsMutations {
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {
                             Button("Edit", systemImage: "pencil") { showsEditor = true }
+                                .tint(ColorTokens.textSecondary)
                             if service.isArchived {
                                 Button("Reactivate", systemImage: "arrow.counterclockwise") {
                                     guard subscription.allowsMutations else { return }
@@ -60,6 +64,7 @@ struct ServiceDetailView: View {
                         } label: {
                             Label("Actions", systemImage: "ellipsis.circle")
                         }
+                        .tint(ColorTokens.textSecondary)
                     }
                     }
                 }

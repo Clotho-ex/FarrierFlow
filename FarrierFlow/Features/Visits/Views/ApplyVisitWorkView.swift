@@ -25,6 +25,7 @@ struct ApplyVisitWorkView: View {
                 }
             }
         }
+        .farrierFlowScrollBackground()
         .navigationTitle("Apply Work to Horses")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -32,13 +33,14 @@ struct ApplyVisitWorkView: View {
                 Button("Cancel") {
                     dismiss()
                 }
+                .tint(ColorTokens.textSecondary)
             }
             ToolbarItemGroup(placement: .bottomBar) {
                 Spacer()
                 Button(confirmationTitle) {
                     applyWork()
                 }
-                .buttonStyle(.borderedProminent)
+                .farrierFlowPrimaryAction()
                 .accessibilityHint("Marks the selected horses Serviced and adds independent copies of the recorded Services.")
                 .accessibilityIdentifier("visit-batch-confirm")
                 .disabled(selectedTargetIDs.isEmpty)
@@ -84,6 +86,7 @@ struct ApplyVisitWorkView: View {
             .accessibilityHint("Choose the serviced horse whose recorded Services and prices will be copied.")
             .accessibilityIdentifier("visit-batch-source")
         }
+        .listRowBackground(ColorTokens.surface)
     }
 
     private func recordedWorkSection(
@@ -108,6 +111,7 @@ struct ApplyVisitWorkView: View {
         } footer: {
             Text("Service names and prices are copied exactly. Work Notes and photographs are not copied.")
         }
+        .listRowBackground(ColorTokens.surface)
     }
 
     private func targetSection(
@@ -118,7 +122,7 @@ struct ApplyVisitWorkView: View {
                 if let violation = target.violation {
                     LabeledContent(target.horseName) {
                         Text(targetExplanation(for: violation))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ColorTokens.textSecondary)
                     }
                     .accessibilityElement(children: .combine)
                     .accessibilityIdentifier("visit-batch-target-ineligible-\(target.horseName)")
@@ -128,7 +132,7 @@ struct ApplyVisitWorkView: View {
                             Text(target.horseName)
                             Text("Not Started")
                                 .font(Typography.recordMetadata)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(ColorTokens.textSecondary)
                         }
                     }
                     .accessibilityValue(
@@ -142,6 +146,7 @@ struct ApplyVisitWorkView: View {
         } footer: {
             Text("Horses with an outcome, Work Notes, or recorded Services are never changed.")
         }
+        .listRowBackground(ColorTokens.surface)
     }
 
     private func targetSelection(

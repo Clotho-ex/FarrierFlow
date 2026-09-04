@@ -496,7 +496,7 @@ mode.
   stacks, standard controls, local-first behavior, and the established data
   graph.
 - Adopt the approved Field Book visual direction in `DESIGN.md`, including the
-  restrained Survey Ink palette, Run Sheet action field, vertical workline,
+  restrained semantic orange palette, warm Run Sheet action field, vertical workline,
   flat native depth, and outdoor/accessibility rules.
 
 ### Exclusions
@@ -532,6 +532,26 @@ mode.
 
 The complete product and architecture contract is recorded in
 `docs/superpowers/specs/2026-08-02-slice-5a-owner-setup-field-book-design.md`.
+
+## Release Readiness — Onboarding and Launch
+
+**Status:** Implemented and locally verified on 2026-09-01. Physical-device and
+final App Store candidate acceptance remain release activities.
+
+- Use a minimal adaptive system launch screen with FarrierFlow's app mark.
+- Route fresh installs through Welcome, existing BusinessProfile identity, and
+  the existing RevenueCat Offering. Keep the Appointment to Payment concept as
+  concise Welcome context rather than a standalone tutorial step.
+- Persist versioned completion and interrupted-step state independently from
+  subscription entitlement and SwiftData business records.
+- Treat valid pre-onboarding workspaces as completed without rewriting data.
+- Preserve Pro-only operational mutations and Free/Unavailable read-only
+  access; allow only the required onboarding identity save before entitlement.
+- Show small first-use guidance for empty Today, first invoice creation, and
+  manual payment recording. Do not add a tutorial framework or payment
+  processing semantics.
+- Validate relaunch, RevenueCat purchase/restore handoff, accessibility XXXL,
+  localization, Light/Dark launch assets, and supported iOS runtimes.
 
 ## Later Slices
 

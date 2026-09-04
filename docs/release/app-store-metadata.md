@@ -103,6 +103,12 @@ readable and ordinary mutations are disabled. No login or local Xcode StoreKit
 configuration is required or supplied for App Review. Submit the monthly and
 yearly products with version 1.0 so App Review can evaluate purchase and restore.
 
+On a new installation, App Review sees a short native welcome, required business
+name setup, one Appointment to Payment workflow explanation, and then the same
+RevenueCat-backed monthly/yearly subscription surface. Trial duration and price
+come from the submitted App Store products. Reviewers may continue read only if
+subscription status cannot be verified; this does not grant mutation access.
+
 ## Required public links
 
 - Privacy Policy: `https://farrierflow.vercel.app/privacy/` — RevenueCat

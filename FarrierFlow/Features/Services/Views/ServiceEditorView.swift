@@ -29,16 +29,19 @@ struct ServiceEditorView: View {
                         .accessibilityIdentifier("service-price-field")
                     Text("Enter a U.S. dollar amount with up to two decimal places.")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ColorTokens.textSecondary)
                     priceFeedback
                 }
+                .listRowBackground(ColorTokens.surface)
             }
+            .farrierFlowScrollBackground()
             .disabled(!subscription.allowsMutations)
             .navigationTitle(model.serviceID == nil ? "New Service" : "Edit Service")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .tint(ColorTokens.textSecondary)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
@@ -66,14 +69,14 @@ struct ServiceEditorView: View {
            ) {
             Text(formatted)
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ColorTokens.textSecondary)
                 .accessibilityLabel(
                     String(localized: "Default price \(formatted)", locale: locale)
                 )
         } else if !model.draft.priceInput.isEmpty {
             Text("Enter a valid U.S. dollar amount.")
                 .font(.footnote)
-                .foregroundStyle(.red)
+                .foregroundStyle(ColorTokens.destructive)
         }
     }
 }

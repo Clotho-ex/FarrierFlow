@@ -9,15 +9,20 @@ nonisolated enum SubscriptionRootState: Equatable {
 nonisolated enum SubscriptionRootRules {
     static func state(
         access: SubscriptionAccess,
-        hasIdentity: Bool
+        hasIdentity: Bool,
+        hasExistingBusinessData: Bool
     ) -> SubscriptionRootState {
         switch access {
         case .loading:
             .loading
         case .free:
-            hasIdentity ? .app(readOnly: true) : .subscriptionWelcome
+            hasIdentity || hasExistingBusinessData
+                ? .app(readOnly: true)
+                : .subscriptionWelcome
         case .unavailable:
-            hasIdentity ? .app(readOnly: true) : .subscriptionUnavailable
+            hasIdentity || hasExistingBusinessData
+                ? .app(readOnly: true)
+                : .subscriptionUnavailable
         case .pro:
             hasIdentity ? .app(readOnly: false) : .ownerSetup
         }

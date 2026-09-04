@@ -2,6 +2,7 @@ import SwiftData
 import SwiftUI
 
 struct TodayView: View {
+    @Environment(OnboardingExperienceModel.self) private var onboarding
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
     @Environment(\.scenePhase) private var scenePhase
@@ -42,7 +43,11 @@ struct TodayView: View {
             .navigationDestination(for: SubscriptionRoute.self) { route in
                 switch route {
                 case .store:
-                    SubscriptionView(showsManageSubscriptionButton: true)
+                    SubscriptionView(
+                        presentation: .standard(
+                            showsManageSubscriptionButton: true
+                        )
+                    )
                 }
             }
             .sheet(item: $presentedSheet, onDismiss: handleSheetDismissal) { sheet in
@@ -80,6 +85,7 @@ struct TodayView: View {
                         path.append(SubscriptionRoute.store)
                     }
                 }
+                .listRowBackground(ColorTokens.surface)
             }
 
             if dynamicTypeSize.isAccessibilitySize {
@@ -94,7 +100,7 @@ struct TodayView: View {
                 Section("Today’s Stops") {
                     ForEach(model.remainingAppointments.indices, id: \.self) { index in
                         let appointment = model.remainingAppointments[index]
-                        NavigationLink(
+                        RecordNavigationLink(
                             value: TodayRoute.appointment(appointment.id)
                         ) {
                             TodayAppointmentRow(
@@ -103,12 +109,18 @@ struct TodayView: View {
                                 isLast: index == model.remainingAppointments.count - 1
                             )
                         }
+                        .badge(
+                            dynamicTypeSize.isAccessibilitySize ? nil : Text(appointment.state.localizedTitle)
+                                .foregroundStyle(appointment.state.emphasisColor)
+                        )
                         .listRowSeparator(.hidden)
+                        .listRowBackground(ColorTokens.surface)
                     }
                 }
             }
         }
         .listSectionSpacing(.compact)
+        .farrierFlowScrollBackground()
         .refreshable { reload() }
     }
 
@@ -122,7 +134,7 @@ struct TodayView: View {
                     format: .dateTime.weekday(.wide).month(.abbreviated).day()
                 )
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ColorTokens.textSecondary)
             }
             .accessibilityElement(children: .combine)
         }
@@ -146,7 +158,7 @@ struct TodayView: View {
                 }
                 .buttonStyle(.plain)
                 .listRowInsets(EdgeInsets())
-                .listRowBackground(ColorTokens.surveyInk)
+                .listRowBackground(ColorTokens.brandTint)
                 .listRowSeparator(.hidden)
                 .accessibilityIdentifier("today-run-sheet-active")
             }
@@ -159,7 +171,7 @@ struct TodayView: View {
                 }
                 .buttonStyle(.plain)
                 .listRowInsets(EdgeInsets())
-                .listRowBackground(ColorTokens.surveyInk)
+                .listRowBackground(ColorTokens.brandTint)
                 .listRowSeparator(.hidden)
                 .accessibilityIdentifier("today-run-sheet-scheduled")
             }
@@ -176,27 +188,34 @@ struct TodayView: View {
                     )
                 }
                 .accessibilityIdentifier("today-add-first-client")
+                .listRowBackground(ColorTokens.surface)
             }
         case .createInvoice(let candidate) where subscription.allowsMutations:
             Section("Ready to Invoice") {
-                NavigationLink(
-                    value: TodayRoute.createInvoice(
-                        clientID: candidate.clientID,
-                        visitID: candidate.visitID
+                Button {
+                    onboarding.markInvoiceCreationHintSeen()
+                    path.append(
+                        TodayRoute.createInvoice(
+                            clientID: candidate.clientID,
+                            visitID: candidate.visitID
+                        )
                     )
-                ) {
+                } label: {
                     TodayPrimaryActionLabel(
                         title: "Create Invoice",
-                        detail: "Work complete for \(candidate.clientName) on \(candidate.workDate.formatted(date: .abbreviated, time: .omitted))",
+                        detail: onboarding.showsInvoiceCreationHint
+                            ? "Completed work can now become a customer invoice."
+                            : "Work complete for \(candidate.clientName) on \(candidate.workDate.formatted(date: .abbreviated, time: .omitted))",
                         systemImage: "doc.text",
                         detailAccessibilityIdentifier: "today-create-invoice-context"
                     )
                 }
                 .accessibilityIdentifier("today-create-invoice-action")
+                .listRowBackground(ColorTokens.surface)
             }
         case .reviewInvoice(let invoice):
             Section("Payment Status") {
-                NavigationLink(value: TodayRoute.invoice(invoice.id)) {
+                RecordNavigationLink(value: TodayRoute.invoice(invoice.id)) {
                     TodayPrimaryActionLabel(
                         title: "Review Invoice \(invoice.number)",
                         detail: "\(invoice.clientName), issued \(invoice.invoiceDate.formatted(date: .abbreviated, time: .omitted)), payment pending",
@@ -205,18 +224,19 @@ struct TodayView: View {
                     )
                 }
                 .accessibilityIdentifier("today-review-invoice-action")
+                .listRowBackground(ColorTokens.surface)
             }
         case .scheduleAppointment where subscription.allowsMutations:
             Section {
                 ContentUnavailableView {
-                    Label("No Stops Today", systemImage: "sun.max")
+                    Label("Nothing Scheduled Yet", systemImage: "calendar.badge.plus")
                 } description: {
-                    Text("Schedule the next barn or customer stop when you’re ready.")
+                    Text("Your appointments will appear here.")
                 } actions: {
                     Button("Schedule Appointment") {
                         presentedSheet = .appointment
                     }
-                    .buttonStyle(.borderedProminent)
+                    .farrierFlowPrimaryAction()
                     .controlSize(.large)
                 }
             }
@@ -318,7 +338,7 @@ private struct TodayPrimaryActionLabel: View {
     private var detailText: some View {
         Text(detail)
             .font(.subheadline)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(ColorTokens.textSecondary)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier(detailAccessibilityIdentifier)
     }
@@ -337,13 +357,13 @@ private struct TodayPrimaryActionMarker: View {
                 .frame(
                     maxHeight: fillsAvailableHeight ? .infinity : markerSize + 10
                 )
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(ColorTokens.border)
 
             Image(systemName: systemImage)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(ColorTokens.interactive)
+                .foregroundStyle(ColorTokens.brandActionText)
                 .frame(width: markerSize, height: markerSize)
-                .background(.background, in: Circle())
+                .background(ColorTokens.surface, in: Circle())
         }
         .frame(width: markerSize)
         .frame(maxHeight: fillsAvailableHeight ? .infinity : nil)
@@ -386,12 +406,9 @@ private struct TodayAppointmentRow: View {
                     .font(.headline)
                     .monospacedDigit()
                 locationText
-                Label(summary.state.localizedTitle, systemImage: summary.state.systemImage)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
                 Text(summary.horseNames.formatted(.list(type: .and)))
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ColorTokens.textSecondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -411,7 +428,7 @@ private struct TodayAppointmentRow: View {
                         .monospacedDigit()
                     Text(summary.state.localizedTitle)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(summary.state.emphasisColor)
                 }
             }
 
@@ -420,7 +437,7 @@ private struct TodayAppointmentRow: View {
                 .fixedSize(horizontal: false, vertical: true)
             Text(todayHorseSummaryText(summary.horseNames))
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ColorTokens.textSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -446,7 +463,10 @@ private struct TodayAppointmentRow: View {
     }
 
     private var accessibilityValue: String {
-        "\(String(localized: summary.state.localizedTitle)), \(summary.horseNames.formatted(.list(type: .and)))"
+        let horseNames = summary.horseNames.formatted(.list(type: .and))
+        return dynamicTypeSize.isAccessibilitySize
+            ? "\(String(localized: summary.state.localizedTitle)), \(horseNames)"
+            : horseNames
     }
 }
 
@@ -467,9 +487,9 @@ private struct TodayWorklineMarker: View {
             Image(systemName: state.systemImage)
                 .font(.caption.weight(.semibold))
                 .frame(width: markerSize, height: markerSize)
-                .background(.background, in: Circle())
+                .background(ColorTokens.surface, in: Circle())
         }
-        .foregroundStyle(.secondary)
+        .foregroundStyle(ColorTokens.textSecondary)
         .frame(width: markerSize)
         .frame(maxHeight: .infinity)
         .accessibilityHidden(true)
@@ -498,6 +518,17 @@ private extension TodayAppointmentState {
             "checkmark.circle.fill"
         }
     }
+
+    var emphasisColor: Color {
+        switch self {
+        case .scheduled:
+            ColorTokens.textSecondary
+        case .inProgress:
+            ColorTokens.brandActionText
+        case .completed:
+            ColorTokens.success
+        }
+    }
 }
 
 private struct TodayRunSheetBand: View {
@@ -524,8 +555,8 @@ private struct TodayRunSheetBand: View {
         .padding(.horizontal, 20)
         .padding(.vertical, dynamicTypeSize.isAccessibilitySize ? 16 : 22)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(ColorTokens.surveyInk)
-        .foregroundStyle(.white)
+        .background(ColorTokens.brandTint)
+        .foregroundStyle(ColorTokens.textPrimary)
     }
 
     private func scheduledContent(_ appointment: TodayAppointmentSummary) -> some View {
@@ -545,6 +576,7 @@ private struct TodayRunSheetBand: View {
             )
             Label("Open Appointment", systemImage: "arrow.right")
                 .font(.headline)
+                .foregroundStyle(ColorTokens.brandActionText)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Next stop, \(appointment.serviceLocationName)")
@@ -564,12 +596,13 @@ private struct TodayRunSheetBand: View {
                 value: Double(visit.resolvedHorseCount),
                 total: Double(visit.totalHorseCount)
             )
-            .tint(.white)
+            .tint(ColorTokens.brandActionText)
             Text("\(visit.resolvedHorseCount) of \(visit.totalHorseCount) horses recorded")
                 .font(.subheadline)
                 .monospacedDigit()
             Label(activeActionLabel, systemImage: "arrow.right")
                 .font(.headline)
+                .foregroundStyle(ColorTokens.brandActionText)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Visit in progress, \(visit.serviceLocationName)")
@@ -592,6 +625,7 @@ private struct TodayRunSheetBand: View {
                     .font(.headline)
                 Text(status)
                     .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ColorTokens.brandActionText)
             }
         } else {
             HStack(alignment: .firstTextBaseline) {
@@ -600,6 +634,7 @@ private struct TodayRunSheetBand: View {
                 Spacer()
                 Text(status)
                     .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ColorTokens.brandActionText)
             }
         }
     }
@@ -619,11 +654,11 @@ private struct TodayRunSheetBand: View {
             if let address {
                 Text(address)
                     .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.86))
+                    .foregroundStyle(ColorTokens.textSecondary)
             }
             Text(todayHorseSummaryText(horseNames))
                 .font(.body)
-                .foregroundStyle(.white.opacity(0.86))
+                .foregroundStyle(ColorTokens.textSecondary)
         }
     }
 

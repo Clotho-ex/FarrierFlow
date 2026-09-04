@@ -38,17 +38,20 @@ struct BarnEditorView: View {
                             .accessibilityLabel("Contact Notes")
                         Text("Gate codes, parking, or arrival instructions.")
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ColorTokens.textSecondary)
                     }
                     .accessibilityIdentifier("barn-more-details")
                 }
+                .listRowBackground(ColorTokens.surface)
             }
+            .farrierFlowScrollBackground()
             .disabled(!subscription.allowsMutations)
             .navigationTitle(model.barnID == nil ? "New Service Location" : "Edit Service Location")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .tint(ColorTokens.textSecondary)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {

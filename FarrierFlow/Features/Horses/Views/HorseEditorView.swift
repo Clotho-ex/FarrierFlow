@@ -38,7 +38,7 @@ struct HorseEditorView: View {
                     if model.choicesLoadState == .loaded {
                         if model.clients.isEmpty {
                             Text("Add the horse’s owner before saving this horse.")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(ColorTokens.textSecondary)
                             Button("Add Client", systemImage: "person.badge.plus") {
                                 presentedSheet = .client
                             }
@@ -54,7 +54,7 @@ struct HorseEditorView: View {
                         }
                         if model.barns.isEmpty {
                             Text("No service locations available")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(ColorTokens.textSecondary)
                         } else {
                             Picker("Service Location", selection: $model.draft.barnID) {
                                 Text("Select Service Location").tag(PersistentIdentifier?.none)
@@ -88,11 +88,18 @@ struct HorseEditorView: View {
                                     "No active services are available. You can continue without a default."
                                 )
                                 .font(.footnote)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(ColorTokens.textSecondary)
                             }
-                            TextEditor(text: $model.draft.safetyNotes)
-                                .frame(minHeight: 88)
-                                .accessibilityLabel("Safety Notes")
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Additional Notes")
+                                    .font(.subheadline.weight(.semibold))
+                                Text("Behavior, handling, or safety details")
+                                    .font(.footnote)
+                                    .foregroundStyle(ColorTokens.textSecondary)
+                                TextEditor(text: $model.draft.safetyNotes)
+                                    .frame(minHeight: 88)
+                                    .accessibilityLabel("Additional Notes")
+                            }
                             Stepper(
                                 value: $model.draft.appointmentIntervalWeeks,
                                 in: 1...52
@@ -108,14 +115,17 @@ struct HorseEditorView: View {
                         .accessibilityIdentifier("horse-more-details")
                     }
                 }
+                .listRowBackground(ColorTokens.surface)
                 loadStateSection
             }
+            .farrierFlowScrollBackground()
             .disabled(!subscription.allowsMutations)
             .navigationTitle(model.horseID == nil ? "New Horse" : "Edit Horse")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .tint(ColorTokens.textSecondary)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
@@ -182,6 +192,7 @@ struct HorseEditorView: View {
                     Text("Loading records…")
                 }
             }
+            .listRowBackground(ColorTokens.surface)
         case .failed:
             Section {
                 ContentUnavailableView {
@@ -194,6 +205,7 @@ struct HorseEditorView: View {
                     }
                 }
             }
+            .listRowBackground(ColorTokens.surface)
         case .loaded:
             EmptyView()
         }

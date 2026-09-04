@@ -14,6 +14,10 @@ final class TodayRunSheetUITests: XCTestCase {
         XCTAssertEqual(completedStops.count, 2)
         XCTAssertTrue(completedStops.element(boundBy: 0).isHittable)
         XCTAssertTrue(completedStops.element(boundBy: 1).isHittable)
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "Today native status badges"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
     }
 
     @MainActor

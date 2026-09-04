@@ -11,6 +11,7 @@ struct InvoiceDetailView: View {
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
+    @Environment(OnboardingExperienceModel.self) private var onboarding
     @State private var model: InvoiceDetailModel
     @State private var actionConfirmation: InvoiceActionConfirmation?
     @State private var shareModel = InvoicePDFShareModel()
@@ -181,14 +182,28 @@ struct InvoiceDetailView: View {
             .padding(.vertical, 28)
             .accessibilityIdentifier("invoice-native-detail-content")
         }
-        .background(Color(uiColor: .systemBackground))
+        .background(ColorTokens.surface)
         .accessibilityIdentifier("invoice-detail-\(detail.number)")
     }
 
     @ViewBuilder
     private func invoiceActions(_ detail: InvoiceDetail) -> some View {
         if detail.status == .unpaid, case .available(let amount) = detail.total {
+            if onboarding.showsPaymentRecordingHint {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Received payment outside FarrierFlow?")
+                        .font(.headline)
+                    Text("Record it here to keep outstanding invoices accurate. FarrierFlow does not process the payment.")
+                        .font(.subheadline)
+                        .foregroundStyle(ColorTokens.textSecondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("invoice-first-payment-hint")
+            }
+
             Button("Mark as Paid") {
+                onboarding.markPaymentRecordingHintSeen()
                 paymentModel = PaymentRecordingModel(
                     invoiceID: invoiceID,
                     amountMinorUnits: amount,
@@ -196,19 +211,21 @@ struct InvoiceDetailView: View {
                 )
                 showsPaymentSheet = true
             }
-            .buttonStyle(.borderedProminent)
+            .farrierFlowPrimaryAction()
             .frame(maxWidth: .infinity)
             .accessibilityIdentifier("invoice-mark-paid-action")
 
             Button("Delete Invoice", role: .destructive) {
                 actionConfirmation = .delete
             }
+            .foregroundStyle(ColorTokens.destructive)
             .frame(maxWidth: .infinity)
             .accessibilityIdentifier("invoice-delete-action")
         } else if detail.status == .paid {
             Button("Mark as Unpaid", role: .destructive) {
                 actionConfirmation = .markUnpaid
             }
+            .foregroundStyle(ColorTokens.destructive)
             .frame(maxWidth: .infinity)
             .accessibilityIdentifier("invoice-mark-unpaid-action")
         }
@@ -281,25 +298,38 @@ struct InvoiceDetailView: View {
 }
 
 private struct InvoiceDetailHeader: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let number: String
     let businessName: String
     let status: InvoiceStatus
     let amount: String
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: 20) {
-                identity
-                amountSummary
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-            }
-            VStack(alignment: .leading, spacing: 20) {
-                identity
-                amountSummary
-                    .frame(maxWidth: .infinity, alignment: .leading)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                stacked
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .firstTextBaseline, spacing: 20) {
+                        identity.fixedSize()
+                        amountSummary(alignment: .trailing)
+                            .fixedSize()
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                    }
+                    stacked
+                }
             }
         }
         .padding(.bottom, SpacingTokens.rowContent)
+    }
+
+    private var stacked: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            identity
+            amountSummary(alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .multilineTextAlignment(.leading)
     }
 
     private var identity: some View {
@@ -308,26 +338,26 @@ private struct InvoiceDetailHeader: View {
                 .font(.title2.weight(.semibold))
             Text("Invoice \(number)")
                 .font(.headline)
-                .foregroundStyle(.secondary)
-            Text(statusText)
-                .font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(.fill.tertiary, in: Capsule())
-                .accessibilityLabel("Status, \(statusText)")
+                .foregroundStyle(ColorTokens.textSecondary)
+            StatusBadge(
+                title: statusText,
+                tone: status == .paid ? .success : .warning
+            )
+            .accessibilityLabel("Status, \(statusText)")
         }
     }
 
-    private var amountSummary: some View {
-        VStack(alignment: .trailing, spacing: SpacingTokens.rowContent) {
+    private func amountSummary(alignment: HorizontalAlignment) -> some View {
+        VStack(alignment: alignment, spacing: SpacingTokens.rowContent) {
             Text(amount)
                 .font(.largeTitle.weight(.bold))
                 .monospacedDigit()
                 .accessibilityIdentifier("invoice-detail-total")
             Text(amountLabel)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ColorTokens.textSecondary)
         }
+        .multilineTextAlignment(alignment == .leading ? .leading : .trailing)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(
             status == .unpaid ? "invoice-detail-amount-due" : "invoice-detail-invoice-total"
@@ -365,7 +395,7 @@ private struct InvoiceMetadataSection: View {
         } label: {
             Text(label)
                 .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ColorTokens.textSecondary)
         }
     }
 }
@@ -433,6 +463,7 @@ private struct PaymentRecordingView: View {
                             .accessibilityIdentifier("payment-other-description")
                     }
                 }
+                .listRowBackground(ColorTokens.surface)
                 Section("Details") {
                     TextField("Reference (Optional)", text: $model.draft.reference)
                         .accessibilityIdentifier("payment-reference")
@@ -440,12 +471,15 @@ private struct PaymentRecordingView: View {
                         .lineLimit(2...5)
                         .accessibilityIdentifier("payment-note")
                 }
+                .listRowBackground(ColorTokens.surface)
             }
+            .farrierFlowScrollBackground()
             .navigationTitle("Record Payment")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .tint(ColorTokens.textSecondary)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Confirm Payment") {
@@ -484,15 +518,15 @@ private struct InvoiceContactSection: View {
                 .font(.title3.weight(.semibold))
             if let phone {
                 Text(phone)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ColorTokens.textSecondary)
             }
             if let email {
                 Text(email)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ColorTokens.textSecondary)
             }
             if let address {
                 Text(address)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ColorTokens.textSecondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -508,13 +542,13 @@ private struct InvoiceVisitSection: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text(visit.visitDate, format: .dateTime.month(.abbreviated).day().year())
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ColorTokens.textSecondary)
                 Text(visit.serviceLocationName)
                     .font(.headline)
                 if let address = visit.serviceLocationAddress {
                     Text(address)
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ColorTokens.textSecondary)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -522,7 +556,7 @@ private struct InvoiceVisitSection: View {
             VStack(alignment: .leading, spacing: 0) {
                 Text("Services Provided")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ColorTokens.textSecondary)
                     .padding(.bottom, 12)
                 Divider()
                 ForEach(visit.lineItems) { lineItem in

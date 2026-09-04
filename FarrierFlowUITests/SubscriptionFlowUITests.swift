@@ -2,7 +2,7 @@ import XCTest
 
 final class SubscriptionFlowUITests: XCTestCase {
     @MainActor
-    func testReadOnlyWithoutIdentityShowsSubscriptionWelcomeBeforeOwnerSetup() {
+    func testReadOnlyWithoutIdentityStartsReleaseOnboarding() {
         let app = launch(
             storeName: "SubscriptionWelcome-\(UUID().uuidString)",
             scenario: "owner-setup"
@@ -10,7 +10,7 @@ final class SubscriptionFlowUITests: XCTestCase {
         defer { app.terminate() }
 
         XCTAssertTrue(
-            app.descendants(matching: .any)["subscription-welcome"]
+            app.descendants(matching: .any)["onboarding-welcome"]
                 .waitForExistence(timeout: 5)
         )
         XCTAssertFalse(app.textFields["business-profile-name-field"].exists)
@@ -38,11 +38,57 @@ final class SubscriptionFlowUITests: XCTestCase {
         let app = launchWelcome(access: "read-only")
         defer { app.terminate() }
 
-        XCTAssertTrue(app.buttons["subscription-plan-annual"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["$119.99"].exists)
-        XCTAssertTrue(app.buttons["subscription-plan-monthly"].exists)
-        app.buttons["subscription-plan-annual"].tap()
-        XCTAssertTrue(app.textFields["business-profile-name-field"].waitForExistence(timeout: 3))
+        let monthly = app.buttons["subscription-plan-monthly"]
+        let annual = app.buttons["subscription-plan-annual"]
+        XCTAssertTrue(monthly.waitForExistence(timeout: 5))
+        XCTAssertTrue(annual.exists)
+        XCTAssertTrue(accessibilityText(of: monthly).contains("$14.99"))
+        XCTAssertTrue(accessibilityText(of: monthly).contains("2 weeks free"))
+        XCTAssertTrue(accessibilityText(of: annual).contains("$119.99"))
+        XCTAssertTrue(accessibilityText(of: annual).contains("$10.00 per month"))
+        XCTAssertTrue(accessibilityText(of: annual).contains("2 weeks free"))
+        XCTAssertTrue(accessibilityText(of: annual).contains("Save 33%"))
+        XCTAssertEqual(monthly.frame.midY, annual.frame.midY, accuracy: 2)
+        XCTAssertLessThan(monthly.frame.minX, annual.frame.minX)
+        XCTAssertFalse(monthly.isSelected)
+        XCTAssertTrue(annual.isSelected)
+        XCTAssertTrue(app.staticTexts["Yearly Pro"].exists)
+        XCTAssertTrue(
+            app.staticTexts["Save 33% compared with monthly"].exists
+        )
+        XCTAssertFalse(app.buttons["subscription-continue-read-only"].exists)
+        let purchase = app.buttons["subscription-primary-purchase"]
+        XCTAssertTrue(purchase.waitForExistence(timeout: 3))
+        XCTAssertEqual(purchase.label, "Start 2-Week Free Trial")
+        XCTAssertTrue(
+            app.staticTexts["2 weeks free, then $119.99/year. Cancel anytime."]
+                .exists
+        )
+        XCTAssertTrue(app.staticTexts["$10.00/month, billed annually."].exists)
+        XCTAssertFalse(app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH[c] %@", "Just")
+        ).firstMatch.exists)
+        monthly.tap()
+        XCTAssertTrue(monthly.isSelected)
+        XCTAssertFalse(annual.isSelected)
+        XCTAssertTrue(app.staticTexts["Monthly Pro"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["Flexible monthly billing"].exists)
+        annual.tap()
+        XCTAssertTrue(annual.isSelected)
+        XCTAssertTrue(app.staticTexts["Yearly Pro"].waitForExistence(timeout: 2))
+        purchase.tap()
+        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    func testFreshEmptyWorkspaceCannotBypassTheOnboardingPaywall() {
+        let app = launchWelcome(access: "read-only")
+        defer { app.terminate() }
+
+        XCTAssertFalse(app.buttons["subscription-continue-read-only"].exists)
+        XCTAssertFalse(app.navigationBars["Today"].exists)
+        XCTAssertTrue(app.buttons["subscription-primary-purchase"].isHittable)
+        XCTAssertTrue(app.buttons["subscription-restore"].isHittable)
     }
 
     @MainActor
@@ -53,8 +99,31 @@ final class SubscriptionFlowUITests: XCTestCase {
         let annual = app.buttons["subscription-plan-annual"]
         XCTAssertTrue(annual.waitForExistence(timeout: 5))
         annual.tap()
+        app.buttons["subscription-primary-purchase"].tap()
         XCTAssertTrue(annual.waitForExistence(timeout: 3))
         XCTAssertFalse(app.otherElements["subscription-error"].exists)
+        XCTAssertFalse(app.navigationBars["Today"].exists)
+        XCTAssertTrue(app.buttons["subscription-primary-purchase"].isEnabled)
+    }
+
+    @MainActor
+    func testPlanWithoutIntroductoryOfferUsesSubscribeAction() {
+        let app = launchWelcome(access: "no-trial")
+        defer { app.terminate() }
+
+        let monthly = app.buttons["subscription-plan-monthly"]
+        XCTAssertTrue(monthly.waitForExistence(timeout: 5))
+        monthly.tap()
+        let purchase = app.buttons["subscription-primary-purchase"]
+        XCTAssertTrue(purchase.waitForExistence(timeout: 5))
+        XCTAssertEqual(purchase.label, "Subscribe")
+        XCTAssertFalse(accessibilityText(of: monthly)
+            .contains("free"))
+        XCTAssertTrue(
+            app.staticTexts[
+                "$14.99/month. Renews automatically. Cancel anytime."
+            ].exists
+        )
     }
 
     @MainActor
@@ -65,6 +134,7 @@ final class SubscriptionFlowUITests: XCTestCase {
         let monthly = app.buttons["subscription-plan-monthly"]
         XCTAssertTrue(monthly.waitForExistence(timeout: 5))
         monthly.tap()
+        app.buttons["subscription-primary-purchase"].tap()
         XCTAssertTrue(
             app.descendants(matching: .any)["subscription-error"]
                 .waitForExistence(timeout: 3)
@@ -79,10 +149,7 @@ final class SubscriptionFlowUITests: XCTestCase {
         let restore = app.buttons["subscription-restore"]
         XCTAssertTrue(restore.waitForExistence(timeout: 5))
         restore.tap()
-        XCTAssertTrue(
-            app.textFields["business-profile-name-field"]
-                .waitForExistence(timeout: 3)
-        )
+        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 5))
     }
 
     @MainActor
@@ -92,6 +159,16 @@ final class SubscriptionFlowUITests: XCTestCase {
 
         XCTAssertTrue(app.buttons["subscription-retry"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["subscription-plan-annual"].exists)
+        XCTAssertFalse(app.buttons["subscription-continue-read-only"].exists)
+        XCTAssertTrue(app.buttons["subscription-restore"].exists)
+        XCTAssertFalse(app.navigationBars["Today"].exists)
+
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(
+            app.navigationBars["FarrierFlow Pro"].waitForExistence(timeout: 5)
+        )
+        XCTAssertFalse(app.descendants(matching: .any)["onboarding-welcome"].exists)
     }
 
     @MainActor
@@ -133,7 +210,39 @@ final class SubscriptionFlowUITests: XCTestCase {
         app.launchEnvironment["FARRIERFLOW_UI_TEST_SCENARIO"] = "owner-setup"
         app.launchEnvironment["FARRIERFLOW_UI_TEST_SUBSCRIPTION_ACCESS"] = access
         app.launch()
+        let getStarted = app.buttons["onboarding-briefing-continue"]
+        XCTAssertTrue(waitUntilEnabled(getStarted))
+        let name = app.textFields["business-profile-name-field"]
+        for _ in 0..<2 where !name.exists {
+            getStarted.tap()
+            _ = name.waitForExistence(timeout: 3)
+        }
+        XCTAssertTrue(name.exists)
+        for _ in 0..<2 where !app.keyboards.firstMatch.exists {
+            name.tap()
+            _ = app.keyboards.firstMatch.waitForExistence(timeout: 2)
+        }
+        XCTAssertTrue(app.keyboards.firstMatch.exists)
+        name.typeText("Carter Field Farrier")
+        let save = app.buttons["business-profile-save-action"]
+        let subscription = app.navigationBars["FarrierFlow Pro"]
+        for _ in 0..<2 where !subscription.exists {
+            XCTAssertTrue(save.isHittable)
+            save.tap()
+            _ = subscription.waitForExistence(timeout: 5)
+        }
+        XCTAssertTrue(subscription.exists)
         return app
+    }
+
+    @MainActor
+    private func waitUntilEnabled(_ element: XCUIElement) -> Bool {
+        guard element.waitForExistence(timeout: 5) else { return false }
+        let enabled = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "isEnabled == true"),
+            object: element
+        )
+        return XCTWaiter.wait(for: [enabled], timeout: 3) == .completed
     }
 
     @MainActor
@@ -168,5 +277,12 @@ final class SubscriptionFlowUITests: XCTestCase {
         more.tap()
         XCTAssertTrue(subscription.waitForExistence(timeout: 3))
         return subscription
+    }
+
+    @MainActor
+    private func accessibilityText(of element: XCUIElement) -> String {
+        [element.label, element.value as? String]
+            .compactMap { $0 }
+            .joined(separator: " ")
     }
 }
