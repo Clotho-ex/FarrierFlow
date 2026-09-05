@@ -1,8 +1,9 @@
 # FarrierFlow 1.0 Submission Checklist
 
-This is a local release gate checklist. It records current evidence and does
-not authorize portal changes, signing, archiving, uploading, TestFlight, or
-submission.
+This release gate checklist records current evidence. The 2026-09-05 release
+certification authorizes signed archiving, validation, build/TestFlight upload,
+screenshot upload, and source-backed App Store Connect draft preparation. It
+does not authorize **Add for Review** or **Submit for Review**.
 
 ## Completed local Unit 6 work
 
@@ -49,9 +50,11 @@ submission.
   and monthly/yearly products in App Store Connect. Both United States products
   have the 14-day introductory offer, and the 16-day All Renewals billing grace
   period is enabled in production and sandbox. On 2026-08-18, upload the
-  sanitized 1206 x 2622 review screenshot to both products and add both to the
-  review draft; each product now reports **Ready for Review**. On 2026-08-28,
-  add the required `FarrierFlow Pro` subscription group to the same draft.
+  sanitized 1206 x 2622 review screenshot to both products; each product
+  reported **Ready for Review**. Historical notes said both products and the
+  group were added to the version draft. A live read-only check on 2026-09-05
+  showed no in-app purchases or subscriptions attached to version 1.0, so
+  attachment remains an open portal gate.
 - [x] On 2026-08-18, complete the source-backed age-rating questionnaire; App
   Store Connect calculated and saved a 4+ rating.
 - [x] On 2026-08-28, replace the prior **Data Not Collected** answer with Purchase History used
@@ -78,9 +81,9 @@ submission.
   localization, iOS 18/iOS 26 builds, and final diff audit.
 - [ ] Freeze a new release-candidate source boundary after the RevenueCat and
   structured-payment implementation is reviewed and committed.
-- [x] On 2026-08-15, App Store Connect showed **No Builds** in TestFlight and no
-  build attached to version 1.0. Project build number `1` is therefore the
-  first available upload candidate.
+- [x] On 2026-09-05, App Store Connect showed **No Builds** in TestFlight and no
+  build attached to version 1.0. Project build number `1` remains unused and is
+  the first available upload candidate.
 - [x] On 2026-08-15, complete the serial local release verification gates:
   iOS 18 and iOS 26 unit/integration suites each passed 396 tests; the focused
   iOS 18 subscription and first-customer gate passed 6 tests; the full iOS 26
@@ -100,21 +103,34 @@ submission.
   release and remains resolved exactly in `Package.resolved`. Localization,
   source and built privacy manifests, StoreKit product contracts, credential
   and mutation-boundary scans, and `git diff --check` passed.
-- [ ] Capture final App Store screenshots from the shipping candidate, with no
-  private customer or account data. The one current sanitized 1206 x 2622
-  asset is valid for the 6.3-inch slot, but version 1.0 still has 0 of 10
-  iPhone screenshots because Chrome file-chooser access blocked the upload;
-  broader planned product-page coverage also remains unfinished.
+- [x] On 2026-09-05, certify current head serially: iOS 18 and iOS 26 each
+  passed 475 declared unit/integration tests in 72 suites, representing 558
+  parameterized executions; the focused iOS 18 UI gate passed 43 tests; the
+  full iOS 26 UI target passed 60 tests; and both fresh Release simulator
+  builds succeeded. Localization, plist and StoreKit JSON validation,
+  credential-name scan, both built app and RevenueCat privacy manifests,
+  absence of `.storekit` and test/debug artifacts from both Release bundles,
+  screenshot specifications, and `git diff --check` passed.
+- [x] Capture and locally validate six final 1320 x 2868 6.9-inch App Store
+  screenshots from deterministic fictional fixtures on the iPhone 17 Pro Max
+  iOS 26.5 simulator, with no private customer, account, or testing-label data.
+  The existing 1206 x 2622 6.3-inch repository set is superseded.
+- [ ] Replace the seven stale custom 6.9-inch screenshots observed in App Store
+  Connect on 2026-09-05 with the exact six final release-candidate assets. The
+  6.5-inch slot currently inherits the 6.9-inch set; add a separate 6.3-inch set
+  only if the live portal requires one.
 - [ ] Enter the prepared subtitle, promotional text, description, keywords,
   Support URL, copyright, category, review contact, and review notes. On
   2026-08-18, the subtitle, promotional text, description, keywords, Support
   URL, Business category, and review notes were saved, and **Sign-in required**
-  was cleared for this account-free app. Copyright, exact review contact,
-  Content Rights, and final release-behavior confirmation remain open.
+  was cleared for this account-free app. A live check on 2026-09-05 confirmed
+  no build or subscriptions attached and found copyright plus the review
+  contact name, phone, and email blank. Content Rights and final
+  release-behavior confirmation also remain open.
 - [ ] Archive, upload, and process one signed release candidate.
 - [ ] Complete TestFlight and physical-iPhone acceptance.
 - [ ] Finish the remaining verified metadata and screenshots, upload and select
   the release-candidate build, complete Content Rights and App Review contact
-  information, then add version 1.0 to the draft that already contains both
-  subscriptions and the `FarrierFlow Pro` group. Submit for review only after
-  the excluded sandbox/TestFlight lifecycle acceptance is complete.
+  information, and attach both subscriptions plus the `FarrierFlow Pro` group
+  to version 1.0. Stop with the version in draft; submission is a separately
+  authorized action after sandbox/TestFlight lifecycle acceptance.

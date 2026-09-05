@@ -10,7 +10,7 @@ final class ConnectedRecordsUITests: XCTestCase {
         let app = launch(storeName: storeName)
 
         openClients(in: app)
-        let addClient = app.buttons["Add Client"].firstMatch
+        let addClient = app.navigationBars["Clients"].buttons["Add Client"]
         let clientNameField = app.textFields["client-name-field"]
         guard tapUntilDestinationAppears(
             addClient,
@@ -39,7 +39,10 @@ final class ConnectedRecordsUITests: XCTestCase {
         focusAndType(barnName, in: barnNameField)
         app.buttons["Save"].tap()
         XCTAssertTrue(app.buttons["barn-row-\(barnName)"].waitForExistence(timeout: 3))
-        app.navigationBars.buttons["Clients"].tap()
+        guard tapUntilDestinationAppears(
+            app.navigationBars["Service Locations"].buttons["Clients"],
+            destination: app.buttons["client-row-\(clientName)"]
+        ) else { return }
 
         guard tapUntilDestinationAppears(
             app.buttons["client-row-\(clientName)"],
@@ -68,9 +71,11 @@ final class ConnectedRecordsUITests: XCTestCase {
             addAppointment,
             destination: app.buttons["appointment-barn-picker"]
         ) else { return }
-        app.buttons["appointment-barn-picker"].tap()
         let barnOptions = app.buttons.matching(identifier: barnName)
-        XCTAssertTrue(barnOptions.firstMatch.waitForExistence(timeout: 10))
+        guard tapUntilDestinationAppears(
+            app.buttons["appointment-barn-picker"],
+            destination: barnOptions.firstMatch
+        ) else { return }
         XCTAssertGreaterThan(barnOptions.count, 0)
         guard barnOptions.count > 0 else { return }
         barnOptions.element(boundBy: barnOptions.count - 1).tap()

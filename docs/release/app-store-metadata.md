@@ -106,7 +106,7 @@ yearly products with version 1.0 so App Review can evaluate purchase and restore
 On a new installation, App Review sees a short native welcome, required business
 name setup, one Appointment to Payment workflow explanation, and then the same
 RevenueCat-backed monthly/yearly subscription surface. Trial duration and price
-come from the submitted App Store products. Reviewers may continue read only if
+come from the configured App Store products. Reviewers may continue read only if
 subscription status cannot be verified; this does not grant mutation access.
 
 ## Required public links
@@ -130,11 +130,11 @@ account data, debug labels, or test-data disclaimers:
 6. Read-only state showing records remain available and the reason for the
    restricted controls.
 
-## Final 6.3-inch screenshot assets
+## Superseded 6.3-inch screenshot assets
 
-Captured on 2026-08-20 from the integrated release candidate on the iOS 26.5
-iPhone 17 Pro Simulator, using English (U.S.) formatting and deterministic,
-sanitized fictional fixtures:
+The following repository assets were captured on 2026-08-20 from an earlier
+iOS 26.5 iPhone 17 Pro simulator build. They are retained as historical
+evidence only and are not the final 1.0 release-candidate storefront set:
 
 1. `screenshots/6.3-inch/01-subscription-welcome.jpg`
 2. `screenshots/6.3-inch/02-today-run-sheet.jpg`
@@ -143,6 +143,25 @@ sanitized fictional fixtures:
 5. `screenshots/6.3-inch/05-invoice-detail.jpg`
 6. `screenshots/6.3-inch/06-read-only-records.jpg`
 
-Each accepted asset is a 1206 x 2622 RGB JPEG with no alpha channel. Uploading
-the set to App Store Connect remains a separate, explicitly authorized portal
-step.
+Each historical asset is a 1206 x 2622 RGB JPEG with no alpha channel. Do not
+upload this set as the 1.0 release candidate.
+
+## Primary 6.9-inch release-candidate assets
+
+The 1.0 release candidate uses six current 1320 x 2868 RGB JPEGs with no alpha
+channel under `screenshots/6.9-inch/`. Repository presence proves only local
+capture and validation; the submission checklist separately records whether
+App Store Connect contains that exact set. A new 6.3-inch set is required only
+if the live portal does not inherit the primary 6.9-inch set.
+
+1. `screenshots/6.9-inch/01-farrierflow-pro.jpg`
+2. `screenshots/6.9-inch/02-today-run-sheet.jpg`
+3. `screenshots/6.9-inch/03-schedule-appointment.jpg`
+4. `screenshots/6.9-inch/04-horse-history.jpg`
+5. `screenshots/6.9-inch/05-invoice-detail.jpg`
+6. `screenshots/6.9-inch/06-read-only-retained-records.jpg`
+
+The set was captured on 2026-09-05 from deterministic fictional DEBUG-only
+fixtures on the iPhone 17 Pro Max iOS 26.5 simulator, then visually reviewed
+against the compiled Release appearance. It contains no customer, Apple ID, or
+testing-label data.

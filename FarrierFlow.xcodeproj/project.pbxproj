@@ -38,6 +38,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
+				Resources/FarrierFlow.storekit,
 			);
 			target = C2E75D4F301641FF008B005F /* FarrierFlow */;
 		};

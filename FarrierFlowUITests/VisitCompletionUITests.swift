@@ -130,7 +130,7 @@ final class VisitCompletionUITests: XCTestCase {
 
         assertNextAppointmentAppearsAfterVisitDismisses(in: app)
         app.buttons["Not Now"].tap()
-        XCTAssertTrue(app.staticTexts["Ready to Invoice"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["today-create-invoice-action"].waitForExistence(timeout: 3))
 
         app.tabBars.buttons["Schedule"].tap()
         XCTAssertEqual(
@@ -425,8 +425,8 @@ final class VisitCompletionUITests: XCTestCase {
         confirm.tap()
 
         for horseName in [
-            graph.servicedHorseName,
             graph.notServicedHorseName,
+            graph.servicedHorseName,
             thirdHorseName,
         ] {
             XCTAssertTrue(
@@ -453,8 +453,8 @@ final class VisitCompletionUITests: XCTestCase {
             app.buttons["visit-resume-action"].tap()
         }
         for horseName in [
-            graph.servicedHorseName,
             graph.notServicedHorseName,
+            graph.servicedHorseName,
             thirdHorseName,
         ] {
             XCTAssertTrue(
@@ -624,23 +624,12 @@ final class VisitCompletionUITests: XCTestCase {
     }
 
     @MainActor
-    private func bringIntoViewFromTop(
-        _ element: XCUIElement,
-        in app: XCUIApplication
-    ) -> Bool {
-        for _ in 0..<4 {
-            scrollForm(in: app, upward: false)
-        }
-        return bringIntoView(element, in: app)
-    }
-
-    @MainActor
     private func bringIntoView(
         _ element: XCUIElement,
         in app: XCUIApplication
     ) -> Bool {
         let visibleFrame = app.frame.insetBy(dx: 0, dy: 100)
-        for _ in 0..<4 {
+        for _ in 0..<8 {
             if element.exists,
                element.isHittable,
                visibleFrame.contains(
@@ -648,7 +637,7 @@ final class VisitCompletionUITests: XCTestCase {
                ) {
                 return true
             }
-            scrollForm(
+            scrollFormSlowly(
                 in: app,
                 upward: !(element.exists && element.frame.midY < visibleFrame.minY)
             )
@@ -658,6 +647,17 @@ final class VisitCompletionUITests: XCTestCase {
             && visibleFrame.contains(
                 CGPoint(x: element.frame.midX, y: element.frame.midY)
             )
+    }
+
+    @MainActor
+    private func bringIntoViewFromTop(
+        _ element: XCUIElement,
+        in app: XCUIApplication
+    ) -> Bool {
+        for _ in 0..<10 {
+            scrollFormSlowly(in: app, upward: false)
+        }
+        return bringIntoView(element, in: app)
     }
 
     @MainActor
@@ -677,6 +677,26 @@ final class VisitCompletionUITests: XCTestCase {
             form.swipeUp()
         } else {
             form.swipeDown()
+        }
+    }
+
+    @MainActor
+    private func scrollFormSlowly(in app: XCUIApplication, upward: Bool) {
+        let collectionViews = app.collectionViews
+        guard collectionViews.count > 0 else {
+            if upward {
+                app.swipeUp(velocity: .slow)
+            } else {
+                app.swipeDown(velocity: .slow)
+            }
+            return
+        }
+
+        let form = collectionViews.element(boundBy: min(1, collectionViews.count - 1))
+        if upward {
+            form.swipeUp(velocity: .slow)
+        } else {
+            form.swipeDown(velocity: .slow)
         }
     }
 
@@ -725,7 +745,7 @@ final class VisitCompletionUITests: XCTestCase {
 
     @MainActor
     private func createClient(_ name: String, in app: XCUIApplication) {
-        let addClient = app.buttons["Add Client"].firstMatch
+        let addClient = app.navigationBars["Clients"].buttons["Add Client"]
         for _ in 0..<2 {
             app.tabBars.buttons["Clients"].tap()
             if addClient.waitForExistence(timeout: 2) {
@@ -816,7 +836,7 @@ final class VisitCompletionUITests: XCTestCase {
         in app: XCUIApplication
     ) {
         let addHorse = app.buttons["Add Horse"].firstMatch
-        XCTAssertTrue(addHorse.waitForExistence(timeout: 3))
+        XCTAssertTrue(addHorse.waitForExistence(timeout: 5))
         let nameField = app.textFields["horse-name-field"]
         guard tapUntilDestinationAppears(addHorse, destination: nameField) else { return }
         focusAndType(name, in: nameField)
@@ -915,10 +935,28 @@ final class VisitCompletionUITests: XCTestCase {
             }
             XCTAssertTrue(accessibilityText(of: horseButton).contains("Selected"))
         }
-        app.buttons["Save"].tap()
+        let newAppointmentNavigationBar = app.navigationBars["New Appointment"]
+        XCTAssertTrue(newAppointmentNavigationBar.waitForExistence(timeout: 3))
+        let save = newAppointmentNavigationBar.buttons["Save"]
+        for _ in 0..<2 where newAppointmentNavigationBar.exists {
+            XCTAssertTrue(save.waitForExistence(timeout: 3))
+            guard save.isHittable else { continue }
+            save.tap()
+            _ = newAppointmentNavigationBar.waitForNonExistence(timeout: 5)
+        }
+        XCTAssertFalse(newAppointmentNavigationBar.exists)
+        guard !newAppointmentNavigationBar.exists else { return }
         // The next half-hour can fall tomorrow, outside the Today run sheet.
-        app.tabBars.buttons["Schedule"].tap()
-        XCTAssertTrue(app.navigationBars["Schedule"].waitForExistence(timeout: 3))
+        let scheduleNavigationBar = app.navigationBars["Schedule"]
+        let scheduleTab = app.tabBars.buttons["Schedule"]
+        for _ in 0..<2 where !scheduleNavigationBar.exists {
+            guard scheduleTab.waitForExistence(timeout: 3), scheduleTab.isHittable else {
+                continue
+            }
+            scheduleTab.tap()
+            _ = scheduleNavigationBar.waitForExistence(timeout: 3)
+        }
+        XCTAssertTrue(scheduleNavigationBar.exists)
         let appointmentRow = app.buttons["appointment-row-\(barnName)"]
         XCTAssertTrue(appointmentRow.waitForExistence(timeout: 3))
     }
@@ -1029,16 +1067,27 @@ final class VisitCompletionUITests: XCTestCase {
             XCTFail("Expected outcome picker to become visible and hittable")
             return
         }
-        let option = app.buttons[outcome.title].firstMatch
-        for _ in 0..<2 {
+        let options = app.buttons.matching(
+            NSPredicate(format: "label == %@", outcome.title)
+        )
+        var selectedOption = false
+        for _ in 0..<3 {
             picker.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-            if option.waitForExistence(timeout: 3) {
+            _ = options.firstMatch.waitForExistence(timeout: 3)
+            guard let option = options.allElementsBoundByIndex.first(where: \.isHittable) else {
+                continue
+            }
+            option.tap()
+            if !assertsSelection {
+                selectedOption = true
+                break
+            }
+            if waitForOutcome(outcome, in: picker) {
+                selectedOption = true
                 break
             }
         }
-        XCTAssertTrue(option.waitForExistence(timeout: 5))
-        guard option.exists else { return }
-        option.tap()
+        XCTAssertTrue(selectedOption, "Expected visible \(outcome.title) option to update \(horseName)")
         if assertsSelection {
             assertOutcome(outcome, for: horseName, in: app)
         }
@@ -1073,7 +1122,19 @@ final class VisitCompletionUITests: XCTestCase {
         let picker = app.buttons["visit-outcome-\(horseName)"]
         XCTAssertTrue(picker.waitForExistence(timeout: 3))
         XCTAssertTrue(picker.label.contains(horseName))
-        XCTAssertTrue(accessibilityText(of: picker).contains(outcome.title))
+        XCTAssertTrue(waitForOutcome(outcome, in: picker))
+    }
+
+    @MainActor
+    private func waitForOutcome(_ outcome: VisitOutcome, in picker: XCUIElement) -> Bool {
+        let selected = XCTNSPredicateExpectation(
+            predicate: NSPredicate { evaluated, _ in
+                guard let element = evaluated as? XCUIElement else { return false }
+                return self.accessibilityText(of: element).contains(outcome.title)
+            },
+            object: picker
+        )
+        return XCTWaiter().wait(for: [selected], timeout: 3) == .completed
     }
 
     @MainActor

@@ -10,33 +10,49 @@ final class EditorAccessibilityUITests: XCTestCase {
 
         XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 5))
         openClients(in: app)
-        let addClient = app.buttons["Add Client"].firstMatch
+        let addClient = app.navigationBars["Clients"].buttons["Add Client"]
         XCTAssertTrue(addClient.waitForExistence(timeout: 10))
         addClient.tap()
         let clientMoreDetails = app.buttons["client-more-details"]
         XCTAssertTrue(clientMoreDetails.waitForExistence(timeout: 3))
-        clientMoreDetails.tap()
-        XCTAssertTrue(app.textViews["Client Notes"].waitForExistence(timeout: 3))
-        app.textFields["client-name-field"].tap()
-        app.textFields["client-name-field"].typeText("Accessible Client")
+        guard tapUntilDestinationAppears(
+            clientMoreDetails,
+            destination: app.textViews["Client Notes"]
+        ) else { return }
+        guard focusAndType(
+            "Accessible Client",
+            in: app.textFields["client-name-field"]
+        ) else { return }
         app.buttons["Save"].tap()
 
-        app.tabBars.buttons["Today"].tap()
-        let addAppointment = app.buttons["Schedule Appointment"].firstMatch
+        guard let todayNavigationBar = openToday(in: app) else { return }
+        let addAppointment = todayNavigationBar.buttons["Schedule Appointment"]
         XCTAssertTrue(addAppointment.waitForExistence(timeout: 10))
-        addAppointment.tap()
+        guard tapUntilDestinationAppears(
+            addAppointment,
+            destination: app.navigationBars["New Appointment"]
+        ) else { return }
         let appointmentNotes = app.textViews["Appointment Notes"]
-        app.buttons["appointment-more-details"].tap()
-        XCTAssertTrue(appointmentNotes.waitForExistence(timeout: 3))
+        guard tapUntilDestinationAppears(
+            app.buttons["appointment-more-details"],
+            destination: appointmentNotes
+        ) else { return }
         appointmentNotes.tap()
         appointmentNotes.typeText("Keep this draft")
         let addServiceLocation = app.buttons["appointment-add-service-location"]
         XCTAssertTrue(addServiceLocation.waitForExistence(timeout: 3))
-        addServiceLocation.tap()
-        app.buttons["barn-more-details"].tap()
-        XCTAssertTrue(app.textViews["Contact Notes"].waitForExistence(timeout: 3))
-        app.textFields["barn-name-field"].tap()
-        app.textFields["barn-name-field"].typeText("Accessible Barn")
+        guard tapUntilDestinationAppears(
+            addServiceLocation,
+            destination: app.textFields["barn-name-field"]
+        ) else { return }
+        guard tapUntilDestinationAppears(
+            app.buttons["barn-more-details"],
+            destination: app.textViews["Contact Notes"]
+        ) else { return }
+        guard focusAndType(
+            "Accessible Barn",
+            in: app.textFields["barn-name-field"]
+        ) else { return }
         app.navigationBars["New Service Location"].buttons["Save"].tap()
         let barnPicker = app.buttons["appointment-barn-picker"]
         XCTAssertTrue(barnPicker.waitForExistence(timeout: 3))
@@ -47,13 +63,17 @@ final class EditorAccessibilityUITests: XCTestCase {
                 "Add or move a horse to this service location before scheduling an appointment."
             ].waitForExistence(timeout: 3)
         )
-        app.buttons["appointment-add-horse"].tap()
-        app.buttons["horse-more-details"].tap()
-        XCTAssertTrue(app.textViews["Additional Notes"].waitForExistence(timeout: 3))
         let horseName = app.textFields["horse-name-field"]
+        guard tapUntilDestinationAppears(
+            app.buttons["appointment-add-horse"],
+            destination: horseName
+        ) else { return }
+        guard tapUntilDestinationAppears(
+            app.buttons["horse-more-details"],
+            destination: app.textViews["Additional Notes"]
+        ) else { return }
         XCTAssertTrue(horseName.waitForExistence(timeout: 3))
-        horseName.tap()
-        horseName.typeText("Appointment Horse")
+        guard focusAndType("Appointment Horse", in: horseName) else { return }
         app.buttons["horse-client-picker"].tap()
         app.buttons["Accessible Client"].tap()
         app.navigationBars["New Horse"].buttons["Save"].tap()
@@ -67,11 +87,14 @@ final class EditorAccessibilityUITests: XCTestCase {
             XCTFail("Add Horse should remain available after creating the first horse")
             return
         }
-        addAnotherHorse.tap()
         let secondHorseName = app.textFields["horse-name-field"]
-        XCTAssertTrue(secondHorseName.waitForExistence(timeout: 3))
-        secondHorseName.tap()
-        secondHorseName.typeText("Second Appointment Horse")
+        guard tapUntilDestinationAppears(
+            addAnotherHorse,
+            destination: secondHorseName
+        ) else { return }
+        guard focusAndType("Second Appointment Horse", in: secondHorseName) else {
+            return
+        }
         app.buttons["horse-client-picker"].tap()
         app.buttons["Accessible Client"].tap()
         app.navigationBars["New Horse"].buttons["Save"].tap()
@@ -94,5 +117,70 @@ final class EditorAccessibilityUITests: XCTestCase {
             }
         }
         XCTFail("Clients tab did not open")
+    }
+
+    @MainActor
+    private func openToday(in app: XCUIApplication) -> XCUIElement? {
+        let navigationBar = app.navigationBars["Today"]
+        for _ in 0..<3 {
+            app.tabBars.buttons["Today"].tap()
+            if navigationBar.waitForExistence(timeout: 3) {
+                return navigationBar
+            }
+        }
+        XCTFail("Today tab did not open")
+        return nil
+    }
+
+    @MainActor
+    private func tapUntilDestinationAppears(
+        _ trigger: XCUIElement,
+        destination: XCUIElement
+    ) -> Bool {
+        for _ in 0..<3 {
+            if destination.exists || destination.waitForExistence(timeout: 1) {
+                return true
+            }
+            guard trigger.waitForExistence(timeout: 3), trigger.isHittable else {
+                continue
+            }
+            trigger.tap()
+        }
+        if destination.waitForExistence(timeout: 3) {
+            return true
+        }
+        XCTFail("Expected \(destination.identifier) after tapping \(trigger.identifier)")
+        return false
+    }
+
+    @MainActor
+    private func focusAndType(_ text: String, in element: XCUIElement) -> Bool {
+        XCTAssertTrue(element.waitForExistence(timeout: 3))
+        guard element.exists else { return false }
+        XCTAssertTrue(element.isHittable)
+        for attempt in 0..<4 {
+            if attempt == 0 {
+                element.tap()
+            } else {
+                element.coordinate(
+                    withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
+                ).tap()
+            }
+            if waitForKeyboardFocus(in: element) {
+                element.typeText(text)
+                return true
+            }
+        }
+        XCTFail("Expected \(element.identifier) to receive keyboard focus")
+        return false
+    }
+
+    @MainActor
+    private func waitForKeyboardFocus(in element: XCUIElement) -> Bool {
+        let focusExpectation = expectation(
+            for: NSPredicate(format: "hasKeyboardFocus == true"),
+            evaluatedWith: element
+        )
+        return XCTWaiter().wait(for: [focusExpectation], timeout: 2) == .completed
     }
 }

@@ -179,6 +179,8 @@ enum UITestFixtures {
         photographRootURL: URL
     ) throws {
         switch scenario {
+        case .appStoreShowcase:
+            try seedAppStoreShowcase(in: container)
         case .invoiceReady:
             try seedInvoiceReady(
                 in: container,

@@ -101,6 +101,7 @@ struct UITestLaunchConfiguration {
 }
 
 enum UITestScenario: String {
+    case appStoreShowcase = "app-store-showcase"
     case invoiceReady = "invoice-ready"
     case paymentPending = "payment-pending"
     case nextAppointment = "next-appointment"

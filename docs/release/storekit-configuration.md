@@ -110,9 +110,12 @@ Both products have a United States introductory offer that starts August 11,
 enabled for 16 days for **All Renewals** in both production and sandbox.
 
 On 2026-08-18, both products had a sanitized review screenshot uploaded and
-were added to the version 1.0 draft, where each reported **Ready for Review**.
-Neither product nor the app version was submitted. No credentials or private
-account data are recorded in this repository.
+each reported **Ready for Review**. Historical portal evidence recorded both
+products as attached to the version 1.0 draft. A live read-only check on
+2026-09-05 showed no in-app purchases or subscriptions attached to that
+version, so both products and the group must be reattached before review.
+Neither product nor the app version has been submitted. No credentials or
+private account data are recorded in this repository.
 
 Sanitized portal evidence excludes the account header and browser chrome:
 

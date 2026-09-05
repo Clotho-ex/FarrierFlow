@@ -90,23 +90,27 @@ features.
   account-free sign-in setting, and 4+ age rating; configured a free United
   States launch matching both subscriptions; and disabled Mac and Vision Pro availability for the
   iPhone-only 1.0 scope. Both monthly and yearly product review screenshots
-  were uploaded and both products were added to the version 1.0 draft, where
-  they report **Ready for Review**. On 2026-08-28, App Privacy was republished
+  were uploaded and the products reported **Ready for Review**. On 2026-08-28,
+  App Privacy was republished
   with RevenueCat Purchase History for App Functionality and Analytics, not
-  linked to identity and not used for tracking; the `FarrierFlow Pro` group was
-  also added to the draft. Copyright, exact review contact, Content
-  Rights, final release-behavior confirmation, and App Store product-page
-  screenshots remain incomplete. The current sanitized 1206 x 2622 asset is
-  compatible with the 6.3-inch screenshot slot, but Chrome file-chooser access
-  blocked that upload and version 1.0 still has zero screenshots.
-- TestFlight still has no build, so project build 1 remains the first available
+  linked to identity and not used for tracking. A live read-only check on
+  2026-09-05 showed that neither product nor the `FarrierFlow Pro` group is
+  currently attached to the version draft. Copyright, exact review contact,
+  Content Rights, and final release-behavior confirmation remain incomplete. The live
+  draft currently has seven stale custom 6.9-inch screenshots, while its
+  6.5-inch slot inherits that set. They must be replaced by the six current
+  1320 x 2868 release-candidate captures; the existing repository 6.3-inch set
+  is superseded.
+- TestFlight still has no build as of 2026-09-05, so project build 1 remains the first available
   upload candidate. The Paid Apps Agreement, bank account, both submitted U.S.
   tax forms, and updated Apple Developer Program License Agreement were
   confirmed active or accepted on 2026-08-18. App Store Connect's stale
   agreement-review banner still requires a propagation recheck before upload
   or submission.
-- Final product-page screenshots and metadata, physical-device acceptance,
-  signed archive, TestFlight, and submission gates remain unmet.
+- Six locally validated 1320 x 2868 RGB/no-alpha release-candidate screenshots
+  now exist, and the full current-head local test and Release-build matrix is
+  green. Portal screenshot replacement, physical-device acceptance, signed
+  archive validation, TestFlight, and submission gates remain unmet.
 
 Low-risk edge-case hardening, feature expansion, and aesthetic polish do not
 block 1.0 once the real owner flow and major failure, relaunch, offline,
