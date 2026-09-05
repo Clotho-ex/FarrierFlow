@@ -30,6 +30,11 @@ Testing configuration for the FarrierFlow scheme's Run action. It was created
 with Xcode's StoreKit Configuration editor and contains exactly one
 auto-renewable subscription group:
 
+The application target explicitly excludes this file from bundle membership;
+the shared scheme continues to reference it for local StoreKit runs. Fresh
+Debug/Release product inspection and the frozen device archive on 2026-09-05
+contained no `.storekit` resource.
+
 | Group | Product | Identifier | Price | Duration | Introductory offer |
 | --- | --- | --- | --- | --- | --- |
 | FarrierFlow Pro | FarrierFlow Yearly | `com.farrierflow.yusufcan.FarrierFlow.pro.yearly` | USD 119.99 | 1 year | Free for 2 weeks (14 days) |

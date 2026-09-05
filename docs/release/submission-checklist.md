@@ -79,8 +79,8 @@ does not authorize **Add for Review** or **Submit for Review**.
   Offering-authoritative trial copy, Pro skip/purchase/restore handoff,
   read-only recovery, contextual hints, relaunch, accessibility XXXL,
   localization, iOS 18/iOS 26 builds, and final diff audit.
-- [ ] Freeze a new release-candidate source boundary after the RevenueCat and
-  structured-payment implementation is reviewed and committed.
+- [x] Freeze the reviewed application release candidate at local commit
+  `cee7a12381a22b6bf95632368508d2df3ba9cd61`; no push was performed.
 - [x] On 2026-09-05, App Store Connect showed **No Builds** in TestFlight and no
   build attached to version 1.0. Project build number `1` remains unused and is
   the first available upload candidate.
@@ -118,7 +118,9 @@ does not authorize **Add for Review** or **Submit for Review**.
 - [ ] Replace the seven stale custom 6.9-inch screenshots observed in App Store
   Connect on 2026-09-05 with the exact six final release-candidate assets. The
   6.5-inch slot currently inherits the 6.9-inch set; add a separate 6.3-inch set
-  only if the live portal requires one.
+  only if the live portal requires one. The authorized Safari session redirected
+  to Apple sign-in when Distribution was opened later that day, so no screenshot
+  or draft mutation was performed.
 - [ ] Enter the prepared subtitle, promotional text, description, keywords,
   Support URL, copyright, category, review contact, and review notes. On
   2026-08-18, the subtitle, promotional text, description, keywords, Support
@@ -127,7 +129,15 @@ does not authorize **Add for Review** or **Submit for Review**.
   no build or subscriptions attached and found copyright plus the review
   contact name, phone, and email blank. Content Rights and final
   release-behavior confirmation also remain open.
-- [ ] Archive, upload, and process one signed release candidate.
+- [x] Create `/tmp/FarrierFlow-1.0-RC.xcarchive` from the immutable RC and
+  verify its signature, version/build, iPhone/iOS settings, icons/assets,
+  privacy manifests, RevenueCat static linkage/resource bundle, and absence of
+  test/debug/`.storekit` artifacts.
+- [ ] Obtain App Store distribution signing, run Organizer Validate App,
+  upload the frozen archive, and wait for build 1 to finish processing. The
+  non-uploading App Store export attempt on 2026-09-05 reported `No Accounts`
+  and no distribution profile; Safari authorization alone does not satisfy
+  Xcode signing.
 - [ ] Complete TestFlight and physical-iPhone acceptance.
 - [ ] Finish the remaining verified metadata and screenshots, upload and select
   the release-candidate build, complete Content Rights and App Review contact
