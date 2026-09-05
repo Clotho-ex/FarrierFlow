@@ -1,12 +1,19 @@
 # FarrierFlow 1.0 Ship Readiness
 
-**Certification date:** 2026-09-05  
-**Immutable application RC:** `cee7a12381a22b6bf95632368508d2df3ba9cd61`  
-**Baseline before certification:** `827a4f6d336793011cf9a13dcb08a20dd2b048a4`  
-**Uncertified release delta reviewed:** `7d7f44b..827a4f6` (100 files)  
-**Version:** 1.0 (build 1)  
-**Bundle identifier:** `com.farrierflow.yusufcan.FarrierFlow`  
-**Deployment / device family:** iOS 18.0+, iPhone only  
+**Certification date:** 2026-09-05
+
+**Immutable application RC:** `cee7a12381a22b6bf95632368508d2df3ba9cd61`
+
+**Baseline before certification:** `827a4f6d336793011cf9a13dcb08a20dd2b048a4`
+
+**Uncertified release delta reviewed:** `7d7f44b..827a4f6` (100 files)
+
+**Version:** 1.0 (build 1)
+
+**Bundle identifier:** `com.farrierflow.yusufcan.FarrierFlow`
+
+**Deployment / device family:** iOS 18.0+, iPhone only
+
 **RevenueCat:** Purchases iOS 5.87.1 at revision
 `b65cae4f227be800c57cb9700dbd94f2aa5409b2`
 
