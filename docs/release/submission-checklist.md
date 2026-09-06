@@ -198,6 +198,11 @@ does not authorize **Add for Review** or **Submit for Review**.
   purchase and entitlement activation only; trial, monthly purchase, Restore,
   entitlement loss/read-only, reactivation, and App Store Server Notification
   receipt remain separate gates.
+- [x] On the active physical-device entitlement, the owner created the
+  fictional Willow Creek Stables appointment with its fictional address and
+  both Atlas and Beacon. Device evidence shows the appointment as the scheduled
+  Next Stop on Today; visit, photo, invoice, payment, follow-up, and relaunch
+  acceptance remain in progress.
 - [ ] Complete TestFlight and physical-iPhone acceptance.
 - [ ] Finish the remaining owner-supplied metadata, upload and select
   the replacement release-candidate build, and complete Content Rights,
