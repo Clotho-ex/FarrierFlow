@@ -163,12 +163,12 @@ does not authorize **Add for Review** or **Submit for Review**.
 - [x] Create `/tmp/FarrierFlow-1.0-build2-RC.xcarchive` from that exact SHA and
   pass version/build, signature, entitlement, privacy-manifest, RevenueCat,
   icon, artifact-exclusion, binary-hash, and source-integrity inspection.
-- [ ] Validate/upload the unchanged build 2 archive, wait for processing, save
-  its export-compliance answer, and attach only build 2 to version 1.0. The
-  first upload attempt stopped before upload with `Failed to Use Accounts`;
-  Xcode reported no active App Store Connect account for team `5SN9TWDXQ4`.
-  Refresh the Apple Account in Xcode Settings > Accounts and retry this exact
-  archive without rebuilding it.
+- [x] Validate/upload the unchanged build 2 archive after restoring Xcode's
+  Apple Account session. Xcode reported `Upload succeeded` and
+  `** EXPORT SUCCEEDED **`; live TestFlight showed build 2 Ready to Submit
+  after its source-backed export-compliance answer was saved.
+- [x] Attach only build 2 to version 1.0 and verify the saved draft displays
+  build 2 / version 1.0. Build 1 remains superseded for submission.
 - [ ] Complete TestFlight and physical-iPhone acceptance.
 - [ ] Finish the remaining owner-supplied metadata, upload and select
   the replacement release-candidate build, and complete Content Rights,
