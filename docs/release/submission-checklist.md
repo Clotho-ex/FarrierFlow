@@ -174,6 +174,9 @@ does not authorize **Add for Review** or **Submit for Review**.
   App Store Connect showed the group with one build in `Ready to Test` state
   on 2026-09-07. The Account Holder was then added as the sole internal tester;
   the live tester status was `Invited`, with no install yet inferred.
+- [x] Owner reported installing TestFlight build 1.0 (2) on an iPhone 14 Pro
+  running iOS 26.6.1 on 2026-09-07. At the immediate portal recheck the tester
+  still showed `Invited` with no session, so runtime acceptance is not inferred.
 - [ ] Complete TestFlight and physical-iPhone acceptance.
 - [ ] Finish the remaining owner-supplied metadata, upload and select
   the replacement release-candidate build, and complete Content Rights,
