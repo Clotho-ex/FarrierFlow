@@ -214,6 +214,16 @@ resized asset is currently required.
   above” answer was saved.
 - Version attachment: PASS — live version 1.0 draft displayed build 2 / version
   1.0 and the saved build section after attachment.
+- Physical TestFlight clean launch and subscription-plan load: PASS — owner
+  evidence from iPhone 14 Pro on iOS 26.6.1 showed the clean first-run flow
+  reaching `FarrierFlow Pro`, both monthly and yearly products, yearly selected
+  by default, and the eligible two-week free trial. The app displayed
+  `$14.99/month` and `$119.99/year`; Apple's TestFlight confirmation sheet
+  displayed `₺5,999.99/year` for the Turkish storefront. RevenueCat documents
+  [this split](https://www.revenuecat.com/docs/test-and-launch/sandbox/apple-app-store)
+  as a sandbox/TestFlight metadata quirk, and source inspection confirms the
+  shipping client passes through `Package.localizedPriceString`.
+  No purchase or entitlement state is inferred from the confirmation sheet.
 
 ### Superseded build 1 RC
 

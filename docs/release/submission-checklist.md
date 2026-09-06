@@ -179,7 +179,16 @@ does not authorize **Add for Review** or **Submit for Review**.
   still showed `Invited` with no session, so runtime acceptance is not inferred.
 - [x] Because an earlier FarrierFlow build had existed on the device, the owner
   deleted it and reinstalled build 1.0 (2) from TestFlight before opening it.
-  This establishes the clean-install prerequisite; first launch remains pending.
+  This establishes the clean-install prerequisite.
+- [x] The owner completed the clean first-run path through briefing and business
+  identity to `FarrierFlow Pro`. Supplied device screenshots show both monthly
+  and yearly products, yearly selected by default, a two-week free trial,
+  `$14.99/month`, and `$119.99/year`; there was no plans-unavailable state.
+  Apple's confirmation sheet showed `₺5,999.99/year` for the Turkish storefront.
+  [RevenueCat documents](https://www.revenuecat.com/docs/test-and-launch/sandbox/apple-app-store)
+  USD Offerings metadata beside correctly localized Apple purchase sheets as a
+  known TestFlight/sandbox quirk; the shipping client uses RevenueCat's
+  `localizedPriceString` rather than a hardcoded production price.
 - [ ] Complete TestFlight and physical-iPhone acceptance.
 - [ ] Finish the remaining owner-supplied metadata, upload and select
   the replacement release-candidate build, and complete Content Rights,
