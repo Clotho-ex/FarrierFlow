@@ -177,6 +177,9 @@ does not authorize **Add for Review** or **Submit for Review**.
 - [x] Owner reported installing TestFlight build 1.0 (2) on an iPhone 14 Pro
   running iOS 26.6.1 on 2026-09-07. At the immediate portal recheck the tester
   still showed `Invited` with no session, so runtime acceptance is not inferred.
+- [x] Because an earlier FarrierFlow build had existed on the device, the owner
+  deleted it and reinstalled build 1.0 (2) from TestFlight before opening it.
+  This establishes the clean-install prerequisite; first launch remains pending.
 - [ ] Complete TestFlight and physical-iPhone acceptance.
 - [ ] Finish the remaining owner-supplied metadata, upload and select
   the replacement release-candidate build, and complete Content Rights,
