@@ -189,6 +189,15 @@ does not authorize **Add for Review** or **Submit for Review**.
   USD Offerings metadata beside correctly localized Apple purchase sheets as a
   known TestFlight/sandbox quirk; the shipping client uses RevenueCat's
   `localizedPriceString` rather than a hardcoded production price.
+- [x] The owner completed the yearly TestFlight sandbox purchase on the same
+  physical device. The app showed `Completing Purchase...`, Apple's `You're all
+  set` confirmation appeared after about two seconds, and FarrierFlow routed to
+  Today about two seconds later. RevenueCat sandbox data independently records
+  the matching Turkish `INITIAL_PURCHASE` for `FarrierFlow Yearly`, entitlement
+  ID `pro`, and an Active `FarrierFlow Pro` entitlement. This passes yearly
+  purchase and entitlement activation only; trial, monthly purchase, Restore,
+  entitlement loss/read-only, reactivation, and App Store Server Notification
+  receipt remain separate gates.
 - [ ] Complete TestFlight and physical-iPhone acceptance.
 - [ ] Finish the remaining owner-supplied metadata, upload and select
   the replacement release-candidate build, and complete Content Rights,

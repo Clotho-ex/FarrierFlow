@@ -223,7 +223,14 @@ resized asset is currently required.
   [this split](https://www.revenuecat.com/docs/test-and-launch/sandbox/apple-app-store)
   as a sandbox/TestFlight metadata quirk, and source inspection confirms the
   shipping client passes through `Package.localizedPriceString`.
-  No purchase or entitlement state is inferred from the confirmation sheet.
+- Yearly sandbox purchase and entitlement activation: PASS — on the same
+  physical TestFlight installation, the app showed `Completing Purchase...`,
+  Apple's `You're all set` confirmation appeared after about two seconds, and
+  FarrierFlow routed to Today about two seconds later. RevenueCat's sandbox
+  customer profile independently records the matching Turkish
+  `INITIAL_PURCHASE` for `FarrierFlow Yearly`, entitlement ID `pro`, and an
+  Active `FarrierFlow Pro` entitlement. RevenueCat records the period as
+  `NORMAL`; trial activation is therefore not inferred.
 
 ### Superseded build 1 RC
 
@@ -275,7 +282,10 @@ Every external gate has one status below.
 | Agreements and free-download state | PASS | Live Business inspection on 2026-09-06 showed both Free Apps and Paid Apps agreements Active with no review banner. Pricing shows the existing current price schedule with no paid amount/proceeds; no pricing state was changed. |
 | Sign-in Required is false | PASS | Live version-draft evidence records the account-free review setting. |
 | TestFlight install and complete physical-iPhone workflow | NOT YET VERIFIED | On 2026-09-07, the owner reported installing build 1.0 (2) on an iPhone 14 Pro running iOS 26.6.1. Because an earlier app copy had existed, the owner deleted it and reinstalled from TestFlight before opening. The immediate live portal recheck still showed `Invited` with no session. Perform and evidence the clean first launch, then exercise onboarding through next appointment, PDF/share, photos, background/foreground, relaunch, Light/Dark, keyboard, touch targets, and outdoor legibility before this combined gate can pass. |
-| Sandbox purchase, entitlement activation, Restore, loss to read-only, and reactivation | NOT YET VERIFIED | On the corrected replacement build, use an Apple sandbox tester and retain device video/screenshots plus RevenueCat customer-event evidence for every transition. |
+| Yearly sandbox purchase and `pro` entitlement activation | PASS | Physical-device screenshots show the TestFlight purchase flow, Apple success confirmation, and automatic route to Today. RevenueCat sandbox data records the matching Turkish `INITIAL_PURCHASE` for `FarrierFlow Yearly`, entitlement ID `pro`, and Active `FarrierFlow Pro` access. |
+| Monthly sandbox purchase and trial behavior | NOT YET VERIFIED | Exercise the monthly product with an eligible Apple sandbox tester and retain the Apple confirmation plus matching RevenueCat customer-event evidence. The completed yearly event has period type `NORMAL`, so it does not prove introductory-trial behavior. |
+| Restore Purchases | NOT YET VERIFIED | Perform Restore Purchases after creating meaningful records and retain the device result plus matching RevenueCat state. |
+| Entitlement loss, retained read-only records, and reactivation | NOT YET VERIFIED | After the full workflow and persistence checks, allow or force a real sandbox entitlement transition, verify retained records are read-only, then reactivate and retain device plus RevenueCat evidence. |
 | Apple server-notification receipt in RevenueCat | NOT YET VERIFIED | Retain the RevenueCat dashboard event/log tied to the sandbox lifecycle run. |
 | Support mailbox receive-and-reply operation | NOT YET VERIFIED | Send a fresh external message to `farrierflow.support@gmail.com`, receive it, reply from that address, and retain redacted sent/received evidence. |
 | Stop before Add for Review / Submit for Review | PASS | Neither action was taken; version remains a draft. |
