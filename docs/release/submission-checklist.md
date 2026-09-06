@@ -38,10 +38,8 @@ does not authorize **Add for Review** or **Submit for Review**.
 - [x] On 2026-08-18, verify Apple Developer Account records the newly updated
   Apple Developer Program License Agreement as issued and accepted on that
   date.
-- [ ] Reconfirm App Store Connect has cleared its stale agreement-review banner
-  before upload or submission. The immediate post-acceptance refresh still
-  displayed the banner even though Apple Developer Account recorded the new
-  agreement as accepted.
+- [x] On 2026-09-06, live Business inspection confirmed the stale agreement
+  banner is cleared and both Free Apps and Paid Apps agreements are Active.
 - [x] On 2026-08-18, configure the app as a free download in the United States,
   matching both subscriptions' one-country launch availability.
 - [x] On 2026-08-18, disable Apple-Silicon Mac and Apple Vision Pro
@@ -51,10 +49,8 @@ does not authorize **Add for Review** or **Submit for Review**.
   have the 14-day introductory offer, and the 16-day All Renewals billing grace
   period is enabled in production and sandbox. On 2026-08-18, upload the
   sanitized 1206 x 2622 review screenshot to both products; each product
-  reported **Ready for Review**. Historical notes said both products and the
-  group were added to the version draft. A live read-only check on 2026-09-05
-  showed no in-app purchases or subscriptions attached to version 1.0, so
-  attachment remains an open portal gate.
+  reported **Ready for Review**. The live 2026-09-06 Draft Submission contains
+  the FarrierFlow Pro group plus FarrierFlow Monthly and FarrierFlow Yearly.
 - [x] On 2026-08-18, complete the source-backed age-rating questionnaire; App
   Store Connect calculated and saved a 4+ rating.
 - [x] On 2026-08-28, replace the prior **Data Not Collected** answer with Purchase History used
@@ -79,8 +75,10 @@ does not authorize **Add for Review** or **Submit for Review**.
   Offering-authoritative trial copy, Pro skip/purchase/restore handoff,
   read-only recovery, contextual hints, relaunch, accessibility XXXL,
   localization, iOS 18/iOS 26 builds, and final diff audit.
-- [x] Freeze the reviewed application release candidate at local commit
-  `cee7a12381a22b6bf95632368508d2df3ba9cd61`; no push was performed.
+- [x] Freeze the original reviewed application release candidate at local
+  commit `cee7a12381a22b6bf95632368508d2df3ba9cd61`; no push was performed.
+  This RC and its build 1 were superseded for submission by the owner-authorized
+  2026-09-06 UI corrections below.
 - [x] On 2026-09-05, App Store Connect showed **No Builds** in TestFlight and no
   build attached to version 1.0. Project build number `1` remains unused and is
   the first available upload candidate.
@@ -111,36 +109,64 @@ does not authorize **Add for Review** or **Submit for Review**.
   credential-name scan, both built app and RevenueCat privacy manifests,
   absence of `.storekit` and test/debug artifacts from both Release bundles,
   screenshot specifications, and `git diff --check` passed.
-- [x] Capture and locally validate six final 1320 x 2868 6.9-inch App Store
-  screenshots from deterministic fictional fixtures on the iPhone 17 Pro Max
-  iOS 26.5 simulator, with no private customer, account, or testing-label data.
-  The existing 1206 x 2622 6.3-inch repository set is superseded.
-- [ ] Replace the seven stale custom 6.9-inch screenshots observed in App Store
-  Connect on 2026-09-05 with the exact six final release-candidate assets. The
-  6.5-inch slot currently inherits the 6.9-inch set; add a separate 6.3-inch set
-  only if the live portal requires one. The authorized Safari session redirected
-  to Apple sign-in when Distribution was opened later that day, so no screenshot
-  or draft mutation was performed.
+- [x] Locally validate the seven corrected product-page exports in
+  `/Users/prometheus/Desktop/Updated-Screenshots-Figma-Export`: every file is a
+  1320 x 2868 JPEG with no alpha channel. Seven files are intentional because
+  two adjacent images form one continuous visual. The historical repository
+  screenshot sets are superseded.
+- [x] On 2026-09-06, live App Store Connect inspection confirmed all seven
+  corrected exports in the 6.9-inch slot in saved order. The 6.5-inch slot
+  inherits all seven from 6.9-inch. The draft has zero App Previews by owner
+  choice; a preview is optional and is not a blocker.
 - [ ] Enter the prepared subtitle, promotional text, description, keywords,
   Support URL, copyright, category, review contact, and review notes. On
   2026-08-18, the subtitle, promotional text, description, keywords, Support
   URL, Business category, and review notes were saved, and **Sign-in required**
-  was cleared for this account-free app. A live check on 2026-09-05 confirmed
-  no build or subscriptions attached and found copyright plus the review
-  contact name, phone, and email blank. Content Rights and final
-  release-behavior confirmation also remain open.
+  was cleared for this account-free app. Live inspection on 2026-09-06
+  confirmed the source-backed metadata remains saved, the three subscription
+  items are in the Draft Submission, and no build is attached. Copyright plus
+  review-contact first name, last name, phone, and email remain blank; Content
+  Rights and owner-selected release behavior also remain open.
 - [x] Create `/tmp/FarrierFlow-1.0-RC.xcarchive` from the immutable RC and
   verify its signature, version/build, iPhone/iOS settings, icons/assets,
   privacy manifests, RevenueCat static linkage/resource bundle, and absence of
   test/debug/`.storekit` artifacts.
-- [ ] Obtain App Store distribution signing, run Organizer Validate App,
-  upload the frozen archive, and wait for build 1 to finish processing. The
-  non-uploading App Store export attempt on 2026-09-05 reported `No Accounts`
-  and no distribution profile; Safari authorization alone does not satisfy
-  Xcode signing.
+- [x] On 2026-09-05, the owner authenticated Xcode and reported successful
+  Organizer validation of `/tmp/FarrierFlow-1.0-RC.xcarchive`; the exact frozen
+  archive upload then succeeded and App Store Connect displayed TestFlight
+  version 1.0 build 1. The owner reported saving its source-backed
+  export-compliance answer on 2026-09-06. Build 1 is now superseded for
+  submission by the corrected application source.
+- [x] Implement and focus-test the approved post-RC UI corrections: top invoice
+  toolbar actions, floating full-width Next Appointment Continue, inline-large
+  Today/Schedule/Clients titles with accessibility fallback and existing 8/16
+  point spacing tokens, and one visible Hoof Photos label in each Visit horse
+  section. Six focused UI tests passed across iOS 18 and iOS 26; the iOS 18
+  Release simulator build, localization compilation, and `git diff --check`
+  passed.
+- [x] Revalidate the complete Next Appointment boundary after updating only its
+  UI harness for current native controls: the iOS 26.5 UI suite passed 2/2,
+  including persistence/reopen, and the iOS 18.0 model suite passed all 9
+  declared tests (14 parameterized executions) with no failures or skips,
+  including manual date/time override behavior. The native virtual Toggle
+  activation issue on the iOS 18 simulator is an XCTest/simulator interaction
+  limitation, not a reproduced product failure.
+- [x] Set the application target to build 2, then pass a fresh iOS 26.5 Release
+  simulator build and verify the built app reports 1.0 (2), includes both
+  privacy manifests, and excludes `.storekit`. Localization, plist/StoreKit
+  validation, and `git diff --check` also passed.
+- [x] On 2026-09-06, live TestFlight showed only build 1, Ready to Submit, with
+  no invites or installs. Build 2 is the smallest unused build number.
+- [ ] Audit and freeze the corrected source as a new immutable build 2 RC,
+  archive that exact SHA, validate it in Organizer, upload it, wait for
+  processing, save its export-compliance answer, and attach only build 2 to
+  version 1.0.
 - [ ] Complete TestFlight and physical-iPhone acceptance.
-- [ ] Finish the remaining verified metadata and screenshots, upload and select
-  the release-candidate build, complete Content Rights and App Review contact
-  information, and attach both subscriptions plus the `FarrierFlow Pro` group
-  to version 1.0. Stop with the version in draft; submission is a separately
-  authorized action after sandbox/TestFlight lifecycle acceptance.
+- [ ] Finish the remaining owner-supplied metadata, upload and select
+  the replacement release-candidate build, and complete Content Rights,
+  copyright, App Review contact information, and the owner-selected release
+  behavior. The screenshots, 4+ rating, U.S.-only availability, Mac/Vision
+  exclusions, Sign-in Required false state, both subscriptions, and the
+  `FarrierFlow Pro` group are already verified. Stop with the version in draft;
+  submission is a separately authorized action after sandbox/TestFlight
+  lifecycle acceptance.

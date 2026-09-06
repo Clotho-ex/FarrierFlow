@@ -62,12 +62,43 @@ struct InvoiceDetailView: View {
             }
         }
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                if subscription.allowsMutations, model.canMarkPaid {
+                    Button("Mark as Paid", systemImage: "checkmark.circle") {
+                        beginPaymentRecording()
+                    }
+                    .accessibilityIdentifier("invoice-mark-paid-action")
+                }
+
                 Button("Share Invoice", systemImage: "square.and.arrow.up") {
                     preparePDF()
                 }
                 .disabled(shareModel.isPreparing)
                 .accessibilityIdentifier("invoice-share-pdf-action")
+
+                if subscription.allowsMutations,
+                   model.canDelete || model.detail?.status == .paid {
+                    Menu("More", systemImage: "ellipsis.circle") {
+                        if model.detail?.status == .paid {
+                            Button(
+                                "Mark as Unpaid",
+                                systemImage: "arrow.uturn.backward",
+                                role: .destructive
+                            ) {
+                                actionConfirmation = .markUnpaid
+                            }
+                            .accessibilityIdentifier("invoice-mark-unpaid-action")
+                        }
+
+                        if model.canDelete {
+                            Button("Delete Invoice", systemImage: "trash", role: .destructive) {
+                                actionConfirmation = .delete
+                            }
+                            .accessibilityIdentifier("invoice-delete-action")
+                        }
+                    }
+                    .accessibilityIdentifier("invoice-more-actions")
+                }
             }
         }
         .alert(
@@ -174,8 +205,10 @@ struct InvoiceDetailView: View {
                     email: detail.businessEmail,
                     address: detail.businessAddress
                 )
-                if subscription.allowsMutations {
-                    invoiceActions(detail)
+                if subscription.allowsMutations,
+                   detail.status == .unpaid,
+                   onboarding.showsPaymentRecordingHint {
+                    paymentRecordingHint
                 }
             }
             .padding(.horizontal, 20)
@@ -186,49 +219,17 @@ struct InvoiceDetailView: View {
         .accessibilityIdentifier("invoice-detail-\(detail.number)")
     }
 
-    @ViewBuilder
-    private func invoiceActions(_ detail: InvoiceDetail) -> some View {
-        if detail.status == .unpaid, case .available(let amount) = detail.total {
-            if onboarding.showsPaymentRecordingHint {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Received payment outside FarrierFlow?")
-                        .font(.headline)
-                    Text("Record it here to keep outstanding invoices accurate. FarrierFlow does not process the payment.")
-                        .font(.subheadline)
-                        .foregroundStyle(ColorTokens.textSecondary)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityElement(children: .combine)
-                .accessibilityIdentifier("invoice-first-payment-hint")
-            }
-
-            Button("Mark as Paid") {
-                onboarding.markPaymentRecordingHintSeen()
-                paymentModel = PaymentRecordingModel(
-                    invoiceID: invoiceID,
-                    amountMinorUnits: amount,
-                    currencyCode: detail.currencyCode
-                )
-                showsPaymentSheet = true
-            }
-            .farrierFlowPrimaryAction()
-            .frame(maxWidth: .infinity)
-            .accessibilityIdentifier("invoice-mark-paid-action")
-
-            Button("Delete Invoice", role: .destructive) {
-                actionConfirmation = .delete
-            }
-            .foregroundStyle(ColorTokens.destructive)
-            .frame(maxWidth: .infinity)
-            .accessibilityIdentifier("invoice-delete-action")
-        } else if detail.status == .paid {
-            Button("Mark as Unpaid", role: .destructive) {
-                actionConfirmation = .markUnpaid
-            }
-            .foregroundStyle(ColorTokens.destructive)
-            .frame(maxWidth: .infinity)
-            .accessibilityIdentifier("invoice-mark-unpaid-action")
+    private var paymentRecordingHint: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Received payment outside FarrierFlow?")
+                .font(.headline)
+            Text("Record it here to keep outstanding invoices accurate. FarrierFlow does not process the payment.")
+                .font(.subheadline)
+                .foregroundStyle(ColorTokens.textSecondary)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("invoice-first-payment-hint")
     }
 
     private func formattedTotal(_ total: MoneyAvailability) -> String {
@@ -276,6 +277,22 @@ struct InvoiceDetailView: View {
 
     private func reload() {
         model.load(in: context, locale: locale)
+    }
+
+    private func beginPaymentRecording() {
+        guard subscription.allowsMutations,
+              let detail = model.detail,
+              case .available(let amount) = detail.total,
+              detail.status == .unpaid else {
+            return
+        }
+        onboarding.markPaymentRecordingHintSeen()
+        paymentModel = PaymentRecordingModel(
+            invoiceID: invoiceID,
+            amountMinorUnits: amount,
+            currencyCode: detail.currencyCode
+        )
+        showsPaymentSheet = true
     }
 
     private func preparePDF(isRetry: Bool = false) {

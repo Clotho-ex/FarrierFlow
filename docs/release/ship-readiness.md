@@ -2,13 +2,16 @@
 
 **Certification date:** 2026-09-05
 
-**Immutable application RC:** `cee7a12381a22b6bf95632368508d2df3ba9cd61`
+**Last updated:** 2026-09-06
+
+**Superseded immutable application RC:** `cee7a12381a22b6bf95632368508d2df3ba9cd61`
 
 **Baseline before certification:** `827a4f6d336793011cf9a13dcb08a20dd2b048a4`
 
 **Uncertified release delta reviewed:** `7d7f44b..827a4f6` (100 files)
 
-**Version:** 1.0 (build 1)
+**Version:** 1.0 (historical validated/uploaded build 1; corrected replacement
+candidate uses build 2 and is not yet frozen)
 
 **Bundle identifier:** `com.farrierflow.yusufcan.FarrierFlow`
 
@@ -19,12 +22,51 @@
 
 ## Verdict summary
 
-The frozen source is a locally certified release candidate. All current-head
-unit, integration, UI, Release-build, localization, privacy, screenshot, and
-archive-structure gates pass. App Store distribution validation/upload,
-processed-build attachment, portal screenshot replacement, TestFlight and
-physical-device purchase lifecycle, and support-mailbox operation are not yet
-verified. Those external gates keep the overall verdict at NO-GO.
+The original frozen source remains a valid record of the completed certification
+matrix, successful Organizer validation, and upload/processing of version 1.0
+build 1. On 2026-09-06, the owner authorized four release UI corrections on
+`main`: invoice toolbar actions, a floating full-width Next Appointment action,
+inline-large root titles with preserved spacing, and an explicit Hoof Photos row
+label. Because these are application-source changes after the freeze, build 1 is
+superseded for submission. The corrected worktree passes focused UI and model
+coverage, a Release build, localization, bundle inspection, and diff checks,
+but is not yet a new immutable RC. The
+seven corrected screenshots are now uploaded and inherited by the 6.5-inch
+slot. Freeze, archive validation/upload, physical-device purchase lifecycle,
+and support-mailbox operation remain open, keeping the verdict at NO-GO.
+
+## Post-RC source corrections — 2026-09-06
+
+- Invoice detail: PASS — Mark as Paid, Share, and More are top-right toolbar
+  actions; Mark as Unpaid and Delete Invoice are destructive actions inside
+  More. The focused iOS 18 toolbar regression passed 1/1.
+- Next Appointment: PASS — Continue is full width, pinned above the safe area,
+  and floats directly on the screen background rather than inside a Form
+  section. The focused iOS 26 pinned-action regression passed 1/1.
+- Root navigation and spacing: PASS — Today, Schedule, and Clients use
+  `inlineLarge` at regular text sizes, fall back to `inline` at accessibility
+  sizes, retain an 8-point toolbar/content gap, and use the existing 16-point
+  standard rhythm between major content groups. Focused iOS 26 coverage passed
+  3/3, including Accessibility XXXL.
+- Visit photographs: PASS — Atlas and every other Visit horse now expose one
+  visible Hoof Photos row label followed by its count. The focused iOS 26
+  showcase regression passed 1/1.
+- Next Appointment persistence/reopen: PASS — the complete iOS 26.5 UI suite
+  passed 2/2 after its harness was updated to use destination-based navigation
+  and to leave compact DatePicker override coverage to the model boundary.
+  `NextAppointmentAssistantModelTests` passed all 9 declared tests on iOS 18.0
+  (14 parameterized executions, no failures or skips), including manual date
+  and time overrides. The native virtual Toggle activation issue observed on
+  the iOS 18 simulator is classified as an XCTest/simulator interaction issue,
+  not a reproduced product or persistence defect.
+- Release simulator build for candidate build 2 on iOS 26.5: PASS. The built
+  app reports 1.0 (2), contains both privacy manifests, and contains no
+  `.storekit` resource. Localization catalog compilation, plist/StoreKit
+  validation, and `git diff --check`: PASS.
+
+No schema, domain model, entitlement policy, pricing, privacy, onboarding,
+RevenueCat, StoreKit, or public API behavior changed. The prior full
+certification evidence remains applicable to those unchanged boundaries.
 
 ## Toolchain and destinations
 
@@ -38,7 +80,7 @@ verified. Those external gates keep the overall verdict at NO-GO.
 - Physical iPhone: `00008120-0016043C0138C01E`, iOS 26.6; offline during
   certification.
 
-## Current-head automated certification
+## Superseded-RC automated certification
 
 All Xcode operations ran serially with parallel testing disabled and one
 maximum test worker. Result bundles and logs are under
@@ -130,15 +172,18 @@ Accessibility 2.
 
 ## Screenshots
 
-The six primary assets in `docs/release/screenshots/6.9-inch/` are 1320 x 2868
-RGB JPEGs without alpha. They were captured from the frozen behavior on the
-iPhone 17 Pro Max using deterministic fictional data and contain no testing
-labels, customer data, or Apple account data. Visual review passed for
-FarrierFlow Pro, Today run sheet, Schedule, Atlas history, invoice 0148, and
-read-only retained records. The historical 6.3-inch set is superseded.
+The six historical primary assets in `docs/release/screenshots/6.9-inch/` are
+superseded by the post-correction screenshot design. The current seven Figma
+exports are in `/Users/prometheus/Desktop/Updated-Screenshots-Figma-Export`;
+each is a 1320 x 2868 JPEG with `hasAlpha: no`. Seven files are intentional
+because two adjacent product-page images form one continuous visual. App Preview
+is intentionally omitted; it is optional and is not a release blocker.
 
-Repository presence does not imply App Store Connect upload. The portal still
-contained seven stale custom 6.9-inch images at the last live read-only check.
+Live App Store Connect inspection on 2026-09-06 confirmed all seven corrected
+images in the 6.9-inch slot, in this saved order: Hero, Cats-You-Meet,
+Memories-You-Keep, Photo-To-Card, Atlas, Frame-1, and Frame. The 6.5-inch slot
+shows **Using 6.9-inch Display** and inherits all seven. No additional slot or
+resized asset is currently required.
 
 ## Archive evidence
 
@@ -157,9 +202,12 @@ contained seven stale custom 6.9-inch images at the last live read-only check.
   relative to the immutable RC SHA.
 
 The archive carries the automatic Apple Development profile used to create the
-Xcode archive. A non-uploading App Store Connect export then failed with
-`No Accounts` and `No profiles for 'com.farrierflow.yusufcan.FarrierFlow' were
-found`. This was not retried unchanged.
+Xcode archive. The owner authenticated the Apple Developer account in Xcode and
+reported a successful Organizer **Validate App** result for this exact archive
+on 2026-09-05. An upload-only `xcodebuild -exportArchive` then completed with
+`Upload succeeded` and `** EXPORT SUCCEEDED **`; App Store Connect subsequently
+displayed version 1.0 build 1 under TestFlight. The upload log is
+`/tmp/farrierflow-cert.rO0al7/upload.log`.
 
 ## External gates
 
@@ -167,42 +215,39 @@ Every external gate has one status below.
 
 | External gate | Status | Evidence or exact next operator step |
 | --- | --- | --- |
-| App Store Connect version 1.0 draft exists; build 1 unused | PASS | Live Safari check on 2026-09-05 showed Prepare for Submission, no version build, and TestFlight No Builds. |
+| App Store Connect version 1.0 draft exists | PASS | Live Safari inspection on 2026-09-06 showed version 1.0 in Prepare for Submission. Build 1 exists in TestFlight but no build is attached to the version. |
 | Privacy and Support URLs publicly reachable and source-faithful | PASS | Both returned HTTP 200 on 2026-09-05 and matched local-first, RevenueCat, read-only, and support-mailbox behavior. |
 | App Privacy Purchase History disclosure published | PASS | Published 2026-08-28 for App Functionality and Analytics, not linked, no tracking; current binary remains consistent. |
 | Monthly/yearly products and FarrierFlow Pro configuration | PASS | Both products are Ready for Review, use the approved U.S. prices/trials, and are connected to RevenueCat entitlement `pro` and the current Offering. |
-| Xcode Organizer Validate App / App Store distribution profile | NOT YET VERIFIED | Unlock the Mac, sign in to the Apple ID under Xcode Settings > Accounts, obtain/refresh App Store distribution signing, then run Organizer Validate App for `/tmp/FarrierFlow-1.0-RC.xcarchive`; retain the validation success report. |
-| Upload and processing of build 1 | NOT YET VERIFIED | After validation, upload the frozen archive and wait for build 1 to finish processing; retain Organizer upload success and App Store Connect processed-build evidence. |
-| Attach processed build 1 to version 1.0 | NOT YET VERIFIED | Select only the processed 1.0 (1) build in the version draft and retain the saved build-section screenshot. |
-| Replace stale portal screenshots with the exact six RC assets | NOT YET VERIFIED | In the English (U.S.) 6.9-inch slot, remove the seven stale images and upload the six files under `docs/release/screenshots/6.9-inch/` in numeric order; verify 6.5-inch inheritance and create 6.3-inch assets only if required. |
-| Attach FarrierFlow Pro plus monthly/yearly subscriptions to version 1.0 | NOT YET VERIFIED | Add the existing group/products to the draft's In-App Purchases and Subscriptions section and retain the saved attachment evidence. |
-| Copyright, review contact, Content Rights, release behavior, age rating, and source-backed metadata complete | NOT YET VERIFIED | The live draft had blank copyright and review-contact fields and incomplete Content Rights/release confirmation. Enter only owner-confirmed contact/copyright facts; recheck the already-saved metadata and 4+ age rating. |
-| Agreements banner cleared; free download; U.S. subscription availability; Mac/Vision exclusion | NOT YET VERIFIED | Re-open the live portal after unlock and capture current saved state. Do not mutate agreements, legal, tax, banking, pricing, or availability. |
+| Xcode Organizer Validate App / App Store distribution profile | PASS | Owner reported successful Organizer validation of `/tmp/FarrierFlow-1.0-RC.xcarchive` on 2026-09-05. |
+| Upload and processing of superseded build 1 | PASS | Exact frozen archive upload succeeded at 2026-09-05 14:58 local time; App Store Connect displayed TestFlight version 1.0 build 1. The owner reports that its export-compliance answer was saved. |
+| Export compliance for build 1 | PASS | Owner reported saving the source-backed answer on 2026-09-06. The replacement build must receive the same source-backed answer after processing. |
+| Freeze, archive, validate, upload, process, and attach corrected build 2 | NOT YET VERIFIED | Live TestFlight shows only build 1, Ready to Submit, with no invites or installs; build 2 is the smallest unused number. Candidate build 2 passed focused UI/model coverage, Release build, static validation, and bundle inspection. Audit and commit only the approved source/tests/docs, archive that exact SHA, validate, upload, wait for processing, save export compliance, and attach only build 2 to version 1.0. |
+| Replace stale portal screenshots with the seven corrected 6.9-inch assets | PASS | Live Safari inspection on 2026-09-06 showed all seven corrected JPEGs in saved order in the 6.9-inch slot; the 6.5-inch slot inherits the same seven. |
+| App Preview | PASS | The live draft shows 0 of 3 previews. Owner deliberately omitted this optional media; no preview is required for submission. |
+| Attach FarrierFlow Pro plus monthly/yearly subscriptions to version 1.0 | PASS | The live Draft Submission contains three ready items: FarrierFlow Pro subscription group, FarrierFlow Monthly, and FarrierFlow Yearly. No Add for Review or Submit action was taken. |
+| Copyright, review contact, Content Rights, and release behavior complete | NOT YET VERIFIED | Live Safari inspection on 2026-09-06 showed copyright and all four review-contact fields blank; Content Rights still says Set Up. Automatic release is selected, but owner intent is not established. Supply only those owner-confirmed facts and choose the intended release behavior. |
+| Age rating | PASS | Live App Information shows 4+ in 172 countries/regions and global 4+ for operating systems earlier than version 26. |
+| U.S. availability; Mac/Vision exclusion | PASS | Live Pricing and Availability shows 1 available country (United States), Mac availability off, and version 1.0 incompatible/unavailable on Vision Pro. |
+| Agreements and free-download state | PASS | Live Business inspection on 2026-09-06 showed both Free Apps and Paid Apps agreements Active with no review banner. Pricing shows the existing current price schedule with no paid amount/proceeds; no pricing state was changed. |
 | Sign-in Required is false | PASS | Live version-draft evidence records the account-free review setting. |
-| TestFlight install and complete physical-iPhone workflow | NOT YET VERIFIED | Bring physical iPhone `00008120-0016043C0138C01E` online, install processed build 1, record tester/date/device/OS, and exercise onboarding through next appointment, PDF/share, photos, background/foreground, relaunch, Light/Dark, keyboard, touch targets, and outdoor legibility. |
-| Sandbox purchase, entitlement activation, Restore, loss to read-only, and reactivation | NOT YET VERIFIED | On processed build 1, use an Apple sandbox tester and retain device video/screenshots plus RevenueCat customer-event evidence for all five transitions. |
+| TestFlight availability, install, and complete physical-iPhone workflow | NOT YET VERIFIED | Live TestFlight has no internal group and build 1 has no invites/installs. After corrected build 2 processes, create the intended internal-testing path, install build 2 on physical iPhone `00008120-0016043C0138C01E`, record tester/date/device/OS, and exercise onboarding through next appointment, PDF/share, photos, background/foreground, relaunch, Light/Dark, keyboard, touch targets, and outdoor legibility. |
+| Sandbox purchase, entitlement activation, Restore, loss to read-only, and reactivation | NOT YET VERIFIED | On the corrected replacement build, use an Apple sandbox tester and retain device video/screenshots plus RevenueCat customer-event evidence for every transition. |
 | Apple server-notification receipt in RevenueCat | NOT YET VERIFIED | Retain the RevenueCat dashboard event/log tied to the sandbox lifecycle run. |
 | Support mailbox receive-and-reply operation | NOT YET VERIFIED | Send a fresh external message to `farrierflow.support@gmail.com`, receive it, reply from that address, and retain redacted sent/received evidence. |
 | Stop before Add for Review / Submit for Review | PASS | Neither action was taken; version remains a draft. |
 
-The Safari session initially displayed the authorized FarrierFlow TestFlight
-page and confirmed **No Builds**, but navigating to Distribution redirected to
-Apple sign-in. No credentials were requested or entered and no portal state was
-changed. Reauthenticate the Apple account before performing the remaining
-draft-only portal steps.
-
 ## Must fix before App Review
 
-1. Restore an authenticated Xcode account/distribution profile and obtain a
-   successful Organizer validation for the frozen archive.
-2. Upload build 1, wait for processing, and attach that exact build to version
-   1.0.
-3. Replace the stale portal screenshots with the exact six certified 6.9-inch
-   assets and attach the existing subscription group/products.
-4. Complete only the missing owner-supplied copyright, review contact, Content
-   Rights, and release-behavior fields; reverify agreements and saved
-   availability without changing legal, financial, price, or market scope.
-5. Complete the physical-device/TestFlight purchase lifecycle, server
+1. Freeze the approved corrections as a new immutable RC using verified build
+   number 2.
+2. Archive, validate, upload, process, save export compliance for, and
+   attach the exact corrected replacement build. Build 1 must not be submitted
+   as the corrected application.
+3. Complete only the missing owner-supplied copyright, review contact, Content
+   Rights, and release-behavior fields without changing legal, financial,
+   price, or market scope.
+4. Complete the physical-device/TestFlight purchase lifecycle, server
    notification, full workflow, and support-mailbox checks with evidence.
 
 No speculative polish, schema change, feature expansion, pricing change, or

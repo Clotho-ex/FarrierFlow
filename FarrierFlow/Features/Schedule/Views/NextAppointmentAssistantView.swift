@@ -71,61 +71,70 @@ struct NextAppointmentAssistantView: View {
     }
 
     private func loadedForm(_ projection: NextAppointmentAssistantProjection) -> some View {
-        Form {
-            Section("Visit") {
-                LabeledContent("Service Location", value: projection.sourceBarnName)
-                LabeledContent {
-                    Text(
-                        projection.sourceWorkDate,
-                        format: .dateTime.month().day().year()
-                    )
-                } label: {
-                    Text("Work Date")
-                }
-            }
-            .listRowBackground(ColorTokens.surface)
-
-            Section("Appointment") {
-                DatePicker(
-                    "Proposed Start",
-                    selection: Binding(
-                        get: { model.projection?.proposedStart ?? projection.proposedStart },
-                        set: { proposedStart in
-                            model.setProposedStart(proposedStart)
-                        }
-                    ),
-                    displayedComponents: [.date, .hourAndMinute]
-                )
-                if !projection.hasFollowUpSuggestion {
-                    Text("No selected Horse has a follow-up suggestion. Choose any available start.")
-                        .font(.footnote)
-                        .foregroundStyle(ColorTokens.textSecondary)
-                }
-            }
-            .listRowBackground(ColorTokens.surface)
-
-            Section("Horses") {
-                ForEach(projection.options) { option in
-                    horseRow(option)
-                }
-            }
-            .listRowBackground(ColorTokens.surface)
-
-            if subscription.allowsMutations, hasSelectableHorse(in: projection) {
-                Section {
-                    Button("Continue") {
-                        editorSeed = model.makeSeed()
+        VStack(spacing: 0) {
+            Form {
+                Section("Visit") {
+                    LabeledContent("Service Location", value: projection.sourceBarnName)
+                    LabeledContent {
+                        Text(
+                            projection.sourceWorkDate,
+                            format: .dateTime.month().day().year()
+                        )
+                    } label: {
+                        Text("Work Date")
                     }
-                    .farrierFlowPrimaryAction()
-                    .controlSize(.large)
-                    .frame(maxWidth: .infinity)
-                    .disabled(model.makeSeed() == nil)
-                    .accessibilityIdentifier("next-appointment-continue")
+                }
+                .listRowBackground(ColorTokens.surface)
+
+                Section("Appointment") {
+                    DatePicker(
+                        "Proposed Start",
+                        selection: Binding(
+                            get: { model.projection?.proposedStart ?? projection.proposedStart },
+                            set: { proposedStart in
+                                model.setProposedStart(proposedStart)
+                            }
+                        ),
+                        displayedComponents: [.date, .hourAndMinute]
+                    )
+                    if !projection.hasFollowUpSuggestion {
+                        Text("No selected Horse has a follow-up suggestion. Choose any available start.")
+                            .font(.footnote)
+                            .foregroundStyle(ColorTokens.textSecondary)
+                    }
+                }
+                .listRowBackground(ColorTokens.surface)
+
+                Section("Horses") {
+                    ForEach(projection.options) { option in
+                        horseRow(option)
+                    }
                 }
                 .listRowBackground(ColorTokens.surface)
             }
+            .farrierFlowScrollBackground()
         }
-        .farrierFlowScrollBackground()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(ColorTokens.background)
+        .safeAreaInset(edge: .bottom) {
+            if subscription.allowsMutations, hasSelectableHorse(in: projection) {
+                Button {
+                    editorSeed = model.makeSeed()
+                } label: {
+                    Text("Continue")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                }
+                .farrierFlowPrimaryAction()
+                .controlSize(.large)
+                .frame(maxWidth: .infinity)
+                .disabled(model.makeSeed() == nil)
+                .accessibilityIdentifier("next-appointment-continue")
+                .padding(.horizontal, 24)
+                .padding(.top, 8)
+                .padding(.bottom, 12)
+            }
+        }
     }
 
     @ViewBuilder

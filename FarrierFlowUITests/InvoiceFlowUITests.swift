@@ -2,6 +2,44 @@ import XCTest
 
 final class InvoiceFlowUITests: XCTestCase {
     @MainActor
+    func testInvoiceToolbarKeepsPrimaryActionsAtTopAndDeleteInMore() {
+        let app = XCUIApplication()
+        app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] =
+            "InvoiceToolbar-\(UUID().uuidString)"
+        app.launchEnvironment["FARRIERFLOW_UI_TEST_SCENARIO"] = "app-store-showcase"
+        app.launchEnvironment["FARRIERFLOW_UI_TEST_SUBSCRIPTION_ACCESS"] = "full"
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        defer { app.terminate() }
+
+        openClients(in: app)
+        openInvoices(in: app)
+        let invoice = app.buttons["invoice-row-0148"]
+        XCTAssertTrue(invoice.waitForExistence(timeout: 5))
+        invoice.tap()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["invoice-detail-0148"]
+                .waitForExistence(timeout: 5)
+        )
+        let markPaid = app.buttons["invoice-mark-paid-action"]
+        let share = app.buttons["invoice-share-pdf-action"]
+        let more = app.buttons["invoice-more-actions"]
+        XCTAssertTrue(markPaid.waitForExistence(timeout: 3))
+        XCTAssertTrue(share.waitForExistence(timeout: 3))
+        XCTAssertTrue(more.waitForExistence(timeout: 3))
+        XCTAssertLessThan(markPaid.frame.midY, app.frame.height * 0.2)
+
+        more.tap()
+        XCTAssertTrue(app.buttons["Delete Invoice"].waitForExistence(timeout: 3))
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.05, dy: 0.5)).tap()
+        XCTAssertTrue(app.buttons["Delete Invoice"].waitForNonExistence(timeout: 3))
+
+        markPaid.tap()
+        XCTAssertTrue(app.navigationBars["Record Payment"].waitForExistence(timeout: 3))
+    }
+
+    @MainActor
     func testInvoiceEntryRemainsUsableAtLargeDynamicType() {
         let app = launch(
             storeName: "InvoiceLargeType-\(UUID().uuidString)",
@@ -110,6 +148,16 @@ final class InvoiceFlowUITests: XCTestCase {
         let detail = app.descendants(matching: .any)["invoice-detail-0001"]
         XCTAssertTrue(detail.waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["invoice-share-pdf-action"].exists)
+        let markPaid = app.buttons["invoice-mark-paid-action"]
+        XCTAssertTrue(markPaid.waitForExistence(timeout: 3))
+        XCTAssertTrue(markPaid.isHittable)
+        XCTAssertLessThan(markPaid.frame.midY, app.frame.height * 0.2)
+        let moreActions = app.buttons["invoice-more-actions"]
+        XCTAssertTrue(moreActions.waitForExistence(timeout: 3))
+        moreActions.tap()
+        XCTAssertTrue(app.buttons["Delete Invoice"].waitForExistence(timeout: 3))
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.05, dy: 0.5)).tap()
+        XCTAssertTrue(app.buttons["Delete Invoice"].waitForNonExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["Milo"].exists)
         XCTAssertTrue(app.staticTexts["Trim"].exists)
         XCTAssertFalse(app.staticTexts["Scout"].exists)
@@ -130,10 +178,6 @@ final class InvoiceFlowUITests: XCTestCase {
             detail.swipeUp()
         }
         XCTAssertTrue(app.staticTexts["Invoice Client"].waitForExistence(timeout: 3))
-        let markPaid = app.buttons["invoice-mark-paid-action"]
-        for _ in 0..<4 where !markPaid.exists { detail.swipeUp() }
-        XCTAssertTrue(markPaid.waitForExistence(timeout: 3))
-        XCTAssertTrue(app.buttons["invoice-delete-action"].exists)
         XCTAssertTrue(
             app.descendants(matching: .any)["invoice-first-payment-hint"].exists
         )
@@ -142,11 +186,26 @@ final class InvoiceFlowUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Record Payment"].waitForExistence(timeout: 3))
         let method = app.buttons["payment-method-picker"]
         XCTAssertTrue(method.waitForExistence(timeout: 3))
-        method.tap()
-        app.buttons["Bank Transfer"].tap()
+        let bankTransfer = app.buttons["Bank Transfer"]
+        for _ in 0..<2 where !bankTransfer.exists {
+            method.tap()
+            _ = bankTransfer.waitForExistence(timeout: 2)
+        }
+        XCTAssertTrue(bankTransfer.exists)
+        bankTransfer.tap()
         let reference = app.textFields["payment-reference"]
-        reference.tap()
-        reference.typeText("BANK-UI-42")
+        XCTAssertTrue(reference.waitForExistence(timeout: 3))
+        let appFrame = app.frame
+        let referenceFrame = reference.frame
+        app.coordinate(
+            withNormalizedOffset: CGVector(
+                dx: referenceFrame.midX / appFrame.width,
+                dy: referenceFrame.midY / appFrame.height
+            )
+        ).tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 3))
+        app.typeText("BANK-UI-42")
+        XCTAssertEqual(reference.value as? String, "BANK-UI-42")
         app.buttons["payment-confirm"].tap()
         let paidStatus = app.staticTexts["Status, Paid"].firstMatch
         for _ in 0..<6 where !paidStatus.exists {
@@ -205,10 +264,10 @@ final class InvoiceFlowUITests: XCTestCase {
         XCTAssertFalse(app.buttons["visit-edit-action"].exists)
         XCTAssertTrue(app.buttons["visit-invoice-0001"].waitForExistence(timeout: 3))
         app.buttons["visit-invoice-0001"].tap()
+        let paidMoreActions = app.buttons["invoice-more-actions"]
+        XCTAssertTrue(paidMoreActions.waitForExistence(timeout: 3))
+        paidMoreActions.tap()
         let markUnpaid = app.buttons["invoice-mark-unpaid-action"]
-        for _ in 0..<4 where !markUnpaid.exists {
-            app.descendants(matching: .any)["invoice-detail-0001"].swipeUp()
-        }
         XCTAssertTrue(markUnpaid.waitForExistence(timeout: 3))
         markUnpaid.tap()
         let correction = app.alerts["Mark Invoice Unpaid?"]
@@ -291,18 +350,25 @@ final class InvoiceFlowUITests: XCTestCase {
 
     @MainActor
     private func openInvoices(in app: XCUIApplication) {
-        for _ in 0..<2 {
+        let invoices = app.buttons["Invoices"]
+        for _ in 0..<3 {
             if app.navigationBars["Invoices"].exists {
                 return
             }
-            if app.buttons["Invoices"].waitForExistence(timeout: 1) {
-                app.buttons["Invoices"].tap()
+            if invoices.waitForExistence(timeout: 1) {
+                invoices.tap()
                 if app.navigationBars["Invoices"].waitForExistence(timeout: 2) {
                     return
                 }
             }
             if app.buttons["More"].waitForExistence(timeout: 1) {
                 app.buttons["More"].tap()
+                if invoices.waitForExistence(timeout: 2) {
+                    invoices.tap()
+                    if app.navigationBars["Invoices"].waitForExistence(timeout: 2) {
+                        return
+                    }
+                }
             }
         }
         XCTFail("Invoices did not open")

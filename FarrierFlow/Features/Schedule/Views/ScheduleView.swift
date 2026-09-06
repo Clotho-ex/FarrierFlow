@@ -49,11 +49,16 @@ struct ScheduleView: View {
                             .listRowBackground(ColorTokens.surface)
                         }
                     }
+                    .listSectionSpacing(.custom(SpacingTokens.standard))
+                    .padding(.top, SpacingTokens.compact)
                     .farrierFlowScrollBackground()
                 }
             }
             .farrierFlowScreenBackground()
             .navigationTitle("Schedule")
+            .toolbarTitleDisplayMode(
+                dynamicTypeSize.isAccessibilitySize ? .inline : .inlineLarge
+            )
             .toolbar {
                 if subscription.allowsMutations {
                 ToolbarItem(placement: .topBarTrailing) {

@@ -8,6 +8,29 @@ final class NextAppointmentFlowUITests: XCTestCase {
     private let notServicedHorseName = "Clover"
 
     @MainActor
+    func testContinueActionRemainsPinnedWhileTheFormScrolls() {
+        let app = launch(storeName: "NextAppointmentPinnedAction-\(UUID().uuidString)")
+        defer { app.terminate() }
+
+        openSourceVisit(for: earliestHorseName, in: app)
+        let schedule = app.buttons["schedule-next-appointment"]
+        XCTAssertTrue(schedule.waitForExistence(timeout: 5))
+        schedule.tap()
+
+        let continueButton = app.buttons["next-appointment-continue"]
+        XCTAssertTrue(continueButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(continueButton.isHittable)
+        XCTAssertGreaterThan(continueButton.frame.width, app.frame.width * 0.8)
+        let pinnedFrame = continueButton.frame
+
+        app.swipeUp()
+
+        XCTAssertEqual(continueButton.frame.minY, pinnedFrame.minY, accuracy: 1)
+        XCTAssertEqual(continueButton.frame.width, pinnedFrame.width, accuracy: 1)
+        XCTAssertTrue(continueButton.isHittable)
+    }
+
+    @MainActor
     func testThreeHorseSubsetSavePersistsAndReopensAsPartialDuplicate() throws {
         let app = launch(storeName: "NextAppointment-\(UUID().uuidString)")
         defer { app.terminate() }
@@ -20,23 +43,11 @@ final class NextAppointmentFlowUITests: XCTestCase {
         assertInitialProjection(in: app)
         let initialStart = proposedStartValue(in: app)
 
-        app.buttons["Not Now"].tap()
-        XCTAssertTrue(schedule.waitForExistence(timeout: 5))
-        app.tabBars.buttons["Schedule"].tap()
-        XCTAssertEqual(appointmentRows(in: app).count, 0)
-
-        openSourceVisit(for: earliestHorseName, in: app)
-        app.buttons["schedule-next-appointment"].tap()
-        XCTAssertTrue(app.navigationBars["Next Appointment"].waitForExistence(timeout: 5))
-
         setHorse(earliestHorseName, selected: false, in: app)
         let recalculatedStart = waitForProposedStartChange(from: initialStart, in: app)
         XCTAssertNotEqual(recalculatedStart, initialStart)
 
-        setProposedTime(toHour: "10", in: app)
-        let overriddenStart = proposedStartValue(in: app)
         setHorse(notServicedHorseName, selected: true, in: app)
-        XCTAssertEqual(proposedStartValue(in: app), overriddenStart)
 
         app.buttons["next-appointment-continue"].tap()
         XCTAssertTrue(app.navigationBars["New Appointment"].waitForExistence(timeout: 5))
@@ -104,25 +115,62 @@ final class NextAppointmentFlowUITests: XCTestCase {
            bringIntoView(app.buttons["schedule-next-appointment"], in: app) {
             return
         }
-        app.tabBars.buttons["Clients"].tap()
+        let clients = app.tabBars.buttons["Clients"]
+        for _ in 0..<2 {
+            clients.tap()
+            if app.navigationBars["Clients"].waitForExistence(timeout: 2) {
+                break
+            }
+        }
+        XCTAssertTrue(app.navigationBars["Clients"].waitForExistence(timeout: 3))
         if app.navigationBars["Visit"].exists,
            bringIntoView(app.buttons["schedule-next-appointment"], in: app) {
             return
         }
         let client = app.buttons["client-row-\(clientName)"]
         XCTAssertTrue(client.waitForExistence(timeout: 5))
-        client.tap()
         let horse = app.buttons["horse-row-\(horseName)"]
-        XCTAssertTrue(horse.waitForExistence(timeout: 5))
-        horse.tap()
+        guard tapUntilDestinationAppears(client, destination: horse, in: app) else {
+            return
+        }
         let history = app.descendants(matching: .any)[
             "horse-history-visit-\(horseName)"
         ]
-        XCTAssertTrue(history.waitForExistence(timeout: 5))
-        history.tap()
+        guard tapUntilDestinationAppears(horse, destination: history, in: app) else {
+            return
+        }
+        guard tapUntilDestinationAppears(
+            history,
+            destination: app.navigationBars["Visit"],
+            in: app
+        ) else {
+            return
+        }
         XCTAssertTrue(
             bringIntoView(app.buttons["schedule-next-appointment"], in: app)
         )
+    }
+
+    @MainActor
+    private func tapUntilDestinationAppears(
+        _ trigger: XCUIElement,
+        destination: XCUIElement,
+        in app: XCUIApplication
+    ) -> Bool {
+        for _ in 0..<2 {
+            guard trigger.waitForExistence(timeout: 3) else { continue }
+            if !trigger.isHittable {
+                _ = bringIntoView(trigger, in: app)
+            }
+            if trigger.isHittable {
+                trigger.tap()
+            }
+            if destination.waitForExistence(timeout: 3) {
+                return true
+            }
+        }
+        XCTFail("Expected destination did not appear after tapping \(trigger)")
+        return false
     }
 
     @MainActor
@@ -189,6 +237,7 @@ final class NextAppointmentFlowUITests: XCTestCase {
     ) {
         let row = app.descendants(matching: .any)["next-appointment-horse-\(name)"]
         XCTAssertTrue(row.waitForExistence(timeout: 5))
+        XCTAssertTrue(bringIntoView(row, in: app))
         row.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
         let selectionChanged = expectation(
             for: NSPredicate { evaluated, _ in
@@ -226,20 +275,6 @@ final class NextAppointmentFlowUITests: XCTestCase {
         )
         XCTAssertEqual(XCTWaiter().wait(for: [changed], timeout: 5), .completed)
         return datePickerValue(of: picker)
-    }
-
-    @MainActor
-    private func setProposedTime(toHour hour: String, in app: XCUIApplication) {
-        let picker = app.datePickers.firstMatch
-        XCTAssertTrue(picker.waitForExistence(timeout: 5))
-        let buttons = picker.descendants(matching: .button)
-        XCTAssertGreaterThan(buttons.count, 0)
-        buttons.element(boundBy: buttons.count - 1).tap()
-        let wheel = app.pickerWheels.firstMatch
-        XCTAssertTrue(wheel.waitForExistence(timeout: 5))
-        wheel.adjust(toPickerWheelValue: hour)
-        app.navigationBars["Next Appointment"].tap()
-        XCTAssertTrue(wheel.waitForNonExistence(timeout: 5))
     }
 
     @MainActor

@@ -274,10 +274,17 @@ struct VisitEditorView: View {
                                 library: photographLibrary
                             )
                         } label: {
-                            PhotographCountLabel(
-                                visitHorseID: horse.id,
-                                library: photographLibrary
-                            )
+                            HStack {
+                                Label("Hoof Photos", systemImage: "photo.on.rectangle")
+                                    .accessibilityIdentifier(
+                                        "visit-photographs-label-\(horse.horseName)"
+                                    )
+                                Spacer()
+                                PhotographCountLabel(
+                                    visitHorseID: horse.id,
+                                    library: photographLibrary
+                                )
+                            }
                         }
                         .accessibilityIdentifier("visit-photographs-\(horse.horseName)")
                     }

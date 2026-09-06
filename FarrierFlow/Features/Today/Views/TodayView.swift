@@ -25,8 +25,8 @@ struct TodayView: View {
                 }
             }
             .navigationTitle("Today")
-            .navigationBarTitleDisplayMode(
-                dynamicTypeSize.isAccessibilitySize ? .inline : .large
+            .toolbarTitleDisplayMode(
+                dynamicTypeSize.isAccessibilitySize ? .inline : .inlineLarge
             )
             .toolbar {
                 if subscription.allowsMutations {
@@ -119,7 +119,8 @@ struct TodayView: View {
                 }
             }
         }
-        .listSectionSpacing(.compact)
+        .listSectionSpacing(.custom(SpacingTokens.standard))
+        .padding(.top, SpacingTokens.compact)
         .farrierFlowScrollBackground()
         .refreshable { reload() }
     }

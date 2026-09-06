@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct ClientListView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var path = NavigationPath()
@@ -30,11 +31,16 @@ struct ClientListView: View {
                         }
                         .listRowBackground(ColorTokens.surface)
                     }
+                    .listSectionSpacing(.custom(SpacingTokens.standard))
+                    .padding(.top, SpacingTokens.compact)
                     .farrierFlowScrollBackground()
                 }
             }
             .farrierFlowScreenBackground()
             .navigationTitle("Clients")
+            .toolbarTitleDisplayMode(
+                dynamicTypeSize.isAccessibilitySize ? .inline : .inlineLarge
+            )
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     if subscription.allowsMutations {
