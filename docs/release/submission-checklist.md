@@ -157,10 +157,18 @@ does not authorize **Add for Review** or **Submit for Review**.
   validation, and `git diff --check` also passed.
 - [x] On 2026-09-06, live TestFlight showed only build 1, Ready to Submit, with
   no invites or installs. Build 2 is the smallest unused build number.
-- [ ] Audit and freeze the corrected source as a new immutable build 2 RC,
-  archive that exact SHA, validate it in Organizer, upload it, wait for
-  processing, save its export-compliance answer, and attach only build 2 to
-  version 1.0.
+- [x] Audit and freeze the corrected source as immutable build 2 RC
+  `b1d4a8ea55fb14ce56b81a2c0fba73da5b5a8611` in a local commit without a
+  push. The explicit allowlist excluded all pre-existing untracked artifacts.
+- [x] Create `/tmp/FarrierFlow-1.0-build2-RC.xcarchive` from that exact SHA and
+  pass version/build, signature, entitlement, privacy-manifest, RevenueCat,
+  icon, artifact-exclusion, binary-hash, and source-integrity inspection.
+- [ ] Validate/upload the unchanged build 2 archive, wait for processing, save
+  its export-compliance answer, and attach only build 2 to version 1.0. The
+  first upload attempt stopped before upload with `Failed to Use Accounts`;
+  Xcode reported no active App Store Connect account for team `5SN9TWDXQ4`.
+  Refresh the Apple Account in Xcode Settings > Accounts and retry this exact
+  archive without rebuilding it.
 - [ ] Complete TestFlight and physical-iPhone acceptance.
 - [ ] Finish the remaining owner-supplied metadata, upload and select
   the replacement release-candidate build, and complete Content Rights,

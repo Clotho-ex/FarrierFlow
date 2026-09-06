@@ -4,14 +4,15 @@
 
 **Last updated:** 2026-09-06
 
-**Superseded immutable application RC:** `cee7a12381a22b6bf95632368508d2df3ba9cd61`
+**Immutable application RC:** `b1d4a8ea55fb14ce56b81a2c0fba73da5b5a8611`
+
+**Superseded build 1 RC:** `cee7a12381a22b6bf95632368508d2df3ba9cd61`
 
 **Baseline before certification:** `827a4f6d336793011cf9a13dcb08a20dd2b048a4`
 
 **Uncertified release delta reviewed:** `7d7f44b..827a4f6` (100 files)
 
-**Version:** 1.0 (historical validated/uploaded build 1; corrected replacement
-candidate uses build 2 and is not yet frozen)
+**Version:** 1.0 (corrected replacement candidate build 2)
 
 **Bundle identifier:** `com.farrierflow.yusufcan.FarrierFlow`
 
@@ -29,10 +30,11 @@ build 1. On 2026-09-06, the owner authorized four release UI corrections on
 inline-large root titles with preserved spacing, and an explicit Hoof Photos row
 label. Because these are application-source changes after the freeze, build 1 is
 superseded for submission. The corrected worktree passes focused UI and model
-coverage, a Release build, localization, bundle inspection, and diff checks,
-but is not yet a new immutable RC. The
+coverage, a Release build, localization, bundle inspection, and diff checks and
+is frozen at immutable RC `b1d4a8ea55fb14ce56b81a2c0fba73da5b5a8611`.
+Its signed archive also passed local inspection. The
 seven corrected screenshots are now uploaded and inherited by the 6.5-inch
-slot. Freeze, archive validation/upload, physical-device purchase lifecycle,
+slot. App Store validation/upload, physical-device purchase lifecycle,
 and support-mailbox operation remain open, keeping the verdict at NO-GO.
 
 ## Post-RC source corrections — 2026-09-06
@@ -187,6 +189,28 @@ resized asset is currently required.
 
 ## Archive evidence
 
+### Corrected build 2 RC
+
+- Immutable RC SHA: `b1d4a8ea55fb14ce56b81a2c0fba73da5b5a8611`.
+- Archive path: `/tmp/FarrierFlow-1.0-build2-RC.xcarchive`.
+- `xcodebuild archive` from the exact RC SHA: PASS.
+- Archive app signature and designated requirement: PASS.
+- Bundle/version/build/minimum OS/device family: PASS —
+  `com.farrierflow.yusufcan.FarrierFlow`, 1.0 (2), iOS 18.0, iPhone family 1.
+- App and RevenueCat privacy manifests: PASS.
+- RevenueCat linkage/resources: PASS — no dynamic RevenueCat framework,
+  RevenueCat resource bundle present.
+- Test/debug/StoreKit resource exclusion: PASS.
+- Archive binary SHA-256:
+  `39e5a5270152d3c27a62e6fd7f4663eaea18e4eb8c4768a341216204e6c42628`.
+- Source integrity after archive: PASS — no tracked application/project change
+  relative to the immutable RC SHA.
+- App Store upload attempt: NOT YET VERIFIED — Xcode stopped before upload with
+  `Failed to Use Accounts`; its distribution log says no account with App Store
+  Connect access is active for team `5SN9TWDXQ4`. No package was uploaded.
+
+### Superseded build 1 RC
+
 - Archive path: `/tmp/FarrierFlow-1.0-RC.xcarchive`.
 - `xcodebuild archive` from RC SHA: PASS.
 - Archive app signature and designated requirement: PASS.
@@ -222,7 +246,9 @@ Every external gate has one status below.
 | Xcode Organizer Validate App / App Store distribution profile | PASS | Owner reported successful Organizer validation of `/tmp/FarrierFlow-1.0-RC.xcarchive` on 2026-09-05. |
 | Upload and processing of superseded build 1 | PASS | Exact frozen archive upload succeeded at 2026-09-05 14:58 local time; App Store Connect displayed TestFlight version 1.0 build 1. The owner reports that its export-compliance answer was saved. |
 | Export compliance for build 1 | PASS | Owner reported saving the source-backed answer on 2026-09-06. The replacement build must receive the same source-backed answer after processing. |
-| Freeze, archive, validate, upload, process, and attach corrected build 2 | NOT YET VERIFIED | Live TestFlight shows only build 1, Ready to Submit, with no invites or installs; build 2 is the smallest unused number. Candidate build 2 passed focused UI/model coverage, Release build, static validation, and bundle inspection. Audit and commit only the approved source/tests/docs, archive that exact SHA, validate, upload, wait for processing, save export compliance, and attach only build 2 to version 1.0. |
+| Freeze corrected build 2 | PASS | Approved source/configuration/tests/docs were committed locally at immutable application RC `b1d4a8ea55fb14ce56b81a2c0fba73da5b5a8611`; no push was performed and pre-existing untracked artifacts were excluded. |
+| Archive and locally inspect corrected build 2 | PASS | `/tmp/FarrierFlow-1.0-build2-RC.xcarchive` was created from the exact RC SHA and passed version, signature, entitlement, privacy, RevenueCat, icon, artifact-exclusion, and source-integrity inspection. |
+| Validate, upload, process, and attach corrected build 2 | NOT YET VERIFIED | Xcode stopped before upload with `Failed to Use Accounts`; the distribution log reports no active App Store Connect account for team `5SN9TWDXQ4`. Unlock the Mac, refresh the Apple Account in Xcode Settings > Accounts, then retry the unchanged archive. After processing, save export compliance and attach only build 2 to version 1.0. |
 | Replace stale portal screenshots with the seven corrected 6.9-inch assets | PASS | Live Safari inspection on 2026-09-06 showed all seven corrected JPEGs in saved order in the 6.9-inch slot; the 6.5-inch slot inherits the same seven. |
 | App Preview | PASS | The live draft shows 0 of 3 previews. Owner deliberately omitted this optional media; no preview is required for submission. |
 | Attach FarrierFlow Pro plus monthly/yearly subscriptions to version 1.0 | PASS | The live Draft Submission contains three ready items: FarrierFlow Pro subscription group, FarrierFlow Monthly, and FarrierFlow Yearly. No Add for Review or Submit action was taken. |
@@ -239,15 +265,14 @@ Every external gate has one status below.
 
 ## Must fix before App Review
 
-1. Freeze the approved corrections as a new immutable RC using verified build
-   number 2.
-2. Archive, validate, upload, process, save export compliance for, and
+1. Refresh the Apple Account in Xcode, then validate/upload the already-frozen
+   build 2 archive, wait for processing, save export compliance for, and
    attach the exact corrected replacement build. Build 1 must not be submitted
    as the corrected application.
-3. Complete only the missing owner-supplied copyright, review contact, Content
+2. Complete only the missing owner-supplied copyright, review contact, Content
    Rights, and release-behavior fields without changing legal, financial,
    price, or market scope.
-4. Complete the physical-device/TestFlight purchase lifecycle, server
+3. Complete the physical-device/TestFlight purchase lifecycle, server
    notification, full workflow, and support-mailbox checks with evidence.
 
 No speculative polish, schema change, feature expansion, pricing change, or
