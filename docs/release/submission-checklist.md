@@ -169,6 +169,10 @@ does not authorize **Add for Review** or **Submit for Review**.
   after its source-backed export-compliance answer was saved.
 - [x] Attach only build 2 to version 1.0 and verify the saved draft displays
   build 2 / version 1.0. Build 1 remains superseded for submission.
+- [x] Create the internal TestFlight group `FarrierFlow 1.0 RC` with automatic
+  future-build distribution disabled, then add only build 1.0 (2). Live
+  App Store Connect showed the group with one build in `Ready to Test` state
+  on 2026-09-07; no tester had yet been invited.
 - [ ] Complete TestFlight and physical-iPhone acceptance.
 - [ ] Finish the remaining owner-supplied metadata, upload and select
   the replacement release-candidate build, and complete Content Rights,
