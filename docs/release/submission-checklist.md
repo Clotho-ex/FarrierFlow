@@ -172,7 +172,8 @@ does not authorize **Add for Review** or **Submit for Review**.
 - [x] Create the internal TestFlight group `FarrierFlow 1.0 RC` with automatic
   future-build distribution disabled, then add only build 1.0 (2). Live
   App Store Connect showed the group with one build in `Ready to Test` state
-  on 2026-09-07; no tester had yet been invited.
+  on 2026-09-07. The Account Holder was then added as the sole internal tester;
+  the live tester status was `Invited`, with no install yet inferred.
 - [ ] Complete TestFlight and physical-iPhone acceptance.
 - [ ] Finish the remaining owner-supplied metadata, upload and select
   the replacement release-candidate build, and complete Content Rights,
