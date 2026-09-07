@@ -223,6 +223,10 @@ does not authorize **Add for Review** or **Submit for Review**.
   and returned to FarrierFlow. The PDF preserved the invoice number, status,
   business/client/location/date snapshots, Atlas → Full Set line item, totals,
   and page footer without clipping; the app remained responsive on return.
+- [x] The owner recorded Invoice 0001 as paid by Bank Transfer. Physical-device
+  evidence shows Paid status, paid amount `$220.00`, payment date September 7,
+  2026, method Bank Transfer, reference `BANK-TEST-0001`, and removal of the
+  Mark as Paid toolbar action.
 - [ ] Complete TestFlight and physical-iPhone acceptance.
 - [ ] Finish the remaining owner-supplied metadata, upload and select
   the replacement release-candidate build, and complete Content Rights,
