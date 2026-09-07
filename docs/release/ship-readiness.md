@@ -269,6 +269,12 @@ resized asset is currently required.
   0001 in Dark Mode. Text hierarchy, cards, separators, status colors, orange
   actions, and tab selection remain distinct without visible clipping; the
   owner successfully navigated between the tested surfaces.
+- Physical Restore Purchases: PASS — with the yearly sandbox entitlement active
+  and meaningful records retained, the owner invoked Restore Purchases on the
+  iPhone 14 Pro. FarrierFlow showed `Restoring Purchases...`, completed without
+  an error, and continued to display `FarrierFlow Pro is active`. A read-only
+  RevenueCat dashboard check immediately afterward also showed the matching
+  yearly `FarrierFlow Pro` entitlement as Active.
 
 ### Superseded build 1 RC
 
@@ -328,10 +334,10 @@ Every external gate has one status below.
 | Physical cold-relaunch persistence | PASS | After force-close and relaunch, FarrierFlow opened directly to Today. Schedule retained the completed and follow-up appointments; the Visit retained outcomes, work notes, Full Set, photo count, and paid-invoice linkage; Invoice 0001 retained Paid status and Bank Transfer details; and the Atlas photo remained available. |
 | Physical paid-state invoice PDF | PASS | The regenerated one-page PDF shows Paid status, `$220.00` total, payment date, Bank Transfer, reference `BANK-TEST-0001`, correct snapshots and line item, and no clipping or blank pages. |
 | Physical Light/Dark Mode and basic touch interaction | PASS | The major workflow is evidenced in Light Mode; Today and paid Invoice 0001 are also evidenced in Dark Mode with readable hierarchy, distinct cards/status/actions/tab selection, no visible clipping, and successful navigation. |
-| TestFlight install and complete physical-iPhone workflow | NOT YET VERIFIED | On 2026-09-07, the owner installed build 1.0 (2) on an iPhone 14 Pro running iOS 26.6.1, deleted the prior app copy, and reinstalled from TestFlight before opening. Clean onboarding, connected records, physical camera/photo persistence, Visit completion, next-appointment save, invoice generation, PDF/share, background/foreground return, payment, cold-relaunch persistence, paid-state PDF, and Light/Dark navigation are evidenced. Exercise and evidence the remaining keyboard-avoidance and outdoor-legibility checks before this combined gate can pass. |
+| TestFlight install and complete physical-iPhone workflow | NOT YET VERIFIED | On 2026-09-07, the owner installed build 1.0 (2) on an iPhone 14 Pro running iOS 26.6.1, deleted the prior app copy, and reinstalled from TestFlight before opening. Clean onboarding, connected records, physical camera/photo persistence, Visit completion, next-appointment save, invoice generation, PDF/share, background/foreground return, payment, cold-relaunch persistence, paid-state PDF, Light/Dark navigation, and Restore Purchases are evidenced. Exercise and evidence the remaining keyboard-avoidance and outdoor-legibility checks before this combined gate can pass. |
 | Yearly sandbox purchase and `pro` entitlement activation | PASS | Physical-device screenshots show the TestFlight purchase flow, Apple success confirmation, and automatic route to Today. RevenueCat sandbox data records the matching Turkish `INITIAL_PURCHASE` for `FarrierFlow Yearly`, entitlement ID `pro`, and Active `FarrierFlow Pro` access. |
 | Monthly sandbox purchase and trial behavior | NOT YET VERIFIED | Exercise the monthly product with an eligible Apple sandbox tester and retain the Apple confirmation plus matching RevenueCat customer-event evidence. The completed yearly event has period type `NORMAL`, so it does not prove introductory-trial behavior. |
-| Restore Purchases | NOT YET VERIFIED | Perform Restore Purchases after creating meaningful records and retain the device result plus matching RevenueCat state. |
+| Restore Purchases | PASS | On the physical TestFlight build, Restore Purchases showed its progress state, completed without an error, and left `FarrierFlow Pro is active` visible. A read-only RevenueCat check immediately afterward showed the matching yearly `FarrierFlow Pro` entitlement still Active. |
 | Entitlement loss, retained read-only records, and reactivation | NOT YET VERIFIED | After the full workflow and persistence checks, allow or force a real sandbox entitlement transition, verify retained records are read-only, then reactivate and retain device plus RevenueCat evidence. |
 | Apple server-notification receipt in RevenueCat | NOT YET VERIFIED | Retain the RevenueCat dashboard event/log tied to the sandbox lifecycle run. |
 | Support mailbox receive-and-reply operation | NOT YET VERIFIED | Send a fresh external message to `farrierflow.support@gmail.com`, receive it, reply from that address, and retain redacted sent/received evidence. |

@@ -195,7 +195,7 @@ does not authorize **Add for Review** or **Submit for Review**.
   Today about two seconds later. RevenueCat sandbox data independently records
   the matching Turkish `INITIAL_PURCHASE` for `FarrierFlow Yearly`, entitlement
   ID `pro`, and an Active `FarrierFlow Pro` entitlement. This passes yearly
-  purchase and entitlement activation only; trial, monthly purchase, Restore,
+  purchase and entitlement activation only; trial, monthly purchase,
   entitlement loss/read-only, reactivation, and App Store Server Notification
   receipt remain separate gates.
 - [x] On the active physical-device entitlement, the owner created the
@@ -240,6 +240,12 @@ does not authorize **Add for Review** or **Submit for Review**.
   primary/secondary text, cards, separators, Paid green, orange actions, and tab
   selection without visible clipping; navigation to the invoice remained
   responsive.
+- [x] With the yearly sandbox entitlement active and meaningful records
+  retained, the owner invoked Restore Purchases on the physical TestFlight
+  build. FarrierFlow showed `Restoring Purchases...`, completed without an
+  error, and continued to display `FarrierFlow Pro is active`. A read-only
+  RevenueCat check immediately afterward showed the matching yearly
+  `FarrierFlow Pro` entitlement still Active.
 - [ ] Complete TestFlight and physical-iPhone acceptance.
 - [ ] Finish the remaining owner-supplied metadata, upload and select
   the replacement release-candidate build, and complete Content Rights,
