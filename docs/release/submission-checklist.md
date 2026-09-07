@@ -215,6 +215,11 @@ does not authorize **Add for Review** or **Submit for Review**.
   Physical-device evidence shows the September 7 Willow Creek appointment as
   Completed and the October 19 appointment persisted with Atlas only; next-
   appointment creation therefore passes.
+- [x] The owner generated physical-device Invoice 0001 from the completed
+  September 7 Visit. Device evidence shows Unpaid status, Jordan Ellis, Willow
+  Creek Stables, Atlas → Full Set, a `$220.00` amount due, the 14-day due date,
+  and the expected paid/share/more toolbar actions. PDF sharing and payment
+  recording remain pending.
 - [ ] Complete TestFlight and physical-iPhone acceptance.
 - [ ] Finish the remaining owner-supplied metadata, upload and select
   the replacement release-candidate build, and complete Content Rights,
