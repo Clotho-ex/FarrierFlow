@@ -210,8 +210,11 @@ does not authorize **Add for Review** or **Submit for Review**.
 - [x] The owner completed the physical Visit with Atlas Serviced and Beacon Not
   Serviced. The resulting Next Appointment assistant preserved Willow Creek
   Stables, proposed Atlas at its six-week interval, selected Atlas, and excluded
-  Beacon from the suggestion. Saving the follow-up and completing the invoice
-  path remain pending.
+  Beacon from the suggestion.
+- [x] The owner continued from the assistant and saved the proposed follow-up.
+  Physical-device evidence shows the September 7 Willow Creek appointment as
+  Completed and the October 19 appointment persisted with Atlas only; next-
+  appointment creation therefore passes.
 - [ ] Complete TestFlight and physical-iPhone acceptance.
 - [ ] Finish the remaining owner-supplied metadata, upload and select
   the replacement release-candidate build, and complete Content Rights,
