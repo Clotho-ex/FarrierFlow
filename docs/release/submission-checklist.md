@@ -246,6 +246,10 @@ does not authorize **Add for Review** or **Submit for Review**.
   error, and continued to display `FarrierFlow Pro is active`. A read-only
   RevenueCat check immediately afterward showed the matching yearly
   `FarrierFlow Pro` entitlement still Active.
+- [x] In New Client with More Details expanded, the owner entered multiline
+  Client Notes using the Turkish software keyboard. The focused editor and
+  insertion point remained fully visible above the keyboard, and the
+  Cancel/Save actions remained unobscured and reachable.
 - [ ] Complete TestFlight and physical-iPhone acceptance.
 - [ ] Finish the remaining owner-supplied metadata, upload and select
   the replacement release-candidate build, and complete Content Rights,
