@@ -203,6 +203,10 @@ does not authorize **Add for Review** or **Submit for Review**.
   both Atlas and Beacon. Device evidence shows the appointment as the scheduled
   Next Stop on Today; visit, photo, invoice, payment, follow-up, and relaunch
   acceptance remain in progress.
+- [x] The owner used the physical iPhone camera from Atlas → Hoof Photos, saved
+  one image, saved Visit progress, and reopened the Visit. The supplied device
+  screenshot shows Atlas retaining a Hoof Photos count of `1`; physical capture
+  and photograph persistence therefore pass.
 - [ ] Complete TestFlight and physical-iPhone acceptance.
 - [ ] Finish the remaining owner-supplied metadata, upload and select
   the replacement release-candidate build, and complete Content Rights,
