@@ -207,6 +207,11 @@ does not authorize **Add for Review** or **Submit for Review**.
   one image, saved Visit progress, and reopened the Visit. The supplied device
   screenshot shows Atlas retaining a Hoof Photos count of `1`; physical capture
   and photograph persistence therefore pass.
+- [x] The owner completed the physical Visit with Atlas Serviced and Beacon Not
+  Serviced. The resulting Next Appointment assistant preserved Willow Creek
+  Stables, proposed Atlas at its six-week interval, selected Atlas, and excluded
+  Beacon from the suggestion. Saving the follow-up and completing the invoice
+  path remain pending.
 - [ ] Complete TestFlight and physical-iPhone acceptance.
 - [ ] Finish the remaining owner-supplied metadata, upload and select
   the replacement release-candidate build, and complete Content Rights,
