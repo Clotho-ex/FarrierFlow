@@ -235,6 +235,11 @@ does not authorize **Add for Review** or **Submit for Review**.
   physical-device PDF. It renders one complete page with Paid status, `$220.00`
   total, payment date, Bank Transfer, reference `BANK-TEST-0001`, client/location
   snapshots, Atlas → Full Set, and no clipping or blank pages.
+- [x] Physical-device Light and Dark Mode evidence covers Today, Schedule,
+  Clients, Visit, Hoof Photos, and paid Invoice 0001. Dark Mode preserves clear
+  primary/secondary text, cards, separators, Paid green, orange actions, and tab
+  selection without visible clipping; navigation to the invoice remained
+  responsive.
 - [ ] Complete TestFlight and physical-iPhone acceptance.
 - [ ] Finish the remaining owner-supplied metadata, upload and select
   the replacement release-candidate build, and complete Content Rights,
