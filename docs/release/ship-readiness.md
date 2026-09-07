@@ -34,8 +34,8 @@ coverage, a Release build, localization, bundle inspection, and diff checks and
 is frozen at immutable RC `b1d4a8ea55fb14ce56b81a2c0fba73da5b5a8611`.
 Its signed archive also passed local inspection. The
 seven corrected screenshots are now uploaded and inherited by the 6.5-inch
-slot. Physical-device purchase lifecycle,
-and support-mailbox operation remain open, keeping the verdict at NO-GO.
+slot. The remaining subscription-lifecycle and owner-supplied portal fields
+keep the verdict at NO-GO.
 
 ## Post-RC source corrections — 2026-09-06
 
@@ -283,6 +283,10 @@ resized asset is currently required.
 - Physical outdoor legibility: PASS — the owner checked the major screens on
   the iPhone 14 Pro under real outdoor glare and brightness conditions and
   reported that the screens and controls remained readable.
+- Support mailbox receive-and-reply operation: PASS — the owner sent a fresh
+  external message to `farrierflow.support@gmail.com`, confirmed it arrived,
+  replied from the public support address, and confirmed that reply reached the
+  original sender.
 
 ### Superseded build 1 RC
 
@@ -350,7 +354,7 @@ Every external gate has one status below.
 | Restore Purchases | PASS | On the physical TestFlight build, Restore Purchases showed its progress state, completed without an error, and left `FarrierFlow Pro is active` visible. A read-only RevenueCat check immediately afterward showed the matching yearly `FarrierFlow Pro` entitlement still Active. |
 | Entitlement loss, retained read-only records, and reactivation | NOT YET VERIFIED | After the full workflow and persistence checks, allow or force a real sandbox entitlement transition, verify retained records are read-only, then reactivate and retain device plus RevenueCat evidence. |
 | Apple server-notification receipt in RevenueCat | NOT YET VERIFIED | Retain the RevenueCat dashboard event/log tied to the sandbox lifecycle run. |
-| Support mailbox receive-and-reply operation | NOT YET VERIFIED | Send a fresh external message to `farrierflow.support@gmail.com`, receive it, reply from that address, and retain redacted sent/received evidence. |
+| Support mailbox receive-and-reply operation | PASS | The owner confirmed a fresh external message reached `farrierflow.support@gmail.com`, a reply was sent from that public address, and the reply reached the original sender. |
 | Stop before Add for Review / Submit for Review | PASS | Neither action was taken; version remains a draft. |
 
 ## Must fix before App Review
@@ -358,8 +362,8 @@ Every external gate has one status below.
 1. Complete only the missing owner-supplied copyright, review contact, Content
    Rights, and release-behavior fields without changing legal, financial,
    price, or market scope.
-2. Complete the physical-device/TestFlight purchase lifecycle, server
-   notification, full workflow, and support-mailbox checks with evidence.
+2. Complete the remaining sandbox subscription lifecycle and verify server-
+   notification receipt with evidence.
 
 No speculative polish, schema change, feature expansion, pricing change, or
 architecture refactor is a 1.0 blocker.

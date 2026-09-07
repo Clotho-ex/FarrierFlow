@@ -18,8 +18,9 @@ does not authorize **Add for Review** or **Submit for Review**.
 
 ## Public and commercial gates
 
-- [ ] Confirm the published `farrierflow.support@gmail.com` mailbox is actively
-  monitored and can send replies from that public address.
+- [x] On 2026-09-07, the owner sent a fresh external message to
+  `farrierflow.support@gmail.com`, confirmed it arrived, replied from that
+  public address, and confirmed the reply reached the original sender.
 - [x] Separate website project publishes the approved Privacy Policy and Support
   pages at `https://farrierflow.vercel.app/privacy/` and
   `https://farrierflow.vercel.app/support/`.
