@@ -250,11 +250,18 @@ does not authorize **Add for Review** or **Submit for Review**.
   Client Notes using the Turkish software keyboard. The focused editor and
   insertion point remained fully visible above the keyboard, and the
   Cancel/Save actions remained unobscured and reachable.
-- [ ] Complete TestFlight and physical-iPhone acceptance.
-- [ ] Finish the remaining owner-supplied metadata, upload and select
-  the replacement release-candidate build, and complete Content Rights,
-  copyright, App Review contact information, and the owner-selected release
-  behavior. The screenshots, 4+ rating, U.S.-only availability, Mac/Vision
+- [x] The owner checked the major screens on the iPhone 14 Pro under real
+  outdoor glare and brightness conditions and reported that the screens and
+  controls remained readable.
+- [x] Complete TestFlight and physical-iPhone acceptance. Clean onboarding,
+  connected records, the full Visit-to-paid-invoice workflow, physical camera
+  and photo persistence, follow-up scheduling, PDFs, relaunch persistence,
+  Light/Dark Mode, touch navigation, Restore Purchases, keyboard avoidance, and
+  outdoor legibility all passed on build 1.0 (2).
+- [ ] Finish the remaining owner-supplied metadata: Content Rights, copyright,
+  App Review contact information, and the owner-selected release behavior. The
+  replacement release-candidate build is already uploaded and selected; the
+  screenshots, 4+ rating, U.S.-only availability, Mac/Vision
   exclusions, Sign-in Required false state, both subscriptions, and the
   `FarrierFlow Pro` group are already verified. Stop with the version in draft;
   submission is a separately authorized action after sandbox/TestFlight
