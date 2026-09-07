@@ -218,8 +218,11 @@ does not authorize **Add for Review** or **Submit for Review**.
 - [x] The owner generated physical-device Invoice 0001 from the completed
   September 7 Visit. Device evidence shows Unpaid status, Jordan Ellis, Willow
   Creek Stables, Atlas → Full Set, a `$220.00` amount due, the 14-day due date,
-  and the expected paid/share/more toolbar actions. PDF sharing and payment
-  recording remain pending.
+  and the expected paid/share/more toolbar actions.
+- [x] The owner shared Invoice 0001 to Files, opened the generated one-page PDF,
+  and returned to FarrierFlow. The PDF preserved the invoice number, status,
+  business/client/location/date snapshots, Atlas → Full Set line item, totals,
+  and page footer without clipping; the app remained responsive on return.
 - [ ] Complete TestFlight and physical-iPhone acceptance.
 - [ ] Finish the remaining owner-supplied metadata, upload and select
   the replacement release-candidate build, and complete Content Rights,
