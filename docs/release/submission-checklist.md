@@ -227,6 +227,10 @@ does not authorize **Add for Review** or **Submit for Review**.
   evidence shows Paid status, paid amount `$220.00`, payment date September 7,
   2026, method Bank Transfer, reference `BANK-TEST-0001`, and removal of the
   Mark as Paid toolbar action.
+- [x] After force-closing and relaunching FarrierFlow, the app returned directly
+  to Today without onboarding or paywall. Device evidence shows both Schedule
+  records, completed Visit outcomes/work notes/service/invoice linkage, paid
+  Invoice 0001 and its payment details, and Atlas's captured photo all persisted.
 - [ ] Complete TestFlight and physical-iPhone acceptance.
 - [ ] Finish the remaining owner-supplied metadata, upload and select
   the replacement release-candidate build, and complete Content Rights,
