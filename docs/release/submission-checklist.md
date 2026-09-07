@@ -231,6 +231,10 @@ does not authorize **Add for Review** or **Submit for Review**.
   to Today without onboarding or paywall. Device evidence shows both Schedule
   records, completed Visit outcomes/work notes/service/invoice linkage, paid
   Invoice 0001 and its payment details, and Atlas's captured photo all persisted.
+- [x] The owner regenerated Invoice 0001 after payment and inspected the
+  physical-device PDF. It renders one complete page with Paid status, `$220.00`
+  total, payment date, Bank Transfer, reference `BANK-TEST-0001`, client/location
+  snapshots, Atlas → Full Set, and no clipping or blank pages.
 - [ ] Complete TestFlight and physical-iPhone acceptance.
 - [ ] Finish the remaining owner-supplied metadata, upload and select
   the replacement release-candidate build, and complete Content Rights,

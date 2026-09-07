@@ -260,6 +260,10 @@ resized asset is currently required.
   evidence shows the completed and follow-up Schedule records, completed Visit
   outcomes/work notes/service/invoice linkage, paid Invoice 0001 and payment
   details, and Atlas's captured photo all persisted.
+- Physical paid-state PDF: PASS — the regenerated one-page Invoice 0001 PDF
+  displays Paid status, `$220.00` total, payment date, Bank Transfer, reference
+  `BANK-TEST-0001`, client/location snapshots, Atlas → Full Set, and no clipping
+  or blank pages.
 
 ### Superseded build 1 RC
 
@@ -317,7 +321,8 @@ Every external gate has one status below.
 | Physical invoice PDF/share and background/foreground return | PASS | The owner shared Invoice 0001 to Files, opened the one-page PDF, and returned to the responsive invoice. Evidence shows complete unclipped invoice content, matching totals and snapshots, and page footer `Invoice 0001 • 1`. |
 | Physical payment recording | PASS | Invoice 0001 shows Paid status and the retained `$220.00` Bank Transfer dated September 7, 2026 with reference `BANK-TEST-0001`; the Mark as Paid action is no longer present. |
 | Physical cold-relaunch persistence | PASS | After force-close and relaunch, FarrierFlow opened directly to Today. Schedule retained the completed and follow-up appointments; the Visit retained outcomes, work notes, Full Set, photo count, and paid-invoice linkage; Invoice 0001 retained Paid status and Bank Transfer details; and the Atlas photo remained available. |
-| TestFlight install and complete physical-iPhone workflow | NOT YET VERIFIED | On 2026-09-07, the owner installed build 1.0 (2) on an iPhone 14 Pro running iOS 26.6.1, deleted the prior app copy, and reinstalled from TestFlight before opening. Clean onboarding, connected records, physical camera/photo persistence, Visit completion, next-appointment save, invoice generation, PDF/share, background/foreground return, payment, and cold-relaunch persistence are evidenced. Exercise and evidence the remaining paid-state PDF, Light/Dark, keyboard, touch targets, and outdoor legibility before this combined gate can pass. |
+| Physical paid-state invoice PDF | PASS | The regenerated one-page PDF shows Paid status, `$220.00` total, payment date, Bank Transfer, reference `BANK-TEST-0001`, correct snapshots and line item, and no clipping or blank pages. |
+| TestFlight install and complete physical-iPhone workflow | NOT YET VERIFIED | On 2026-09-07, the owner installed build 1.0 (2) on an iPhone 14 Pro running iOS 26.6.1, deleted the prior app copy, and reinstalled from TestFlight before opening. Clean onboarding, connected records, physical camera/photo persistence, Visit completion, next-appointment save, invoice generation, PDF/share, background/foreground return, payment, cold-relaunch persistence, and paid-state PDF are evidenced. Exercise and evidence the remaining Light/Dark, keyboard, touch targets, and outdoor legibility before this combined gate can pass. |
 | Yearly sandbox purchase and `pro` entitlement activation | PASS | Physical-device screenshots show the TestFlight purchase flow, Apple success confirmation, and automatic route to Today. RevenueCat sandbox data records the matching Turkish `INITIAL_PURCHASE` for `FarrierFlow Yearly`, entitlement ID `pro`, and Active `FarrierFlow Pro` access. |
 | Monthly sandbox purchase and trial behavior | NOT YET VERIFIED | Exercise the monthly product with an eligible Apple sandbox tester and retain the Apple confirmation plus matching RevenueCat customer-event evidence. The completed yearly event has period type `NORMAL`, so it does not prove introductory-trial behavior. |
 | Restore Purchases | NOT YET VERIFIED | Perform Restore Purchases after creating meaningful records and retain the device result plus matching RevenueCat state. |
