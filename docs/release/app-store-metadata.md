@@ -53,21 +53,42 @@ Connect state.
 
 ## Description
 
-FarrierFlow is a local-first business app for independent farriers. Keep
-clients, horses, service locations, appointments, visits, hoof photographs,
-invoices, payment status, and next appointments together on your iPhone.
+FarrierFlow helps independent farriers keep every job connected—from the next
+appointment to completed work, invoices, payments, and the next visit.
 
-FarrierFlow Pro is available as an auto-renewable monthly or yearly
-subscription. If access is unavailable, existing records, photographs,
-history, and existing Invoice PDF generation and sharing stay available in
-read-only mode. Manage or restore App Store purchases through the app's native
-controls. Record full customer Invoice payments by date and method; FarrierFlow
-does not process those payments.
+FARRIERFLOW PRO — SUBSCRIPTION REQUIRED
+
+Creating and editing business records requires a separate purchase of a
+monthly or yearly FarrierFlow Pro auto-renewable subscription.
+
+With an active FarrierFlow Pro subscription, you can:
+
+• Keep clients, horses, and service locations organized
+• Schedule appointments and see what’s coming next
+• Run single- or multi-horse visits from the field
+• Record services and work completed for each horse
+• Capture hoof photographs as part of the visit record
+• Create invoices from completed work
+• Record payments by date and method
+• Review complete horse and visit history
+• Plan the next appointment while the work is still fresh
+
+BUILT FOR FIELD WORK
+
+FarrierFlow is designed to stay fast, clear, and useful while you’re
+working—not just when you’re back at a desk.
+
+Your business records are local-first, and no FarrierFlow account or sign-in is
+required. If you no longer have an active subscription, your existing records,
+photographs, history, and invoice PDFs remain available in read-only mode.
+
+Terms of Use: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+Privacy Policy: https://farrierflow.vercel.app/privacy/
 
 ## Promotional text
 
-Local-first farrier records, appointments, visit history, hoof photographs,
-and invoices on iPhone.
+FarrierFlow Pro subscription: appointments, visits, hoof photos, invoices,
+payments, and next appointments—connected on iPhone.
 
 ## Keywords
 
@@ -97,17 +118,31 @@ FarrierFlow manifest retains Disk Space required-reason `E174.1`.
 
 ## Review notes source
 
-FarrierFlow is local-first and has no FarrierFlow account. RevenueCat projects
-the Apple-processed `pro` entitlement; without it, existing records remain
-readable and ordinary mutations are disabled. No login or local Xcode StoreKit
-configuration is required or supplied for App Review. Submit the monthly and
-yearly products with version 1.0 so App Review can evaluate purchase and restore.
+FarrierFlow is a local-first iPhone business app and does not require a
+FarrierFlow account or sign-in.
 
-On a new installation, App Review sees a short native welcome, required business
-name setup, one Appointment to Payment workflow explanation, and then the same
-RevenueCat-backed monthly/yearly subscription surface. Trial duration and price
-come from the configured App Store products. Reviewers may continue read only if
-subscription status cannot be verified; this does not grant mutation access.
+FarrierFlow Pro is offered through two auto-renewable subscriptions submitted
+together with version 1.0:
+
+• FarrierFlow Monthly — $14.99/month
+• FarrierFlow Yearly — $119.99/year
+
+Eligible customers receive the configured 14-day introductory free trial.
+Creating and editing business records requires an active FarrierFlow Pro
+entitlement. Without an active entitlement, existing records, photographs,
+history, and existing invoice PDFs remain available in read-only mode.
+
+On a new installation, enter any business name and continue through the short
+workflow introduction to reach the FarrierFlow Pro subscription screen. It
+shows both subscription titles, durations, localized prices, renewal terms,
+Restore Purchases, and functional Terms of Use and Privacy Policy links.
+
+Terms of Use (Apple Standard EULA):
+https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+
+Privacy Policy: https://farrierflow.vercel.app/privacy/
+
+No login credentials or local StoreKit configuration are required for review.
 
 ## Required public links
 

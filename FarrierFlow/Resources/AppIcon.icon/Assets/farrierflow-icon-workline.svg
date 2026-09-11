@@ -1,4 +1,26 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <path d="M192 650 L438 404 L566 532 L832 266" fill="none" stroke="#F5F1E8" stroke-linecap="round" stroke-linejoin="round" stroke-width="112"/>
-  <path d="M684 266 H832 V414" fill="none" stroke="#F5F1E8" stroke-linecap="round" stroke-linejoin="round" stroke-width="112"/>
+  <title>FarrierFlow workline</title>
+  <path fill="#F5F1E8" d="
+    M 156.40 661.40
+    L 413.72 404.08
+    Q 442.00 375.80 470.28 404.08
+    L 553.03 486.83
+    Q 570.00 503.80 586.97 486.83
+    L 675.67 398.13
+    Q 688.40 385.40 675.67 372.67
+    L 630.42 327.42
+    Q 614.86 311.86 636.52 308.01
+    L 860.46 268.25
+    Q 890.00 263.00 884.75 292.54
+    L 844.99 516.48
+    Q 841.14 538.14 825.58 522.58
+    L 780.33 477.33
+    Q 767.60 464.60 754.87 477.33
+    L 598.28 633.92
+    Q 570.00 662.20 541.72 633.92
+    L 458.97 551.17
+    Q 442.00 534.20 425.03 551.17
+    L 235.60 740.60
+    A 56 56 0 0 1 156.40 661.40
+    Z"/>
 </svg>
