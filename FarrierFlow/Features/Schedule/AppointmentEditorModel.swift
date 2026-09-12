@@ -59,6 +59,7 @@ final class AppointmentEditorModel {
     private(set) var appliedOwnerDurationDefault = false
     let appointmentID: PersistentIdentifier?
     let hasFollowUpSuggestion: Bool
+    private let isNextAppointmentAssisted: Bool
     var alert: FeatureAlert?
 
     var canSave: Bool {
@@ -98,6 +99,7 @@ final class AppointmentEditorModel {
         let seed = appointment == nil ? seed : nil
         appointmentID = appointment?.persistentModelID
         hasFollowUpSuggestion = seed?.hasFollowUpSuggestion ?? false
+        isNextAppointmentAssisted = seed != nil
         draft = AppointmentDraft(
             barnID: appointment?.barn?.persistentModelID ?? seed?.barnID,
             startDate: appointment?.startDate
@@ -322,6 +324,9 @@ final class AppointmentEditorModel {
             try DomainGraphValidator.save(context)
             if existingAppointment == nil {
                 analyticsClient.track(.appointmentCreated)
+                if isNextAppointmentAssisted {
+                    analyticsClient.track(.nextAppointmentCreated)
+                }
             }
             return appointment.persistentModelID
         } catch {

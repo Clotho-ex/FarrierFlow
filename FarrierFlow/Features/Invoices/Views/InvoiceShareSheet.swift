@@ -3,15 +3,15 @@ import UIKit
 
 struct InvoiceShareSheet: UIViewControllerRepresentable {
     let url: URL
-    let completion: () -> Void
+    let completion: (Bool) -> Void
 
     func makeUIViewController(context: Context) -> UIActivityViewController {
         let controller = UIActivityViewController(
             activityItems: [url],
             applicationActivities: nil
         )
-        controller.completionWithItemsHandler = { _, _, _, _ in
-            completion()
+        controller.completionWithItemsHandler = { _, completed, _, _ in
+            completion(completed)
         }
         return controller
     }
@@ -20,4 +20,18 @@ struct InvoiceShareSheet: UIViewControllerRepresentable {
         _ uiViewController: UIActivityViewController,
         context: Context
     ) {}
+}
+
+@MainActor
+enum InvoiceShareCompletion {
+    static func handle(
+        didComplete: Bool,
+        analyticsClient: any AnalyticsClient,
+        cleanup: () -> Void
+    ) {
+        if didComplete {
+            analyticsClient.track(.invoiceShared)
+        }
+        cleanup()
+    }
 }

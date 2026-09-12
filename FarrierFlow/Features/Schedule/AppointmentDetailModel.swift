@@ -66,14 +66,19 @@ final class AppointmentDetailModel {
         }
     }
 
-    func startVisit(now: Date = .now, in container: ModelContainer) {
+    func startVisit(
+        now: Date = .now,
+        in container: ModelContainer,
+        analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()
+    ) {
         guard let appointment else { return }
 
         do {
             let visitID = try VisitStartUseCase.start(
                 appointmentID: appointment.persistentModelID,
                 now: now,
-                in: container
+                in: container,
+                analyticsClient: analyticsClient
             )
             visitPresentation = .editor(visitID)
         } catch {

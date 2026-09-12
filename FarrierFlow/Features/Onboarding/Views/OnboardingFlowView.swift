@@ -218,7 +218,7 @@ struct OnboardingFlowView: View {
     }
 
     private func continueFromBriefing() {
-        model.briefingDidFinish()
+        model.briefingDidFinish(analyticsClient: analyticsClient)
     }
 }
 

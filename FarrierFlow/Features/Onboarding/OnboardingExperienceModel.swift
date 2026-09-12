@@ -25,6 +25,9 @@ final class OnboardingExperienceModel {
         static let completedVersion = "onboarding.completedVersion"
         static let inProgressVersion = "onboarding.inProgressVersion"
         static let currentStep = "onboarding.currentStep"
+        static let briefingCompletedVersion = "onboarding.briefingCompletedVersion"
+        static let businessSetupCompletedVersion = "onboarding.businessSetupCompletedVersion"
+        static let paywallViewedVersion = "onboarding.paywallViewedVersion"
         static let invoiceHintSeen = "onboarding.invoiceHintSeen"
         static let paymentHintSeen = "onboarding.paymentHintSeen"
     }
@@ -105,15 +108,37 @@ final class OnboardingExperienceModel {
         guard step == .business, hasValidBusinessProfile else { return }
         if access == .pro {
             complete()
+            trackOnce(
+                .businessSetupCompleted,
+                versionKey: Key.businessSetupCompletedVersion,
+                analyticsClient: analyticsClient
+            )
             analyticsClient.track(.onboardingCompleted)
         } else {
             persist(.subscription)
+            trackOnce(
+                .businessSetupCompleted,
+                versionKey: Key.businessSetupCompletedVersion,
+                analyticsClient: analyticsClient
+            )
+            trackOnce(
+                .paywallViewed,
+                versionKey: Key.paywallViewedVersion,
+                analyticsClient: analyticsClient
+            )
         }
     }
 
-    func briefingDidFinish() {
+    func briefingDidFinish(
+        analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()
+    ) {
         guard step == .briefing else { return }
         persist(.business)
+        trackOnce(
+            .onboardingBriefingCompleted,
+            versionKey: Key.briefingCompletedVersion,
+            analyticsClient: analyticsClient
+        )
     }
 
     func subscriptionAccessDidChange(
@@ -178,5 +203,15 @@ final class OnboardingExperienceModel {
         defaults.removeObject(forKey: Key.currentStep)
         defaults.removeObject(forKey: Key.inProgressVersion)
         step = .completed
+    }
+
+    private func trackOnce(
+        _ event: AnalyticsEvent,
+        versionKey: String,
+        analyticsClient: any AnalyticsClient
+    ) {
+        guard defaults.integer(forKey: versionKey) < Self.currentVersion else { return }
+        defaults.set(Self.currentVersion, forKey: versionKey)
+        analyticsClient.track(event)
     }
 }

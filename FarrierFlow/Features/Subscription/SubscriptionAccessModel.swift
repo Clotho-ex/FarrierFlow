@@ -68,30 +68,43 @@ final class SubscriptionAccessModel {
         }
     }
 
-    func purchase(planID: String) async {
-        guard operation == .idle, plans.contains(where: { $0.id == planID }) else { return }
+    func purchase(
+        planID: String,
+        analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()
+    ) async {
+        guard operation == .idle,
+              let plan = plans.first(where: { $0.id == planID }) else { return }
         operation = .purchasing(planID: planID)
         defer { operation = .idle }
+        let analyticsPlan = plan.kind.analyticsPlan
+        analyticsClient.track(.subscriptionPurchaseStarted(analyticsPlan))
         do {
             let result = try await client.purchase(planID: planID)
             guard !result.wasCancelled else {
                 errorMessage = nil
+                analyticsClient.track(.subscriptionPurchaseCancelled(analyticsPlan))
                 return
             }
             apply(result.customer)
             errorMessage = nil
+            if result.customer.hasActiveProEntitlement {
+                analyticsClient.track(.subscriptionPurchaseCompleted(analyticsPlan))
+            }
         } catch {
             errorMessage = "FarrierFlow couldn’t complete the purchase. Try again."
         }
     }
 
-    func restorePurchases() async {
+    func restorePurchases(
+        analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()
+    ) async {
         guard operation == .idle else { return }
         operation = .restoring
         defer { operation = .idle }
         do {
             apply(try await client.restorePurchases())
             errorMessage = nil
+            analyticsClient.track(.subscriptionRestoreCompleted)
         } catch {
             errorMessage = "FarrierFlow couldn’t restore purchases. Try again."
         }

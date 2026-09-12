@@ -70,7 +70,7 @@ struct OnboardingExperienceModelTests {
                 hasValidBusinessProfile: false,
                 analyticsClient: analytics
             )
-            model.briefingDidFinish()
+            model.briefingDidFinish(analyticsClient: analytics)
 
             model.businessSetupDidFinish(
                 hasValidBusinessProfile: true,
@@ -84,7 +84,12 @@ struct OnboardingExperienceModelTests {
             )
 
             #expect(model.step == .completed)
-            #expect(analytics.events == [.onboardingStarted, .onboardingCompleted])
+            #expect(analytics.events == [
+                .onboardingStarted,
+                .onboardingBriefingCompleted,
+                .businessSetupCompleted,
+                .onboardingCompleted,
+            ])
         }
     }
 
@@ -97,7 +102,7 @@ struct OnboardingExperienceModelTests {
                 hasValidBusinessProfile: false,
                 analyticsClient: analytics
             )
-            model.briefingDidFinish()
+            model.briefingDidFinish(analyticsClient: analytics)
             model.businessSetupDidFinish(
                 hasValidBusinessProfile: true,
                 access: .free,
@@ -108,7 +113,48 @@ struct OnboardingExperienceModelTests {
             model.subscriptionAccessDidChange(.pro, analyticsClient: analytics)
 
             #expect(model.step == .completed)
-            #expect(analytics.events == [.onboardingStarted, .onboardingCompleted])
+            #expect(analytics.events == [
+                .onboardingStarted,
+                .onboardingBriefingCompleted,
+                .businessSetupCompleted,
+                .paywallViewed,
+                .onboardingCompleted,
+            ])
+        }
+    }
+
+    @Test
+    func onboardingFunnelTransitionsEmitOnceAcrossBackNavigationAndReconstruction() throws {
+        try withDefaults { defaults in
+            let analytics = AnalyticsSpy()
+            var model = OnboardingExperienceModel(defaults: defaults)
+            model.resolve(hasValidBusinessProfile: false, analyticsClient: analytics)
+            model.briefingDidFinish(analyticsClient: analytics)
+            model.businessSetupDidFinish(
+                hasValidBusinessProfile: true,
+                access: .free,
+                analyticsClient: analytics
+            )
+
+            model.navigationPathDidChange([.business])
+            model = OnboardingExperienceModel(defaults: defaults)
+            model.resolve(hasValidBusinessProfile: true, analyticsClient: analytics)
+            model.businessSetupDidFinish(
+                hasValidBusinessProfile: true,
+                access: .free,
+                analyticsClient: analytics
+            )
+
+            let relaunched = OnboardingExperienceModel(defaults: defaults)
+            relaunched.resolve(hasValidBusinessProfile: true, analyticsClient: analytics)
+
+            #expect(relaunched.step == .subscription)
+            #expect(analytics.events == [
+                .onboardingStarted,
+                .onboardingBriefingCompleted,
+                .businessSetupCompleted,
+                .paywallViewed,
+            ])
         }
     }
 

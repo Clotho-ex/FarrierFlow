@@ -106,7 +106,10 @@ final class HorseEditorModel {
         draft.clientID = id
     }
 
-    func save(in context: ModelContext) -> PersistentIdentifier? {
+    func save(
+        in context: ModelContext,
+        analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()
+    ) -> PersistentIdentifier? {
         guard
             let name = TextNormalization.required(draft.name),
             draft.appointmentIntervalWeeks > 0,
@@ -134,6 +137,7 @@ final class HorseEditorModel {
             defaultService = nil
         }
 
+        let isCreating = horseID == nil
         let horse: Horse
         if let horseID {
             guard let existing = context.model(for: horseID) as? Horse else {
@@ -184,6 +188,9 @@ final class HorseEditorModel {
 
         do {
             try DomainGraphValidator.save(context)
+            if isCreating {
+                analyticsClient.track(.horseCreated)
+            }
             return horse.persistentModelID
         } catch {
             context.rollback()

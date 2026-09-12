@@ -1,0 +1,4 @@
+// Keep the public ingestion host in the Xcode project. Supply the project
+// token only through the ignored PostHog.local.xcconfig file.
+POSTHOG_PROJECT_TOKEN =
+#include? "PostHog.local.xcconfig"

@@ -5,6 +5,7 @@ struct AppointmentDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
+    @Environment(\.analyticsClient) private var analyticsClient
     @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model = AppointmentDetailModel()
     @State private var showsEditor = false
@@ -112,7 +113,10 @@ struct AppointmentDetailView: View {
                         Section {
                             Button("Start Visit") {
                                 guard subscription.allowsMutations else { return }
-                                model.startVisit(in: context.container)
+                                model.startVisit(
+                                    in: context.container,
+                                    analyticsClient: analyticsClient
+                                )
                             }
                             .farrierFlowPrimaryAction()
                             .controlSize(.large)

@@ -10,15 +10,37 @@ struct ServiceEditorModelTests {
     func createsNormalizedUSDServiceIncludingComplimentaryPrice() throws {
         let container = try ModelContainerFactory.inMemoryTest()
         let context = container.mainContext
+        let analytics = AnalyticsSpy()
         let model = ServiceEditorModel()
         model.draft = ServiceDraft(name: "  Hoof Trim ", priceInput: "0")
 
-        let id = try #require(model.save(in: context))
+        let id = try #require(model.save(in: context, analyticsClient: analytics))
         let service = try #require(context.model(for: id) as? Service)
         #expect(service.name == "Hoof Trim")
         #expect(service.defaultAmountMinorUnits == 0)
         #expect(service.currencyCode == "USD")
         #expect(!service.isArchived)
+        #expect(analytics.events == [.serviceCreated])
+
+        let edit = ServiceEditorModel(service: service)
+        edit.draft.name = "Maintenance Trim"
+        #expect(edit.save(in: context, analyticsClient: analytics) == id)
+        #expect(analytics.events == [.serviceCreated])
+    }
+
+    @Test
+    func failedCreateDoesNotEmitAnalytics() throws {
+        let container = try ModelContainerFactory.inMemoryTest()
+        let context = container.mainContext
+        context.insert(BusinessProfile(name: "First"))
+        context.insert(BusinessProfile(name: "Second"))
+        try context.save()
+        let analytics = AnalyticsSpy()
+        let model = ServiceEditorModel()
+        model.draft = ServiceDraft(name: "Trim", priceInput: "75")
+
+        #expect(model.save(in: context, analyticsClient: analytics) == nil)
+        #expect(analytics.events.isEmpty)
     }
 
     @Test

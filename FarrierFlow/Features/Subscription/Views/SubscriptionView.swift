@@ -8,10 +8,11 @@ struct SubscriptionView: View {
     }
 
     @Environment(SubscriptionAccessModel.self) private var subscription
+    @Environment(\.analyticsClient) private var analyticsClient
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var presentsManageSubscriptions = false
-    @State private var selectedPlanID: String?
+    @State private var planSelection = SubscriptionPlanSelectionModel()
     @State private var onboardingActionFeedbackTrigger = 0
 
     let presentation: Presentation
@@ -106,7 +107,10 @@ struct SubscriptionView: View {
                     ForEach(subscription.plans) { plan in
                         Button {
                             Task {
-                                await subscription.purchase(planID: plan.id)
+                                await subscription.purchase(
+                                    planID: plan.id,
+                                    analyticsClient: analyticsClient
+                                )
                             }
                         } label: {
                             SubscriptionPlanRow(plan: plan)
@@ -153,7 +157,11 @@ struct SubscriptionView: View {
 
             Section {
                 Button("Restore Purchases") {
-                    Task { await subscription.restorePurchases() }
+                    Task {
+                        await subscription.restorePurchases(
+                            analyticsClient: analyticsClient
+                        )
+                    }
                 }
                 .disabled(subscription.operation != .idle)
                 .accessibilityIdentifier("subscription-restore")
@@ -221,7 +229,11 @@ struct SubscriptionView: View {
 
                 VStack(spacing: 14) {
                     Button("Restore Purchases") {
-                        Task { await subscription.restorePurchases() }
+                        Task {
+                            await subscription.restorePurchases(
+                                analyticsClient: analyticsClient
+                            )
+                        }
                     }
                     .disabled(subscription.operation != .idle)
                     .accessibilityIdentifier("subscription-restore")
@@ -341,9 +353,15 @@ struct SubscriptionView: View {
             VStack(alignment: .leading, spacing: 14) {
                 OnboardingBillingSelector(
                     plans: displayedPlans,
-                    selectedPlanID: $selectedPlanID,
+                    selectedPlanID: planSelection.selectedPlanID,
                     savingsPercentage: annualSavingsPercentage,
-                    isEnabled: subscription.operation == .idle
+                    isEnabled: subscription.operation == .idle,
+                    onSelect: { plan in
+                        planSelection.select(
+                            plan,
+                            analyticsClient: analyticsClient
+                        )
+                    }
                 )
 
                 if let selectedPlan {
@@ -435,25 +453,24 @@ struct SubscriptionView: View {
     }
 
     private var selectedPlan: SubscriptionPlan? {
-        displayedPlans.first { $0.id == selectedPlanID }
+        displayedPlans.first { $0.id == planSelection.selectedPlanID }
     }
 
     private func reconcileSelectedPlan(with plans: [SubscriptionPlan]) {
         guard presentation == .onboarding else { return }
-        if plans.contains(where: { $0.id == selectedPlanID }) {
-            return
-        }
-        selectedPlanID = plans.first(where: { $0.kind == .annual })?.id
-            ?? plans.first?.id
+        planSelection.reconcile(with: plans)
     }
 
     private func continueFromOnboarding() {
         guard let planID = OnboardingSubscriptionDecisionRules.purchasePlanID(
-            selectedPlanID: selectedPlanID,
+            selectedPlanID: planSelection.selectedPlanID,
             availablePlans: displayedPlans
         ) else { return }
         Task {
-            await subscription.purchase(planID: planID)
+            await subscription.purchase(
+                planID: planID,
+                analyticsClient: analyticsClient
+            )
         }
     }
 
@@ -484,9 +501,10 @@ private struct OnboardingBillingSelector: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let plans: [SubscriptionPlan]
-    @Binding var selectedPlanID: String?
+    let selectedPlanID: String?
     let savingsPercentage: Int?
     let isEnabled: Bool
+    let onSelect: (SubscriptionPlan) -> Void
 
     var body: some View {
         HStack(spacing: 4) {
@@ -495,7 +513,7 @@ private struct OnboardingBillingSelector: View {
                     withAnimation(
                         reduceMotion ? nil : .easeOut(duration: 0.2)
                     ) {
-                        selectedPlanID = plan.id
+                        onSelect(plan)
                     }
                 } label: {
                     selectorLabel(for: plan)

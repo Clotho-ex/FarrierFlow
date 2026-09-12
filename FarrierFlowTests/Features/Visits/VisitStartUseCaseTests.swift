@@ -10,11 +10,13 @@ struct VisitStartUseCaseTests {
     func startingVisitCopiesAppointmentMembershipAndLocationSnapshots() throws {
         let graph = try makeTwoHorseGraph()
         let startedAt = Date(timeIntervalSinceReferenceDate: 123_456)
+        let analytics = AnalyticsSpy()
 
         let visitID = try VisitStartUseCase.start(
             appointmentID: graph.appointment.persistentModelID,
             now: startedAt,
-            in: graph.container
+            in: graph.container,
+            analyticsClient: analytics
         )
 
         let verificationContext = ModelContext(graph.container)
@@ -47,6 +49,17 @@ struct VisitStartUseCaseTests {
                 && membership.horse?.visitHorses.contains { $0 === membership } == true
         })
         #expect(visit.visitHorses.allSatisfy { $0.workItems.isEmpty })
+        #expect(analytics.events == [.visitStarted])
+
+        #expect(throws: VisitStartError.visitAlreadyExists) {
+            try VisitStartUseCase.start(
+                appointmentID: graph.appointment.persistentModelID,
+                now: startedAt,
+                in: graph.container,
+                analyticsClient: analytics
+            )
+        }
+        #expect(analytics.events == [.visitStarted])
     }
 
     @Test
@@ -90,6 +103,7 @@ struct VisitStartUseCaseTests {
     @Test
     func archivedHorseDefaultBlocksStartWithoutCreatingAnyVisitRecords() throws {
         let graph = try makeTwoHorseGraph()
+        let analytics = AnalyticsSpy()
         let service = ModelFixtures.makeService(
             name: "Full Set",
             defaultAmountMinorUnits: 12_500,
@@ -104,7 +118,8 @@ struct VisitStartUseCaseTests {
             try VisitStartUseCase.start(
                 appointmentID: graph.appointment.persistentModelID,
                 now: Date(timeIntervalSinceReferenceDate: 123_456),
-                in: graph.container
+                in: graph.container,
+                analyticsClient: analytics
             )
         }
 
@@ -112,6 +127,7 @@ struct VisitStartUseCaseTests {
         #expect(try graph.context.fetchCount(FetchDescriptor<VisitHorse>()) == 0)
         #expect(try graph.context.fetchCount(FetchDescriptor<WorkItem>()) == 0)
         #expect(graph.appointment.visit == nil)
+        #expect(analytics.events.isEmpty)
     }
 
     @Test(arguments: VisitStartInvalidGraph.allCases)

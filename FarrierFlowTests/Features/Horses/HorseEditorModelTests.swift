@@ -7,6 +7,50 @@ import Testing
 @MainActor
 struct HorseEditorModelTests {
     @Test
+    func creationEmitsAfterSaveWhileEditAndInvalidSaveDoNot() throws {
+        let graph = try makeHorseGraph()
+        let analytics = AnalyticsSpy()
+        let editor = HorseEditorModel(
+            preselectedClientID: graph.client.persistentModelID,
+            preselectedBarnID: graph.barn.persistentModelID
+        )
+        editor.loadChoices(in: graph.context)
+        editor.draft.name = "Scout"
+
+        let id = try #require(
+            editor.save(in: graph.context, analyticsClient: analytics)
+        )
+        let horse = try #require(graph.context.model(for: id) as? Horse)
+        let edit = HorseEditorModel(horse: horse)
+        edit.loadChoices(in: graph.context)
+        edit.draft.name = "Scout II"
+        #expect(edit.save(in: graph.context, analyticsClient: analytics) == id)
+
+        let invalid = HorseEditorModel()
+        invalid.loadChoices(in: graph.context)
+        #expect(invalid.save(in: graph.context, analyticsClient: analytics) == nil)
+        #expect(analytics.events == [.horseCreated])
+    }
+
+    @Test
+    func failedPersistenceDoesNotEmitHorseCreated() throws {
+        let graph = try makeHorseGraph()
+        graph.context.insert(BusinessProfile(name: "First"))
+        graph.context.insert(BusinessProfile(name: "Second"))
+        try graph.context.save()
+        let analytics = AnalyticsSpy()
+        let editor = HorseEditorModel(
+            preselectedClientID: graph.client.persistentModelID,
+            preselectedBarnID: graph.barn.persistentModelID
+        )
+        editor.loadChoices(in: graph.context)
+        editor.draft.name = "Scout"
+
+        #expect(editor.save(in: graph.context, analyticsClient: analytics) == nil)
+        #expect(analytics.events.isEmpty)
+    }
+
+    @Test
     func selectingCreatedClientPreservesTheHorseDraft() throws {
         let container = try ModelContainerFactory.inMemoryTest()
         let context = container.mainContext

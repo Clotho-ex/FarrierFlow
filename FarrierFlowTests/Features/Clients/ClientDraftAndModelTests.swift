@@ -16,6 +16,7 @@ struct ClientDraftAndModelTests {
     func createNormalizesFieldsAndEditPreservesIdentity() throws {
         let container = try ModelContainerFactory.inMemoryTest()
         let context = container.mainContext
+        let analytics = AnalyticsSpy()
         let editor = ClientEditorModel()
         editor.draft = ClientDraft(
             name: "  Alex Carter ",
@@ -24,7 +25,7 @@ struct ClientDraftAndModelTests {
             notes: "\n"
         )
 
-        let id = try #require(editor.save(in: context))
+        let id = try #require(editor.save(in: context, analyticsClient: analytics))
         let client = try #require(context.model(for: id) as? Client)
         #expect(client.name == "Alex Carter")
         #expect(client.phone == nil)
@@ -33,8 +34,28 @@ struct ClientDraftAndModelTests {
 
         let edit = ClientEditorModel(client: client)
         edit.draft.name = "Alex B. Carter"
-        #expect(edit.save(in: context) == id)
+        #expect(edit.save(in: context, analyticsClient: analytics) == id)
         #expect(client.name == "Alex B. Carter")
+        #expect(analytics.events == [.clientCreated])
+
+        let invalid = ClientEditorModel()
+        #expect(invalid.save(in: context, analyticsClient: analytics) == nil)
+        #expect(analytics.events == [.clientCreated])
+    }
+
+    @Test
+    func failedCreateDoesNotEmitAnalytics() throws {
+        let container = try ModelContainerFactory.inMemoryTest()
+        let context = container.mainContext
+        context.insert(BusinessProfile(name: "First"))
+        context.insert(BusinessProfile(name: "Second"))
+        try context.save()
+        let analytics = AnalyticsSpy()
+        let editor = ClientEditorModel()
+        editor.draft.name = "Alex"
+
+        #expect(editor.save(in: context, analyticsClient: analytics) == nil)
+        #expect(analytics.events.isEmpty)
     }
 
     @Test

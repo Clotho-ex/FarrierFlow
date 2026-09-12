@@ -5,78 +5,89 @@ import Testing
 @Suite("Analytics contract")
 struct AnalyticsContractTests {
     @Test
+    @MainActor
     func everyEventMapsToOneStableProviderNameAndApprovedProperties() {
-        let catalog: [(AnalyticsEvent, String, [AnalyticsProviderProperty])] = [
-            (.appFirstOpened, "app_first_opened", []),
-            (.appSessionStarted, "app_session_started", []),
-            (.onboardingStarted, "onboarding_started", []),
-            (.onboardingBriefingCompleted, "onboarding_briefing_completed", []),
-            (.businessSetupCompleted, "business_setup_completed", []),
-            (.onboardingCompleted, "onboarding_completed", []),
-            (.paywallViewed, "paywall_viewed", []),
+        let catalog: [(AnalyticsEvent, String, [String: String])] = [
+            (.appFirstOpened, "app_first_opened", [:]),
+            (.appSessionStarted, "app_session_started", [:]),
+            (.onboardingStarted, "onboarding_started", [:]),
+            (.onboardingBriefingCompleted, "onboarding_briefing_completed", [:]),
+            (.businessSetupCompleted, "business_setup_completed", [:]),
+            (.onboardingCompleted, "onboarding_completed", [:]),
+            (.paywallViewed, "paywall_viewed", [:]),
             (
                 .subscriptionPlanSelected(.monthly),
                 "subscription_plan_selected",
-                [.plan(.monthly)]
+                ["plan": "monthly"]
             ),
             (
                 .subscriptionPurchaseStarted(.annual),
                 "subscription_purchase_started",
-                [.plan(.annual)]
+                ["plan": "annual"]
             ),
             (
                 .subscriptionPurchaseCompleted(.monthly),
                 "subscription_purchase_completed",
-                [.plan(.monthly)]
+                ["plan": "monthly"]
             ),
             (
                 .subscriptionPurchaseCancelled(.annual),
                 "subscription_purchase_cancelled",
-                [.plan(.annual)]
+                ["plan": "annual"]
             ),
-            (.subscriptionRestoreCompleted, "subscription_restore_completed", []),
-            (.clientCreated, "client_created", []),
-            (.horseCreated, "horse_created", []),
-            (.serviceCreated, "service_created", []),
-            (.serviceLocationCreated, "service_location_created", []),
-            (.appointmentCreated, "appointment_created", []),
-            (.visitStarted, "visit_started", []),
-            (.visitCompleted, "visit_completed", []),
-            (.invoiceCreated, "invoice_created", []),
-            (.invoiceShared, "invoice_shared", []),
-            (.invoiceMarkedPaid, "invoice_marked_paid", []),
-            (.nextAppointmentCreated, "next_appointment_created", []),
+            (.subscriptionRestoreCompleted, "subscription_restore_completed", [:]),
+            (.clientCreated, "client_created", [:]),
+            (.horseCreated, "horse_created", [:]),
+            (.serviceCreated, "service_created", [:]),
+            (.serviceLocationCreated, "service_location_created", [:]),
+            (.appointmentCreated, "appointment_created", [:]),
+            (.visitStarted, "visit_started", [:]),
+            (.visitCompleted, "visit_completed", [:]),
+            (.invoiceCreated, "invoice_created", [:]),
+            (.invoiceShared, "invoice_shared", [:]),
+            (.invoiceMarkedPaid, "invoice_marked_paid", [:]),
+            (.nextAppointmentCreated, "next_appointment_created", [:]),
         ]
 
         let names = catalog.map { $0.1 }
         #expect(names.count == Set(names).count)
+        var captures: [(String, [String: Any]?)] = []
+        let client = PostHogAnalyticsClient { name, properties in
+            captures.append((name, properties))
+        }
         for (event, expectedName, expectedProperties) in catalog {
-            let providerEvent = AnalyticsProviderEvent(event)
-            #expect(providerEvent.name == expectedName)
-            #expect(providerEvent.properties == expectedProperties)
+            captures.removeAll()
+            client.track(event)
+            #expect(captures.count == 1)
+            #expect(captures[0].0 == expectedName)
+            let properties = captures[0].1?.compactMapValues { $0 as? String } ?? [:]
+            #expect(properties == expectedProperties)
+            #expect(captures[0].1?["$geoip_disable"] as? Bool == true)
+            #expect(captures[0].1?.count == expectedProperties.count + 1)
         }
     }
 
     @Test(arguments: [AnalyticsSubscriptionPlan.monthly, .annual])
+    @MainActor
     func subscriptionPlansMapToTheOnlyApprovedProperty(
         plan: AnalyticsSubscriptionPlan
     ) {
-        let property = AnalyticsProviderProperty.plan(plan)
+        var captures: [[String: Any]?] = []
+        let client = PostHogAnalyticsClient { _, properties in
+            captures.append(properties)
+        }
 
-        #expect(property.name == "plan")
-        #expect(property.value == plan.rawValue)
-        #expect(
-            AnalyticsProviderEvent(.subscriptionPlanSelected(plan)).properties == [property]
-        )
-        #expect(
-            AnalyticsProviderEvent(.subscriptionPurchaseStarted(plan)).properties == [property]
-        )
-        #expect(
-            AnalyticsProviderEvent(.subscriptionPurchaseCompleted(plan)).properties == [property]
-        )
-        #expect(
-            AnalyticsProviderEvent(.subscriptionPurchaseCancelled(plan)).properties == [property]
-        )
+        client.track(.subscriptionPlanSelected(plan))
+        client.track(.subscriptionPurchaseStarted(plan))
+        client.track(.subscriptionPurchaseCompleted(plan))
+        client.track(.subscriptionPurchaseCancelled(plan))
+
+        #expect(captures.count == 4)
+        for properties in captures {
+            #expect(properties?["plan"] as? String == plan.rawValue)
+            #expect(properties?["$geoip_disable"] as? Bool == true)
+            #expect(properties?.count == 2)
+        }
     }
 
     @Test

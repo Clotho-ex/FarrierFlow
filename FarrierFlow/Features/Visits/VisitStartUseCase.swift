@@ -12,7 +12,8 @@ enum VisitStartUseCase {
     static func start(
         appointmentID: PersistentIdentifier,
         now: Date,
-        in container: ModelContainer
+        in container: ModelContainer,
+        analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()
     ) throws -> PersistentIdentifier {
         try start(
             appointmentID: appointmentID,
@@ -21,7 +22,8 @@ enum VisitStartUseCase {
             actionContext: ModelContext(container),
             saving: { context in
                 try DomainGraphValidator.save(context)
-            }
+            },
+            analyticsClient: analyticsClient
         )
     }
 
@@ -29,14 +31,16 @@ enum VisitStartUseCase {
         appointmentID: PersistentIdentifier,
         now: Date,
         in container: ModelContainer,
-        saving: (ModelContext) throws -> Void
+        saving: (ModelContext) throws -> Void,
+        analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()
     ) throws -> PersistentIdentifier {
         try start(
             appointmentID: appointmentID,
             now: now,
             in: container,
             actionContext: ModelContext(container),
-            saving: saving
+            saving: saving,
+            analyticsClient: analyticsClient
         )
     }
 
@@ -45,7 +49,8 @@ enum VisitStartUseCase {
         now: Date,
         in _: ModelContainer,
         actionContext: ModelContext,
-        saving: (ModelContext) throws -> Void
+        saving: (ModelContext) throws -> Void,
+        analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()
     ) throws -> PersistentIdentifier {
         let context = actionContext
 
@@ -116,6 +121,7 @@ enum VisitStartUseCase {
             }
 
             try saving(context)
+            analyticsClient.track(.visitStarted)
             return visit.persistentModelID
         } catch {
             context.rollback()

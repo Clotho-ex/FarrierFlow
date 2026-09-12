@@ -29,7 +29,10 @@ final class PaymentRecordingModel {
         )
     }
 
-    func confirm(in context: ModelContext) {
+    func confirm(
+        in context: ModelContext,
+        analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()
+    ) {
         guard let method = draft.method, canConfirm else {
             alert = FeatureAlert(
                 title: "Payment Method Required",
@@ -49,6 +52,7 @@ final class PaymentRecordingModel {
             )
             didRecord = true
             alert = nil
+            analyticsClient.track(.invoiceMarkedPaid)
         } catch {
             alert = FeatureAlert(
                 title: "Couldn’t Record Payment",

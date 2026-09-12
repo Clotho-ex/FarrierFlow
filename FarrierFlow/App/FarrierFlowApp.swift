@@ -64,7 +64,7 @@ struct FarrierFlowApp: App {
             )
             return AppDependencies(
                 container: container,
-                analyticsClient: NoOpAnalyticsClient(),
+                analyticsClient: AnalyticsClientComposition.make(),
                 photographLibrary: PhotographLibrary(
                     container: container,
                     fileStore: PhotographFileStore(

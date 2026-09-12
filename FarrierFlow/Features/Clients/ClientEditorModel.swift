@@ -21,9 +21,13 @@ final class ClientEditorModel {
         )
     }
 
-    func save(in context: ModelContext) -> PersistentIdentifier? {
+    func save(
+        in context: ModelContext,
+        analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()
+    ) -> PersistentIdentifier? {
         guard let name = TextNormalization.required(draft.name) else { return nil }
 
+        let isCreating = clientID == nil
         let client: Client
         if let clientID {
             guard let existing = context.model(for: clientID) as? Client else {
@@ -46,6 +50,9 @@ final class ClientEditorModel {
 
         do {
             try DomainGraphValidator.save(context)
+            if isCreating {
+                analyticsClient.track(.clientCreated)
+            }
             return client.persistentModelID
         } catch {
             alert = FeatureAlert(

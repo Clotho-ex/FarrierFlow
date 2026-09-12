@@ -23,7 +23,10 @@ final class ServiceEditorModel {
         )
     }
 
-    func save(in context: ModelContext) -> PersistentIdentifier? {
+    func save(
+        in context: ModelContext,
+        analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()
+    ) -> PersistentIdentifier? {
         let values: ServiceValues
         do {
             values = try ServiceRules.validated(draft)
@@ -31,6 +34,7 @@ final class ServiceEditorModel {
             return nil
         }
 
+        let isCreating = serviceID == nil
         let service: Service
         if let serviceID {
             guard let existing = context.model(for: serviceID) as? Service else {
@@ -56,6 +60,9 @@ final class ServiceEditorModel {
 
         do {
             try DomainGraphValidator.save(context)
+            if isCreating {
+                analyticsClient.track(.serviceCreated)
+            }
             return service.persistentModelID
         } catch {
             context.rollback()

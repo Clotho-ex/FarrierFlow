@@ -213,7 +213,7 @@ struct AppointmentEditorModelTests {
         )
         #expect(appointment.startDate == seededStart)
         #expect(appointment.notes == nil)
-        #expect(analytics.events == [.appointmentCreated])
+        #expect(analytics.events == [.appointmentCreated, .nextAppointmentCreated])
 
         let existingEditor = AppointmentEditorModel(appointment: appointment)
         existingEditor.load(in: fixture.context)
@@ -223,7 +223,7 @@ struct AppointmentEditorModelTests {
                 analyticsClient: analytics
             ) == appointment.persistentModelID
         )
-        #expect(analytics.events == [.appointmentCreated])
+        #expect(analytics.events == [.appointmentCreated, .nextAppointmentCreated])
     }
 
     @Test

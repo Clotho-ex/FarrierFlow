@@ -4,6 +4,7 @@ import SwiftUI
 struct BarnEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(\.analyticsClient) private var analyticsClient
     @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model: BarnEditorModel
     @State private var showsMoreDetails: Bool
@@ -56,7 +57,10 @@ struct BarnEditorView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         guard subscription.allowsMutations else { return }
-                        if let id = model.save(in: context) {
+                        if let id = model.save(
+                            in: context,
+                            analyticsClient: analyticsClient
+                        ) {
                             createdBarnID?.wrappedValue = id
                             dismiss()
                         }

@@ -13,3 +13,12 @@ nonisolated enum SubscriptionProduct {
         }
     }
 }
+
+nonisolated extension SubscriptionPlanKind {
+    var analyticsPlan: AnalyticsSubscriptionPlan {
+        switch self {
+        case .monthly: .monthly
+        case .annual: .annual
+        }
+    }
+}

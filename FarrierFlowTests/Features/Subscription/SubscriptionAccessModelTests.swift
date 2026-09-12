@@ -94,12 +94,17 @@ struct SubscriptionAccessModelTests {
         await client.setPlans([Self.monthly, Self.annual])
         await client.setPurchaseResult(.init(customer: .init(hasActiveProEntitlement: true), wasCancelled: false))
         let model = SubscriptionAccessModel(client: client)
+        let analytics = AnalyticsSpy()
         await model.refresh()
-        await model.purchase(planID: Self.monthly.id)
+        await model.purchase(planID: Self.monthly.id, analyticsClient: analytics)
         #expect(model.access == .pro)
         #expect(model.operation == .idle)
         #expect(model.errorMessage == nil)
         #expect(await client.purchasedPlanIDs == [Self.monthly.id])
+        #expect(analytics.events == [
+            .subscriptionPurchaseStarted(.monthly),
+            .subscriptionPurchaseCompleted(.monthly),
+        ])
     }
 
     @Test func cancelledPurchaseReturnsToIdleWithoutError() async {
@@ -107,11 +112,16 @@ struct SubscriptionAccessModelTests {
         await client.setPlans([Self.monthly, Self.annual])
         await client.setPurchaseResult(.init(customer: .init(hasActiveProEntitlement: false), wasCancelled: true))
         let model = SubscriptionAccessModel(client: client)
+        let analytics = AnalyticsSpy()
         await model.refresh()
-        await model.purchase(planID: Self.annual.id)
+        await model.purchase(planID: Self.annual.id, analyticsClient: analytics)
         #expect(model.access == .free)
         #expect(model.operation == .idle)
         #expect(model.errorMessage == nil)
+        #expect(analytics.events == [
+            .subscriptionPurchaseStarted(.annual),
+            .subscriptionPurchaseCancelled(.annual),
+        ])
     }
 
     @Test func purchaseFailureRetainsConfirmedAccessAndShowsError() async {
@@ -119,23 +129,53 @@ struct SubscriptionAccessModelTests {
         client.setPlans([Self.monthly, Self.annual])
         client.setPurchaseError(TestError.failed)
         let model = SubscriptionAccessModel(client: client)
+        let analytics = AnalyticsSpy()
         await model.refresh()
 
-        await model.purchase(planID: Self.monthly.id)
+        await model.purchase(planID: Self.monthly.id, analyticsClient: analytics)
 
         #expect(model.access == .free)
         #expect(model.operation == .idle)
         #expect(model.errorMessage != nil)
+        #expect(analytics.events == [.subscriptionPurchaseStarted(.monthly)])
+    }
+
+    @Test func purchaseWithoutActiveEntitlementDoesNotReportCompletion() async {
+        let client = TestSubscriptionClient(customer: .init(hasActiveProEntitlement: false))
+        client.setPlans([Self.monthly, Self.annual])
+        client.setPurchaseResult(.init(customer: .init(hasActiveProEntitlement: false), wasCancelled: false))
+        let model = SubscriptionAccessModel(client: client)
+        let analytics = AnalyticsSpy()
+        await model.refresh()
+
+        await model.purchase(planID: Self.annual.id, analyticsClient: analytics)
+
+        #expect(analytics.events == [.subscriptionPurchaseStarted(.annual)])
     }
 
     @Test func restoreGrantsProOnlyFromReturnedCustomerInfo() async {
         let client = TestSubscriptionClient(customer: .init(hasActiveProEntitlement: false))
         await client.setRestoreCustomer(.init(hasActiveProEntitlement: true))
         let model = SubscriptionAccessModel(client: client)
+        let analytics = AnalyticsSpy()
         await model.refresh()
-        await model.restorePurchases()
+        await model.restorePurchases(analyticsClient: analytics)
         #expect(model.access == .pro)
         #expect(model.operation == .idle)
+        #expect(analytics.events == [.subscriptionRestoreCompleted])
+    }
+
+    @Test func restoreFailureDoesNotReportCompletion() async {
+        let client = TestSubscriptionClient(customer: .init(hasActiveProEntitlement: false))
+        client.setRestoreError(TestError.failed)
+        let model = SubscriptionAccessModel(client: client)
+        let analytics = AnalyticsSpy()
+        await model.refresh()
+
+        await model.restorePurchases(analyticsClient: analytics)
+
+        #expect(model.errorMessage != nil)
+        #expect(analytics.events.isEmpty)
     }
 
     @Test func startCreatesOneListenerAndAppliesUpdatesWithoutRefetch() async {
@@ -181,6 +221,7 @@ private final class TestSubscriptionClient: SubscriptionClient, @unchecked Senda
     private var purchaseResult = SubscriptionPurchaseResult(customer: .init(hasActiveProEntitlement: false), wasCancelled: false)
     private var purchaseError: Error?
     private var restoreCustomer = SubscriptionCustomerSnapshot(hasActiveProEntitlement: false)
+    private var restoreError: Error?
     private var continuation: AsyncStream<SubscriptionCustomerSnapshot>.Continuation?
     private var suspendsOfferings = false
     private var offeringsContinuations: [CheckedContinuation<[SubscriptionPlan], Error>] = []
@@ -211,7 +252,10 @@ private final class TestSubscriptionClient: SubscriptionClient, @unchecked Senda
         if let purchaseError { throw purchaseError }
         return purchaseResult
     }
-    func restorePurchases() async throws -> SubscriptionCustomerSnapshot { restoreCustomer }
+    func restorePurchases() async throws -> SubscriptionCustomerSnapshot {
+        if let restoreError { throw restoreError }
+        return restoreCustomer
+    }
     func customerInfoUpdates() async -> AsyncStream<SubscriptionCustomerSnapshot> {
         let (stream, continuation) = AsyncStream<SubscriptionCustomerSnapshot>.makeStream()
         self.continuation = continuation
@@ -232,5 +276,6 @@ private final class TestSubscriptionClient: SubscriptionClient, @unchecked Senda
     func setPurchaseResult(_ result: SubscriptionPurchaseResult) { purchaseResult = result }
     func setPurchaseError(_ error: Error?) { purchaseError = error }
     func setRestoreCustomer(_ customer: SubscriptionCustomerSnapshot) { restoreCustomer = customer }
+    func setRestoreError(_ error: Error?) { restoreError = error }
     func emit(_ customer: SubscriptionCustomerSnapshot) { continuation?.yield(customer) }
 }

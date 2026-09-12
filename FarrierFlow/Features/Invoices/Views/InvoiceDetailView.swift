@@ -10,6 +10,7 @@ struct InvoiceDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
+    @Environment(\.analyticsClient) private var analyticsClient
     @Environment(SubscriptionAccessModel.self) private var subscription
     @Environment(OnboardingExperienceModel.self) private var onboarding
     @State private var model: InvoiceDetailModel
@@ -146,8 +147,12 @@ struct InvoiceDetailView: View {
         }
         .sheet(isPresented: shareSheetPresented) {
             if let url = shareModel.shareURL {
-                InvoiceShareSheet(url: url) {
-                    shareModel.sharingCompleted()
+                InvoiceShareSheet(url: url) { didComplete in
+                    InvoiceShareCompletion.handle(
+                        didComplete: didComplete,
+                        analyticsClient: analyticsClient,
+                        cleanup: shareModel.sharingCompleted
+                    )
                 }
             }
         }
@@ -456,6 +461,7 @@ private struct PaymentRecordingView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
+    @Environment(\.analyticsClient) private var analyticsClient
     @Environment(SubscriptionAccessModel.self) private var subscription
     @Bindable var model: PaymentRecordingModel
     let onRecorded: () -> Void
@@ -501,7 +507,10 @@ private struct PaymentRecordingView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Confirm Payment") {
                         guard subscription.allowsMutations else { return }
-                        model.confirm(in: context)
+                        model.confirm(
+                            in: context,
+                            analyticsClient: analyticsClient
+                        )
                         if model.didRecord { onRecorded() }
                     }
                     .disabled(!subscription.allowsMutations || !model.canConfirm)

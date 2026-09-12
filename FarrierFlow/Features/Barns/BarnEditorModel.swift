@@ -20,9 +20,13 @@ final class BarnEditorModel {
         )
     }
 
-    func save(in context: ModelContext) -> PersistentIdentifier? {
+    func save(
+        in context: ModelContext,
+        analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()
+    ) -> PersistentIdentifier? {
         guard let name = TextNormalization.required(draft.name) else { return nil }
 
+        let isCreating = barnID == nil
         let barn: Barn
         if let barnID {
             guard let existing = context.model(for: barnID) as? Barn else {
@@ -44,6 +48,9 @@ final class BarnEditorModel {
 
         do {
             try DomainGraphValidator.save(context)
+            if isCreating {
+                analyticsClient.track(.serviceLocationCreated)
+            }
             return barn.persistentModelID
         } catch {
             alert = FeatureAlert(
