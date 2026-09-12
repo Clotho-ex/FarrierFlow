@@ -18,6 +18,7 @@ enum OnboardingBriefingRevealStep: Int, CaseIterable {
 
 struct OnboardingFlowView: View {
     @Environment(SubscriptionAccessModel.self) private var subscription
+    @Environment(\.analyticsClient) private var analyticsClient
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ScaledMetric(relativeTo: .largeTitle) private var brandTitleSize = 48
 
@@ -53,7 +54,10 @@ struct OnboardingFlowView: View {
             model.navigationPathDidChange(newPath)
         }
         .onChange(of: subscription.access, initial: true) { _, access in
-            model.subscriptionAccessDidChange(access)
+            model.subscriptionAccessDidChange(
+                access,
+                analyticsClient: analyticsClient
+            )
         }
         .accessibilityIdentifier("onboarding-flow")
     }
@@ -77,7 +81,8 @@ struct OnboardingFlowView: View {
             OwnerSetupView(model: setupModel) {
                 model.businessSetupDidFinish(
                     hasValidBusinessProfile: setupModel.hasValidIdentity,
-                    access: subscription.access
+                    access: subscription.access,
+                    analyticsClient: analyticsClient
                 )
             }
         case .subscription:

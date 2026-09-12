@@ -558,6 +558,7 @@ struct VisitEditorModelTests {
     @Test
     func completionPersistsDraftAndCompletedAtTogether() throws {
         let graph = try makeVisitGraph()
+        let analytics = AnalyticsSpy()
         let model = VisitEditorModel(visitID: graph.visitID, in: graph.container)
         model.load()
 
@@ -571,8 +572,25 @@ struct VisitEditorModelTests {
 
         let completedAt = Date(timeIntervalSinceReferenceDate: 200)
         #expect(model.canComplete)
-        #expect(model.completeVisit(at: completedAt))
+        #expect(model.completeVisit(at: completedAt, analyticsClient: analytics))
+        #expect(!model.completeVisit(at: completedAt, analyticsClient: analytics))
         #expect(!model.isDirty)
+        #expect(analytics.events == [.visitCompleted])
+
+        let reconstructed = VisitEditorModel(
+            visitID: graph.visitID,
+            in: graph.container,
+            mode: .correction
+        )
+        reconstructed.load()
+
+        #expect(reconstructed.loadState == .loaded)
+        #expect(!reconstructed.canComplete)
+        #expect(!reconstructed.completeVisit(
+            at: completedAt,
+            analyticsClient: analytics
+        ))
+        #expect(analytics.events == [.visitCompleted])
 
         let context = ModelContext(graph.container)
         let visit = try #require(context.model(for: graph.visitID) as? Visit)
@@ -590,6 +608,7 @@ struct VisitEditorModelTests {
     ])
     func completionRejectsIncompleteOutcomes(_ outcomes: [VisitOutcome]) throws {
         let graph = try makeVisitGraph()
+        let analytics = AnalyticsSpy()
         let model = VisitEditorModel(visitID: graph.visitID, in: graph.container)
         model.load()
 
@@ -600,7 +619,11 @@ struct VisitEditorModelTests {
         model.draft = draft
 
         #expect(!model.canComplete)
-        #expect(!model.completeVisit(at: Date(timeIntervalSinceReferenceDate: 200)))
+        #expect(!model.completeVisit(
+            at: Date(timeIntervalSinceReferenceDate: 200),
+            analyticsClient: analytics
+        ))
+        #expect(analytics.events.isEmpty)
 
         let context = ModelContext(graph.container)
         let visit = try #require(context.model(for: graph.visitID) as? Visit)
@@ -638,6 +661,7 @@ struct VisitEditorModelTests {
     @Test
     func failedCompletionPreservesDirtyDraftAndRollsBackPersistedValues() throws {
         let graph = try makeVisitGraph()
+        let analytics = AnalyticsSpy()
         let model = VisitEditorModel(
             visitID: graph.visitID,
             in: graph.container,
@@ -653,9 +677,13 @@ struct VisitEditorModelTests {
         draft.horses[scoutIndex].outcome = .notServiced
         model.draft = draft
 
-        #expect(!model.completeVisit(at: Date(timeIntervalSinceReferenceDate: 200)))
+        #expect(!model.completeVisit(
+            at: Date(timeIntervalSinceReferenceDate: 200),
+            analyticsClient: analytics
+        ))
         #expect(model.isDirty)
         #expect(model.draft == draft)
+        #expect(analytics.events.isEmpty)
 
         let context = ModelContext(graph.container)
         let visit = try #require(context.model(for: graph.visitID) as? Visit)

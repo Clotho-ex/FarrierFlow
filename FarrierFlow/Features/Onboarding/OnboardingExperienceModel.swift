@@ -47,7 +47,8 @@ final class OnboardingExperienceModel {
 
     func resolve(
         hasValidBusinessProfile: Bool,
-        hasExistingBusinessData: Bool = false
+        hasExistingBusinessData: Bool = false,
+        analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()
     ) {
         let completedVersion = defaults.integer(forKey: Key.completedVersion)
         if completedVersion >= Self.currentVersion {
@@ -57,6 +58,10 @@ final class OnboardingExperienceModel {
 
         let persistedStep = defaults.string(forKey: Key.currentStep)
             .flatMap(OnboardingStep.init(rawValue:))
+        let isFreshOnboardingStart = persistedStep == nil
+            && completedVersion < Self.currentVersion
+            && !hasValidBusinessProfile
+            && !hasExistingBusinessData
 
         if persistedStep != nil,
            defaults.integer(forKey: Key.inProgressVersion) != Self.currentVersion {
@@ -86,16 +91,21 @@ final class OnboardingExperienceModel {
             complete()
         default:
             persist(.briefing)
+            if isFreshOnboardingStart {
+                analyticsClient.track(.onboardingStarted)
+            }
         }
     }
 
     func businessSetupDidFinish(
         hasValidBusinessProfile: Bool,
-        access: SubscriptionAccess
+        access: SubscriptionAccess,
+        analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()
     ) {
         guard step == .business, hasValidBusinessProfile else { return }
         if access == .pro {
             complete()
+            analyticsClient.track(.onboardingCompleted)
         } else {
             persist(.subscription)
         }
@@ -106,9 +116,13 @@ final class OnboardingExperienceModel {
         persist(.business)
     }
 
-    func subscriptionAccessDidChange(_ access: SubscriptionAccess) {
+    func subscriptionAccessDidChange(
+        _ access: SubscriptionAccess,
+        analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()
+    ) {
         guard step == .subscription, access == .pro else { return }
         complete()
+        analyticsClient.track(.onboardingCompleted)
     }
 
     func navigationPathDidChange(_ path: [OnboardingRoute]) {

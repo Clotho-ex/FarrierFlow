@@ -61,6 +61,7 @@ final class VisitEditorModel {
     var draft: VisitDraft?
     private(set) var pendingOutcomeChange: VisitOutcomeChange?
     private var backgroundSaveErrorPending = false
+    private var didCompleteVisit = false
     var alert: FeatureAlert?
 
     let visitID: PersistentIdentifier
@@ -460,8 +461,11 @@ final class VisitEditorModel {
     }
 
     @discardableResult
-    func completeVisit(at completedAt: Date = .now) -> Bool {
-        guard let draft, canComplete else {
+    func completeVisit(
+        at completedAt: Date = .now,
+        analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()
+    ) -> Bool {
+        guard !didCompleteVisit, let draft, canComplete else {
             return false
         }
 
@@ -469,7 +473,9 @@ final class VisitEditorModel {
             let savedDraft = try completing(draft, completedAt, context)
             self.draft = savedDraft
             lastSavedDraft = savedDraft
+            didCompleteVisit = true
             alert = nil
+            analyticsClient.track(.visitCompleted)
             return true
         } catch {
             Self.logger.error("Failed to complete visit: \(error, privacy: .public)")

@@ -208,7 +208,10 @@ final class AppointmentEditorModel {
         }
     }
 
-    func save(in context: ModelContext) -> PersistentIdentifier? {
+    func save(
+        in context: ModelContext,
+        analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()
+    ) -> PersistentIdentifier? {
         guard
             draft.isValid,
             let barnID = draft.barnID,
@@ -317,6 +320,9 @@ final class AppointmentEditorModel {
 
         do {
             try DomainGraphValidator.save(context)
+            if existingAppointment == nil {
+                analyticsClient.track(.appointmentCreated)
+            }
             return appointment.persistentModelID
         } catch {
             context.rollback()

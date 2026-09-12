@@ -197,7 +197,10 @@ final class InvoiceCreationModel {
     }
 
     @discardableResult
-    func generate(in context: ModelContext) -> PersistentIdentifier? {
+    func generate(
+        in context: ModelContext,
+        analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()
+    ) -> PersistentIdentifier? {
         guard let draft, canGenerate else {
             return nil
         }
@@ -207,6 +210,7 @@ final class InvoiceCreationModel {
         do {
             let invoiceID = try InvoiceGenerationUseCase.generate(draft, in: context)
             alert = nil
+            analyticsClient.track(.invoiceCreated)
             return invoiceID
         } catch {
             alert = FeatureAlert(

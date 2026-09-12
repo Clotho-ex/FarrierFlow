@@ -3,6 +3,7 @@ import SwiftUI
 
 struct AppointmentEditorView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.analyticsClient) private var analyticsClient
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model: AppointmentEditorModel
@@ -157,7 +158,10 @@ struct AppointmentEditorView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         guard subscription.allowsMutations else { return }
-                        if let appointmentID = model.save(in: context) {
+                        if let appointmentID = model.save(
+                            in: context,
+                            analyticsClient: analyticsClient
+                        ) {
                             onSaved?(appointmentID)
                             dismiss()
                         }

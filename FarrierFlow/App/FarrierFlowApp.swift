@@ -36,6 +36,7 @@ struct FarrierFlowApp: App {
                 try uiTestConfiguration.prepare(container)
                 return AppDependencies(
                     container: container,
+                    analyticsClient: NoOpAnalyticsClient(),
                     photographLibrary: PhotographLibrary(
                         container: container,
                         fileStore: PhotographFileStore(
@@ -63,6 +64,7 @@ struct FarrierFlowApp: App {
             )
             return AppDependencies(
                 container: container,
+                analyticsClient: NoOpAnalyticsClient(),
                 photographLibrary: PhotographLibrary(
                     container: container,
                     fileStore: PhotographFileStore(
@@ -90,6 +92,7 @@ struct FarrierFlowApp: App {
                 case .success(let dependencies):
                     RootView(onboardingDefaults: dependencies.onboardingDefaults)
                         .modelContainer(dependencies.container)
+                        .environment(\.analyticsClient, dependencies.analyticsClient)
                         .environment(dependencies.photographLibrary)
                         .uiTestDynamicTypeSize(uiTestDynamicTypeSize)
                         .uiTestColorScheme(uiTestColorScheme)
@@ -129,6 +132,7 @@ private extension View {
 @MainActor
 private struct AppDependencies {
     let container: ModelContainer
+    let analyticsClient: any AnalyticsClient
     let photographLibrary: PhotographLibrary
     let subscriptionAccessModel: SubscriptionAccessModel
     let onboardingDefaults: UserDefaults

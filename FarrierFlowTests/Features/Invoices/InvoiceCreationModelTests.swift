@@ -192,6 +192,7 @@ struct InvoiceCreationModelTests {
     @Test
     func missingBusinessProfileKeepsEligibilityVisibleButBlocksGeneration() throws {
         let graph = try makeCreationGraph(hasBusinessProfile: false)
+        let analytics = AnalyticsSpy()
         let model = InvoiceCreationModel(clientID: graph.clientID)
 
         model.load(in: graph.context, now: Date(timeIntervalSinceReferenceDate: 1_000))
@@ -201,6 +202,43 @@ struct InvoiceCreationModelTests {
         #expect(!model.hasValidBusinessProfile)
         #expect(!model.visitChoices.isEmpty)
         #expect(!model.canGenerate)
+        #expect(model.generate(in: graph.context, analyticsClient: analytics) == nil)
+        #expect(analytics.events.isEmpty)
+    }
+
+    @Test
+    func successfulInvoiceGenerationReportsOnceAndARepeatedAttemptDoesNot() throws {
+        let graph = try makeCreationGraph(hasBusinessProfile: true)
+        let analytics = AnalyticsSpy()
+        let model = InvoiceCreationModel(clientID: graph.clientID)
+        model.load(in: graph.context, now: Date(timeIntervalSinceReferenceDate: 1_000))
+        model.selectAll()
+
+        let invoiceID = model.generate(
+            in: graph.context,
+            analyticsClient: analytics
+        )
+
+        #expect(invoiceID != nil)
+        #expect(analytics.events == [.invoiceCreated])
+        #expect(model.generate(in: graph.context, analyticsClient: analytics) == nil)
+        #expect(analytics.events == [.invoiceCreated])
+
+        let relaunchedContext = ModelContext(graph.container)
+        let reconstructed = InvoiceCreationModel(clientID: graph.clientID)
+        reconstructed.load(
+            in: relaunchedContext,
+            now: Date(timeIntervalSinceReferenceDate: 2_000)
+        )
+        reconstructed.selectAll()
+
+        #expect(reconstructed.visitChoices.isEmpty)
+        #expect(!reconstructed.canGenerate)
+        #expect(reconstructed.generate(
+            in: relaunchedContext,
+            analyticsClient: analytics
+        ) == nil)
+        #expect(analytics.events == [.invoiceCreated])
     }
 
     @Test

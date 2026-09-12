@@ -19,6 +19,7 @@ struct RootView: View {
 
     @Environment(PhotographLibrary.self) private var photographLibrary
     @Environment(SubscriptionAccessModel.self) private var subscription
+    @Environment(\.analyticsClient) private var analyticsClient
     @Environment(\.modelContext) private var context
     @State private var selectedTab = AppTab.today
     @State private var setupModel = OwnerSetupReadinessModel()
@@ -108,7 +109,8 @@ struct RootView: View {
         if setupModel.loadState == .loaded {
             onboarding.resolve(
                 hasValidBusinessProfile: setupModel.hasValidIdentity,
-                hasExistingBusinessData: setupModel.hasExistingBusinessData
+                hasExistingBusinessData: setupModel.hasExistingBusinessData,
+                analyticsClient: analyticsClient
             )
         }
     }

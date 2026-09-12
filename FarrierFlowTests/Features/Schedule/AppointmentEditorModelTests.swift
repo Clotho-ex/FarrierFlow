@@ -187,6 +187,7 @@ struct AppointmentEditorModelTests {
     @Test
     func seededDraftSaveReturnsTheCreatedAppointmentIdentifier() throws {
         let fixture = try makeTwoHorseFixture()
+        let analytics = AnalyticsSpy()
         let seededStart = Date(timeIntervalSinceReferenceDate: 2_000)
         let seed = NextAppointmentSeed(
             barnID: fixture.barn.persistentModelID,
@@ -197,7 +198,9 @@ struct AppointmentEditorModelTests {
         let editor = AppointmentEditorModel(seed: seed)
         editor.load(in: fixture.context)
 
-        let savedID = try #require(editor.save(in: fixture.context))
+        let savedID = try #require(
+            editor.save(in: fixture.context, analyticsClient: analytics)
+        )
 
         let appointments = try fixture.context.fetch(FetchDescriptor<Appointment>())
         let appointment = try #require(appointments.first)
@@ -210,11 +213,23 @@ struct AppointmentEditorModelTests {
         )
         #expect(appointment.startDate == seededStart)
         #expect(appointment.notes == nil)
+        #expect(analytics.events == [.appointmentCreated])
+
+        let existingEditor = AppointmentEditorModel(appointment: appointment)
+        existingEditor.load(in: fixture.context)
+        #expect(
+            existingEditor.save(
+                in: fixture.context,
+                analyticsClient: analytics
+            ) == appointment.persistentModelID
+        )
+        #expect(analytics.events == [.appointmentCreated])
     }
 
     @Test
     func failedSeededDraftSavePreservesTheDraftAndCreatesNoAppointment() throws {
         let fixture = try makeTwoHorseFixture()
+        let analytics = AnalyticsSpy()
         fixture.context.insert(BusinessProfile(name: "First Profile"))
         fixture.context.insert(BusinessProfile(name: "Second Profile"))
         try fixture.context.save()
@@ -230,7 +245,12 @@ struct AppointmentEditorModelTests {
         editor.draft.notes = "Keep this draft"
         editor.draft.expectedDurationText = "55"
 
-        #expect(editor.save(in: fixture.context) == nil)
+        #expect(
+            editor.save(
+                in: fixture.context,
+                analyticsClient: analytics
+            ) == nil
+        )
 
         #expect(editor.alert?.title == "Couldn’t Save Appointment")
         #expect(editor.draft.barnID == fixture.barn.persistentModelID)
@@ -239,6 +259,7 @@ struct AppointmentEditorModelTests {
         #expect(editor.draft.notes == "Keep this draft")
         #expect(editor.draft.expectedDurationText == "55")
         #expect(try fixture.context.fetchCount(FetchDescriptor<Appointment>()) == 0)
+        #expect(analytics.events.isEmpty)
     }
 
     @Test

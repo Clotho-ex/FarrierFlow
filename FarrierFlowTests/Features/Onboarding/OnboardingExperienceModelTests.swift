@@ -6,6 +6,113 @@ import Testing
 @MainActor
 struct OnboardingExperienceModelTests {
     @Test
+    func freshOnboardingStartEmitsOnceAcrossResolutionAndReconstruction() throws {
+        try withDefaults { defaults in
+            let analytics = AnalyticsSpy()
+            let firstLaunch = OnboardingExperienceModel(defaults: defaults)
+
+            firstLaunch.resolve(
+                hasValidBusinessProfile: false,
+                analyticsClient: analytics
+            )
+            firstLaunch.resolve(
+                hasValidBusinessProfile: false,
+                analyticsClient: analytics
+            )
+            #expect(defaults.string(forKey: "onboarding.currentStep") == "briefing")
+
+            let reconstructed = OnboardingExperienceModel(defaults: defaults)
+            reconstructed.resolve(
+                hasValidBusinessProfile: false,
+                analyticsClient: analytics
+            )
+            reconstructed.subscriptionAccessDidChange(
+                .pro,
+                analyticsClient: analytics
+            )
+            reconstructed.navigationPathDidChange(reconstructed.navigationPath)
+
+            let relaunched = OnboardingExperienceModel(defaults: defaults)
+            relaunched.resolve(
+                hasValidBusinessProfile: false,
+                analyticsClient: analytics
+            )
+
+            #expect(firstLaunch.step == .briefing)
+            #expect(reconstructed.step == .briefing)
+            #expect(relaunched.step == .briefing)
+            #expect(analytics.events == [.onboardingStarted])
+        }
+    }
+
+    @Test
+    func existingWorkspaceBypassDoesNotReportOnboardingStartedOrCompleted() throws {
+        try withDefaults { defaults in
+            let analytics = AnalyticsSpy()
+            let model = OnboardingExperienceModel(defaults: defaults)
+
+            model.resolve(
+                hasValidBusinessProfile: true,
+                analyticsClient: analytics
+            )
+
+            #expect(model.step == .completed)
+            #expect(analytics.events.isEmpty)
+        }
+    }
+
+    @Test
+    func proBusinessCompletionReportsOnboardingCompletedOnce() throws {
+        try withDefaults { defaults in
+            let analytics = AnalyticsSpy()
+            let model = OnboardingExperienceModel(defaults: defaults)
+            model.resolve(
+                hasValidBusinessProfile: false,
+                analyticsClient: analytics
+            )
+            model.briefingDidFinish()
+
+            model.businessSetupDidFinish(
+                hasValidBusinessProfile: true,
+                access: .pro,
+                analyticsClient: analytics
+            )
+            model.businessSetupDidFinish(
+                hasValidBusinessProfile: true,
+                access: .pro,
+                analyticsClient: analytics
+            )
+
+            #expect(model.step == .completed)
+            #expect(analytics.events == [.onboardingStarted, .onboardingCompleted])
+        }
+    }
+
+    @Test
+    func subscriptionCompletionReportsOnboardingCompletedOnce() throws {
+        try withDefaults { defaults in
+            let analytics = AnalyticsSpy()
+            let model = OnboardingExperienceModel(defaults: defaults)
+            model.resolve(
+                hasValidBusinessProfile: false,
+                analyticsClient: analytics
+            )
+            model.briefingDidFinish()
+            model.businessSetupDidFinish(
+                hasValidBusinessProfile: true,
+                access: .free,
+                analyticsClient: analytics
+            )
+
+            model.subscriptionAccessDidChange(.pro, analyticsClient: analytics)
+            model.subscriptionAccessDidChange(.pro, analyticsClient: analytics)
+
+            #expect(model.step == .completed)
+            #expect(analytics.events == [.onboardingStarted, .onboardingCompleted])
+        }
+    }
+
+    @Test
     func freshInstallStartsWithTheProductBriefingAndResumesIt() throws {
         try withDefaults { defaults in
             let firstLaunch = OnboardingExperienceModel(defaults: defaults)

@@ -2,6 +2,7 @@ import SwiftData
 import SwiftUI
 
 struct InvoiceCreationView: View {
+    @Environment(\.analyticsClient) private var analyticsClient
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
@@ -184,7 +185,10 @@ struct InvoiceCreationView: View {
 
     private func generate() {
         guard subscription.allowsMutations else { return }
-        guard let invoiceID = model.generate(in: context) else { return }
+        guard let invoiceID = model.generate(
+            in: context,
+            analyticsClient: analyticsClient
+        ) else { return }
         onGenerated(invoiceID)
     }
 

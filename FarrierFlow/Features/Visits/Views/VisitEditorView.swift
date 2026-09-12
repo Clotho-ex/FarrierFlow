@@ -3,6 +3,7 @@ import SwiftUI
 
 struct VisitEditorView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.analyticsClient) private var analyticsClient
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.locale) private var locale
     @Environment(PhotographLibrary.self) private var photographLibrary
@@ -84,7 +85,7 @@ struct VisitEditorView: View {
                         Button("Complete Visit") {
                             guard subscription.allowsMutations else { return }
                             focusedWorkNotesID = nil
-                            if model.completeVisit() {
+                            if model.completeVisit(analyticsClient: analyticsClient) {
                                 onCompleted?(model.visitID)
                                 dismiss()
                             }
