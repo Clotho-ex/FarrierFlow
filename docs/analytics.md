@@ -192,6 +192,11 @@ No App Store Connect or public-site changes are part of this unit.
 - After privacy approvals, verify one non-sensitive custom event in a development
   build without logging the token, distinct ID, or payload.
 
-RevenueCat and Apple Ads attribution, rating prompts, dashboards, experiments,
-session replay, and runtime semantics for first-open/session-start remain
-separate future units.
+RevenueCat now owns Standard Apple AdServices attribution behind the existing
+subscription-provider boundary. Its initialization, privacy constraints,
+owner-side Advanced integration setup, and production verification limits are
+documented in [Apple Ads Attribution](apple-ads-attribution.md). Apple Ads data
+does not enter this analytics contract or PostHog.
+
+Rating prompts, dashboards, experiments, session replay, and runtime semantics
+for first-open/session-start remain separate future units.

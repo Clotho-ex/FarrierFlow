@@ -71,18 +71,12 @@ struct FarrierFlowApp: App {
                         applicationSupportURL: applicationSupportURL
                     )
                 ),
-                subscriptionAccessModel: SubscriptionAccessModel(client: Self.subscriptionClient()),
+                subscriptionAccessModel: SubscriptionAccessModel(
+                    client: RevenueCatSubscriptionClientComposition.make()
+                ),
                 onboardingDefaults: .standard
             )
         }
-    }
-
-    @MainActor
-    private static func subscriptionClient() -> any SubscriptionClient {
-        guard let key = try? RevenueCatConfiguration.publicSDKKey() else {
-            return UnavailableSubscriptionClient()
-        }
-        return RevenueCatSubscriptionClient(publicSDKKey: key)
     }
 
     var body: some Scene {

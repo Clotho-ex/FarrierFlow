@@ -20,12 +20,45 @@ nonisolated enum RevenueCatConfiguration {
 }
 
 @MainActor
+enum RevenueCatSubscriptionClientComposition {
+    static func make(
+        publicSDKKey: () throws -> String = {
+            try RevenueCatConfiguration.publicSDKKey()
+        },
+        clientFactory: (String) -> any SubscriptionClient = {
+            RevenueCatSubscriptionClient(publicSDKKey: $0)
+        }
+    ) -> any SubscriptionClient {
+        guard let key = try? publicSDKKey() else {
+            return UnavailableSubscriptionClient()
+        }
+        return clientFactory(key)
+    }
+}
+
+@MainActor
 final class RevenueCatSubscriptionClient: SubscriptionClient, @unchecked Sendable {
     private let purchases: Purchases
     private var packagesByID: [String: Package] = [:]
 
     init(publicSDKKey: String) {
-        purchases = Purchases.configure(withAPIKey: publicSDKKey)
+        purchases = Self.configurePurchases(
+            publicSDKKey: publicSDKKey,
+            configure: { Purchases.configure(withAPIKey: $0) },
+            enableStandardAdServicesAttribution: {
+                $0.attribution.enableAdServicesAttributionTokenCollection()
+            }
+        )
+    }
+
+    static func configurePurchases<ConfiguredPurchases: AnyObject>(
+        publicSDKKey: String,
+        configure: (String) -> ConfiguredPurchases,
+        enableStandardAdServicesAttribution: (ConfiguredPurchases) -> Void
+    ) -> ConfiguredPurchases {
+        let purchases = configure(publicSDKKey)
+        enableStandardAdServicesAttribution(purchases)
+        return purchases
     }
 
     func customerInfo() async throws -> SubscriptionCustomerSnapshot {
