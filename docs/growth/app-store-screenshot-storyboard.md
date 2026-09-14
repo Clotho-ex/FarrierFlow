@@ -1,147 +1,361 @@
 # FarrierFlow App Store Screenshot Storyboard
 
-**Status:** Planning only. Do not modify or upload live App Store screenshots.
-This is not authorization to create final marketing images.
+**Status:** Local preparation only. Do not modify or upload live App Store
+screenshots while FarrierFlow v1.0 remains under review. This document records
+the current Figma export and the proposed v1.0.1 storefront order; it is not
+authorization to publish, recreate, or edit the images.
 
 **Target:** US App Store, iPhone-first FarrierFlow v1.0.1
 
-## Story principle
+**Export reviewed:** Seven RGB JPEGs from `Updated-Screenshots-Figma-Export`,
+each 1320 × 2868 pixels with no alpha channel. The source files remain outside
+the repository.
 
-Tell one connected working-day story rather than seven unrelated feature
-cards:
+The source filenames below identify the existing, untouched exports. Their
+numeric prefixes reflect the current file set, not the proposed storefront
+order. This documentation revision does not rename or modify screenshot files.
+
+## Connected story direction
+
+Present one connected farrier workflow rather than seven disconnected feature
+demonstrations:
 
 ```text
-Plan the day → arrive prepared → know the horse → record the work
-→ invoice it → track payment → book the next visit
+Run the day
+→ work the barn
+→ turn work into an invoice
+→ retain horse history
+→ document the hooves
+→ capture visit details
+→ schedule follow-up
 ```
 
-The headline should state the outcome. The actual interface should carry the
-proof. Use deterministic fictional fixtures only, never real customer or
-business information. Keep the native Field Book interface legible and avoid
-decorative dashboards, invented metrics, or features that do not ship.
+The first three frames answer the primary commercial question:
 
-## Proposed sequence
+```text
+What does this app do for my business?
 
-### 1. Run the whole day from one place
+organizes the workday
+→ handles the real barn visit
+→ turns recorded work into an invoice
+```
 
-- **Purpose:** Establish FarrierFlow as a complete working-day system, not a
-  single-purpose record book.
-- **Target screen:** Today Run Sheet with a realistic mix of upcoming and
-  completed appointments.
-- **Draft headline:** `Your whole workday, in hand`
-- **Supporting copy:** `See what is next and keep every job moving.`
-- **Required fixture/state:** Three fictional appointments across two service
-  locations; one completed visit; clear next action; no overdue alarmism or
-  fabricated revenue totals.
-- **Visual hierarchy:** Today title and next appointment first, orange reserved
-  for the primary action, completed work quieter below. The screen should be
-  understandable before reading supporting copy.
+Frames 4–7 then establish product depth:
 
-### 2. Keep the next work clear
+```text
+horse history
+→ hoof documentation
+→ detailed visit records
+→ follow-up scheduling
+```
 
-- **Purpose:** Show scheduling intent and the connection between location,
-  client, horses, and planned work.
-- **Target screen:** Schedule or Appointment detail/editing screen.
-- **Draft headline:** `Know where you are going next`
-- **Supporting copy:** `Plan appointments around the horses and work involved.`
-- **Required fixture/state:** One upcoming appointment at a fictional barn with
-  two fictional horses and scheduled service context.
-- **Visual hierarchy:** Date/time and service location lead; horse/work context
-  follows. Avoid showing a keyboard, validation error, or empty form.
+Moving Invoice to frame 3 surfaces a core business outcome before the
+documentation-oriented screens. The interface remains the proof behind every
+headline.
 
-### 3. Arrive with the horse's history
+## Final recommended sequence
 
-- **Purpose:** Demonstrate continuity across visits.
-- **Target screen:** Horse detail/history.
-- **Draft headline:** `Carry the history into every visit`
-- **Supporting copy:** `Review prior work, outcomes, and hoof photos in the field.`
-- **Required fixture/state:** A fictional horse with two completed historical
-  visits, distinct dates, service summaries, and at least one hoof-photo count.
-- **Visual hierarchy:** Horse identity and most recent history lead. Use enough
-  history to prove continuity without creating a dense wall of records.
+### 1
 
-### 4. Record the work while it is fresh
+**Your whole workday. One run sheet.**
 
-- **Purpose:** Show real field participation rather than office-only data entry.
-- **Target screen:** Active Visit editor with work and Hoof Photos visible.
-- **Draft headline:** `Capture the work at the horse`
-- **Supporting copy:** `Record services, outcomes, notes, and hoof photos as you go.`
-- **Required fixture/state:** An in-progress fictional two-horse visit; one horse
-  serviced, the other still pending; safe, non-identifying hoof images created
-  specifically for marketing fixtures.
-- **Visual hierarchy:** Current horse and completion state first, service/work
-  controls second, Hoof Photos row clearly labeled. Do not imply image analysis
-  or automated diagnosis.
+*Barns. Horses. Next stops.*
 
-### 5. Turn completed work into an invoice
+### 2
 
-- **Purpose:** Show the transition from field work to billable administration.
-- **Target screen:** Invoice detail or generated invoice preview.
-- **Draft headline:** `Invoice the visit without retyping it`
-- **Supporting copy:** `Build a clear invoice from work already completed.`
-- **Required fixture/state:** A fictional completed visit linked to one invoice
-  with realistic but non-promotional line items and totals.
-- **Visual hierarchy:** Invoice status, amount due, client/location snapshot,
-  line items, and Share action should be visible. Avoid claims about automatic
-  payment processing; FarrierFlow shares invoices and records payment status.
+**Work the whole barn.**
 
-### 6. Keep payment status visible
+*Every horse in one visit.*
 
-- **Purpose:** Close the administrative loop without implying a payment gateway.
-- **Target screen:** Paid Invoice detail.
-- **Draft headline:** `Know what has been paid`
-- **Supporting copy:** `Record payment status and evidence alongside the invoice.`
-- **Required fixture/state:** The same fictional invoice transitioned to Paid,
-  with a fictional date and method and no sensitive reference or note.
-- **Visual hierarchy:** Paid status and amount lead; evidence appears as
-  supporting detail. Do not show card entry, bank information, or imply that
-  FarrierFlow moves money.
+### 3
 
-### 7. Leave with the next visit planned
+**From work to invoice.**
 
-- **Purpose:** Demonstrate the full-loop differentiator.
-- **Target screen:** Next Appointment assistance followed by the saved upcoming
-  appointment if one frame can show the result truthfully.
-- **Draft headline:** `Finish today with the next visit set`
-- **Supporting copy:** `Carry the right horses and timing into a new appointment.`
-- **Required fixture/state:** A completed fictional visit with interval-based
-  follow-up suggestions and a successfully saved next appointment.
-- **Visual hierarchy:** Suggested date and selected horses lead, with the primary
-  Continue/Save action clear. Do not suggest reminders, automatic booking, or
-  customer messaging.
+*Services and prices carry through.*
+
+### 4
+
+**Every horse. Every visit.**
+
+*History stays connected.*
+
+### 5
+
+**Document every hoof.**
+
+*Photos stay with each visit.*
+
+### 6
+
+**Record it as you go.**
+
+*Services, notes and photos in the visit.*
+
+### 7
+
+**Keep the next visit moving.**
+
+*Schedule follow-up from completed work.*
+
+## Detailed storyboard
+
+### 1. Your whole workday. One run sheet.
+
+- **Source export:** `01-today-run-sheet.jpg`
+- **Supporting line:** `Barns. Horses. Next stops.`
+- **Screen shown:** Today Run Sheet.
+- **Visible state:** Northline Farrier Service on Sunday, Sep 6; a Visit in
+  Progress at Willow Creek Stables with three of three horses recorded and a
+  Resume Visit action; scheduled stops at Oak Ridge Farm and Cedar Run
+  Equestrian.
+- **Story role:** Establishes FarrierFlow as the field-work command surface,
+  showing multiple barns, horses, stops, and active work while immediately
+  communicating that the app organizes the working farrier's day.
+- **Visual treatment:** Straight-on device, large two-line black headline,
+  muted supporting line, cream-to-sage gradient, and restrained orange product
+  accents.
+
+### 2. Work the whole barn.
+
+- **Source export:** `02-multi-horse-visit.jpg`
+- **Supporting line:** `Every horse in one visit.`
+- **Screen shown:** Multi-horse Visit editor.
+- **Visible state:** The rotated device shows service entry, Beacon's work
+  status and notes, a Hoof Photos route, Save Progress, and Complete Visit.
+- **Story role:** Demonstrates the farrier-specific reality that one barn stop
+  can contain work across multiple horses.
+- **Visual treatment:** Cropped, diagonal device gives the visit controls the
+  lower-right focus while the headline remains dominant.
+
+### 3. From work to invoice.
+
+- **Source export:** `06-work-to-invoice.jpg`
+- **Supporting line:** `Services and prices carry through.`
+- **Screen shown:** Invoice detail.
+- **Visible state:** Invoice 0148 is visibly Unpaid, with its $355 total,
+  fictional customer context, actual service lines carried from recorded work,
+  and Share action. Jordan Ellis, Willow Creek Stables, Atlas's Full Set, and
+  Beacon's Front Shoes provide the fictional context.
+- **Story role:** Completes the opening commercial sequence by showing how
+  recorded work becomes a shareable invoice without claiming FarrierFlow
+  processes, settles, transfers, or collects payment.
+- **Visual treatment:** Straight-on device and high UI crop keep invoice status,
+  total, customer context, service lines, and Share action visible.
+
+### 4. Every horse. Every visit.
+
+- **Source export:** `05-horse-history.jpg`
+- **Supporting line:** `History stays connected.`
+- **Screen shown:** Horse detail / visit history.
+- **Visible state:** Atlas's safety notes and dated visit history at Willow Creek
+  Stables, including service counts and subtotals.
+- **Story role:** Demonstrates continuity between visits and shows that
+  FarrierFlow preserves the horse's working history rather than only handling
+  appointments and invoices.
+- **Visual treatment:** Straight-on device with the history list occupying most
+  of the frame; the headline remains readable before the UI details.
+
+### 5. Document every hoof.
+
+- **Source export:** `04-hoof-photos.jpg`
+- **Supporting line:** `Photos stay with each visit.`
+- **Screen shown:** Hoof Photos gallery.
+- **Visible state:** Six synthetic hoof photographs dated Sep 6, 2026 appear in
+  the app, with a larger approved hoof photograph layered behind the device.
+- **Story role:** Makes the photographic record concrete and connects it to the
+  visit without implying image analysis, diagnosis, automatic classification,
+  cloud photo backup, or AI functionality.
+- **Visual treatment:** Tilted device plus one physical-photo-style layer adds
+  variation. At storefront thumbnail size, the large external hoof-photo layer
+  must not overpower the actual gallery UI.
+
+### 6. Record it as you go.
+
+- **Source export:** `03-visit-documentation.jpg`
+- **Supporting line:** `Services, notes and photos in the visit.`
+- **Screen shown:** Visit work-entry detail.
+- **Visible state:** A serviced work status, work notes, service pricing, and a
+  hoof-photo count are visible in the active Visit interface.
+- **Story role:** Emphasizes that services, notes, and photographs remain
+  connected inside the visit rather than presenting them as a generic feature
+  inventory or separate office task.
+- **Visual treatment:** A close, rotated crop emphasizes the native form and
+  work details; headline and supporting line anchor the lower portion.
+
+### 7. Keep the next visit moving.
+
+- **Source export:** `07-next-appointment.jpg`
+- **Supporting line:** `Schedule follow-up from completed work.`
+- **Screen shown:** Next Appointment assistance.
+- **Visible state:** Willow Creek Stables with a Sep 6 work date; proposed Oct 4
+  start; Atlas and Beacon selected using four- and six-week service intervals;
+  Clover shown as not serviced; Continue action visible.
+- **Story role:** Closes the workflow truthfully:
+
+  ```text
+  completed work
+  → proposed follow-up
+  → next appointment
+  ```
+
+  It does not imply a reminder, customer-messaging, or dashboard feature.
+- **Visual treatment:** Large interface crop prioritizes the proposed date,
+  horse-level interval decisions, and orange Continue action.
+
+## What the set does and does not show
+
+The proposed storefront sequence directly shows:
+
+- A working-day run sheet with multiple stops.
+- A multi-horse visit.
+- An unpaid invoice built from recorded service lines.
+- Horse-level visit history and safety notes.
+- A dedicated hoof-photo gallery.
+- Visit services, work notes, hoof photos, and pricing.
+- Next-appointment assistance using horse-level service intervals.
+
+The set does **not** include:
+
+- A standalone appointment-creation or schedule frame.
+- A paid-invoice or payment-evidence frame.
+- A separate client-list frame.
+- Any analytics, subscription, attribution, reminder, route-optimization,
+  online-payment, synchronization, or team feature.
+
+Do not add a new payment screenshot merely to cover payment status. The visible
+`Unpaid` state in the Invoice frame is sufficient for this seven-frame story.
+FarrierFlow records payment state; this screenshot set does not demonstrate
+Apple Pay customer payment, card processing, bank settlement, automatic
+reconciliation, payment collection, or online payment processing.
 
 ## Fixture continuity
 
-Use one coherent fictional business day across all frames:
+Preserve the coherent fictional fixture set already shown:
 
-- A fictional farrier business name created only for marketing fixtures.
-- Two fictional clients/service locations.
-- Three to four fictional horses reused consistently.
-- Plausible services and dates with no resemblance to real customer records.
-- One visit that becomes one invoice, one paid state, and one next appointment.
+- **Business:** Northline Farrier Service.
+- **Primary location:** Willow Creek Stables.
+- **Additional run-sheet stops:** Oak Ridge Farm and Cedar Run Equestrian.
+- **Recurring horses:** Atlas, Beacon, and Clover, with Milo, Scout, Jasper, and
+  Luna visible on the run sheet.
+- **Invoice recipient:** Jordan Ellis.
+- **Visit/follow-up date:** Sep 6, 2026.
+- **Proposed follow-up:** Oct 4, 2026.
+- **Current invoice shown:** Invoice 0148 dated Aug 9, 2026.
 
-Keep all copy, names, dates, amounts, photographs, and addresses visibly
-fictional yet professional. Avoid “test,” “demo,” or debug labels in final
-screenshots.
+Continue requiring:
 
-## Production notes
+- Obviously fictional names.
+- `555` telephone numbers.
+- `example.com` email addresses.
+- No real customer or business information.
+- Only approved synthetic or marketing hoof photographs.
 
-- Capture from the final shipping candidate after privacy and metadata review.
-- Use the current primary iPhone screenshot size accepted by App Store Connect;
-  verify requirements at production time rather than assuming the v1.0 sizes.
-- Keep device appearance, text size, color scheme, locale, time zone, and fixture
-  state consistent across the sequence.
-- Check Light and Dark appearance, but choose one coherent storefront story
-  unless alternating modes serves a deliberate narrative.
-- Ensure headlines remain legible at thumbnail scale and do not cover native
-  navigation, primary actions, status, or important record content.
-- Do not include ratings, testimonials, customer counts, revenue claims,
-  competitor logos, Apple Ads performance, or functionality absent from the
-  app.
+Do not replace fixture content as part of this documentation revision.
+
+## Mandatory pre-export blockers
+
+These must be resolved in the fixture/export workflow before final screenshots
+are produced. This document does not authorize editing the current images.
+
+### Appointment time
+
+The visible `12:29 AM` does not read as a plausible farrier field-work
+appointment. Replace it with a believable daytime appointment time before final
+export, such as `8:00 AM`, or another realistic time that better fits the
+fixture.
+
+### Status-bar times
+
+Normalize varying simulator/status-bar times such as `00:37`, `01:08`, and
+`03:23` if they are capture artifacts rather than meaningful fixture state.
+The final set should not look as though it was captured randomly across
+unrelated simulator sessions.
+
+### Date continuity
+
+The current fixture shows a Sep 6, 2026 visit/follow-up but an Aug 9, 2026
+invoice. If the storefront set portrays one continuous example, align the
+invoice with the Sep 6 workflow before final export:
+
+```text
+Sep 6 appointment / visit
+→ hoof photos
+→ invoice generated from that work
+→ follow-up proposed for Oct 4
+```
+
+Do not invent the replacement invoice date without inspecting the actual
+fixture implementation. Either align the invoice with the Sep 6 workflow or
+explicitly document why it represents an earlier visit. Alignment is preferred
+for the storefront narrative.
+
+### Fixture privacy and consistency
+
+Re-audit every visible name, contact detail, record value, note, amount, and
+photograph. All must be approved fictional marketing fixtures, with no real
+customer or business information.
+
+## Thumbnail review
+
+Every frame must work first as a small App Store storefront thumbnail and second
+as a full-resolution marketing composition:
+
+- Headlines must be readable before the detailed UI.
+- Rotated devices must remain recognizable.
+- Important UI evidence must remain legible rather than becoming decorative
+  background texture.
+- Device edges must not be cropped so aggressively that the composition looks
+  accidental.
+- The large layered hoof photograph must not overpower the actual app screen.
+- Invoice status, service lines, and Share action must remain recognizable in
+  frame 3.
+
+## Export-wide visual system
+
+Preserve the existing visual system:
+
+- 1320 × 2868 portrait source/export.
+- Warm cream-to-muted-sage background.
+- Large black headline typography.
+- Smaller gray supporting copy.
+- Orange limited to FarrierFlow product accents.
+- Consistent iPhone treatment.
+- Alternation between straight and rotated device compositions.
+
+Verify Apple's current accepted screenshot sizes at actual upload time. The
+existing 1320 × 2868 export dimensions alone do not guarantee acceptance.
+
+## Claims safety
+
+Every headline and supporting line must correspond to visible shipping behavior.
+Do not add:
+
+- Ratings or testimonials.
+- Customer counts.
+- Revenue or time-saved claims.
+- Competitor comparisons or logos.
+- AI, image-analysis, diagnosis, or automatic-classification claims.
+- Reminders or route optimization.
+- Accounting integrations.
+- Cloud synchronization.
+- Online payments, payment collection, or team collaboration.
+- Analytics, subscription, attribution, or Apple Ads claims.
+- Any other unshipped functionality.
 
 ## Review gate
 
-Before producing final images, verify every screen and claim against the final
-v1.0.1 build, the approved metadata, Apple's current screenshot specifications,
-and the fictional-fixture privacy checklist. No live screenshot change is
-authorized by this storyboard.
+Before any screenshot is uploaded to App Store Connect:
+
+1. v1.0 review must be complete.
+2. The final v1.0.1 binary must exist.
+3. Every pictured screen must match shipping behavior.
+4. Synthetic fixture data and photographs must be re-audited.
+5. Fixture dates and times must be coherent.
+6. Final metadata and localized metadata must be approved.
+7. The v1.0.1 Privacy Policy must be deployed and its URL verified.
+8. Current Apple screenshot-size requirements must be checked.
+9. Thumbnail readability and crop quality must be reviewed.
+10. No real customer or business data may be present.
+
+No live screenshot or App Store Connect change is authorized by this document
+while v1.0 remains under review.
