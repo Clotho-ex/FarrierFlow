@@ -1,0 +1,26 @@
+project:
+  name: "FarrierFlow Creative Proof"
+  output_dir: "../../output/screenshots/creative-proof/staging"
+  device: "iPhone 17 Pro Max - Deep Blue - Portrait"
+  output_size: "iPhone6_9"
+  parallel_workers: 2
+
+screenshots:
+  01-today-run-sheet:
+    template: "creative/01-today-run-sheet.html"
+    frame: true
+    variables:
+      headline_line_one: "Your whole workday."
+      headline_line_two: "One run sheet."
+      supporting_line: "Barns. Horses. Next stops."
+    assets:
+      screen: "../../output/screenshots/raw/01-today-run-sheet.png"
+
+  03-work-to-invoice:
+    template: "creative/03-work-to-invoice.html"
+    frame: true
+    variables:
+      headline: "From work to invoice."
+      supporting_line: "Services and prices carry through."
+    assets:
+      invoice_screen: "../../output/screenshots/raw/03-work-to-invoice.png"

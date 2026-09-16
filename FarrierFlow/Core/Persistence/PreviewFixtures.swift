@@ -176,11 +176,19 @@ enum UITestFixtures {
     static func seed(
         _ scenario: UITestScenario,
         in container: ModelContainer,
-        photographRootURL: URL
+        photographRootURL: URL,
+        now: Date = .now,
+        calendar: Calendar = .autoupdatingCurrent,
+        screenshotStage: ScreenshotFixtureStage? = nil
     ) throws {
         switch scenario {
         case .appStoreShowcase:
-            try seedAppStoreShowcase(in: container)
+            try seedAppStoreShowcase(
+                in: container,
+                now: now,
+                calendar: calendar,
+                stage: screenshotStage ?? .active
+            )
         case .invoiceReady:
             try seedInvoiceReady(
                 in: container,

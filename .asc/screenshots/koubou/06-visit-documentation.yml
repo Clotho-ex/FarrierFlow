@@ -1,0 +1,16 @@
+project:
+  name: "FarrierFlow 06 Visit Documentation"
+  output_dir: "../../../output/screenshots/koubou"
+  device: "iPhone 17 Pro Max - Silver - Portrait"
+  output_size: "iPhone6_9"
+defaults:
+  background:
+    type: "linear"
+    colors: ["#F4F0EB", "#C9D4C3"]
+    direction: 180
+screenshots:
+  06-visit-documentation:
+    content:
+      - { type: "text", content: "Record it as you go.", position: ["50%", "8%"], size: 82, max_width: 1120, color: "#24211E", weight: "bold" }
+      - { type: "text", content: "Services, notes and photos in the visit.", position: ["50%", "15%"], size: 36, max_width: 1120, color: "#5F5953" }
+      - { type: "image", asset: "../../../output/screenshots/raw/06-visit-documentation.png", position: ["46%", "62%"], scale: 0.72, frame: true, rotation: 4 }

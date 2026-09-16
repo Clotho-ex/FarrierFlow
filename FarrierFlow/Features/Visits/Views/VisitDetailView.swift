@@ -2,6 +2,7 @@ import SwiftData
 import SwiftUI
 
 struct VisitDetailView: View {
+    @Environment(\.appClock) private var appClock
     @Environment(\.calendar) private var calendar
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -255,7 +256,7 @@ struct VisitDetailView: View {
     }
 
     private func reloadNextAppointmentProjection() {
-        let projectionNow = Date.now
+        let projectionNow = appClock.now()
         nextAppointmentModel.load(
             in: context,
             now: projectionNow,

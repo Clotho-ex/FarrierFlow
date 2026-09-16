@@ -14,20 +14,27 @@ struct FarrierFlowApp: App {
     private let dependenciesResult: Result<AppDependencies, Error>
     private let uiTestDynamicTypeSize: DynamicTypeSize?
     private let uiTestColorScheme: ColorScheme?
+    private let uiTestReferenceDate: Date?
 
     init() {
         #if DEBUG
         let uiTestConfiguration = UITestLaunchConfiguration()
         uiTestDynamicTypeSize = uiTestConfiguration.dynamicTypeSize
         uiTestColorScheme = uiTestConfiguration.colorScheme
+        uiTestReferenceDate = uiTestConfiguration.referenceDate
         #else
         uiTestDynamicTypeSize = nil
         uiTestColorScheme = nil
+        uiTestReferenceDate = nil
         #endif
         dependenciesResult = Result {
             #if DEBUG
-            let uiTestConfiguration = UITestLaunchConfiguration()
-            if let storeURL = uiTestConfiguration.storeURL {
+            switch uiTestConfiguration.launchMode {
+            case .isolated:
+                guard let storeURL = uiTestConfiguration.storeURL,
+                      let onboardingDefaults = uiTestConfiguration.onboardingDefaults else {
+                    throw ScreenshotLaunchError.invalidConfiguration
+                }
                 try FileManager.default.createDirectory(
                     at: storeURL.deletingLastPathComponent(),
                     withIntermediateDirectories: true
@@ -51,8 +58,12 @@ struct FarrierFlowApp: App {
                     subscriptionAccessModel: SubscriptionAccessModel(
                         client: UITestSubscriptionClient(configuration: uiTestConfiguration)
                     ),
-                    onboardingDefaults: uiTestConfiguration.onboardingDefaults
+                    onboardingDefaults: onboardingDefaults
                 )
+            case .invalidScreenshot:
+                throw ScreenshotLaunchError.invalidConfiguration
+            case .production:
+                break
             }
             #endif
             let container = try ModelContainerFactory.production()
@@ -90,6 +101,7 @@ struct FarrierFlowApp: App {
                         .environment(dependencies.photographLibrary)
                         .uiTestDynamicTypeSize(uiTestDynamicTypeSize)
                         .uiTestColorScheme(uiTestColorScheme)
+                        .uiTestAppClock(referenceDate: uiTestReferenceDate)
                         .environment(dependencies.subscriptionAccessModel)
                 case .failure:
                     ModelContainerFailureView()
@@ -121,7 +133,22 @@ private extension View {
             self
         }
     }
+
+    @ViewBuilder
+    func uiTestAppClock(referenceDate: Date?) -> some View {
+        if let referenceDate {
+            environment(\.appClock, .fixed(referenceDate))
+        } else {
+            self
+        }
+    }
 }
+
+#if DEBUG
+private enum ScreenshotLaunchError: Error {
+    case invalidConfiguration
+}
+#endif
 
 @MainActor
 private struct AppDependencies {

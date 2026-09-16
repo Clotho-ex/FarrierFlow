@@ -5,6 +5,10 @@ import SwiftUI
 
 struct UITestLaunchConfiguration {
     static let storeNameEnvironmentKey = "FARRIERFLOW_UI_TEST_STORE"
+    static let screenshotModeEnvironmentKey = "FARRIERFLOW_SCREENSHOT_MODE"
+    static let referenceDateEnvironmentKey = "FARRIERFLOW_UI_TEST_NOW"
+    static let screenshotStageEnvironmentKey = "FARRIERFLOW_SCREENSHOT_STAGE"
+    static let unitTestHostEnvironmentKey = "FARRIERFLOW_UNIT_TEST_HOST"
     static let cameraUnavailableEnvironmentKey =
         "FARRIERFLOW_UI_TEST_CAMERA_UNAVAILABLE"
     static let scenarioEnvironmentKey = "FARRIERFLOW_UI_TEST_SCENARIO"
@@ -21,19 +25,38 @@ struct UITestLaunchConfiguration {
     let dynamicTypeSize: DynamicTypeSize?
     let colorScheme: ColorScheme?
     let subscriptionAccess: SubscriptionUITestAccess
+    let isScreenshotMode: Bool
+    let referenceDate: Date?
+    let screenshotStage: ScreenshotFixtureStage?
+    let launchMode: UITestLaunchMode
 
-    var onboardingDefaults: UserDefaults {
-        guard let storeURL else { return .standard }
+    var onboardingDefaults: UserDefaults? {
+        guard let storeURL else { return nil }
         let suiteName = "FarrierFlow.UITests.\(storeURL.deletingPathExtension().lastPathComponent)"
-        return UserDefaults(suiteName: suiteName) ?? .standard
+        return UserDefaults(suiteName: suiteName)
     }
 
     init(processInfo: ProcessInfo = .processInfo) {
+        var environment = processInfo.environment
+        if environment["XCTestConfigurationFilePath"] != nil
+            || NSClassFromString("XCTestCase") != nil {
+            environment[Self.unitTestHostEnvironmentKey] = "1"
+        }
+        self.init(
+            environment: environment,
+            applicationSupportURL: FileManager.default.urls(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask
+            )[0]
+        )
+    }
+
+    init(environment: [String: String], applicationSupportURL: URL) {
         forcesCameraUnavailable =
-            processInfo.environment[Self.cameraUnavailableEnvironmentKey] == "1"
-        scenario = processInfo.environment[Self.scenarioEnvironmentKey]
+            environment[Self.cameraUnavailableEnvironmentKey] == "1"
+        scenario = environment[Self.scenarioEnvironmentKey]
             .flatMap(UITestScenario.init(rawValue:))
-        dynamicTypeSize = switch processInfo.environment[
+        dynamicTypeSize = switch environment[
             Self.dynamicTypeSizeEnvironmentKey
         ] {
         case "accessibility5":
@@ -41,7 +64,7 @@ struct UITestLaunchConfiguration {
         default:
             nil
         }
-        colorScheme = switch processInfo.environment[
+        colorScheme = switch environment[
             Self.colorSchemeEnvironmentKey
         ] {
         case "dark":
@@ -51,33 +74,53 @@ struct UITestLaunchConfiguration {
         default:
             nil
         }
-        subscriptionAccess = processInfo.environment[
+        subscriptionAccess = environment[
             Self.subscriptionAccessEnvironmentKey
         ]
         .flatMap(SubscriptionUITestAccess.init(rawValue:)) ?? .full
-        guard let rawName = processInfo.environment[Self.storeNameEnvironmentKey] else {
+        let screenshotModeValue = environment[Self.screenshotModeEnvironmentKey]
+        isScreenshotMode = screenshotModeValue == "1"
+        referenceDate = environment[Self.referenceDateEnvironmentKey]
+            .flatMap { ISO8601DateFormatter().date(from: $0) }
+        screenshotStage = environment[Self.screenshotStageEnvironmentKey]
+            .flatMap(ScreenshotFixtureStage.init(rawValue:))
+
+        if let rawName = environment[Self.storeNameEnvironmentKey] {
+            let allowed = CharacterSet.alphanumerics.union(
+                CharacterSet(charactersIn: "-_")
+            )
+            let sanitized = rawName.unicodeScalars
+                .filter(allowed.contains)
+                .map(String.init)
+                .joined()
+
+            if sanitized.isEmpty {
+                storeURL = nil
+            } else {
+                storeURL = applicationSupportURL
+                    .appending(path: "UITests", directoryHint: .isDirectory)
+                    .appending(path: "\(sanitized).store")
+            }
+        } else if environment[Self.unitTestHostEnvironmentKey] == "1" {
+            storeURL = applicationSupportURL
+                .appending(path: "UITests", directoryHint: .isDirectory)
+                .appending(path: "UnitTestHost.store")
+        } else {
             storeURL = nil
-            return
         }
 
-        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
-        let sanitized = rawName.unicodeScalars
-            .filter(allowed.contains)
-            .map(String.init)
-            .joined()
-
-        guard !sanitized.isEmpty else {
-            storeURL = nil
-            return
+        if screenshotModeValue != nil && !isScreenshotMode {
+            launchMode = .invalidScreenshot
+        } else if isScreenshotMode {
+            let hasRequiredInputs = storeURL != nil
+                && environment[Self.storeNameEnvironmentKey] != nil
+                && scenario == .appStoreShowcase
+                && referenceDate != nil
+                && screenshotStage != nil
+            launchMode = hasRequiredInputs ? .isolated : .invalidScreenshot
+        } else {
+            launchMode = storeURL == nil ? .production : .isolated
         }
-
-        let support = FileManager.default.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        )[0]
-        storeURL = support
-            .appending(path: "UITests", directoryHint: .isDirectory)
-            .appending(path: "\(sanitized).store")
     }
 
     @MainActor
@@ -92,12 +135,25 @@ struct UITestLaunchConfiguration {
                     .appending(
                         path: PhotographConstants.rootDirectoryName,
                         directoryHint: .isDirectory
-                    )
+                    ),
+                now: referenceDate ?? .now,
+                screenshotStage: screenshotStage
             )
         } else {
             try UITestFixtures.seedOwnerIdentity(in: container)
         }
     }
+}
+
+enum UITestLaunchMode: Equatable {
+    case production
+    case isolated
+    case invalidScreenshot
+}
+
+enum ScreenshotFixtureStage: String {
+    case active
+    case completed
 }
 
 enum UITestScenario: String {

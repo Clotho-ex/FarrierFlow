@@ -2,14 +2,18 @@
 
 **Status:** Local preparation only. Do not modify or upload live App Store
 screenshots while FarrierFlow v1.0 remains under review. This document records
-the current Figma export and the proposed v1.0.1 storefront order; it is not
-authorization to publish, recreate, or edit the images.
+the current Figma export and the proposed v1.0.1 storefront order. The latest
+automated Slide 01 and Slide 03 proofs are approved as the v1.0.1 visual
+references. This status is not authorization to publish, upload, or modify any
+live App Store screenshot.
 
 **Target:** US App Store, iPhone-first FarrierFlow v1.0.1
 
-**Export reviewed:** Seven RGB JPEGs from `Updated-Screenshots-Figma-Export`,
-each 1320 × 2868 pixels with no alpha channel. The source files remain outside
-the repository.
+**Historical export reviewed:** Seven RGB JPEGs from
+`Updated-Screenshots-Figma-Export`, each 1320 × 2868 pixels with no alpha
+channel. The source files remain outside the repository. The Slide 01 and Slide
+03 Figma files remain historical comparison and quality-baseline references;
+the approved automated proofs are now the campaign's visual anchors.
 
 The source filenames below identify the existing, untouched exports. Their
 numeric prefixes reflect the current file set, not the proposed storefront
@@ -53,9 +57,28 @@ Moving Invoice to frame 3 surfaces a core business outcome before the
 documentation-oriented screens. The interface remains the proof behind every
 headline.
 
+## Approved visual reference anchors
+
+Slides 01 and 03 are **APPROVED VISUAL REFERENCE — v1.0.1**. Preserve their
+current templates, composition, typography, device treatment, deterministic
+capture state, and output scale. Do not make another aesthetic pass unless the
+owner explicitly reopens them for revision.
+
+The approved local outputs are:
+
+```text
+output/screenshots/creative-proof/new/01-today-run-sheet.png
+output/screenshots/creative-proof/new/03-work-to-invoice.png
+```
+
+These two slides are the reference anchors for later work on Slides 02, 04, 05,
+06, and 07. Their approval does not authorize work on those remaining slides.
+
 ## Final recommended sequence
 
 ### 1
+
+**APPROVED VISUAL REFERENCE — v1.0.1**
 
 **Your whole workday. One run sheet.**
 
@@ -68,6 +91,8 @@ headline.
 *Every horse in one visit.*
 
 ### 3
+
+**APPROVED VISUAL REFERENCE — v1.0.1**
 
 **From work to invoice.**
 
@@ -101,7 +126,10 @@ headline.
 
 ### 1. Your whole workday. One run sheet.
 
-- **Source export:** `01-today-run-sheet.jpg`
+- **Approval:** **APPROVED VISUAL REFERENCE — v1.0.1**
+- **Approved output:**
+  `output/screenshots/creative-proof/new/01-today-run-sheet.png`
+- **Historical Figma reference:** `01-today-run-sheet.jpg`
 - **Supporting line:** `Barns. Horses. Next stops.`
 - **Screen shown:** Today Run Sheet.
 - **Visible state:** Northline Farrier Service on Sunday, Sep 6; a Visit in
@@ -129,7 +157,10 @@ headline.
 
 ### 3. From work to invoice.
 
-- **Source export:** `06-work-to-invoice.jpg`
+- **Approval:** **APPROVED VISUAL REFERENCE — v1.0.1**
+- **Approved output:**
+  `output/screenshots/creative-proof/new/03-work-to-invoice.png`
+- **Historical Figma reference:** `06-work-to-invoice.jpg`
 - **Supporting line:** `Services and prices carry through.`
 - **Screen shown:** Invoice detail.
 - **Visible state:** Invoice 0148 is visibly Unpaid, with its $355 total,
@@ -240,7 +271,7 @@ Preserve the coherent fictional fixture set already shown:
 - **Invoice recipient:** Jordan Ellis.
 - **Visit/follow-up date:** Sep 6, 2026.
 - **Proposed follow-up:** Oct 4, 2026.
-- **Current invoice shown:** Invoice 0148 dated Aug 9, 2026.
+- **Current invoice shown:** Invoice 0148 dated Sep 6, 2026.
 
 Continue requiring:
 
@@ -252,7 +283,7 @@ Continue requiring:
 
 Do not replace fixture content as part of this documentation revision.
 
-## Mandatory pre-export blockers
+## Pre-export requirements and remaining blockers
 
 These must be resolved in the fixture/export workflow before final screenshots
 are produced. This document does not authorize editing the current images.
@@ -264,18 +295,15 @@ appointment. Replace it with a believable daytime appointment time before final
 export, such as `8:00 AM`, or another realistic time that better fits the
 fixture.
 
-### Status-bar times
+### Status-bar times — resolved for the approved anchors
 
-Normalize varying simulator/status-bar times such as `00:37`, `01:08`, and
-`03:23` if they are capture artifacts rather than meaningful fixture state.
-The final set should not look as though it was captured randomly across
-unrelated simulator sessions.
+The deterministic capture path fixes the approved Slide 01 and Slide 03 status
+bar at 09:41. Future slides must use the same reference-clock and status-bar
+state so the set does not look captured across unrelated simulator sessions.
 
-### Date continuity
+### Date continuity — resolved for the approved invoice anchor
 
-The current fixture shows a Sep 6, 2026 visit/follow-up but an Aug 9, 2026
-invoice. If the storefront set portrays one continuous example, align the
-invoice with the Sep 6 workflow before final export:
+The approved Slide 03 fixture aligns Invoice 0148 with the Sep 6, 2026 work:
 
 ```text
 Sep 6 appointment / visit
@@ -284,10 +312,8 @@ Sep 6 appointment / visit
 → follow-up proposed for Oct 4
 ```
 
-Do not invent the replacement invoice date without inspecting the actual
-fixture implementation. Either align the invoice with the Sep 6 workflow or
-explicitly document why it represents an earlier visit. Alignment is preferred
-for the storefront narrative.
+Future slides must preserve this continuity and the deterministic fixture
+implementation rather than inventing replacement dates.
 
 ### Fixture privacy and consistency
 
@@ -312,15 +338,25 @@ as a full-resolution marketing composition:
 
 ## Export-wide visual system
 
-Preserve the existing visual system:
+Slides 01 and 03 establish the approved system for future campaign work:
 
-- 1320 × 2868 portrait source/export.
-- Warm cream-to-muted-sage background.
-- Large black headline typography.
-- Smaller gray supporting copy.
-- Orange limited to FarrierFlow product accents.
-- Consistent iPhone treatment.
-- Alternation between straight and rotated device compositions.
+- 1320 × 2868 portrait export.
+- Centered editorial typography by default.
+- Strong, bold headline with deliberate line breaks and tight word spacing.
+- Readable gray supporting copy, centered and clearly subordinate.
+- Warm yellow-to-muted-sage background family.
+- Realistic premium iPhone hardware with a substantial, believable frame,
+  metallic edge treatment, modern proportions, and credible Dynamic Island.
+- Deterministic 09:41 capture state.
+- Generous negative space and restrained composition.
+- FarrierFlow burnt orange reserved primarily for accents inside the product
+  UI.
+- No decorative element without a clear communication purpose.
+- Visual storytelling only when it materially improves feature comprehension.
+
+The approved anchor slides use a centered, straight-on device. Any later crop,
+rotation, or secondary visual layer must improve comprehension and remain part
+of this same visual family; variation alone is not sufficient justification.
 
 Verify Apple's current accepted screenshot sizes at actual upload time. The
 existing 1320 × 2868 export dimensions alone do not guarantee acceptance.

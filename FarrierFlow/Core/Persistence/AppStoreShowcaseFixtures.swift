@@ -25,7 +25,8 @@ extension UITestFixtures {
     static func seedAppStoreShowcase(
         in container: ModelContainer,
         now: Date = .now,
-        calendar: Calendar = .autoupdatingCurrent
+        calendar: Calendar = .autoupdatingCurrent,
+        stage: ScreenshotFixtureStage = .active
     ) throws {
         let context = container.mainContext
         let profiles = try context.fetch(FetchDescriptor<BusinessProfile>())
@@ -33,7 +34,18 @@ extension UITestFixtures {
             guard profiles.count == 1 else {
                 throw AppStoreShowcaseSeedError.unexpectedStoreContents
             }
-            try refreshShowcaseToday(in: container, now: now, calendar: calendar)
+            let visits = try context.fetch(FetchDescriptor<Visit>())
+            let activeVisitCount = visits.filter { $0.completedAt == nil }.count
+            let expectedActiveVisitCount = stage == .active ? 1 : 0
+            guard activeVisitCount == expectedActiveVisitCount else {
+                throw AppStoreShowcaseSeedError.unexpectedStoreContents
+            }
+            try refreshShowcaseToday(
+                in: container,
+                now: now,
+                calendar: calendar,
+                stage: stage
+            )
             try DomainGraphValidator.validateAll(in: ModelContext(container))
             return
         }
@@ -244,19 +256,33 @@ extension UITestFixtures {
             )
         }
 
-        _ = try saveActiveShowcaseVisit(
-            appointmentID: willowToday.persistentModelID,
-            startedAt: today.morning,
-            workByHorseName: [atlas.name: fullSetWork, beacon.name: frontShoesWork],
-            in: container
-        )
+        let invoiceVisitID: PersistentIdentifier
+        switch stage {
+        case .active:
+            _ = try saveActiveShowcaseVisit(
+                appointmentID: willowToday.persistentModelID,
+                startedAt: today.morning,
+                workByHorseName: [atlas.name: fullSetWork, beacon.name: frontShoesWork],
+                in: container
+            )
+            invoiceVisitID = sourceVisitID
+        case .completed:
+            invoiceVisitID = try completeShowcaseVisit(
+                appointmentID: willowToday.persistentModelID,
+                startedAt: today.morning,
+                workByHorseName: [atlas.name: fullSetWork, beacon.name: frontShoesWork],
+                in: container
+            )
+        }
 
         let invoiceContext = ModelContext(container)
-        let invoiceDate = sourceStart.addingTimeInterval(2 * 60 * 60)
+        let invoiceDate = stage == .completed
+            ? now
+            : sourceStart.addingTimeInterval(2 * 60 * 60)
         _ = try InvoiceGenerationUseCase.generate(
             InvoiceCreationDraft(
                 clientID: jordan.persistentModelID,
-                selectedVisitIDs: [sourceVisitID],
+                selectedVisitIDs: [invoiceVisitID],
                 invoiceDate: invoiceDate,
                 dueDate: calendar.date(byAdding: .day, value: 14, to: invoiceDate),
                 note: "Thank you. Payment is due within 14 days."
@@ -264,22 +290,34 @@ extension UITestFixtures {
             in: invoiceContext
         )
 
-        try refreshShowcaseToday(in: container, now: now, calendar: calendar)
+        try refreshShowcaseToday(
+            in: container,
+            now: now,
+            calendar: calendar,
+            stage: stage
+        )
         try DomainGraphValidator.validateAll(in: ModelContext(container))
     }
 
     private static func refreshShowcaseToday(
         in container: ModelContainer,
         now: Date,
-        calendar: Calendar
+        calendar: Calendar,
+        stage: ScreenshotFixtureStage
     ) throws {
         let context = ModelContext(container)
         let times = showcaseTodayTimes(now: now, calendar: calendar)
         let appointments = try context.fetch(FetchDescriptor<Appointment>())
         guard let willow = appointments.first(where: {
-            $0.visit?.completedAt == nil
-                && Set($0.appointmentHorses.compactMap(\.horse?.name))
-                    == Set(["Atlas", "Beacon", "Clover"])
+            let hasExpectedHorses = Set($0.appointmentHorses.compactMap(\.horse?.name))
+                == Set(["Atlas", "Beacon", "Clover"])
+            let hasExpectedVisitState = switch stage {
+            case .active:
+                $0.visit?.completedAt == nil
+            case .completed:
+                $0.visit?.completedAt != nil
+            }
+            return hasExpectedHorses && hasExpectedVisitState
         }),
         let oak = appointments.first(where: {
             $0.visit == nil
@@ -291,11 +329,14 @@ extension UITestFixtures {
                 && Set($0.appointmentHorses.compactMap(\.horse?.name))
                     == Set(["Luna", "Jasper"])
         }) else {
-            return
+            throw AppStoreShowcaseSeedError.unexpectedStoreContents
         }
 
         willow.startDate = times.morning
         willow.visit?.startedAt = times.morning
+        if stage == .completed {
+            willow.visit?.completedAt = times.morning.addingTimeInterval(90 * 60)
+        }
         oak.startDate = times.midday
         cedar.startDate = times.afternoon
         try DomainGraphValidator.save(context)

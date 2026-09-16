@@ -5,6 +5,7 @@ struct ScheduleView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
+    @Environment(\.appClock) private var appClock
     @State private var path = NavigationPath()
     @State private var model = ScheduleModel()
     @State private var showsEditor = false
@@ -85,7 +86,7 @@ struct ScheduleView: View {
     }
 
     private func reload() {
-        model.load(in: context, now: .now, calendar: .autoupdatingCurrent)
+        model.load(in: context, now: appClock.now(), calendar: .autoupdatingCurrent)
     }
 }
 

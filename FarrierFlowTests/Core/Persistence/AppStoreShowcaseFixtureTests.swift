@@ -8,6 +8,7 @@ import Testing
 struct AppStoreShowcaseFixtureTests {
     @Test
     func seedIsValidIdempotentAndReopensWithoutDuplicates() throws {
+        let (referenceDate, calendar) = try fixtureClock()
         let directory = try TemporaryStoreFixtures.makeDirectory(
             prefix: "FarrierFlow-App-Store-Showcase-"
         )
@@ -22,15 +23,21 @@ struct AppStoreShowcaseFixtureTests {
             try UITestFixtures.seed(
                 .appStoreShowcase,
                 in: container,
-                photographRootURL: photographRootURL
+                photographRootURL: photographRootURL,
+                now: referenceDate,
+                calendar: calendar,
+                screenshotStage: .active
             )
             try UITestFixtures.seed(
                 .appStoreShowcase,
                 in: container,
-                photographRootURL: photographRootURL
+                photographRootURL: photographRootURL,
+                now: referenceDate,
+                calendar: calendar,
+                screenshotStage: .active
             )
 
-            try verifyShowcase(in: container)
+            try verifyShowcase(in: container, now: referenceDate, calendar: calendar)
         }
 
         try autoreleasepool {
@@ -38,30 +45,118 @@ struct AppStoreShowcaseFixtureTests {
             try UITestFixtures.seed(
                 .appStoreShowcase,
                 in: container,
-                photographRootURL: photographRootURL
+                photographRootURL: photographRootURL,
+                now: referenceDate,
+                calendar: calendar,
+                screenshotStage: .active
             )
 
-            try verifyShowcase(in: container)
-            try verifyNextAppointmentAfterCompletingActiveVisit(in: container)
+            try verifyShowcase(in: container, now: referenceDate, calendar: calendar)
+            try verifyNextAppointmentAfterCompletingActiveVisit(
+                in: container,
+                now: referenceDate,
+                calendar: calendar
+            )
         }
+
+    }
+
+    @Test
+    func completedStageUsesCurrentVisitForInvoiceAndFollowUp() throws {
+        let (referenceDate, calendar) = try fixtureClock()
+        let directory = try TemporaryStoreFixtures.makeDirectory(
+            prefix: "FarrierFlow-App-Store-Showcase-Completed-"
+        )
+        let storeURL = directory.appending(path: "showcase.store")
+        let photographRootURL = directory.appending(
+            path: PhotographConstants.rootDirectoryName,
+            directoryHint: .isDirectory
+        )
 
         try autoreleasepool {
             let container = try ModelContainerFactory.persistentStoreTest(at: storeURL)
-            try UITestFixtures.seed(
-                .appStoreShowcase,
-                in: container,
-                photographRootURL: photographRootURL
-            )
+            for _ in 0..<2 {
+                try UITestFixtures.seed(
+                    .appStoreShowcase,
+                    in: container,
+                    photographRootURL: photographRootURL,
+                    now: referenceDate,
+                    calendar: calendar,
+                    screenshotStage: .completed
+                )
+            }
+
             let context = ModelContext(container)
+            try DomainGraphValidator.validateAll(in: context)
+            #expect(try context.fetchCount(FetchDescriptor<Appointment>()) == 8)
+            #expect(try context.fetchCount(FetchDescriptor<Visit>()) == 6)
+            #expect(try context.fetchCount(FetchDescriptor<Invoice>()) == 1)
             #expect(
                 try context.fetch(FetchDescriptor<Visit>())
                     .allSatisfy { $0.completedAt != nil }
             )
+
+            let invoice = try #require(context.fetch(FetchDescriptor<Invoice>()).first)
+            let invoiceModel = InvoiceDetailModel(invoiceID: invoice.persistentModelID)
+            invoiceModel.load(in: context, locale: Locale(identifier: "en_US"))
+            #expect(invoiceModel.detail?.number == "0148")
+            #expect(invoiceModel.detail?.invoiceDate == referenceDate)
+            #expect(invoiceModel.detail?.total == .available(35_500))
+            let expectedVisitStart = try #require(
+                calendar.date(
+                    bySettingHour: 8,
+                    minute: 0,
+                    second: 0,
+                    of: referenceDate
+                )
+            )
+            #expect(invoiceModel.detail?.visits.first?.visitDate == expectedVisitStart)
+
+            let willowVisit = try #require(
+                context.fetch(FetchDescriptor<Visit>()).first {
+                    $0.appointment?.barn?.name == "Willow Creek Stables"
+                        && calendar.isDate($0.startedAt, inSameDayAs: referenceDate)
+                }
+            )
+            let assistant = NextAppointmentAssistantModel(
+                visitID: willowVisit.persistentModelID
+            )
+            assistant.load(
+                in: context,
+                now: referenceDate,
+                calendar: calendar,
+                locale: Locale(identifier: "en_US")
+            )
+            let projection = try #require(assistant.projection)
+            #expect(projection.options.map(\.horseName) == ["Atlas", "Beacon", "Clover"])
+            #expect(
+                projection.options.first { $0.horseName == "Atlas" }?.suggestedStart
+                    == calendar.date(byAdding: .weekOfYear, value: 4, to: willowVisit.startedAt)
+            )
+        }
+
+        try autoreleasepool {
+            let container = try ModelContainerFactory.persistentStoreTest(at: storeURL)
+            try UITestFixtures.seed(
+                .appStoreShowcase,
+                in: container,
+                photographRootURL: photographRootURL,
+                now: referenceDate,
+                calendar: calendar,
+                screenshotStage: .completed
+            )
+            let context = ModelContext(container)
+            #expect(try context.fetchCount(FetchDescriptor<Visit>()) == 6)
+            #expect(try context.fetchCount(FetchDescriptor<Invoice>()) == 1)
             try DomainGraphValidator.validateAll(in: context)
         }
     }
 
-    private func verifyShowcase(in container: ModelContainer) throws {
+    private func verifyShowcase(
+        in container: ModelContainer,
+        now: Date,
+        calendar: Calendar
+    ) throws {
         let context = ModelContext(container)
         try DomainGraphValidator.validateAll(in: context)
 
@@ -81,8 +176,8 @@ struct AppStoreShowcaseFixtureTests {
         let todayModel = TodayModel()
         todayModel.load(
             in: context,
-            now: .now,
-            calendar: .autoupdatingCurrent
+            now: now,
+            calendar: calendar
         )
         #expect(todayModel.loadState == .loaded)
         guard case .resumeVisit(let activeVisit) = todayModel.primaryAction else {
@@ -141,7 +236,9 @@ struct AppStoreShowcaseFixtureTests {
     }
 
     private func verifyNextAppointmentAfterCompletingActiveVisit(
-        in container: ModelContainer
+        in container: ModelContainer,
+        now: Date,
+        calendar: Calendar
     ) throws {
         let context = ModelContext(container)
         let followUpVisit = try #require(
@@ -153,15 +250,13 @@ struct AppStoreShowcaseFixtureTests {
         )
         _ = try VisitSaveUseCase.complete(
             draft: draft,
-            completedAt: max(Date.now, followUpVisit.startedAt),
+            completedAt: max(now, followUpVisit.startedAt),
             in: context
         )
 
         let assistant = NextAppointmentAssistantModel(
             visitID: followUpVisit.persistentModelID
         )
-        let calendar = Calendar.autoupdatingCurrent
-        let now = Date.now
         let endOfToday = calendar.date(
             byAdding: .second,
             value: -1,
@@ -182,5 +277,14 @@ struct AppStoreShowcaseFixtureTests {
         #expect(options.first { $0.horseName == "Beacon" }?.isSelected == true)
         #expect(options.first { $0.horseName == "Clover" }?.outcome == .notServiced)
         #expect(options.first { $0.horseName == "Clover" }?.isSelected == false)
+    }
+
+    private func fixtureClock() throws -> (Date, Calendar) {
+        let referenceDate = try #require(
+            ISO8601DateFormatter().date(from: "2026-09-06T13:41:00Z")
+        )
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: "America/New_York"))
+        return (referenceDate, calendar)
     }
 }

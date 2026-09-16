@@ -5,6 +5,7 @@ struct TodayView: View {
     @Environment(OnboardingExperienceModel.self) private var onboarding
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
+    @Environment(\.appClock) private var appClock
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var path = NavigationPath()
@@ -131,7 +132,7 @@ struct TodayView: View {
                 Text(model.businessName)
                     .font(.headline)
                 Text(
-                    Date.now,
+                    appClock.now(),
                     format: .dateTime.weekday(.wide).month(.abbreviated).day()
                 )
                 .font(.subheadline)
@@ -281,7 +282,7 @@ struct TodayView: View {
     }
 
     private func reload() {
-        model.load(in: context, now: .now, calendar: .autoupdatingCurrent)
+        model.load(in: context, now: appClock.now(), calendar: .autoupdatingCurrent)
     }
 
     private func handleSheetDismissal() {

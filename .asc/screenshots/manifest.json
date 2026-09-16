@@ -1,0 +1,119 @@
+{
+  "version": 1,
+  "reference_date": "2026-09-06T13:41:00Z",
+  "locale": "en_US",
+  "time_zone": "America/New_York",
+  "screenshots": [
+    {
+      "id": "01-today-run-sheet",
+      "stage": "active",
+      "headline": "Your whole workday. One run sheet.",
+      "supporting_line": "Barns. Horses. Next stops.",
+      "actions": [
+        { "action": "wait_for", "id": "today-run-sheet-active" }
+      ]
+    },
+    {
+      "id": "02-multi-horse-visit",
+      "stage": "active",
+      "headline": "Work the whole barn.",
+      "supporting_line": "Every horse in one visit.",
+      "actions": [
+        { "action": "wait_for", "id": "today-run-sheet-active" },
+        { "action": "tap", "id": "today-run-sheet-active" },
+        { "action": "wait_for", "id": "visit-actions-menu" }
+      ]
+    },
+    {
+      "id": "03-work-to-invoice",
+      "stage": "completed",
+      "headline": "From work to invoice.",
+      "supporting_line": "Services and prices carry through.",
+      "actions": [
+        { "action": "tap", "label": "Clients" },
+        { "action": "wait_for", "id": "client-row-Jordan Ellis" },
+        { "action": "tap", "id": "client-row-Jordan Ellis" },
+        { "action": "wait_for", "id": "client-invoice-0148" },
+        { "action": "tap", "id": "client-invoice-0148" },
+        { "action": "wait_for", "id": "invoice-detail-0148" }
+      ]
+    },
+    {
+      "id": "04-horse-history",
+      "stage": "completed",
+      "headline": "Every horse. Every visit.",
+      "supporting_line": "History stays connected.",
+      "actions": [
+        { "action": "tap", "label": "Clients" },
+        { "action": "wait_for", "id": "client-row-Jordan Ellis" },
+        { "action": "tap", "id": "client-row-Jordan Ellis" },
+        { "action": "wait_for", "id": "horse-row-Atlas" },
+        { "action": "tap", "id": "horse-row-Atlas" },
+        {
+          "action": "swipe",
+          "start_x": 220,
+          "start_y": 760,
+          "end_x": 220,
+          "end_y": 550,
+          "duration": 0.45
+        },
+        { "action": "wait_for", "id": "horse-history-visit-Atlas" }
+      ]
+    },
+    {
+      "id": "05-hoof-photos",
+      "stage": "completed",
+      "headline": "Document every hoof.",
+      "supporting_line": "Photos stay with each visit.",
+      "blocked": "Approved original synthetic hoof-photo source assets are required."
+    },
+    {
+      "id": "06-visit-documentation",
+      "stage": "active",
+      "headline": "Record it as you go.",
+      "supporting_line": "Services, notes and photos in the visit.",
+      "actions": [
+        { "action": "wait_for", "id": "today-run-sheet-active" },
+        { "action": "tap", "id": "today-run-sheet-active" },
+        { "action": "wait_for", "id": "visit-actions-menu" },
+        {
+          "action": "swipe",
+          "start_x": 220,
+          "start_y": 760,
+          "end_x": 220,
+          "end_y": 280,
+          "duration": 0.45
+        }
+      ]
+    },
+    {
+      "id": "07-next-appointment",
+      "stage": "completed",
+      "headline": "Keep the next visit moving.",
+      "supporting_line": "Schedule follow-up from completed work.",
+      "actions": [
+        { "action": "tap", "label": "Clients" },
+        { "action": "wait_for", "id": "client-row-Jordan Ellis" },
+        { "action": "tap", "id": "client-row-Jordan Ellis" },
+        { "action": "wait_for", "id": "horse-row-Atlas" },
+        { "action": "tap", "id": "horse-row-Atlas" },
+        {
+          "action": "swipe",
+          "start_x": 220,
+          "start_y": 760,
+          "end_x": 220,
+          "end_y": 550,
+          "duration": 0.45
+        },
+        { "action": "wait_for", "id": "horse-history-visit-Atlas" },
+        { "action": "tap", "x": 220, "y": 250 },
+        { "action": "swipe", "start_x": 220, "start_y": 800, "end_x": 220, "end_y": 200, "duration": 0.35 },
+        { "action": "swipe", "start_x": 220, "start_y": 800, "end_x": 220, "end_y": 200, "duration": 0.35 },
+        { "action": "swipe", "start_x": 220, "start_y": 800, "end_x": 220, "end_y": 200, "duration": 0.35 },
+        { "action": "wait_for", "id": "schedule-next-appointment" },
+        { "action": "tap", "id": "schedule-next-appointment" },
+        { "action": "wait_for", "id": "next-appointment-continue" }
+      ]
+    }
+  ]
+}

@@ -2,6 +2,7 @@ import SwiftData
 import SwiftUI
 
 struct NextAppointmentAssistantView: View {
+    @Environment(\.appClock) private var appClock
     @Environment(\.calendar) private var calendar
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
@@ -206,7 +207,7 @@ struct NextAppointmentAssistantView: View {
     }
 
     private func load() {
-        let projectionNow = Date.now
+        let projectionNow = appClock.now()
         model.load(
             in: context,
             now: projectionNow,
