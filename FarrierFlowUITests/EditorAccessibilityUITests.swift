@@ -64,8 +64,10 @@ final class EditorAccessibilityUITests: XCTestCase {
             ].waitForExistence(timeout: 3)
         )
         let horseName = app.textFields["horse-name-field"]
+        let addHorse = app.buttons["appointment-add-horse"]
+        revealAddHorse(addHorse, in: app)
         guard tapUntilDestinationAppears(
-            app.buttons["appointment-add-horse"],
+            addHorse,
             destination: horseName
         ) else { return }
         guard tapUntilDestinationAppears(
@@ -73,9 +75,10 @@ final class EditorAccessibilityUITests: XCTestCase {
             destination: app.textViews["Additional Notes"]
         ) else { return }
         XCTAssertTrue(horseName.waitForExistence(timeout: 3))
-        guard focusAndType("Appointment Horse", in: horseName) else { return }
         app.buttons["horse-client-picker"].tap()
         app.buttons["Accessible Client"].tap()
+        XCTAssertTrue(app.buttons["horse-client-picker"].label.contains("Accessible Client"))
+        guard focusAndType("Appointment Horse", in: horseName) else { return }
         app.navigationBars["New Horse"].buttons["Save"].tap()
         let selectedHorse = app.buttons["appointment-horse-Appointment Horse"]
         XCTAssertTrue(selectedHorse.waitForExistence(timeout: 3))
@@ -88,15 +91,17 @@ final class EditorAccessibilityUITests: XCTestCase {
             return
         }
         let secondHorseName = app.textFields["horse-name-field"]
+        revealAddHorse(addAnotherHorse, in: app)
         guard tapUntilDestinationAppears(
             addAnotherHorse,
             destination: secondHorseName
         ) else { return }
+        app.buttons["horse-client-picker"].tap()
+        app.buttons["Accessible Client"].tap()
+        XCTAssertTrue(app.buttons["horse-client-picker"].label.contains("Accessible Client"))
         guard focusAndType("Second Appointment Horse", in: secondHorseName) else {
             return
         }
-        app.buttons["horse-client-picker"].tap()
-        app.buttons["Accessible Client"].tap()
         app.navigationBars["New Horse"].buttons["Save"].tap()
 
         let secondSelectedHorse = app.buttons[
@@ -106,6 +111,18 @@ final class EditorAccessibilityUITests: XCTestCase {
         XCTAssertEqual(selectedHorse.value as? String, "Selected")
         XCTAssertEqual(secondSelectedHorse.value as? String, "Selected")
         XCTAssertEqual(appointmentNotes.value as? String, "Keep this draft")
+    }
+
+    @MainActor
+    private func revealAddHorse(_ button: XCUIElement, in app: XCUIApplication) {
+        guard !button.isHittable else { return }
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.6))
+            .press(
+                forDuration: 0.05,
+                thenDragTo: app.coordinate(
+                    withNormalizedOffset: CGVector(dx: 0.95, dy: 0.2)
+                )
+            )
     }
 
     @MainActor
