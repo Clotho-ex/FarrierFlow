@@ -6,6 +6,7 @@ readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly REPOSITORY_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 readonly MANIFEST="$REPOSITORY_ROOT/.asc/screenshots/manifest.json"
 readonly KOUBOU_CONFIG_DIR="$REPOSITORY_ROOT/.asc/screenshots/koubou"
+readonly SHOWCASE_PHOTO_DIR="$REPOSITORY_ROOT/.asc/screenshots/fixtures/hoof-photos"
 readonly OUTPUT_ROOT="$REPOSITORY_ROOT/output/screenshots"
 readonly DERIVED_DATA="$OUTPUT_ROOT/DerivedData"
 readonly RAW_DIR="$OUTPUT_ROOT/raw"
@@ -31,10 +32,8 @@ usage() {
     printf '%s\n' \
         "Usage: scripts/local-screenshots.sh <doctor|build|capture|compose|review|all> [screenshot-id]" \
         "" \
-        "Ready screenshot IDs are 01, 02, 03, 04, 06, and 07 as listed in:" \
-        "  .asc/screenshots/manifest.json" \
-        "" \
-        "Screenshot 05-hoof-photos is blocked until approved original assets exist."
+        "Ready screenshot IDs are 01 through 07 as listed in:" \
+        "  .asc/screenshots/manifest.json"
 }
 
 fail() {
@@ -69,6 +68,7 @@ doctor() {
     require_command jq "Install jq with Homebrew."
     require_command open "open is included with macOS."
     require_command sips "sips is included with macOS."
+    require_command shasum "shasum is included with macOS."
 
     [[ -x "$KOUBOU_BIN/kou" ]] || fail \
         "Koubou was not found at '$KOUBOU_BIN/kou'. Set FARRIERFLOW_KOUBOU_BIN or create the documented isolated 0.18.1 environment."
@@ -91,8 +91,8 @@ doctor() {
     jq -e '
         .version == 1
         and .reference_date == "2026-09-06T13:41:00Z"
-        and ([.screenshots[] | select(.blocked == null)] | length == 6)
-        and ([.screenshots[] | select(.id == "05-hoof-photos" and .blocked != null)] | length == 1)
+        and ([.screenshots[] | select(.blocked == null)] | length == 7)
+        and ([.screenshots[] | select(.id == "05-hoof-photos" and .blocked == null)] | length == 1)
         and (([.screenshots[].id] | length) == ([.screenshots[].id] | unique | length))
     ' "$MANIFEST" >/dev/null || fail "Screenshot manifest validation failed."
 
@@ -100,6 +100,14 @@ doctor() {
         [[ -f "$KOUBOU_CONFIG_DIR/$screenshot_id.yml" ]] || fail \
             "Missing Koubou config for $screenshot_id."
     done < <(jq -r '.screenshots[] | select(.blocked == null) | .id' "$MANIFEST")
+
+    local photo_index
+    for photo_index in {1..6}; do
+        [[ -f "$SHOWCASE_PHOTO_DIR/Hoof-Image-$photo_index.jpeg" ]] || fail \
+            "Missing approved showcase photo Hoof-Image-$photo_index.jpeg."
+    done
+    (cd "$SHOWCASE_PHOTO_DIR" && shasum -a 256 -c SHA256SUMS >/dev/null) || fail \
+        "Approved showcase photo checksums do not match the published source assets."
 
     axe list-simulators >/dev/null
     xcrun simctl list runtimes available >/dev/null
@@ -132,7 +140,6 @@ resolve_screenshot_ids() {
         while IFS= read -r screenshot_id; do
             SCREENSHOT_IDS+=("$screenshot_id")
         done < <(jq -r '.screenshots[] | select(.blocked == null) | .id' "$MANIFEST")
-        note "05-hoof-photos is blocked: approved original synthetic source assets are required"
         return
     fi
 
@@ -252,7 +259,7 @@ perform_actions() {
 }
 
 capture_one() {
-    local screenshot_id="$1" stage plan output
+    local screenshot_id="$1" stage plan output data_container photo_staging photo_index
     stage="$(jq -r --arg id "$screenshot_id" \
         '.screenshots[] | select(.id == $id) | .stage' "$MANIFEST")"
     plan="$TEMP_DIR/$screenshot_id-plan.json"
@@ -260,6 +267,13 @@ capture_one() {
 
     xcrun simctl terminate "$SCREENSHOT_UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
     xcrun simctl install "$SCREENSHOT_UDID" "$APP_PATH"
+
+    data_container="$(xcrun simctl get_app_container "$SCREENSHOT_UDID" "$BUNDLE_ID" data)"
+    photo_staging="$data_container/Library/Application Support/UITests/ShowcaseHoofPhotos"
+    mkdir -p "$photo_staging"
+    for photo_index in {1..6}; do
+        cp "$SHOWCASE_PHOTO_DIR/Hoof-Image-$photo_index.jpeg" "$photo_staging/"
+    done
 
     note "launching $screenshot_id with isolated '$stage' fixture"
     SIMCTL_CHILD_FARRIERFLOW_SCREENSHOT_MODE=1 \

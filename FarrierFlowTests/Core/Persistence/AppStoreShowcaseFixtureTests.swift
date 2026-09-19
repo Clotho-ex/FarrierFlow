@@ -1,6 +1,7 @@
 import Foundation
 import SwiftData
 import Testing
+import UIKit
 @testable import FarrierFlow
 
 @Suite("App Store showcase fixture", .serialized)
@@ -17,6 +18,7 @@ struct AppStoreShowcaseFixtureTests {
             path: PhotographConstants.rootDirectoryName,
             directoryHint: .isDirectory
         )
+        let sourceURL = try makePhotoSources(in: directory)
 
         try autoreleasepool {
             let container = try ModelContainerFactory.persistentStoreTest(at: storeURL)
@@ -24,6 +26,7 @@ struct AppStoreShowcaseFixtureTests {
                 .appStoreShowcase,
                 in: container,
                 photographRootURL: photographRootURL,
+                showcasePhotoSourceURL: sourceURL,
                 now: referenceDate,
                 calendar: calendar,
                 screenshotStage: .active
@@ -32,12 +35,19 @@ struct AppStoreShowcaseFixtureTests {
                 .appStoreShowcase,
                 in: container,
                 photographRootURL: photographRootURL,
+                showcasePhotoSourceURL: sourceURL,
                 now: referenceDate,
                 calendar: calendar,
                 screenshotStage: .active
             )
 
-            try verifyShowcase(in: container, now: referenceDate, calendar: calendar)
+            try verifyShowcase(
+                in: container,
+                now: referenceDate,
+                calendar: calendar,
+                photographRootURL: photographRootURL,
+                sourceURL: sourceURL
+            )
         }
 
         try autoreleasepool {
@@ -46,12 +56,19 @@ struct AppStoreShowcaseFixtureTests {
                 .appStoreShowcase,
                 in: container,
                 photographRootURL: photographRootURL,
+                showcasePhotoSourceURL: sourceURL,
                 now: referenceDate,
                 calendar: calendar,
                 screenshotStage: .active
             )
 
-            try verifyShowcase(in: container, now: referenceDate, calendar: calendar)
+            try verifyShowcase(
+                in: container,
+                now: referenceDate,
+                calendar: calendar,
+                photographRootURL: photographRootURL,
+                sourceURL: sourceURL
+            )
             try verifyNextAppointmentAfterCompletingActiveVisit(
                 in: container,
                 now: referenceDate,
@@ -72,6 +89,7 @@ struct AppStoreShowcaseFixtureTests {
             path: PhotographConstants.rootDirectoryName,
             directoryHint: .isDirectory
         )
+        let sourceURL = try makePhotoSources(in: directory)
 
         try autoreleasepool {
             let container = try ModelContainerFactory.persistentStoreTest(at: storeURL)
@@ -80,6 +98,7 @@ struct AppStoreShowcaseFixtureTests {
                     .appStoreShowcase,
                     in: container,
                     photographRootURL: photographRootURL,
+                    showcasePhotoSourceURL: sourceURL,
                     now: referenceDate,
                     calendar: calendar,
                     screenshotStage: .completed
@@ -91,6 +110,7 @@ struct AppStoreShowcaseFixtureTests {
             #expect(try context.fetchCount(FetchDescriptor<Appointment>()) == 8)
             #expect(try context.fetchCount(FetchDescriptor<Visit>()) == 6)
             #expect(try context.fetchCount(FetchDescriptor<Invoice>()) == 1)
+            #expect(try context.fetchCount(FetchDescriptor<Photograph>()) == 6)
             #expect(
                 try context.fetch(FetchDescriptor<Visit>())
                     .allSatisfy { $0.completedAt != nil }
@@ -111,6 +131,26 @@ struct AppStoreShowcaseFixtureTests {
                 )
             )
             #expect(invoiceModel.detail?.visits.first?.visitDate == expectedVisitStart)
+
+            let atlas = try #require(
+                context.fetch(FetchDescriptor<Horse>()).first { $0.name == "Atlas" }
+            )
+            let horseModel = HorseDetailModel()
+            horseModel.load(
+                id: atlas.persistentModelID,
+                in: context,
+                locale: Locale(identifier: "en_US")
+            )
+            let expectedHistoryDates = try [0, 4, 8, 12, 16, 20].map { weeksAgo in
+                try #require(
+                    calendar.date(
+                        byAdding: .weekOfYear,
+                        value: -weeksAgo,
+                        to: expectedVisitStart
+                    )
+                )
+            }
+            #expect(horseModel.history.map(\.startedAt) == expectedHistoryDates)
 
             let willowVisit = try #require(
                 context.fetch(FetchDescriptor<Visit>()).first {
@@ -141,6 +181,7 @@ struct AppStoreShowcaseFixtureTests {
                 .appStoreShowcase,
                 in: container,
                 photographRootURL: photographRootURL,
+                showcasePhotoSourceURL: sourceURL,
                 now: referenceDate,
                 calendar: calendar,
                 screenshotStage: .completed
@@ -148,6 +189,7 @@ struct AppStoreShowcaseFixtureTests {
             let context = ModelContext(container)
             #expect(try context.fetchCount(FetchDescriptor<Visit>()) == 6)
             #expect(try context.fetchCount(FetchDescriptor<Invoice>()) == 1)
+            #expect(try context.fetchCount(FetchDescriptor<Photograph>()) == 6)
             try DomainGraphValidator.validateAll(in: context)
         }
     }
@@ -155,7 +197,9 @@ struct AppStoreShowcaseFixtureTests {
     private func verifyShowcase(
         in container: ModelContainer,
         now: Date,
-        calendar: Calendar
+        calendar: Calendar,
+        photographRootURL: URL,
+        sourceURL: URL
     ) throws {
         let context = ModelContext(container)
         try DomainGraphValidator.validateAll(in: context)
@@ -168,7 +212,7 @@ struct AppStoreShowcaseFixtureTests {
         #expect(try context.fetchCount(FetchDescriptor<Appointment>()) == 8)
         #expect(try context.fetchCount(FetchDescriptor<Visit>()) == 6)
         #expect(try context.fetchCount(FetchDescriptor<Invoice>()) == 1)
-        #expect(try context.fetchCount(FetchDescriptor<Photograph>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<Photograph>()) == 6)
 
         let profile = try #require(context.fetch(FetchDescriptor<BusinessProfile>()).first)
         #expect(profile.name == "Northline Farrier Service")
@@ -197,6 +241,30 @@ struct AppStoreShowcaseFixtureTests {
             visitID: activeVisit.id,
             in: context
         )
+        let activeVisitRecord = try #require(
+            try context.existingModel(Visit.self, for: activeVisit.id)
+        )
+        let atlasVisitHorse = try #require(
+            activeVisitRecord.visitHorses.first { $0.horse?.name == "Atlas" }
+        )
+        #expect(atlasVisitHorse.photographs.count == 6)
+        #expect(
+            activeVisitRecord.visitHorses
+                .filter { $0.horse?.name != "Atlas" }
+                .allSatisfy { $0.photographs.isEmpty }
+        )
+        let fileStore = PhotographFileStore(rootURL: photographRootURL)
+        for index in 1...6 {
+            let photograph = try #require(
+                atlasVisitHorse.photographs.first {
+                    $0.id == showcasePhotographID(index: index)
+                }
+            )
+            #expect(photograph.createdAt == activeVisitRecord.startedAt)
+            let canonicalData = try Data(contentsOf: fileStore.canonicalURL(for: photograph.id))
+            let sourceData = try Data(contentsOf: sourceURL.appending(path: "Hoof-Image-\(index).jpeg"))
+            #expect(canonicalData == sourceData)
+        }
         #expect(VisitRules.completionViolation(in: activeDraft) == nil)
         #expect(activeDraft.horses.first { $0.horseName == "Atlas" }?.outcome == .serviced)
         #expect(
@@ -286,5 +354,23 @@ struct AppStoreShowcaseFixtureTests {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try #require(TimeZone(identifier: "America/New_York"))
         return (referenceDate, calendar)
+    }
+
+    private func makePhotoSources(in directory: URL) throws -> URL {
+        let sourceURL = directory.appending(path: "ShowcaseHoofPhotos", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: sourceURL, withIntermediateDirectories: true)
+        for index in 1...6 {
+            let image = UIGraphicsImageRenderer(size: CGSize(width: 64, height: 64)).image {
+                $0.cgContext.setFillColor(UIColor(white: CGFloat(index) / 7, alpha: 1).cgColor)
+                $0.cgContext.fill(CGRect(x: 0, y: 0, width: 64, height: 64))
+            }
+            let data = try #require(image.jpegData(compressionQuality: 0.8))
+            try data.write(to: sourceURL.appending(path: "Hoof-Image-\(index).jpeg"))
+        }
+        return sourceURL
+    }
+
+    private func showcasePhotographID(index: Int) -> UUID? {
+        UUID(uuidString: String(format: "00000000-0000-4000-8000-%012d", index))
     }
 }

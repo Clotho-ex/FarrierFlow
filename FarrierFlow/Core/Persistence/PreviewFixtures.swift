@@ -177,6 +177,7 @@ enum UITestFixtures {
         _ scenario: UITestScenario,
         in container: ModelContainer,
         photographRootURL: URL,
+        showcasePhotoSourceURL: URL? = nil,
         now: Date = .now,
         calendar: Calendar = .autoupdatingCurrent,
         screenshotStage: ScreenshotFixtureStage? = nil
@@ -185,6 +186,8 @@ enum UITestFixtures {
         case .appStoreShowcase:
             try seedAppStoreShowcase(
                 in: container,
+                photographRootURL: photographRootURL,
+                photographSourceURL: showcasePhotoSourceURL,
                 now: now,
                 calendar: calendar,
                 stage: screenshotStage ?? .active

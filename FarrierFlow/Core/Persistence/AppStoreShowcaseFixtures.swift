@@ -1,10 +1,20 @@
 #if DEBUG
 import Foundation
+import ImageIO
 import SwiftData
 
 extension UITestFixtures {
     private enum AppStoreShowcaseSeedError: Error {
         case unexpectedStoreContents
+        case invalidPhotographSource
+        case photographCleanupFailed
+    }
+
+    private struct ShowcasePhotographSource {
+        let id: UUID
+        let data: Data
+        let pixelWidth: Int
+        let pixelHeight: Int
     }
 
     private struct ShowcaseWork {
@@ -21,13 +31,17 @@ extension UITestFixtures {
     }
 
     private static let showcaseBusinessName = "Northline Farrier Service"
+    private static let showcaseTodayAppointmentNotes = "Work from the main stable aisle; Atlas first."
 
     static func seedAppStoreShowcase(
         in container: ModelContainer,
+        photographRootURL: URL,
+        photographSourceURL: URL?,
         now: Date = .now,
         calendar: Calendar = .autoupdatingCurrent,
         stage: ScreenshotFixtureStage = .active
     ) throws {
+        let photographSources = try photographSourceURL.map(loadShowcasePhotographSources)
         let context = container.mainContext
         let profiles = try context.fetch(FetchDescriptor<BusinessProfile>())
         if profiles.contains(where: { $0.name == showcaseBusinessName }) {
@@ -46,6 +60,19 @@ extension UITestFixtures {
                 calendar: calendar,
                 stage: stage
             )
+            if let photographSources {
+                guard let currentVisit = visits.first(where: {
+                    $0.appointment?.notes == showcaseTodayAppointmentNotes
+                }) else {
+                    throw AppStoreShowcaseSeedError.unexpectedStoreContents
+                }
+                try seedShowcasePhotographs(
+                    on: currentVisit.persistentModelID,
+                    sources: photographSources,
+                    rootURL: photographRootURL,
+                    in: container
+                )
+            }
             try DomainGraphValidator.validateAll(in: ModelContext(container))
             return
         }
@@ -174,7 +201,7 @@ extension UITestFixtures {
         let today = showcaseTodayTimes(now: now, calendar: calendar)
         let willowToday = makeShowcaseAppointment(
             startDate: today.morning,
-            notes: "Work from the main stable aisle; Atlas first.",
+            notes: showcaseTodayAppointmentNotes,
             expectedDurationMinutes: 120,
             barn: willow,
             horses: [atlas, beacon, clover],
@@ -257,9 +284,10 @@ extension UITestFixtures {
         }
 
         let invoiceVisitID: PersistentIdentifier
+        let currentVisitID: PersistentIdentifier
         switch stage {
         case .active:
-            _ = try saveActiveShowcaseVisit(
+            currentVisitID = try saveActiveShowcaseVisit(
                 appointmentID: willowToday.persistentModelID,
                 startedAt: today.morning,
                 workByHorseName: [atlas.name: fullSetWork, beacon.name: frontShoesWork],
@@ -271,6 +299,16 @@ extension UITestFixtures {
                 appointmentID: willowToday.persistentModelID,
                 startedAt: today.morning,
                 workByHorseName: [atlas.name: fullSetWork, beacon.name: frontShoesWork],
+                in: container
+            )
+            currentVisitID = invoiceVisitID
+        }
+
+        if let photographSources {
+            try seedShowcasePhotographs(
+                on: currentVisitID,
+                sources: photographSources,
+                rootURL: photographRootURL,
                 in: container
             )
         }
@@ -309,6 +347,7 @@ extension UITestFixtures {
         let times = showcaseTodayTimes(now: now, calendar: calendar)
         let appointments = try context.fetch(FetchDescriptor<Appointment>())
         guard let willow = appointments.first(where: {
+            let isTodayAppointment = $0.notes == showcaseTodayAppointmentNotes
             let hasExpectedHorses = Set($0.appointmentHorses.compactMap(\.horse?.name))
                 == Set(["Atlas", "Beacon", "Clover"])
             let hasExpectedVisitState = switch stage {
@@ -317,7 +356,7 @@ extension UITestFixtures {
             case .completed:
                 $0.visit?.completedAt != nil
             }
-            return hasExpectedHorses && hasExpectedVisitState
+            return isTodayAppointment && hasExpectedHorses && hasExpectedVisitState
         }),
         let oak = appointments.first(where: {
             $0.visit == nil
@@ -340,6 +379,109 @@ extension UITestFixtures {
         oak.startDate = times.midday
         cedar.startDate = times.afternoon
         try DomainGraphValidator.save(context)
+    }
+
+    private static func loadShowcasePhotographSources(
+        from directory: URL
+    ) throws -> [ShowcasePhotographSource] {
+        let directoryValues = try directory.resourceValues(
+            forKeys: [.isDirectoryKey, .isSymbolicLinkKey]
+        )
+        guard directoryValues.isDirectory == true,
+              directoryValues.isSymbolicLink != true else {
+            throw AppStoreShowcaseSeedError.invalidPhotographSource
+        }
+
+        return try (1...6).map { index in
+            let url = directory.appending(path: "Hoof-Image-\(index).jpeg")
+            let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+            guard values.isRegularFile == true,
+                  values.isSymbolicLink != true else {
+                throw AppStoreShowcaseSeedError.invalidPhotographSource
+            }
+            let data = try Data(contentsOf: url)
+            guard let imageSource = CGImageSourceCreateWithData(data as CFData, nil),
+                  CGImageSourceGetCount(imageSource) == 1,
+                  let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil)
+                    as? [CFString: Any],
+                  let width = properties[kCGImagePropertyPixelWidth] as? Int,
+                  let height = properties[kCGImagePropertyPixelHeight] as? Int,
+                  width > 0, height > 0,
+                  max(width, height) <= PhotographConstants.maximumLongestEdge else {
+                throw AppStoreShowcaseSeedError.invalidPhotographSource
+            }
+            return ShowcasePhotographSource(
+                id: UUID(uuid: (
+                    0, 0, 0, 0, 0, 0, 0x40, 0, 0x80, 0, 0, 0, 0, 0, 0, UInt8(index)
+                )),
+                data: data,
+                pixelWidth: width,
+                pixelHeight: height
+            )
+        }
+    }
+
+    private static func seedShowcasePhotographs(
+        on visitID: PersistentIdentifier,
+        sources: [ShowcasePhotographSource],
+        rootURL: URL,
+        in container: ModelContainer
+    ) throws {
+        let context = ModelContext(container)
+        guard let visit = try context.existingModel(Visit.self, for: visitID),
+              let atlas = visit.visitHorses.first(where: { $0.horse?.name == "Atlas" }) else {
+            throw AppStoreShowcaseSeedError.unexpectedStoreContents
+        }
+        let fileStore = PhotographFileStore(rootURL: rootURL)
+        try fileStore.prepareDirectories()
+
+        if !atlas.photographs.isEmpty {
+            guard atlas.photographs.count == sources.count,
+                  Set(atlas.photographs.map(\.id)) == Set(sources.map(\.id)) else {
+                throw AppStoreShowcaseSeedError.unexpectedStoreContents
+            }
+            for source in sources {
+                guard try Data(contentsOf: fileStore.canonicalURL(for: source.id))
+                    == source.data else {
+                    throw AppStoreShowcaseSeedError.unexpectedStoreContents
+                }
+            }
+            return
+        }
+
+        var writtenURLs: [URL] = []
+        do {
+            for source in sources {
+                let url = fileStore.canonicalURL(for: source.id)
+                guard !FileManager.default.fileExists(atPath: url.path) else {
+                    throw AppStoreShowcaseSeedError.unexpectedStoreContents
+                }
+                try source.data.write(to: url, options: .atomic)
+                writtenURLs.append(url)
+                try fileStore.applyCompleteProtection(to: url)
+                let photograph = Photograph(
+                    id: source.id,
+                    createdAt: visit.startedAt,
+                    pixelWidth: source.pixelWidth,
+                    pixelHeight: source.pixelHeight,
+                    byteCount: Int64(source.data.count),
+                    visitHorse: atlas
+                )
+                context.insert(photograph)
+                atlas.photographs.append(photograph)
+            }
+            try DomainGraphValidator.save(context)
+        } catch {
+            context.rollback()
+            for url in writtenURLs {
+                do {
+                    try fileStore.removeManagedFile(at: url)
+                } catch {
+                    throw AppStoreShowcaseSeedError.photographCleanupFailed
+                }
+            }
+            throw error
+        }
     }
 
     private static func saveActiveShowcaseVisit(

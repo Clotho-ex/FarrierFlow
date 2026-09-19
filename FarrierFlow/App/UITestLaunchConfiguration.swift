@@ -136,6 +136,12 @@ struct UITestLaunchConfiguration {
                         path: PhotographConstants.rootDirectoryName,
                         directoryHint: .isDirectory
                     ),
+                showcasePhotoSourceURL: isScreenshotMode
+                    ? storeURL.deletingLastPathComponent().appending(
+                        path: "ShowcaseHoofPhotos",
+                        directoryHint: .isDirectory
+                    )
+                    : nil,
                 now: referenceDate ?? .now,
                 screenshotStage: screenshotStage
             )

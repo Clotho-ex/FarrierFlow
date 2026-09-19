@@ -1,0 +1,72 @@
+project:
+  name: "FarrierFlow Remaining Screenshot Proofs"
+  output_dir: "../../output/screenshots/creative-batch/staging"
+  device: "iPhone 17 Pro Max - Deep Blue - Portrait"
+  output_size: "iPhone6_9"
+  parallel_workers: 2
+
+screenshots:
+  02-multi-horse-visit:
+    template: "creative/batch-slide.html"
+    frame: true
+    variables:
+      variant: "multi"
+      headline_line_one: "Work the whole barn."
+      headline_line_two: ""
+      supporting_line_one: "Every horse in one visit."
+      supporting_line_two: ""
+      screen_description: "A single Willow Creek visit with Atlas and Beacon work entries"
+    assets:
+      screen: "../../output/screenshots/raw/02-multi-horse-visit.png"
+
+  04-horse-history:
+    template: "creative/batch-slide.html"
+    frame: true
+    variables:
+      variant: "history"
+      headline_line_one: "Every horse. Every visit."
+      headline_line_two: ""
+      supporting_line_one: "History stays connected."
+      supporting_line_two: ""
+      screen_description: "Atlas horse history showing connected completed visits"
+    assets:
+      screen: "../../output/screenshots/raw/04-horse-history.png"
+
+  05-hoof-photos:
+    template: "creative/batch-slide.html"
+    frame: true
+    variables:
+      variant: "photos"
+      headline_line_one: "Document every hoof."
+      headline_line_two: ""
+      supporting_line_one: "Photos stay with each visit."
+      supporting_line_two: ""
+      screen_description: "Atlas's six hoof photographs in the Sep 6 Willow Creek visit"
+    assets:
+      screen: "../../output/screenshots/raw/05-hoof-photos.png"
+
+  06-visit-documentation:
+    template: "creative/batch-slide.html"
+    frame: true
+    variables:
+      variant: "documentation"
+      headline_line_one: "Record it as you go."
+      headline_line_two: ""
+      supporting_line_one: "Services, notes and"
+      supporting_line_two: "photos in the visit."
+      screen_description: "Atlas work entry with notes, services, and six hoof photographs"
+    assets:
+      screen: "../../output/screenshots/raw/06-visit-documentation.png"
+
+  07-next-appointment:
+    template: "creative/batch-slide.html"
+    frame: true
+    variables:
+      variant: "followup"
+      headline_line_one: "Keep the next"
+      headline_line_two: "visit moving."
+      supporting_line_one: "Schedule follow-up"
+      supporting_line_two: "from completed work."
+      screen_description: "Next Appointment assistant with proposed follow-up for Atlas and Beacon"
+    assets:
+      screen: "../../output/screenshots/raw/07-next-appointment.png"

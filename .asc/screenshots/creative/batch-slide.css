@@ -1,0 +1,59 @@
+.batch-copy {
+  top: 126px;
+}
+
+.batch-copy h1 {
+  font-size: 104px;
+}
+
+.batch-copy h1 span,
+.batch-copy p span {
+  display: block;
+  white-space: nowrap;
+}
+
+.batch-copy :is(h1, p) span:empty {
+  display: none;
+}
+
+.batch-copy p {
+  margin-top: 42px;
+  font-size: 79px;
+}
+
+.batch-device {
+  top: 650px;
+  left: 130px;
+  width: 1060px;
+}
+
+.canvas--history .batch-copy h1 {
+  font-size: 98px;
+}
+
+.canvas--documentation {
+  background:
+    radial-gradient(1120px 1120px at 0% 12%, rgba(117, 173, 151, 0.26), transparent 70%),
+    radial-gradient(1050px 1480px at 100% 100%, rgba(78, 153, 133, 0.45), transparent 68%),
+    linear-gradient(158deg, #eedaa9 0%, #e1ddbd 40%, #b8cdae 70%, #7aa99a 100%);
+}
+
+.canvas--documentation .batch-device {
+  top: 730px;
+  left: 152px;
+  width: 1016px;
+}
+
+.canvas--followup .batch-copy {
+  top: 104px;
+}
+
+.canvas--followup .batch-copy h1 {
+  font-size: 101px;
+}
+
+.canvas--followup .batch-device {
+  top: 724px;
+  left: 152px;
+  width: 1016px;
+}

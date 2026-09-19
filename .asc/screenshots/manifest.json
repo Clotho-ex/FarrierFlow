@@ -54,18 +54,24 @@
           "start_x": 220,
           "start_y": 760,
           "end_x": 220,
-          "end_y": 550,
-          "duration": 0.45
+          "end_y": 480,
+          "duration": 1.0
         },
         { "action": "wait_for", "id": "horse-history-visit-Atlas" }
       ]
     },
     {
       "id": "05-hoof-photos",
-      "stage": "completed",
+      "stage": "active",
       "headline": "Document every hoof.",
       "supporting_line": "Photos stay with each visit.",
-      "blocked": "Approved original synthetic hoof-photo source assets are required."
+      "actions": [
+        { "action": "wait_for", "id": "today-run-sheet-active" },
+        { "action": "tap", "id": "today-run-sheet-active" },
+        { "action": "wait_for", "id": "visit-photographs-Atlas" },
+        { "action": "tap", "id": "visit-photographs-Atlas" },
+        { "action": "wait_for", "label": "Photo 6 of 6" }
+      ]
     },
     {
       "id": "06-visit-documentation",
@@ -75,15 +81,7 @@
       "actions": [
         { "action": "wait_for", "id": "today-run-sheet-active" },
         { "action": "tap", "id": "today-run-sheet-active" },
-        { "action": "wait_for", "id": "visit-actions-menu" },
-        {
-          "action": "swipe",
-          "start_x": 220,
-          "start_y": 760,
-          "end_x": 220,
-          "end_y": 280,
-          "duration": 0.45
-        }
+        { "action": "wait_for", "id": "visit-actions-menu" }
       ]
     },
     {
