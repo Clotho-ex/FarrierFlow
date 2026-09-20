@@ -1,7 +1,7 @@
 # FarrierFlow App Store Metadata Draft
 
-**Status:** Local draft only. Do not publish or edit the live v1.0 App Store
-version while it is under review.
+**Status:** Local v1.0.1 draft only. Do not apply it to App Store Connect
+without separate release authorization. FarrierFlow v1.0 is publicly released.
 
 **Research date:** September 13, 2026 (United States storefront)
 
@@ -102,6 +102,10 @@ This sells FarrierFlow's key differentiation—one connected farrier workflow—
 outcome-led, current-product language. Promotional text does not affect search
 ranking, so do not turn it into another keyword field.
 
+## What's New in Version 1.0.1
+
+> FarrierFlow 1.0.1 includes behind-the-scenes refinements. Keep appointments, visits, hoof photos, invoices, and follow-ups connected in one field workflow.
+
 ## Description structure
 
 Use this order for the eventual v1.0.1 description. The current v1.0
@@ -151,14 +155,18 @@ periods, and any introductory trial.
 
 ### 6. Required links
 
-End with the Apple Standard EULA and the production Privacy Policy URL after
-the v1.0.1 policy is deployed and verified.
+End with the Apple Standard EULA URL and the existing canonical production
+Privacy Policy URL. Verify that the v1.0.1 policy is deployed there before
+applying this draft remotely.
+
+**Support URL (App Store Connect field):** `https://farrierflow.vercel.app/support/`
+— the existing production support page. Recheck it before applying this draft.
 
 ## Launch-ready description draft
 
-The following is recommended launch copy. The Privacy Policy URL remains an
-explicit placeholder until the v1.0.1 policy is deployed and its production URL
-is verified.
+The following is recommended launch copy. The Privacy Policy URL is the
+existing canonical production URL; its content remains the live v1.0 policy
+until a separately authorized v1.0.1 deployment.
 
 > **FarrierFlow keeps your whole farrier workday connected—from appointments and horse history to completed work, hoof photos, invoices, payments, and the next visit.**
 >
@@ -187,11 +195,11 @@ is verified.
 >
 > Subscriptions renew automatically unless canceled through your Apple Account settings. Any introductory trial, subscription period, and price shown during purchase are provided by the App Store.
 >
-> Terms of Use: Apple Standard EULA
-> Privacy Policy: [production privacy-policy URL]
+> Terms of Use: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+> Privacy Policy: https://farrierflow.vercel.app/privacy/
 
-Do not replace `[production privacy-policy URL]` with a guessed or unpublished
-URL.
+Do not apply this description until the v1.0.1 policy text at the canonical URL
+has been deployed and verified.
 
 ## Claims excluded from this draft
 
@@ -207,5 +215,4 @@ screenshots, deployed Privacy Policy, actual subscription products, localized
 metadata, final keyword byte count, current Apple policy, and any real Apple
 Ads or App Store search-term evidence available by then.
 
-No App Store Connect change is authorized by this document while v1.0 remains
-under review.
+This local draft does not authorize any App Store Connect metadata change.
