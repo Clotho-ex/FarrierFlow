@@ -60,9 +60,10 @@ final class HorseDetailModel {
             let service = horse.defaultService,
             TextNormalization.required(service.name) == service.name,
             service.defaultAmountMinorUnits >= 0,
-            service.currencyCode == "USD",
-            let formattedAmount = MoneyFormatter.usd(
+            BusinessCurrency.isSupported(service.currencyCode),
+            let formattedAmount = MoneyFormatter.currency(
                 minorUnits: service.defaultAmountMinorUnits,
+                currencyCode: service.currencyCode,
                 locale: locale
             )
         else {
@@ -132,7 +133,8 @@ final class HorseDetailModel {
                 outcomeRawValue: result.outcome.rawValue,
                 workNotes: result.workNotes,
                 workItemCount: result.outcome == .serviced ? result.workItems.count : nil,
-                subtotal: result.subtotal
+                subtotal: result.subtotal,
+                currencyCode: detail.currencyCode
             )
         }
         return try HorseHistoryRules.entries(from: records, locale: locale)

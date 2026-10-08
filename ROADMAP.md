@@ -441,9 +441,17 @@ contract is recorded in
 Maintain an active Service catalog, record priced WorkItems per serviced Horse,
 and preserve service and price snapshots in Visit history.
 
-Money uses integer minor units and explicit USD currency codes. A Horse may use
-one active default Service, and Visit completion requires recorded work for each
+Money uses integer minor units and one supported BusinessProfile currency. The
+current allowlist is USD, TRY, GBP, EUR, CAD, AUD, NZD, and ZAR. Currency flows
+through Service and WorkItem snapshots without conversion. A Horse may use one
+active default Service, and Visit completion requires recorded work for each
 serviced Horse.
+
+**International currency expansion:** Complete. New profiles derive a supported
+regional default and allow owner confirmation before monetary records exist;
+released V1 data migrates to unchanged USD semantics. Invoices, Payments, PDFs,
+and exports preserve and validate the same business currency. Storefront
+territory activation remains a separate App Store operation.
 
 ## Slice 5 — Invoicing
 

@@ -11,7 +11,8 @@ struct BusinessProfileRulesTests {
                 phone: "  555-0100  ",
                 email: "  alex@example.com\n",
                 address: "\n1 Main Street  ",
-                defaultInvoiceNote: "  Thank you for your business. \n"
+                defaultInvoiceNote: "  Thank you for your business. \n",
+                currencyCode: "GBP"
             )
         )
 
@@ -20,7 +21,8 @@ struct BusinessProfileRulesTests {
             phone: "555-0100",
             email: "alex@example.com",
             address: "1 Main Street",
-            defaultInvoiceNote: "Thank you for your business."
+            defaultInvoiceNote: "Thank you for your business.",
+            currencyCode: "GBP"
         ))
     }
 
@@ -89,6 +91,18 @@ struct BusinessProfileRulesTests {
                 BusinessProfileDraft(
                     name: "Carter Farrier Service",
                     defaultInvoiceDueDays: -1
+                )
+            )
+        }
+    }
+
+    @Test
+    func rejectsUnsupportedBusinessCurrency() {
+        #expect(throws: BusinessProfileRulesError.unsupportedCurrency) {
+            _ = try BusinessProfileRules.validated(
+                BusinessProfileDraft(
+                    name: "Carter Farrier Service",
+                    currencyCode: "JPY"
                 )
             )
         }

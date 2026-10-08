@@ -7,23 +7,39 @@ import Testing
 @MainActor
 struct ServiceRulesTests {
     @Test
-    func validatesANormalizedNameAndExactUSDPrice() throws {
+    func validatesANormalizedNameAndLocalizedGBPPrice() throws {
         let values = try ServiceRules.validated(
-            ServiceDraft(name: "  Front Shoes  ", priceInput: "$125.50")
+            ServiceDraft(
+                name: "  Front Shoes  ",
+                priceInput: "£125.50",
+                currencyCode: "GBP"
+            ),
+            locale: Locale(identifier: "en_GB")
         )
 
         #expect(values.name == "Front Shoes")
         #expect(values.defaultAmountMinorUnits == 12_550)
-        #expect(values.currencyCode == "USD")
+        #expect(values.currencyCode == "GBP")
     }
 
     @Test
     func rejectsMissingNameAndInvalidPrice() {
         #expect(throws: ServiceRulesError.nameRequired) {
-            _ = try ServiceRules.validated(ServiceDraft(name: " \n", priceInput: "12.00"))
+            _ = try ServiceRules.validated(
+                ServiceDraft(name: " \n", priceInput: "12.00"),
+                locale: Locale(identifier: "en_US")
+            )
         }
         #expect(throws: ServiceRulesError.invalidPrice) {
-            _ = try ServiceRules.validated(ServiceDraft(name: "Trim", priceInput: "12.005"))
+            _ = try ServiceRules.validated(
+                ServiceDraft(name: "Trim", priceInput: "12.005"),
+                locale: Locale(identifier: "en_US")
+            )
+        }
+        #expect(throws: ServiceRulesError.unsupportedCurrency) {
+            _ = try ServiceRules.validated(
+                ServiceDraft(name: "Trim", priceInput: "12.00", currencyCode: "JPY")
+            )
         }
     }
 

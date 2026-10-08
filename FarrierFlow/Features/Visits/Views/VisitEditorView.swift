@@ -374,8 +374,13 @@ struct VisitEditorView: View {
             .accessibilityIdentifier("visit-add-service-\(horse.horseName)")
         }
 
-        if let subtotal = try? WorkItemRules.subtotal(for: horse.workItems),
-           let formattedSubtotal = MoneyFormatter.usd(minorUnits: subtotal, locale: locale) {
+        if let currencyCode = horse.workItems.first?.currencyCode,
+           let subtotal = try? WorkItemRules.subtotal(for: horse.workItems),
+           let formattedSubtotal = MoneyFormatter.currency(
+               minorUnits: subtotal,
+               currencyCode: currencyCode,
+               locale: locale
+           ) {
             LabeledContent("Subtotal", value: formattedSubtotal)
                 .font(Typography.recordMetadata)
                 .monospacedDigit()
@@ -423,7 +428,11 @@ struct VisitEditorView: View {
     }
 
     private func formattedAmount(for workItem: WorkItemDraft) -> String {
-        MoneyFormatter.usd(minorUnits: workItem.amountMinorUnits, locale: locale)
+        MoneyFormatter.currency(
+            minorUnits: workItem.amountMinorUnits,
+            currencyCode: workItem.currencyCode,
+            locale: locale
+        )
             ?? String(localized: "Unavailable", locale: locale)
     }
 

@@ -39,7 +39,10 @@ struct InvoiceActionGraph {
     let visitID: PersistentIdentifier
     let workItemID: PersistentIdentifier
 
-    static func make(status: InvoiceStatus = .unpaid) throws -> Self {
+    static func make(
+        status: InvoiceStatus = .unpaid,
+        currencyCode: String = "USD"
+    ) throws -> Self {
         let container = try ModelContainerFactory.inMemoryTest()
         let context = container.mainContext
         let client = Client(name: "Alex Carter")
@@ -50,8 +53,16 @@ struct InvoiceActionGraph {
         context.insert(horse)
         client.horses.append(horse)
         barn.horses.append(horse)
-        let profile = ModelFixtures.makeBusinessProfile(nextInvoiceNumber: 2, in: context)
-        let service = ModelFixtures.makeService(name: "Trim", in: context)
+        let profile = ModelFixtures.makeBusinessProfile(
+            nextInvoiceNumber: 2,
+            currencyCode: currencyCode,
+            in: context
+        )
+        let service = ModelFixtures.makeService(
+            name: "Trim",
+            currencyCode: currencyCode,
+            in: context
+        )
         let appointment = ModelFixtures.makeAppointment(barn: barn, horses: [horse], in: context)
         let visit = ModelFixtures.makeVisit(startedAt: Date(timeIntervalSinceReferenceDate: 100), completedAt: Date(timeIntervalSinceReferenceDate: 110), appointment: appointment, in: context)
         let visitHorse = try #require(visit.visitHorses.first)

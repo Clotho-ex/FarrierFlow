@@ -1,6 +1,6 @@
 import SwiftData
 
-extension FarrierFlowSchemaV1 {
+extension FarrierFlowSchemaV2 {
     @Model
     final class BusinessProfile {
         var name: String
@@ -11,6 +11,7 @@ extension FarrierFlowSchemaV1 {
         var defaultAppointmentDurationMinutes: Int?
         var defaultInvoiceDueDays: Int?
         var nextInvoiceNumber: Int64
+        var currencyCode: String = "USD"
 
         init(
             name: String,
@@ -20,7 +21,8 @@ extension FarrierFlowSchemaV1 {
             defaultInvoiceNote: String? = nil,
             defaultAppointmentDurationMinutes: Int? = nil,
             defaultInvoiceDueDays: Int? = 14,
-            nextInvoiceNumber: Int64 = 1
+            nextInvoiceNumber: Int64 = 1,
+            currencyCode: String = "USD"
         ) {
             self.name = name
             self.phone = phone
@@ -30,6 +32,7 @@ extension FarrierFlowSchemaV1 {
             self.defaultAppointmentDurationMinutes = defaultAppointmentDurationMinutes
             self.defaultInvoiceDueDays = defaultInvoiceDueDays
             self.nextInvoiceNumber = nextInvoiceNumber
+            self.currencyCode = currencyCode
         }
     }
 }

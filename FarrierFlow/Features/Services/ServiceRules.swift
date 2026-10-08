@@ -4,20 +4,32 @@ import SwiftData
 nonisolated enum ServiceRulesError: Error, Equatable {
     case nameRequired
     case invalidPrice
+    case unsupportedCurrency
 }
 
 nonisolated enum ServiceRules {
-    static func validated(_ draft: ServiceDraft) throws -> ServiceValues {
+    static func validated(
+        _ draft: ServiceDraft,
+        locale: Locale = .current
+    ) throws -> ServiceValues {
         guard let name = TextNormalization.required(draft.name) else {
             throw ServiceRulesError.nameRequired
         }
-        guard let amount = try? USDPriceParser.parse(draft.priceInput) else {
+        let currencyCode = draft.currencyCode.uppercased()
+        guard BusinessCurrency.isSupported(currencyCode) else {
+            throw ServiceRulesError.unsupportedCurrency
+        }
+        guard let amount = try? MoneyInputParser.parse(
+            draft.priceInput,
+            currencyCode: currencyCode,
+            locale: locale
+        ) else {
             throw ServiceRulesError.invalidPrice
         }
         return ServiceValues(
             name: name,
             defaultAmountMinorUnits: amount,
-            currencyCode: "USD"
+            currencyCode: currencyCode
         )
     }
 
@@ -61,7 +73,7 @@ nonisolated enum ServiceRules {
         !service.isArchived
             && TextNormalization.required(service.name) == service.name
             && service.defaultAmountMinorUnits >= 0
-            && service.currencyCode == "USD"
+            && BusinessCurrency.isSupported(service.currencyCode)
             && service.horsesUsingAsDefault.allSatisfy { $0.defaultService === service }
             && service.workItems.allSatisfy { $0.service === service }
     }

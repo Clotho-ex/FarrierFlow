@@ -2,10 +2,17 @@ import CoreText
 import Foundation
 import UIKit
 
+nonisolated enum InvoicePDFRendererError: Error, Equatable {
+    case unsupportedCurrency(String)
+}
+
 nonisolated struct InvoicePDFRenderer {
     static let pageBounds = CGRect(x: 0, y: 0, width: 456, height: 792)
 
     func render(_ content: InvoicePDFContent) throws -> Data {
+        guard let businessCurrency = BusinessCurrency(rawValue: content.currencyCode) else {
+            throw InvoicePDFRendererError.unsupportedCurrency(content.currencyCode)
+        }
         let renderer = UIGraphicsPDFRenderer(bounds: Self.pageBounds)
         return renderer.pdfData { context in
             let margin: CGFloat = 28
@@ -42,9 +49,7 @@ nonisolated struct InvoicePDFRenderer {
             let totalLabel = String(localized: "Total")
             let noteLabel = String(localized: "Note")
             let unavailableLabel = String(localized: "Unavailable")
-            let currencyLocale = content.currencyCode == "USD"
-                ? Locale(identifier: "en_US")
-                : Locale.current
+            let currencyLocale = businessCurrency.formattingLocale
             var y: CGFloat = margin
             var page = 0
 
@@ -99,11 +104,9 @@ nonisolated struct InvoicePDFRenderer {
             }
 
             func formattedMoney(_ minorUnits: Int64) -> String {
-                guard content.currencyCode == "USD" else {
-                    return unavailableLabel
-                }
-                return MoneyFormatter.usd(
+                MoneyFormatter.currency(
                     minorUnits: minorUnits,
+                    currencyCode: content.currencyCode,
                     locale: currencyLocale
                 ) ?? unavailableLabel
             }

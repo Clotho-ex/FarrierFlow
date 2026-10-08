@@ -28,7 +28,7 @@ struct ServiceEditorView: View {
                     TextField("Default Price", text: $model.draft.priceInput)
                         .keyboardType(.decimalPad)
                         .accessibilityIdentifier("service-price-field")
-                    Text("Enter a U.S. dollar amount with up to two decimal places.")
+                    Text("Enter an amount in \(currencyLabel) with up to two decimal places.")
                         .font(.footnote)
                         .foregroundStyle(ColorTokens.textSecondary)
                     priceFeedback
@@ -61,14 +61,18 @@ struct ServiceEditorView: View {
             .alert(item: $model.alert) {
                 Alert(title: Text($0.title), message: Text($0.message))
             }
+            .task {
+                model.loadBusinessCurrency(in: context)
+            }
         }
     }
 
     @ViewBuilder
     private var priceFeedback: some View {
-        if let values = try? ServiceRules.validated(model.draft),
-           let formatted = MoneyFormatter.usd(
+        if let values = try? ServiceRules.validated(model.draft, locale: locale),
+           let formatted = MoneyFormatter.currency(
                minorUnits: values.defaultAmountMinorUnits,
+               currencyCode: values.currencyCode,
                locale: locale
            ) {
             Text(formatted)
@@ -78,9 +82,16 @@ struct ServiceEditorView: View {
                     String(localized: "Default price \(formatted)", locale: locale)
                 )
         } else if !model.draft.priceInput.isEmpty {
-            Text("Enter a valid U.S. dollar amount.")
+            Text("Enter a valid amount in \(currencyLabel).")
                 .font(.footnote)
                 .foregroundStyle(ColorTokens.destructive)
         }
+    }
+
+    private var currencyLabel: String {
+        guard let currency = BusinessCurrency(rawValue: model.draft.currencyCode) else {
+            return model.draft.currencyCode
+        }
+        return "\(currency.localizedName(in: locale)) (\(currency.rawValue))"
     }
 }

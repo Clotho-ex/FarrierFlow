@@ -8,9 +8,10 @@ ios
 
 ## Users
 
-FarrierFlow is for independent farriers in the United States. Its primary use
-case is managing work while standing at a barn, often outdoors and with only one
-hand available.
+FarrierFlow is for independent farriers in the United States, Turkey, United
+Kingdom, Ireland, Canada, Australia, New Zealand, and South Africa. Its primary
+use case is managing work while standing at a barn, often outdoors and with
+only one hand available.
 
 ## Product Purpose
 
@@ -56,11 +57,17 @@ one continuous field workflow rather than separate generic business modules.
   outcome before completion, and serviced horses may include free-text Work
   Notes.
 - Slice 4 records performed work as priced Services and WorkItems. Prices use
-  integer USD minor units, and a Horse may carry one active default Service.
+  integer minor units in the owner's selected business currency, and a Horse
+  may carry one active default Service.
 - Slice 5 creates one Client invoice from selected completed Visits, includes
   every still-uninvoiced WorkItem belonging to that Client, snapshots all
   financial and display content, and generates a native US Letter PDF for the
   system share sheet.
+- One supported business currency applies to all Services, WorkItems, Invoices,
+  Payments, PDFs, and exported monetary displays. New profiles default from the
+  device region and may select USD, TRY, GBP, EUR, CAD, AUD, NZD, or ZAR before
+  the first Service or financial record. FarrierFlow does not convert amounts
+  or use exchange rates; existing V1 data migrates as unchanged USD values.
 - Release onboarding extends Slice 5A's owner setup into a short first-run
   sequence: required business identity, a concise workflow briefing, then the
   existing RevenueCat Offering. The briefing communicates the connected Appointment to Payment workflow

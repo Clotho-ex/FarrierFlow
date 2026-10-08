@@ -168,7 +168,7 @@ struct InvoiceDetailView: View {
     }
 
     private func detailList(_ detail: InvoiceDetail) -> some View {
-        let amount = formattedTotal(detail.total)
+        let amount = formattedTotal(detail.total, currencyCode: detail.currencyCode)
 
         return ScrollView {
             LazyVStack(alignment: .leading, spacing: 36) {
@@ -237,10 +237,17 @@ struct InvoiceDetailView: View {
         .accessibilityIdentifier("invoice-first-payment-hint")
     }
 
-    private func formattedTotal(_ total: MoneyAvailability) -> String {
+    private func formattedTotal(
+        _ total: MoneyAvailability,
+        currencyCode: String
+    ) -> String {
         switch total {
         case .available(let amount):
-            MoneyFormatter.usd(minorUnits: amount, locale: locale)
+            MoneyFormatter.currency(
+                minorUnits: amount,
+                currencyCode: currencyCode,
+                locale: locale
+            )
                 ?? String(localized: "Unavailable", locale: locale)
         case .unavailable:
             String(localized: "Unavailable", locale: locale)
@@ -446,7 +453,11 @@ private struct InvoicePaymentSection: View {
     }
 
     private var formattedAmount: String {
-        MoneyFormatter.usd(minorUnits: payment.amountMinorUnits, locale: locale)
+        MoneyFormatter.currency(
+            minorUnits: payment.amountMinorUnits,
+            currencyCode: payment.currencyCode,
+            locale: locale
+        )
             ?? String(localized: "Unavailable", locale: locale)
     }
 
@@ -524,7 +535,11 @@ private struct PaymentRecordingView: View {
     }
 
     private var formattedAmount: String {
-        MoneyFormatter.usd(minorUnits: model.draft.amountMinorUnits, locale: locale)
+        MoneyFormatter.currency(
+            minorUnits: model.draft.amountMinorUnits,
+            currencyCode: model.draft.currencyCode,
+            locale: locale
+        )
             ?? String(localized: "Unavailable", locale: locale)
     }
 }

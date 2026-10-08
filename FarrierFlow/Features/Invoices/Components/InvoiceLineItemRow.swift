@@ -45,7 +45,11 @@ struct InvoiceLineItemRow: View {
     }
 
     private var amount: String {
-        MoneyFormatter.usd(minorUnits: lineItem.amountMinorUnits, locale: locale)
+        MoneyFormatter.currency(
+            minorUnits: lineItem.amountMinorUnits,
+            currencyCode: lineItem.currencyCode,
+            locale: locale
+        )
             ?? String(localized: "Unavailable", locale: locale)
     }
 

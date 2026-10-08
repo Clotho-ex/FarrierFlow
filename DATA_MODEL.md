@@ -58,7 +58,7 @@ it adds no model or migration.
 - A Photograph belongs to exactly one VisitHorse and never changes ownership.
 - A VisitHorse may own photographs while Pending, Serviced, or Not Serviced.
 - An active Service may be recorded once per VisitHorse as a WorkItem; each
-  WorkItem snapshots Service name, USD amount in minor units, and currency.
+  WorkItem snapshots Service name, amount in integer minor units, and currency.
 - One Invoice belongs to exactly one Client and contains one or more
   InvoiceVisits and InvoiceLineItems.
 - One Paid Invoice owns exactly one Payment; an Unpaid Invoice owns none.
@@ -82,11 +82,13 @@ saving.
 
 ## Schema Versions and Migration
 
-`FarrierFlowSchemaV1` is the first shipping schema and registers all 15 current
-models. FarrierFlow has not shipped, so pre-release V1-to-V4 stores are not a
-supported migration source and no migration plan is implemented for them.
-SwiftData supplies model identity. Any schema change after first shipment
-requires an explicit version and migration design before implementation.
+`FarrierFlowSchemaV1` is the immutable released 15-model snapshot.
+`FarrierFlowSchemaV2` is current and adds `BusinessProfile.currencyCode`.
+`FarrierFlowMigrationPlan` performs a lightweight V1-to-V2 migration, assigning
+USD to existing profiles while preserving every stored minor-unit amount and
+relationship unchanged. The production configuration name remains
+`FarrierFlowV1`. Any later schema change requires an explicit version and
+migration design before implementation.
 
 ## Client
 
@@ -438,9 +440,10 @@ replacement.
 
 ## Service and WorkItem
 
-`Service` stores a required normalized name, nonnegative default amount in USD
-minor units, currency code, and archive state. An archived Service remains
-historical but is not eligible for new WorkItems or as a Horse default.
+`Service` stores a required normalized name, nonnegative default amount in
+integer minor units, supported business currency code, and archive state. An
+archived Service remains historical but is not eligible for new WorkItems or as
+a Horse default.
 
 `WorkItem` belongs to one VisitHorse and one Service. It stores the recorded
 Service-name, amount, and currency snapshots. A VisitHorse prevents
@@ -468,6 +471,7 @@ or farrier name.
 | `defaultInvoiceDueDays` | `Int?` | Optional; positive when present; begins at 14 |
 | `defaultInvoiceNote` | `String?` | Optional normalized text |
 | `nextInvoiceNumber` | `Int64` | Required positive sequence value; begins at 1 |
+| `currencyCode` | `String` | Required; one of USD, TRY, GBP, EUR, CAD, AUD, NZD, or ZAR |
 
 `nil` duration means Ask Every Time. `nil` due days means No Due Date. These are
 owner preferences for new transient drafts, not persisted links to Appointments
@@ -478,6 +482,10 @@ BusinessProfile.
 
 `nextInvoiceNumber` is never user-editable, advances only with a successful
 Invoice save, and must remain greater than every issued number.
+
+A new profile defaults to the supported currency reported by the device locale,
+falling back to USD. The owner may change it only while no Service, WorkItem,
+Invoice, InvoiceLineItem, or Payment exists. There is no amount conversion.
 
 ## Invoice
 
@@ -598,7 +606,7 @@ Domain rules validate relationships that span models:
 - Photograph has one current inverse-matching VisitHorse owner.
 - Photograph dimensions and byte count are positive, the longest edge is at
   most 2,560 pixels, and Photograph UUIDs are unique.
-- Service names and USD amounts are valid; archived Services are not used for
+- Service names, amounts, and supported business currencies are valid; archived Services are not used for
   new defaults or WorkItems.
 - Serviced VisitHorses have recorded WorkItems, with no duplicate Service;
   not-serviced VisitHorses have none.
@@ -644,7 +652,7 @@ Immediately before every controlled save, complete-graph validation rejects:
 - Multiple Business Profiles, an invalid next-number sequence, or a nonpositive
   owner default.
 - An Invoice without one Client, at least one InvoiceVisit and InvoiceLineItem,
-  immutable valid snapshots, a valid status/payment pair, consistent USD
+  immutable valid snapshots, a valid status/payment pair, consistent supported
   currency, or one-to-one inverse-matching source WorkItems.
 
 SwiftData relationship cardinality metadata is not the domain enforcement

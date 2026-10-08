@@ -93,6 +93,36 @@ final class OwnerSetupUITests: XCTestCase {
     }
 
     @MainActor
+    func testIdentitySetupDetectsRegionCurrencyAndAllowsOwnerOverride() {
+        let app = XCUIApplication()
+        app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] =
+            "OwnerSetupCurrency-\(UUID().uuidString)"
+        app.launchEnvironment["FARRIERFLOW_UI_TEST_SCENARIO"] = "owner-setup"
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_GB"]
+        app.launch()
+        defer { app.terminate() }
+
+        let getStarted = app.buttons["onboarding-briefing-continue"]
+        XCTAssertTrue(waitUntilEnabled(getStarted))
+        let name = app.textFields["business-profile-name-field"]
+        guard tapUntilDestinationAppears(
+            getStarted,
+            destination: name,
+            in: app
+        ) else { return }
+
+        let currency = app.buttons["business-profile-currency-picker"]
+        XCTAssertTrue(currency.waitForExistence(timeout: 3))
+        XCTAssertTrue(currency.label.contains("British Pound (GBP)"))
+
+        currency.tap()
+        let euro = app.buttons["Euro (EUR)"]
+        XCTAssertTrue(euro.waitForExistence(timeout: 3))
+        euro.tap()
+        XCTAssertTrue(currency.label.contains("Euro (EUR)"))
+    }
+
+    @MainActor
     func testNativeBackNavigationPersistsReturnedBriefingStep() {
         let app = XCUIApplication()
         app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] =
@@ -538,13 +568,13 @@ final class OwnerSetupUITests: XCTestCase {
             .map { heroCandidates.element(boundBy: $0) }
             .max { $0.frame.width < $1.frame.width } ?? heroCandidates.firstMatch
         let sectionTitle = app.staticTexts["Make it yours."]
-        let sectionLastLine = app.staticTexts[
-            "Appears on invoices. You can change it later."
+        let compositionLastLine = app.staticTexts[
+            "Used for services, invoices, payments, PDFs, and exports. Confirm it before adding your first service."
         ]
         let continueAction = app.buttons["business-profile-save-action"]
         XCTAssertTrue(hero.waitForExistence(timeout: 3))
         XCTAssertTrue(sectionTitle.waitForExistence(timeout: 3))
-        XCTAssertTrue(sectionLastLine.waitForExistence(timeout: 3))
+        XCTAssertTrue(compositionLastLine.waitForExistence(timeout: 3))
         XCTAssertTrue(continueAction.waitForExistence(timeout: 3))
 
         let contentTop = app.navigationBars["Your Business"].frame.maxY
@@ -555,7 +585,7 @@ final class OwnerSetupUITests: XCTestCase {
             "The title and identity form should read as one intentional composition."
         )
         XCTAssertEqual(
-            (hero.frame.minY + sectionLastLine.frame.maxY) / 2,
+            (hero.frame.minY + compositionLastLine.frame.maxY) / 2,
             availableCenterY,
             accuracy: 48,
             "The complete business composition should sit in the center of the usable space."
@@ -683,6 +713,7 @@ final class OwnerSetupUITests: XCTestCase {
         app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] =
             "FarrierActivation-\(UUID().uuidString)"
         app.launchEnvironment["TZ"] = "America/Los_Angeles"
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
         defer { app.terminate() }
 

@@ -23,7 +23,7 @@ nonisolated enum PaymentRecordSource: String, Codable, Sendable {
     case manual
 }
 
-extension FarrierFlowSchemaV1 {
+extension FarrierFlowSchemaV2 {
     @Model
     final class Payment {
         @Attribute(.unique) private(set) var id: UUID

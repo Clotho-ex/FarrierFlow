@@ -7,25 +7,40 @@ struct MoneyAvailabilityTests {
     @Test
     func formatsZeroAsLocalizedComplimentaryCopy() {
         #expect(
-            MoneyFormatter.usd(
+            MoneyFormatter.currency(
                 minorUnits: 0,
+                currencyCode: "GBP",
                 locale: Locale(identifier: "en_US")
             ) == "Complimentary"
         )
     }
 
     @Test
-    func formatsNonzeroMinorUnitsAsLocalizedUSDCurrency() {
+    func formatsNonzeroMinorUnitsAsStoredCurrency() {
         #expect(
-            MoneyFormatter.usd(
+            MoneyFormatter.currency(
                 minorUnits: 1_250,
-                locale: Locale(identifier: "en_US")
-            ) == "$12.50"
+                currencyCode: "GBP",
+                locale: Locale(identifier: "en_GB")
+            ) == "£12.50"
         )
     }
 
     @Test
-    func declinesNegativePersistenceValues() {
-        #expect(MoneyFormatter.usd(minorUnits: -1, locale: .current) == nil)
+    func declinesNegativeOrUnsupportedPersistenceValues() {
+        #expect(
+            MoneyFormatter.currency(
+                minorUnits: -1,
+                currencyCode: "USD",
+                locale: .current
+            ) == nil
+        )
+        #expect(
+            MoneyFormatter.currency(
+                minorUnits: 1_250,
+                currencyCode: "JPY",
+                locale: .current
+            ) == nil
+        )
     }
 }

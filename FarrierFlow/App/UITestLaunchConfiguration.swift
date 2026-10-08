@@ -18,6 +18,8 @@ struct UITestLaunchConfiguration {
         "FARRIERFLOW_UI_TEST_COLOR_SCHEME"
     static let subscriptionAccessEnvironmentKey =
         "FARRIERFLOW_UI_TEST_SUBSCRIPTION_ACCESS"
+    static let businessCurrencyEnvironmentKey =
+        "FARRIERFLOW_UI_TEST_BUSINESS_CURRENCY"
 
     let storeURL: URL?
     let forcesCameraUnavailable: Bool
@@ -25,6 +27,7 @@ struct UITestLaunchConfiguration {
     let dynamicTypeSize: DynamicTypeSize?
     let colorScheme: ColorScheme?
     let subscriptionAccess: SubscriptionUITestAccess
+    let businessCurrencyCode: String
     let isScreenshotMode: Bool
     let referenceDate: Date?
     let screenshotStage: ScreenshotFixtureStage?
@@ -78,6 +81,11 @@ struct UITestLaunchConfiguration {
             Self.subscriptionAccessEnvironmentKey
         ]
         .flatMap(SubscriptionUITestAccess.init(rawValue:)) ?? .full
+        businessCurrencyCode = environment[
+            Self.businessCurrencyEnvironmentKey
+        ]
+        .flatMap { BusinessCurrency.isSupported($0) ? $0.uppercased() : nil }
+            ?? BusinessCurrency.unitedStatesDollar.rawValue
         let screenshotModeValue = environment[Self.screenshotModeEnvironmentKey]
         isScreenshotMode = screenshotModeValue == "1"
         referenceDate = environment[Self.referenceDateEnvironmentKey]
@@ -130,6 +138,7 @@ struct UITestLaunchConfiguration {
             try UITestFixtures.seed(
                 scenario,
                 in: container,
+                currencyCode: businessCurrencyCode,
                 photographRootURL: storeURL
                     .deletingPathExtension()
                     .appending(

@@ -1,6 +1,7 @@
 nonisolated struct ServiceDraft: Equatable {
     var name: String = ""
     var priceInput: String = ""
+    var currencyCode: String = "USD"
 }
 
 nonisolated struct ServiceValues: Equatable {

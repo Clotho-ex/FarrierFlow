@@ -5,8 +5,9 @@ struct ServiceRow: View {
     let service: Service
 
     private var amount: String {
-        MoneyFormatter.usd(
+        MoneyFormatter.currency(
             minorUnits: service.defaultAmountMinorUnits,
+            currencyCode: service.currencyCode,
             locale: locale
         ) ?? String(localized: "Unavailable", locale: locale)
     }

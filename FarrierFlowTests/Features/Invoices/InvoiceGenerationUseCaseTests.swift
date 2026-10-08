@@ -7,6 +7,23 @@ import Testing
 @MainActor
 struct InvoiceGenerationUseCaseTests {
     @Test
+    func generatesInvoiceSnapshotsInTheBusinessCurrency() throws {
+        let graph = try makeGenerationGraph(currencyCode: "GBP")
+
+        let invoiceID = try InvoiceGenerationUseCase.generate(
+            draft(for: graph.alexID, visitID: graph.mixedVisitID),
+            in: ModelContext(graph.container)
+        )
+
+        let context = ModelContext(graph.container)
+        let invoice = try #require(context.model(for: invoiceID) as? Invoice)
+        #expect(invoice.currencyCode == "GBP")
+        #expect(invoice.invoiceVisits.flatMap(\.lineItems).allSatisfy {
+            $0.currencyCode == "GBP"
+        })
+    }
+
+    @Test
     func generatesEveryEligibleClientWorkItemWithExactImmutableSnapshots() throws {
         let graph = try makeGenerationGraph()
         let invoiceID = try InvoiceGenerationUseCase.generate(
@@ -181,20 +198,23 @@ struct InvoiceGenerationUseCaseTests {
     }
 
     private func makeGenerationGraph(
-        nextInvoiceNumber: Int64 = 1
+        nextInvoiceNumber: Int64 = 1,
+        currencyCode: String = "USD"
     ) throws -> InvoiceGenerationGraph {
         let container = try ModelContainerFactory.inMemoryTest()
         return try makeGenerationGraph(
             in: container.mainContext,
             container: container,
-            nextInvoiceNumber: nextInvoiceNumber
+            nextInvoiceNumber: nextInvoiceNumber,
+            currencyCode: currencyCode
         )
     }
 
     private func makeGenerationGraph(
         in context: ModelContext,
         container: ModelContainer,
-        nextInvoiceNumber: Int64 = 1
+        nextInvoiceNumber: Int64 = 1,
+        currencyCode: String = "USD"
     ) throws -> InvoiceGenerationGraph {
         let alex = Client(
             name: "Alex Carter",
@@ -234,16 +254,19 @@ struct InvoiceGenerationUseCaseTests {
         let frontShoes = ModelFixtures.makeService(
             name: "Front Shoes",
             defaultAmountMinorUnits: 12_000,
+            currencyCode: currencyCode,
             in: context
         )
         let pads = ModelFixtures.makeService(
             name: "Pads",
             defaultAmountMinorUnits: 8_000,
+            currencyCode: currencyCode,
             in: context
         )
         let hindShoes = ModelFixtures.makeService(
             name: "Hind Shoes",
             defaultAmountMinorUnits: 7_000,
+            currencyCode: currencyCode,
             in: context
         )
         let frontWorkItem = ModelFixtures.makeWorkItem(
@@ -268,6 +291,7 @@ struct InvoiceGenerationUseCaseTests {
             address: "1 Main Street",
             defaultInvoiceNote: "Thank you.",
             nextInvoiceNumber: nextInvoiceNumber,
+            currencyCode: currencyCode,
             in: context
         )
         try DomainGraphValidator.save(context)

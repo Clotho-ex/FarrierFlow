@@ -7,4 +7,5 @@ nonisolated struct InvoiceVisitChoice: Identifiable, Equatable {
     let serviceLocationName: String
     let eligibleWorkItemCount: Int
     let subtotalMinorUnits: Int64
+    let currencyCode: String
 }

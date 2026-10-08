@@ -7,6 +7,8 @@ nonisolated enum ExportFormatError: Error, Equatable {
     case unsupportedPaymentSource(String)
     case unsupportedPaymentMethod(String)
     case unsupportedCurrencyCode(String)
+    case businessCurrencyUnavailable
+    case inconsistentCurrencyCode(expected: String, actual: String)
     case invalidMonetaryValue(Int64)
     case missingPhotographResult(UUID)
     case invalidPhotographCopy(relativePath: String, byteCount: Int64)

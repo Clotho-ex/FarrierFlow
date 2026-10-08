@@ -95,6 +95,59 @@ final class InvoiceFlowUITests: XCTestCase {
     }
 
     @MainActor
+    func testGBPCurrencyFlowsThroughInvoicePaymentAndLockedBusinessUI() {
+        let app = launch(
+            storeName: "InvoiceGBP-\(UUID().uuidString)",
+            currencyCode: "GBP",
+            localeIdentifier: "en_GB"
+        )
+        defer { app.terminate() }
+
+        let createInvoice = app.buttons["today-create-invoice-action"]
+        XCTAssertTrue(createInvoice.waitForExistence(timeout: 3))
+        createInvoice.tap()
+
+        let firstVisit = app.buttons["invoice-visit-choice-0"]
+        XCTAssertTrue(firstVisit.waitForExistence(timeout: 5))
+        XCTAssertTrue(accessibilityText(of: firstVisit).contains("£50.00"))
+        selectAllVisits(firstVisit: firstVisit, in: app)
+        XCTAssertTrue(
+            accessibilityText(
+                of: app.descendants(matching: .any)["invoice-selection-total"]
+            ).contains("£100.00")
+        )
+        app.buttons["invoice-generate-action"].tap()
+
+        let detail = app.descendants(matching: .any)["invoice-detail-0001"]
+        XCTAssertTrue(detail.waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            accessibilityText(
+                of: app.descendants(matching: .any)["invoice-detail-total"]
+            ).contains("£100.00")
+        )
+        app.buttons["invoice-mark-paid-action"].tap()
+        XCTAssertTrue(app.navigationBars["Record Payment"].waitForExistence(timeout: 3))
+        XCTAssertTrue(
+            accessibilityText(of: app.descendants(matching: .any)["payment-amount"])
+                .contains("£100.00")
+        )
+        app.navigationBars["Record Payment"].buttons["Cancel"].tap()
+
+        app.navigationBars["Invoice 0001"].buttons.firstMatch.tap()
+        openClients(in: app)
+        for _ in 0..<2 where !app.buttons["My Business"].exists {
+            app.buttons["More"].tap()
+            _ = app.buttons["My Business"].waitForExistence(timeout: 2)
+        }
+        app.buttons["My Business"].tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["business-profile-currency-locked"]
+                .waitForExistence(timeout: 3)
+        )
+        XCTAssertFalse(app.buttons["business-profile-currency-picker"].exists)
+    }
+
+    @MainActor
     func testInvoiceFlowPersistsPaidSnapshotHistoryAcrossRelaunch() throws {
         let app = launch(storeName: "InvoiceFlow-\(UUID().uuidString)")
         defer { app.terminate() }
@@ -322,11 +375,18 @@ final class InvoiceFlowUITests: XCTestCase {
     @MainActor
     private func launch(
         storeName: String,
-        preferredContentSizeCategory: String? = nil
+        preferredContentSizeCategory: String? = nil,
+        currencyCode: String = "USD",
+        localeIdentifier: String = "en_US"
     ) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] = storeName
         app.launchEnvironment["FARRIERFLOW_UI_TEST_SCENARIO"] = "invoice-ready"
+        app.launchEnvironment["FARRIERFLOW_UI_TEST_BUSINESS_CURRENCY"] = currencyCode
+        app.launchArguments = [
+            "-AppleLanguages", "(en)",
+            "-AppleLocale", localeIdentifier,
+        ]
         if let preferredContentSizeCategory {
             app.launchArguments += [
                 "-UIPreferredContentSizeCategoryName",

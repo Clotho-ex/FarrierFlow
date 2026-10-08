@@ -6,6 +6,7 @@ nonisolated struct BusinessProfileDraft: Equatable {
     var defaultInvoiceNote: String = ""
     var defaultAppointmentDurationMinutes: Int?
     var defaultInvoiceDueDays: Int? = 14
+    var currencyCode: String = "USD"
 }
 
 nonisolated struct BusinessProfileValues: Equatable {
@@ -16,6 +17,7 @@ nonisolated struct BusinessProfileValues: Equatable {
     let defaultInvoiceNote: String?
     let defaultAppointmentDurationMinutes: Int?
     let defaultInvoiceDueDays: Int?
+    let currencyCode: String
 
     init(
         name: String,
@@ -24,7 +26,8 @@ nonisolated struct BusinessProfileValues: Equatable {
         address: String?,
         defaultInvoiceNote: String?,
         defaultAppointmentDurationMinutes: Int? = nil,
-        defaultInvoiceDueDays: Int? = 14
+        defaultInvoiceDueDays: Int? = 14,
+        currencyCode: String = "USD"
     ) {
         self.name = name
         self.phone = phone
@@ -33,5 +36,6 @@ nonisolated struct BusinessProfileValues: Equatable {
         self.defaultInvoiceNote = defaultInvoiceNote
         self.defaultAppointmentDurationMinutes = defaultAppointmentDurationMinutes
         self.defaultInvoiceDueDays = defaultInvoiceDueDays
+        self.currencyCode = currencyCode
     }
 }

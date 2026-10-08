@@ -66,7 +66,11 @@ struct InvoiceVisitSelectionRow: View {
     }
 
     private var subtotal: String {
-        MoneyFormatter.usd(minorUnits: choice.subtotalMinorUnits, locale: locale)
+        MoneyFormatter.currency(
+            minorUnits: choice.subtotalMinorUnits,
+            currencyCode: choice.currencyCode,
+            locale: locale
+        )
             ?? String(localized: "Unavailable", locale: locale)
     }
 }

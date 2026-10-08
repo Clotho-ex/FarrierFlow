@@ -340,11 +340,13 @@ The app must fail visibly if the production container cannot be created. It
 must not silently replace a failed durable store with an in-memory store.
 Preview and test fixtures never enter production startup code.
 
-The first shipping store uses `FarrierFlowSchemaV1`, which registers the complete
-15-model graph including Invoice-owned Payment evidence. FarrierFlow has not
-shipped, so pre-release V1-to-V4 stores receive no migration path. Future
-shipping schema changes must preserve the production store identity and require
-an explicitly designed and tested migration.
+The released store identity remains `FarrierFlowV1`. `FarrierFlowSchemaV1` is an
+immutable historical snapshot of the original 15-model graph, while
+`FarrierFlowSchemaV2` is current and adds required BusinessProfile currency
+ownership. A lightweight V1-to-V2 migration supplies USD for existing profiles
+and preserves every existing integer amount without conversion. Future schema
+changes must preserve the production store identity and require an explicitly
+designed and tested migration.
 
 Subscription access is not persisted in SwiftData. Entitlement loss, restore,
 renewal, grace, expiration, or revocation cannot add, delete, hide, repair, or
@@ -543,6 +545,11 @@ and valid relationships.
 Invoice generation similarly validates Business Profile, Client-specific
 eligibility, one-time WorkItem billing, sequence monotonicity, snapshot
 normalization, currency consistency, and checked integer totals before one save.
+`BusinessCurrency` is the allowlist for USD, TRY, GBP, EUR, CAD, AUD, NZD, and
+ZAR. BusinessProfile owns one code; Service, WorkItem, InvoiceLineItem, Invoice,
+and Payment carry same-currency snapshots. Currency changes lock once any of
+those monetary records exists, and PDF/export boundaries reject unsupported
+codes. No layer performs exchange-rate conversion.
 Status change and unpaid deletion use focused atomic use cases. Every failure
 surfaces human error copy without success-shaped navigation or partial state.
 

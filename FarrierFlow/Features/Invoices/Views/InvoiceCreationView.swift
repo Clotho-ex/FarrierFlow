@@ -193,10 +193,14 @@ struct InvoiceCreationView: View {
     }
 
     private var selectionTotal: String {
-        guard let total = model.selectionSummary?.totalMinorUnits else {
+        guard let summary = model.selectionSummary else {
             return String(localized: "No selection", locale: locale)
         }
-        return MoneyFormatter.usd(minorUnits: total, locale: locale)
+        return MoneyFormatter.currency(
+            minorUnits: summary.totalMinorUnits,
+            currencyCode: summary.currencyCode,
+            locale: locale
+        )
             ?? String(localized: "Unavailable", locale: locale)
     }
 

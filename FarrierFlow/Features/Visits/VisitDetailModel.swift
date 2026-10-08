@@ -14,6 +14,7 @@ nonisolated struct VisitWorkItemResult: Equatable, Identifiable {
     let serviceID: PersistentIdentifier?
     let serviceNameSnapshot: String
     let amountMinorUnits: Int64
+    let currencyCode: String
     let serviceIsArchived: Bool?
 }
 
@@ -34,6 +35,7 @@ nonisolated struct VisitDetail: Equatable {
     let serviceLocationNameSnapshot: String
     let serviceLocationAddressSnapshot: String?
     let barnID: PersistentIdentifier?
+    let currencyCode: String
     let horses: [VisitHorseResult]
     let total: MoneyAvailability
     let invoices: [InvoiceSummary]
@@ -145,6 +147,27 @@ final class VisitDetailModel {
             return lhs.id < rhs.id
         }
 
+        var profileDescriptor = FetchDescriptor<BusinessProfile>()
+        profileDescriptor.fetchLimit = 2
+        let profiles = try context.fetch(profileDescriptor)
+        guard profiles.count <= 1 else {
+            throw VisitDetailLoadError.invalidVisit
+        }
+        let workItemCurrencyCodes = Set(
+            horses.flatMap(\.workItems).map(\.currencyCode)
+        )
+        guard workItemCurrencyCodes.count <= 1 else {
+            throw VisitDetailLoadError.invalidVisit
+        }
+        let currencyCode = profiles.first?.currencyCode
+            ?? workItemCurrencyCodes.first
+            ?? BusinessCurrency.unitedStatesDollar.rawValue
+        guard BusinessCurrency.isSupported(currencyCode),
+              workItemCurrencyCodes.allSatisfy({ $0 == currencyCode })
+        else {
+            throw VisitDetailLoadError.invalidVisit
+        }
+
         var invoiceIDs = Set<PersistentIdentifier>()
         let invoices = try visit.invoiceVisits.compactMap { invoiceVisit -> InvoiceSummary? in
             guard invoiceVisit.sourceVisit === visit, let invoice = invoiceVisit.invoice,
@@ -166,6 +189,7 @@ final class VisitDetailModel {
             serviceLocationNameSnapshot: visit.serviceLocationNameSnapshot,
             serviceLocationAddressSnapshot: visit.serviceLocationAddressSnapshot,
             barnID: visit.barn?.persistentModelID,
+            currencyCode: currencyCode,
             horses: horses,
             total: try CheckedMoneyTotal.projectedTotal(horses.map(\.subtotal)),
             invoices: invoices,
@@ -183,7 +207,8 @@ final class VisitDetailModel {
                 TextNormalization.required(workItem.serviceNameSnapshot)
                     == workItem.serviceNameSnapshot,
                 workItem.amountMinorUnits >= 0,
-                workItem.currencyCode == "USD"
+                BusinessCurrency.isSupported(workItem.currencyCode),
+                workItem.service.map({ $0.currencyCode == workItem.currencyCode }) ?? true
             else {
                 throw VisitDetailLoadError.invalidVisit
             }
@@ -200,6 +225,7 @@ final class VisitDetailModel {
                 serviceID: workItem.service?.persistentModelID,
                 serviceNameSnapshot: workItem.serviceNameSnapshot,
                 amountMinorUnits: workItem.amountMinorUnits,
+                currencyCode: workItem.currencyCode,
                 serviceIsArchived: workItem.service?.isArchived
             )
         }

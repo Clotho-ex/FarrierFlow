@@ -12,6 +12,7 @@ nonisolated struct HorseHistoryEntry: Identifiable, Equatable {
     let hasWorkNotes: Bool
     let workItemCount: Int?
     let subtotal: MoneyAvailability
+    let currencyCode: String
 
     init(
         id: PersistentIdentifier,
@@ -23,7 +24,8 @@ nonisolated struct HorseHistoryEntry: Identifiable, Equatable {
         outcome: VisitOutcome,
         hasWorkNotes: Bool,
         workItemCount: Int? = nil,
-        subtotal: MoneyAvailability = .unavailable
+        subtotal: MoneyAvailability = .unavailable,
+        currencyCode: String = "USD"
     ) {
         self.id = id
         self.visitID = visitID
@@ -35,6 +37,7 @@ nonisolated struct HorseHistoryEntry: Identifiable, Equatable {
         self.hasWorkNotes = hasWorkNotes
         self.workItemCount = workItemCount
         self.subtotal = subtotal
+        self.currencyCode = currencyCode
     }
 }
 
@@ -50,6 +53,7 @@ nonisolated struct HorseHistoryRecord: Equatable {
     let workNotes: String?
     let workItemCount: Int?
     let subtotal: MoneyAvailability
+    let currencyCode: String
 
     init(
         id: PersistentIdentifier,
@@ -62,7 +66,8 @@ nonisolated struct HorseHistoryRecord: Equatable {
         outcomeRawValue: String,
         workNotes: String?,
         workItemCount: Int? = nil,
-        subtotal: MoneyAvailability = .unavailable
+        subtotal: MoneyAvailability = .unavailable,
+        currencyCode: String = "USD"
     ) {
         self.id = id
         self.visitID = visitID
@@ -75,6 +80,7 @@ nonisolated struct HorseHistoryRecord: Equatable {
         self.workNotes = workNotes
         self.workItemCount = workItemCount
         self.subtotal = subtotal
+        self.currencyCode = currencyCode
     }
 }
 

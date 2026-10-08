@@ -167,8 +167,9 @@ struct HorseEditorView: View {
     }
 
     private func formattedPrice(for service: ServiceChoice) -> String {
-        MoneyFormatter.usd(
+        MoneyFormatter.currency(
             minorUnits: service.defaultAmountMinorUnits,
+            currencyCode: service.currencyCode,
             locale: locale
         ) ?? String(localized: "Unavailable", locale: locale)
     }

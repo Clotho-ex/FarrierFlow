@@ -60,4 +60,58 @@ struct WorkItemRulesTests {
             try WorkItemRules.subtotal(for: [workItems[0], overflowing])
         }
     }
+
+    @Test
+    @MainActor
+    func acceptsSupportedSameCurrencyItemsAndRejectsMixedOrUnsupportedCodes() throws {
+        let container = try ModelContainerFactory.inMemoryTest()
+        let context = container.mainContext
+        let firstService = Service(
+            name: "Trim",
+            defaultAmountMinorUnits: 7_500,
+            currencyCode: "GBP"
+        )
+        let secondService = Service(
+            name: "Shoes",
+            defaultAmountMinorUnits: 12_500,
+            currencyCode: "GBP"
+        )
+        context.insert(firstService)
+        context.insert(secondService)
+        let first = WorkItemDraft(
+            serviceID: firstService.persistentModelID,
+            serviceNameSnapshot: "Trim",
+            amountMinorUnits: 7_500,
+            currencyCode: "GBP"
+        )
+        let second = WorkItemDraft(
+            serviceID: secondService.persistentModelID,
+            serviceNameSnapshot: "Shoes",
+            amountMinorUnits: 12_500,
+            currencyCode: "GBP"
+        )
+
+        #expect(WorkItemRules.violation(in: [first, second]) == nil)
+        #expect(
+            WorkItemRules.violation(in: [
+                first,
+                WorkItemDraft(
+                    serviceID: secondService.persistentModelID,
+                    serviceNameSnapshot: "Shoes",
+                    amountMinorUnits: 12_500,
+                    currencyCode: "EUR"
+                ),
+            ]) == .mixedCurrency
+        )
+        #expect(
+            WorkItemRules.violation(in: [
+                WorkItemDraft(
+                    serviceID: firstService.persistentModelID,
+                    serviceNameSnapshot: "Trim",
+                    amountMinorUnits: 7_500,
+                    currencyCode: "JPY"
+                ),
+            ]) == .unsupportedCurrency
+        )
+    }
 }

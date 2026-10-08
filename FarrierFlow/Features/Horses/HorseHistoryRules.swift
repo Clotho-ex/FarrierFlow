@@ -31,7 +31,8 @@ nonisolated enum HorseHistoryRules {
                 guard
                     let count = record.workItemCount,
                     count > 0,
-                    case .available = record.subtotal
+                    case .available = record.subtotal,
+                    BusinessCurrency.isSupported(record.currencyCode)
                 else {
                     throw HorseHistoryLoadError.invalidHistory
                 }
@@ -55,7 +56,8 @@ nonisolated enum HorseHistoryRules {
                 outcome: outcome,
                 hasWorkNotes: hasWorkNotes,
                 workItemCount: workItemCount,
-                subtotal: subtotal
+                subtotal: subtotal,
+                currencyCode: record.currencyCode
             )
         }
 

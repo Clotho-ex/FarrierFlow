@@ -2,6 +2,7 @@ nonisolated enum BusinessProfileRulesError: Error, Equatable {
     case nameRequired
     case defaultAppointmentDurationInvalid
     case defaultInvoiceDueDaysInvalid
+    case unsupportedCurrency
 }
 
 nonisolated enum BusinessProfileRules {
@@ -17,6 +18,10 @@ nonisolated enum BusinessProfileRules {
         if let dueDays = draft.defaultInvoiceDueDays, dueDays <= 0 {
             throw BusinessProfileRulesError.defaultInvoiceDueDaysInvalid
         }
+        let currencyCode = draft.currencyCode.uppercased()
+        guard BusinessCurrency.isSupported(currencyCode) else {
+            throw BusinessProfileRulesError.unsupportedCurrency
+        }
 
         return BusinessProfileValues(
             name: name,
@@ -25,7 +30,8 @@ nonisolated enum BusinessProfileRules {
             address: TextNormalization.optional(draft.address),
             defaultInvoiceNote: TextNormalization.optional(draft.defaultInvoiceNote),
             defaultAppointmentDurationMinutes: draft.defaultAppointmentDurationMinutes,
-            defaultInvoiceDueDays: draft.defaultInvoiceDueDays
+            defaultInvoiceDueDays: draft.defaultInvoiceDueDays,
+            currencyCode: currencyCode
         )
     }
 }

@@ -40,7 +40,11 @@ struct HorseHistoryRow: View {
     private var subtotalText: String {
         switch entry.subtotal {
         case let .available(minorUnits):
-            MoneyFormatter.usd(minorUnits: minorUnits, locale: locale)
+            MoneyFormatter.currency(
+                minorUnits: minorUnits,
+                currencyCode: entry.currencyCode,
+                locale: locale
+            )
                 ?? String(localized: "Subtotal Unavailable", locale: locale)
         case .unavailable:
             String(localized: "Subtotal Unavailable", locale: locale)

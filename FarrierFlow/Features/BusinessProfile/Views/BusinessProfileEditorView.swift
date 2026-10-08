@@ -8,6 +8,7 @@ struct BusinessProfileEditorView: View {
     }
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model = BusinessProfileEditorModel()
@@ -73,7 +74,7 @@ struct BusinessProfileEditorView: View {
             Alert(title: Text($0.title), message: Text($0.message))
         }
         .task {
-            model.load(in: context)
+            model.load(in: context, locale: locale)
             if mode == .identity {
                 await Task.yield()
                 focusedField = .name
@@ -209,6 +210,18 @@ struct BusinessProfileEditorView: View {
                     "onboarding-business-introduction"
                 )
             }
+
+            VStack(alignment: .leading, spacing: SpacingTokens.related) {
+                Text("Business currency")
+                    .font(.headline)
+
+                currencyControl
+
+                Text("Used for services, invoices, payments, PDFs, and exports. Confirm it before adding your first service.")
+                    .font(.footnote)
+                    .foregroundStyle(ColorTokens.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .frame(maxWidth: 480)
     }
@@ -246,6 +259,19 @@ struct BusinessProfileEditorView: View {
                 Text("Business")
             } footer: {
                 Text("A business or farrier name is required.")
+            }
+            .listRowBackground(ColorTokens.surface)
+
+            Section {
+                currencyControl
+            } header: {
+                Text("Currency")
+            } footer: {
+                if model.isCurrencyLocked {
+                    Text("Currency is locked because services or financial records already exist.")
+                } else {
+                    Text("Used for future services, invoices, payments, PDFs, and exports. No currency conversion is performed.")
+                }
             }
             .listRowBackground(ColorTokens.surface)
 
@@ -351,6 +377,34 @@ struct BusinessProfileEditorView: View {
 
     private var allowsEditing: Bool {
         mode == .identity || subscription.allowsMutations
+    }
+
+    @ViewBuilder
+    private var currencyControl: some View {
+        if model.isCurrencyLocked {
+            LabeledContent(
+                "Business Currency",
+                value: currencyLabel(for: model.draft.currencyCode)
+            )
+            .accessibilityIdentifier("business-profile-currency-locked")
+        } else {
+            Picker("Business Currency", selection: $model.draft.currencyCode) {
+                ForEach(BusinessCurrency.allCases) { currency in
+                    Text(currencyLabel(for: currency.rawValue))
+                        .tag(currency.rawValue)
+                }
+            }
+            .pickerStyle(.menu)
+            .accessibilityIdentifier("business-profile-currency-picker")
+            .accessibilityHint("Choose the currency used for business amounts.")
+        }
+    }
+
+    private func currencyLabel(for currencyCode: String) -> String {
+        guard let currency = BusinessCurrency(rawValue: currencyCode) else {
+            return currencyCode
+        }
+        return "\(currency.localizedName(in: locale)) (\(currency.rawValue))"
     }
 
     private var canSaveCurrentMode: Bool {

@@ -68,7 +68,7 @@ struct ModelContainerFactoryTests {
 
     @Test
     func testContainersDoNotUseTheProductionStoreURL() throws {
-        let schema = Schema(versionedSchema: FarrierFlowSchemaV1.self)
+        let schema = Schema(versionedSchema: FarrierFlowSchemaV2.self)
         let productionConfiguration = ModelConfiguration(
             "FarrierFlowV1",
             schema: schema,

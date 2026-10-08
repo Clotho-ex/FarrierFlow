@@ -1,6 +1,6 @@
 import SwiftData
 
-extension FarrierFlowSchemaV1 {
+extension FarrierFlowSchemaV2 {
     @Model
     final class AppointmentHorse {
         var appointment: Appointment?

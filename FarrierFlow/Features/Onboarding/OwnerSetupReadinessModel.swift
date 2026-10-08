@@ -57,7 +57,8 @@ final class OwnerSetupReadinessModel {
                 address: profile.address ?? "",
                 defaultInvoiceNote: profile.defaultInvoiceNote ?? "",
                 defaultAppointmentDurationMinutes: profile.defaultAppointmentDurationMinutes,
-                defaultInvoiceDueDays: profile.defaultInvoiceDueDays
+                defaultInvoiceDueDays: profile.defaultInvoiceDueDays,
+                currencyCode: profile.currencyCode
             )
         ) else {
             return false
@@ -67,5 +68,6 @@ final class OwnerSetupReadinessModel {
             && values.email == profile.email
             && values.address == profile.address
             && values.defaultInvoiceNote == profile.defaultInvoiceNote
+            && values.currencyCode == profile.currencyCode
     }
 }

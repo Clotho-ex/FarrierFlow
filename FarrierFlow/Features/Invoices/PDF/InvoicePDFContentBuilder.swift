@@ -15,6 +15,15 @@ enum InvoicePDFContentBuilder {
         guard let invoice = try context.existingModel(Invoice.self, for: invoiceID) else {
             throw InvoicePDFContentBuilderError.invoiceUnavailable
         }
+        let total: Int64
+        do {
+            total = try InvoiceDomainRules.checkedTotal(
+                lineItems: invoice.invoiceVisits.flatMap(\.lineItems),
+                currencyCode: invoice.currencyCode
+            )
+        } catch is CheckedMoneyTotalError {
+            throw InvoicePDFContentBuilderError.totalUnavailable
+        }
         let visits = InvoiceDomainRules.orderedVisits(invoice.invoiceVisits, locale: .current).map { visit in
             InvoicePDFContent.VisitGroup(
                 date: visit.visitDateSnapshot,
@@ -28,11 +37,6 @@ enum InvoicePDFContentBuilder {
                     )
                 }
             )
-        }
-        guard let total = try? InvoiceDomainRules.checkedTotal(
-            visits.flatMap(\.lineItems).map(\.amountMinorUnits)
-        ) else {
-            throw InvoicePDFContentBuilderError.totalUnavailable
         }
         let status = try InvoiceDomainRules.validatedStatus(
             rawValue: invoice.statusRawValue,

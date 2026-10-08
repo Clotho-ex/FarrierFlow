@@ -5,6 +5,7 @@ nonisolated enum ExportCSVProjector {
         from snapshot: ExportSnapshot,
         photographResults: [UUID: PhotographExportFileResult]
     ) throws -> [ExportCSVTable] {
+        try validateCurrencyConsistency(in: snapshot)
         let context = snapshot.context
         let tables: [ExportCSVTable] = [
             table(0, snapshot.businessProfiles.map { record in
@@ -88,16 +89,53 @@ nonisolated enum ExportCSVProjector {
     }
 
     private static func currency(_ value: String) throws -> String {
-        guard value == "USD" else { throw ExportFormatError.unsupportedCurrencyCode(value) }
+        guard BusinessCurrency.isSupported(value) else {
+            throw ExportFormatError.unsupportedCurrencyCode(value)
+        }
         return value
     }
 
     private static func moneyDisplay(_ minorUnits: Int64, currencyCode: String, localeIdentifier: String) throws -> String {
         _ = try currency(currencyCode)
-        guard minorUnits >= 0, let display = ExportValueFormatter.usdDisplay(minorUnits: minorUnits, localeIdentifier: localeIdentifier) else {
+        guard minorUnits >= 0,
+              let display = ExportValueFormatter.currencyDisplay(
+                  minorUnits: minorUnits,
+                  currencyCode: currencyCode,
+                  localeIdentifier: localeIdentifier
+              )
+        else {
             throw ExportFormatError.invalidMonetaryValue(minorUnits)
         }
         return display
+    }
+
+    private static func validateCurrencyConsistency(
+        in snapshot: ExportSnapshot
+    ) throws {
+        let currencies = snapshot.services.map(\.currencyCode)
+            + snapshot.workItems.map(\.currencyCode)
+            + snapshot.invoices.map(\.currencyCode)
+            + snapshot.payments.map(\.currencyCode)
+            + snapshot.invoiceLineItems.map(\.currencyCode)
+        guard snapshot.businessProfiles.count <= 1 else {
+            throw ExportFormatError.businessCurrencyUnavailable
+        }
+        guard let expected = snapshot.businessProfiles.first?.currencyCode else {
+            guard currencies.isEmpty else {
+                throw ExportFormatError.businessCurrencyUnavailable
+            }
+            return
+        }
+        _ = try currency(expected)
+        for actual in currencies {
+            _ = try currency(actual)
+            guard actual == expected else {
+                throw ExportFormatError.inconsistentCurrencyCode(
+                    expected: expected,
+                    actual: actual
+                )
+            }
+        }
     }
 
     private static func photographResult(

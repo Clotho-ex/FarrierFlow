@@ -53,6 +53,7 @@ nonisolated enum DomainGraphViolation: Error, Equatable {
     case businessProfileOptionalTextNotNormalized
     case businessProfileDefaultInvalid
     case businessProfileSequenceInvalid
+    case businessProfileCurrencyInvalid
     case invoiceNumberInvalid
     case duplicateInvoiceNumber
     case invoiceMissingClient
@@ -139,8 +140,9 @@ enum DomainGraphValidator {
             throw DomainGraphViolation.businessProfileSequenceInvalid
         }
 
+        let businessCurrencyCode = businessProfiles.first?.currencyCode
         for service in services {
-            try validate(service)
+            try validate(service, businessCurrencyCode: businessCurrencyCode)
         }
 
         for horse in horses {
@@ -148,7 +150,7 @@ enum DomainGraphValidator {
         }
 
         for workItem in workItems {
-            try validate(workItem)
+            try validate(workItem, businessCurrencyCode: businessCurrencyCode)
         }
 
         var lineItemsByInvoiceVisit = [PersistentIdentifier: [InvoiceLineItem]]()
@@ -196,7 +198,8 @@ enum DomainGraphValidator {
             try validate(
                 invoice,
                 visits: visitsByInvoice[invoice.persistentModelID, default: []],
-                payments: paymentsByInvoice[invoice.persistentModelID, default: []]
+                payments: paymentsByInvoice[invoice.persistentModelID, default: []],
+                businessCurrencyCode: businessCurrencyCode
             )
         }
 
@@ -269,14 +272,19 @@ enum DomainGraphValidator {
         }
     }
 
-    private static func validate(_ service: Service) throws {
+    private static func validate(
+        _ service: Service,
+        businessCurrencyCode: String?
+    ) throws {
         guard TextNormalization.required(service.name) == service.name else {
             throw DomainGraphViolation.serviceNameNotNormalized
         }
         guard service.defaultAmountMinorUnits >= 0 else {
             throw DomainGraphViolation.serviceAmountNegative
         }
-        guard service.currencyCode == "USD" else {
+        guard BusinessCurrency.isSupported(service.currencyCode),
+              businessCurrencyCode.map({ $0 == service.currencyCode }) ?? true
+        else {
             throw DomainGraphViolation.serviceCurrencyInvalid
         }
         guard service.horsesUsingAsDefault.allSatisfy({ $0.defaultService === service }) else {
@@ -305,7 +313,10 @@ enum DomainGraphValidator {
         }
     }
 
-    private static func validate(_ workItem: WorkItem) throws {
+    private static func validate(
+        _ workItem: WorkItem,
+        businessCurrencyCode: String?
+    ) throws {
         guard let service = workItem.service else {
             throw DomainGraphViolation.workItemMissingService
         }
@@ -324,7 +335,10 @@ enum DomainGraphValidator {
         guard workItem.amountMinorUnits >= 0 else {
             throw DomainGraphViolation.workItemAmountNegative
         }
-        guard workItem.currencyCode == "USD" else {
+        guard BusinessCurrency.isSupported(workItem.currencyCode),
+              workItem.currencyCode == service.currencyCode,
+              businessCurrencyCode.map({ $0 == workItem.currencyCode }) ?? true
+        else {
             throw DomainGraphViolation.workItemCurrencyInvalid
         }
         if let lineItem = workItem.invoiceLineItem {
@@ -349,6 +363,9 @@ enum DomainGraphValidator {
         guard businessProfile.nextInvoiceNumber > 0 else {
             throw DomainGraphViolation.businessProfileSequenceInvalid
         }
+        guard BusinessCurrency.isSupported(businessProfile.currencyCode) else {
+            throw DomainGraphViolation.businessProfileCurrencyInvalid
+        }
         guard
             businessProfile.defaultAppointmentDurationMinutes.map({ $0 > 0 }) ?? true,
             businessProfile.defaultInvoiceDueDays.map({ $0 > 0 }) ?? true
@@ -360,7 +377,8 @@ enum DomainGraphValidator {
     private static func validate(
         _ invoice: Invoice,
         visits: [InvoiceVisit],
-        payments: [Payment]
+        payments: [Payment],
+        businessCurrencyCode: String?
     ) throws {
         guard let client = invoice.client else {
             throw DomainGraphViolation.invoiceMissingClient
@@ -380,7 +398,9 @@ enum DomainGraphValidator {
         else {
             throw DomainGraphViolation.invoiceSnapshotNotNormalized
         }
-        guard invoice.currencyCode == "USD" else {
+        guard BusinessCurrency.isSupported(invoice.currencyCode),
+              invoice.currencyCode == businessCurrencyCode
+        else {
             throw DomainGraphViolation.invoiceCurrencyInvalid
         }
         guard !visits.isEmpty else {
@@ -438,7 +458,9 @@ enum DomainGraphValidator {
         guard payment.amountMinorUnits >= 0 else {
             throw DomainGraphViolation.paymentAmountInvalid
         }
-        guard payment.currencyCode == "USD", payment.currencyCode == invoice.currencyCode else {
+        guard BusinessCurrency.isSupported(payment.currencyCode),
+              payment.currencyCode == invoice.currencyCode
+        else {
             throw DomainGraphViolation.paymentCurrencyInvalid
         }
         guard payment.method != nil else {
@@ -522,7 +544,10 @@ enum DomainGraphValidator {
         guard lineItem.amountMinorUnits >= 0 else {
             throw DomainGraphViolation.invoiceLineItemAmountNegative
         }
-        guard lineItem.currencyCode == "USD" else {
+        guard BusinessCurrency.isSupported(lineItem.currencyCode),
+              lineItem.currencyCode == sourceWorkItem.currencyCode,
+              lineItem.currencyCode == invoiceVisit.invoice?.currencyCode
+        else {
             throw DomainGraphViolation.invoiceLineItemCurrencyInvalid
         }
         guard

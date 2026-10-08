@@ -31,12 +31,18 @@ enum InvoiceEligibilityRules {
             } catch {
                 throw InvoiceEligibilityError.subtotalOverflow
             }
+            guard let currencyCode = workItems.first?.currencyCode,
+                  workItems.allSatisfy({ $0.currencyCode == currencyCode })
+            else {
+                throw InvoiceEligibilityError.invalidWorkItem
+            }
             return InvoiceVisitChoice(
                 id: visit.persistentModelID,
                 visitDate: visit.startedAt,
                 serviceLocationName: visit.serviceLocationNameSnapshot,
                 eligibleWorkItemCount: workItems.count,
-                subtotalMinorUnits: subtotal
+                subtotalMinorUnits: subtotal,
+                currencyCode: currencyCode
             )
         }
 
@@ -89,7 +95,8 @@ enum InvoiceEligibilityRules {
                     TextNormalization.required(workItem.serviceNameSnapshot)
                         == workItem.serviceNameSnapshot,
                     workItem.amountMinorUnits >= 0,
-                    workItem.currencyCode == "USD"
+                    BusinessCurrency.isSupported(workItem.currencyCode),
+                    workItem.currencyCode == service.currencyCode
                 else {
                     throw InvoiceEligibilityError.invalidWorkItem
                 }
