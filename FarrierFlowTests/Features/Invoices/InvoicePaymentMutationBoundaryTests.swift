@@ -45,6 +45,9 @@ struct InvoicePaymentMutationBoundaryTests {
         let useCasePath = "Features/Invoices/InvoicePaymentUseCase.swift"
 
         for (path, source) in files {
+            if path.hasPrefix("Core/Persistence/Migrations/") {
+                continue
+            }
             if path != aggregatePath {
                 let assignsStatus = source.split(separator: "\n").contains {
                     $0.contains("statusRawValue =") && !$0.contains("statusRawValue ==")

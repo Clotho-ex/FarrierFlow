@@ -4,6 +4,7 @@ import SwiftData
 nonisolated enum InvoiceDomainRuleError: Error, Equatable {
     case invalidNumber
     case invalidStatus
+    case inconsistentCurrency
 }
 
 @MainActor
@@ -14,7 +15,9 @@ enum InvoiceDomainRules {
         invoiceCurrencyCode: String,
         totalMinorUnits: Int64
     ) throws -> InvoiceStatus {
-        guard let status = InvoiceStatus(rawValue: rawValue) else {
+        guard BusinessCurrency.isSupported(invoiceCurrencyCode),
+              let status = InvoiceStatus(rawValue: rawValue)
+        else {
             throw InvoiceDomainRuleError.invalidStatus
         }
         switch status {
@@ -54,6 +57,18 @@ enum InvoiceDomainRules {
 
     static func checkedTotal(_ amounts: [Int64]) throws -> Int64 {
         try CheckedMoneyTotal.sum(amounts)
+    }
+
+    static func checkedTotal(
+        lineItems: [InvoiceLineItem],
+        currencyCode: String
+    ) throws -> Int64 {
+        guard BusinessCurrency.isSupported(currencyCode),
+              lineItems.allSatisfy({ $0.currencyCode == currencyCode })
+        else {
+            throw InvoiceDomainRuleError.inconsistentCurrency
+        }
+        return try checkedTotal(lineItems.map(\.amountMinorUnits))
     }
 
     static func isCorrectionLocked(_ visit: Visit) -> Bool {

@@ -5,6 +5,65 @@ import Testing
 
 @Suite("Invoice PDF renderer", .serialized)
 struct InvoicePDFRendererTests {
+    @Test func rendersSupportedNonUSDCurrencyAndRejectsUnsupportedCurrency() throws {
+        let content = InvoicePDFContent(
+            number: "0001",
+            invoiceDate: .now,
+            dueDate: nil,
+            status: .unpaid,
+            payment: nil,
+            currencyCode: "GBP",
+            businessName: "Farrier",
+            businessPhone: nil,
+            businessEmail: nil,
+            businessAddress: nil,
+            clientName: "Client",
+            clientPhone: nil,
+            clientEmail: nil,
+            visits: [
+                .init(
+                    date: .now,
+                    location: "North Field",
+                    address: nil,
+                    lineItems: [
+                        .init(
+                            horseName: "Milo",
+                            serviceName: "Full Set",
+                            amountMinorUnits: 12_500
+                        ),
+                    ]
+                ),
+            ],
+            totalMinorUnits: 12_500,
+            note: nil
+        )
+
+        let document = try #require(PDFDocument(data: InvoicePDFRenderer().render(content)))
+        #expect(document.string?.contains("£125.00") == true)
+
+        let unsupported = InvoicePDFContent(
+            number: "0002",
+            invoiceDate: .now,
+            dueDate: nil,
+            status: .unpaid,
+            payment: nil,
+            currencyCode: "JPY",
+            businessName: "Farrier",
+            businessPhone: nil,
+            businessEmail: nil,
+            businessAddress: nil,
+            clientName: "Client",
+            clientPhone: nil,
+            clientEmail: nil,
+            visits: [],
+            totalMinorUnits: 0,
+            note: nil
+        )
+        #expect(throws: InvoicePDFRendererError.unsupportedCurrency("JPY")) {
+            _ = try InvoicePDFRenderer().render(unsupported)
+        }
+    }
+
     @Test func rendersStructuredInvoiceHierarchy() throws {
         let content = InvoicePDFContent(
             number: "0148",

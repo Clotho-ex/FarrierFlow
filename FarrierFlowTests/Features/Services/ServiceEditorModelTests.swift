@@ -7,10 +7,31 @@ import Testing
 @MainActor
 struct ServiceEditorModelTests {
     @Test
+    func createsServiceInTheBusinessCurrency() throws {
+        let container = try ModelContainerFactory.inMemoryTest()
+        let context = container.mainContext
+        _ = ModelFixtures.makeBusinessProfile(currencyCode: "GBP", in: context)
+        try DomainGraphValidator.save(context)
+        let model = ServiceEditorModel(locale: Locale(identifier: "en_GB"))
+
+        model.loadBusinessCurrency(in: context)
+        model.draft.name = "Full Set"
+        model.draft.priceInput = "£125.50"
+
+        let id = try #require(model.save(in: context))
+        let service = try #require(context.model(for: id) as? Service)
+        #expect(service.defaultAmountMinorUnits == 12_550)
+        #expect(service.currencyCode == "GBP")
+    }
+
+    @Test
     func createsNormalizedUSDServiceIncludingComplimentaryPrice() throws {
         let container = try ModelContainerFactory.inMemoryTest()
         let context = container.mainContext
-        let model = ServiceEditorModel()
+        _ = ModelFixtures.makeBusinessProfile(in: context)
+        try DomainGraphValidator.save(context)
+        let model = ServiceEditorModel(locale: Locale(identifier: "en_US"))
+        model.loadBusinessCurrency(in: context)
         model.draft = ServiceDraft(name: "  Hoof Trim ", priceInput: "0")
 
         let id = try #require(model.save(in: context))
@@ -22,9 +43,24 @@ struct ServiceEditorModelTests {
     }
 
     @Test
+    func refusesToCreateServiceBeforeBusinessCurrencyIsSelected() throws {
+        let container = try ModelContainerFactory.inMemoryTest()
+        let context = container.mainContext
+        let model = ServiceEditorModel(locale: Locale(identifier: "en_US"))
+
+        model.loadBusinessCurrency(in: context)
+        model.draft = ServiceDraft(name: "Hoof Trim", priceInput: "75.00")
+
+        #expect(!model.canSave)
+        #expect(model.save(in: context) == nil)
+        #expect(try context.fetchCount(FetchDescriptor<Service>()) == 0)
+    }
+
+    @Test
     func editChangesCatalogValuesWithoutRewritingWorkItemSnapshots() throws {
         let container = try ModelContainerFactory.inMemoryTest()
         let context = container.mainContext
+        _ = ModelFixtures.makeBusinessProfile(in: context)
         let client = ModelFixtures.makeClient()
         let barn = ModelFixtures.makeBarn()
         let horse = ModelFixtures.makeHorse(client: client, barn: barn)
@@ -46,7 +82,10 @@ struct ServiceEditorModelTests {
         let workItem = ModelFixtures.makeWorkItem(service: service, visitHorse: visitHorse, in: context)
         try DomainGraphValidator.save(context)
 
-        let model = ServiceEditorModel(service: service)
+        let model = ServiceEditorModel(
+            service: service,
+            locale: Locale(identifier: "en_US")
+        )
         model.draft = ServiceDraft(name: "Front Shoes and Pads", priceInput: "150.00")
         #expect(model.save(in: context) == service.persistentModelID)
         #expect(service.name == "Front Shoes and Pads")

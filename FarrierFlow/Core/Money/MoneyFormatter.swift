@@ -1,8 +1,12 @@
 import Foundation
 
 nonisolated enum MoneyFormatter {
-    static func usd(minorUnits: Int64, locale: Locale = .current) -> String? {
-        guard minorUnits >= 0 else {
+    static func currency(
+        minorUnits: Int64,
+        currencyCode: String,
+        locale: Locale = .current
+    ) -> String? {
+        guard minorUnits >= 0, BusinessCurrency.isSupported(currencyCode) else {
             return nil
         }
         guard minorUnits != 0 else {
@@ -11,7 +15,7 @@ nonisolated enum MoneyFormatter {
 
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
-        formatter.currencyCode = "USD"
+        formatter.currencyCode = currencyCode
         formatter.locale = locale
         let amount = NSDecimalNumber(decimal: Decimal(minorUnits) / Decimal(100))
         return formatter.string(from: amount)

@@ -17,6 +17,7 @@ nonisolated struct BusinessProfileExportRecord: Sendable, Equatable {
     let defaultAppointmentDurationMinutes: Int?
     let defaultInvoiceDueDays: Int?
     let nextInvoiceNumber: Int64
+    let currencyCode: String
 }
 
 nonisolated struct ClientExportRecord: Sendable, Equatable {

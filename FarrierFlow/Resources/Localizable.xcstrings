@@ -337,7 +337,7 @@
       "comment" : "Next-Appointment state when a Horse already belongs to a future Appointment."
     },
     "Amount" : {
-      "comment" : "Section header for a WorkItem's editable USD amount."
+      "comment" : "Section header for a WorkItem's editable monetary amount."
     },
     "Amount Due" : {
       "comment" : "Invoice PDF label for the unpaid balance."
@@ -435,6 +435,12 @@
     "Business" : {
       "comment" : "Business Profile editor section containing the required business or farrier name."
     },
+    "Business Currency" : {
+      "comment" : "Label for the currency used by all business monetary records."
+    },
+    "Business currency" : {
+      "comment" : "Onboarding heading for choosing the business currency."
+    },
     "Business name" : {
 
     },
@@ -511,6 +517,9 @@
     },
     "Choose a professional business name." : {
 
+    },
+    "Choose the currency used for business amounts." : {
+      "comment" : "Accessibility hint for the business currency picker."
     },
     "Choose an active service or None before saving this horse." : {
       "comment" : "Recovery guidance when a Horse editor default Service selection is unavailable or archived."
@@ -640,6 +649,12 @@
     "Couldn’t Create PDF" : {
       "comment" : "Alert title when Invoice PDF preparation fails."
     },
+    "Currency" : {
+      "comment" : "Section heading for business currency settings."
+    },
+    "Currency is locked because services or financial records already exist." : {
+      "comment" : "Explains why an established business cannot relabel its stored money."
+    },
     "Couldn’t Delete Appointment" : {
 
     },
@@ -753,7 +768,7 @@
       "comment" : "Optional reusable note copied into future invoice snapshots."
     },
     "Default Price" : {
-      "comment" : "Label for the reusable default USD amount of a Service."
+      "comment" : "Label for the reusable default amount of a Service."
     },
     "Default price %@" : {
       "comment" : "VoiceOver announcement of the formatted default Service price."
@@ -879,11 +894,11 @@
     "Enter a duration greater than zero, or leave it blank." : {
       "comment" : "Appointment editor guidance for an invalid optional expected duration."
     },
-    "Enter a U.S. dollar amount with up to two decimal places." : {
-      "comment" : "Price-entry guidance in the Service editor."
+    "Enter a valid amount in %@." : {
+      "comment" : "Inline validation shown for an invalid Service price. The argument is the localized currency name and ISO code."
     },
-    "Enter a valid U.S. dollar amount." : {
-      "comment" : "Inline validation shown for an invalid Service price."
+    "Enter an amount in %@ with up to two decimal places." : {
+      "comment" : "Price-entry guidance in the Service editor. The argument is the localized currency name and ISO code."
     },
     "Every selected horse must be at this service location." : {
       "comment" : "Alert message when a user tries to save an appointment with a selection of horses that aren't at the selected barn.",
@@ -1463,7 +1478,7 @@
       "comment" : "Progress label while an Invoice PDF is rendered and written for sharing."
     },
     "Price" : {
-      "comment" : "Label for an editable WorkItem USD amount."
+      "comment" : "Label for an editable WorkItem monetary amount."
     },
     "Privacy" : {
 
@@ -1999,6 +2014,12 @@
     },
     "Used on future invoices." : {
       "comment" : "VoiceOver hint for reusable Business Profile information."
+    },
+    "Used for future services, invoices, payments, PDFs, and exports. No currency conversion is performed." : {
+      "comment" : "Explains the scope and non-converting behavior of the editable business currency."
+    },
+    "Used for services, invoices, payments, PDFs, and exports. Confirm it before adding your first service." : {
+      "comment" : "Onboarding guidance shown below the business currency picker."
     },
     "Usual Appointment" : {
 

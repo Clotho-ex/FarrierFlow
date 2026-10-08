@@ -23,7 +23,10 @@ struct WorkItemEditorView: View {
         self.visitHorseID = visitHorseID
         self.workItem = workItem
         _priceInput = State(
-            initialValue: USDPriceParser.editableString(minorUnits: workItem.amountMinorUnits) ?? ""
+            initialValue: MoneyInputParser.editableString(
+                minorUnits: workItem.amountMinorUnits,
+                locale: .current
+            ) ?? ""
         )
     }
 
@@ -56,13 +59,17 @@ struct WorkItemEditorView: View {
                     TextField("Price", text: $priceInput)
                         .keyboardType(.decimalPad)
                         .accessibilityLabel("Price")
-                        .accessibilityHint("Enter a U.S. dollar amount with up to two decimal places.")
+                        .accessibilityHint("Enter an amount in \(currencyLabel) with up to two decimal places.")
                         .accessibilityIdentifier("work-item-price-field")
-                    Text("Enter a U.S. dollar amount with up to two decimal places.")
+                    Text("Enter an amount in \(currencyLabel) with up to two decimal places.")
                         .font(.footnote)
                         .foregroundStyle(ColorTokens.textSecondary)
-                    if !priceInput.isEmpty, !model.isValidPriceInput(priceInput) {
-                        Text("Enter a valid U.S. dollar amount.")
+                    if !priceInput.isEmpty, !model.isValidPriceInput(
+                        priceInput,
+                        currencyCode: workItem.currencyCode,
+                        locale: locale
+                    ) {
+                        Text("Enter a valid amount in \(currencyLabel).")
                             .font(.footnote)
                             .foregroundStyle(ColorTokens.destructive)
                     } else {
@@ -96,7 +103,14 @@ struct WorkItemEditorView: View {
                     Button("Save") {
                         save()
                     }
-                    .disabled(!subscription.allowsMutations || !model.isValidPriceInput(priceInput))
+                    .disabled(
+                        !subscription.allowsMutations
+                            || !model.isValidPriceInput(
+                                priceInput,
+                                currencyCode: workItem.currencyCode,
+                                locale: locale
+                            )
+                    )
                 }
             }
         }
@@ -124,8 +138,19 @@ struct WorkItemEditorView: View {
         }
     }
 
+    private var currencyLabel: String {
+        guard let currency = BusinessCurrency(rawValue: workItem.currencyCode) else {
+            return workItem.currencyCode
+        }
+        return "\(currency.localizedName(in: locale)) (\(currency.rawValue))"
+    }
+
     private var currentFormattedAmount: String {
-        MoneyFormatter.usd(minorUnits: workItem.amountMinorUnits, locale: locale)
+        MoneyFormatter.currency(
+            minorUnits: workItem.amountMinorUnits,
+            currencyCode: workItem.currencyCode,
+            locale: locale
+        )
             ?? String(localized: "Unavailable", locale: locale)
     }
 
@@ -135,7 +160,8 @@ struct WorkItemEditorView: View {
             workItem.id,
             serviceID: workItem.serviceID,
             priceInput: priceInput,
-            for: visitHorseID
+            for: visitHorseID,
+            locale: locale
         ) else {
             showsUpdateError = true
             return

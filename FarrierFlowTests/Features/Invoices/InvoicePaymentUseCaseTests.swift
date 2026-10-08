@@ -6,6 +6,22 @@ import Testing
 @Suite("Invoice payment use case", .serialized)
 @MainActor
 struct InvoicePaymentUseCaseTests {
+    @Test
+    func recordsPaymentInTheInvoiceCurrency() throws {
+        let graph = try InvoiceActionGraph.make(currencyCode: "GBP")
+
+        try InvoicePaymentUseCase.recordPayment(
+            invoiceID: graph.invoiceID,
+            method: .bankTransfer,
+            receivedAt: .now,
+            in: graph.context
+        )
+
+        let invoice = try #require(graph.context.model(for: graph.invoiceID) as? Invoice)
+        #expect(invoice.currencyCode == "GBP")
+        #expect(invoice.payments.first?.currencyCode == "GBP")
+    }
+
     @Test(arguments: PaymentMethod.allCases)
     func recordsEveryManualPaymentMethod(_ method: PaymentMethod) throws {
         let graph = try InvoiceActionGraph.make()

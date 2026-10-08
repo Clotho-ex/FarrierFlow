@@ -176,6 +176,7 @@ enum UITestFixtures {
     static func seed(
         _ scenario: UITestScenario,
         in container: ModelContainer,
+        currencyCode: String = "USD",
         photographRootURL: URL
     ) throws {
         switch scenario {
@@ -184,11 +185,13 @@ enum UITestFixtures {
         case .invoiceReady:
             try seedInvoiceReady(
                 in: container,
+                currencyCode: currencyCode,
                 photographRootURL: photographRootURL
             )
         case .paymentPending:
             try seedPaymentPending(
                 in: container,
+                currencyCode: currencyCode,
                 photographRootURL: photographRootURL
             )
         case .nextAppointment:
@@ -209,6 +212,7 @@ enum UITestFixtures {
 
     private static func seedInvoiceReady(
         in container: ModelContainer,
+        currencyCode: String,
         photographRootURL: URL
     ) throws {
         let context = container.mainContext
@@ -216,7 +220,12 @@ enum UITestFixtures {
         guard !existingClients.contains(where: { $0.name == invoiceClientName }) else {
             return
         }
-        context.insert(BusinessProfile(name: "UI Test Farrier"))
+        context.insert(
+            BusinessProfile(
+                name: "UI Test Farrier",
+                currencyCode: currencyCode
+            )
+        )
 
         let invoiceClient = Client(
             name: invoiceClientName,
@@ -230,7 +239,8 @@ enum UITestFixtures {
         )
         let service = Service(
             name: "Trim",
-            defaultAmountMinorUnits: 5_000
+            defaultAmountMinorUnits: 5_000,
+            currencyCode: currencyCode
         )
         let invoiceHorse = Horse(
             name: "Milo",
@@ -292,10 +302,12 @@ enum UITestFixtures {
 
     private static func seedPaymentPending(
         in container: ModelContainer,
+        currencyCode: String,
         photographRootURL: URL
     ) throws {
         try seedInvoiceReady(
             in: container,
+            currencyCode: currencyCode,
             photographRootURL: photographRootURL
         )
         let context = container.mainContext

@@ -7,5 +7,6 @@ nonisolated struct InvoiceSummary: Identifiable, Equatable {
     let clientName: String
     let invoiceDate: Date
     let total: MoneyAvailability
+    let currencyCode: String
     let status: InvoiceStatus
 }

@@ -101,8 +101,9 @@ struct ServiceDetailView: View {
     }
 
     private func formattedAmount(for service: Service) -> String {
-        MoneyFormatter.usd(
+        MoneyFormatter.currency(
             minorUnits: service.defaultAmountMinorUnits,
+            currencyCode: service.currencyCode,
             locale: locale
         ) ?? String(localized: "Unavailable", locale: locale)
     }

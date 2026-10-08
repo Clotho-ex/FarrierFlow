@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-extension FarrierFlowSchemaV1 {
+extension FarrierFlowSchemaV2 {
     @Model
     final class Invoice {
         @Attribute(.unique) private(set) var number: Int64

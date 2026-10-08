@@ -40,7 +40,8 @@ struct InvoiceCreationModelTests {
                 recordedServiceCount: 2,
                 totalMinorUnits: try InvoiceDomainRules.checkedTotal(
                     model.visitChoices.map(\.subtotalMinorUnits)
-                )
+                ),
+                currencyCode: "USD"
             )
         )
         #expect(model.canGenerate)
@@ -69,7 +70,8 @@ struct InvoiceCreationModelTests {
             model.selectionSummary == InvoiceSelectionSummary(
                 visitCount: 1,
                 recordedServiceCount: 1,
-                totalMinorUnits: 12_500
+                totalMinorUnits: 12_500,
+                currencyCode: "USD"
             )
         )
         #expect(model.canGenerate)

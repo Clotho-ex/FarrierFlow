@@ -88,6 +88,34 @@ struct VisitStartUseCaseTests {
     }
 
     @Test
+    func startingVisitPreservesANonUSDBusinessCurrency() throws {
+        let graph = try makeTwoHorseGraph()
+        _ = ModelFixtures.makeBusinessProfile(currencyCode: "GBP", in: graph.context)
+        let defaultService = ModelFixtures.makeService(
+            name: "Full Set",
+            defaultAmountMinorUnits: 12_500,
+            currencyCode: "GBP",
+            in: graph.context
+        )
+        graph.horses[0].defaultService = defaultService
+        defaultService.horsesUsingAsDefault.append(graph.horses[0])
+        try DomainGraphValidator.save(graph.context)
+
+        let visitID = try VisitStartUseCase.start(
+            appointmentID: graph.appointment.persistentModelID,
+            now: Date(timeIntervalSinceReferenceDate: 123_456),
+            in: graph.container
+        )
+
+        let context = ModelContext(graph.container)
+        let visit = try #require(context.model(for: visitID) as? Visit)
+        let defaultedVisitHorse = try #require(
+            visit.visitHorses.first { $0.horse?.name == graph.horses[0].name }
+        )
+        #expect(defaultedVisitHorse.workItems.first?.currencyCode == "GBP")
+    }
+
+    @Test
     func archivedHorseDefaultBlocksStartWithoutCreatingAnyVisitRecords() throws {
         let graph = try makeTwoHorseGraph()
         let service = ModelFixtures.makeService(

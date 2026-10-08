@@ -382,8 +382,16 @@ final class VisitEditorModel {
         return true
     }
 
-    func isValidPriceInput(_ input: String) -> Bool {
-        (try? USDPriceParser.parse(input)) != nil
+    func isValidPriceInput(
+        _ input: String,
+        currencyCode: String,
+        locale: Locale = .current
+    ) -> Bool {
+        (try? MoneyInputParser.parse(
+            input,
+            currencyCode: currencyCode,
+            locale: locale
+        )) != nil
     }
 
     @discardableResult
@@ -391,11 +399,9 @@ final class VisitEditorModel {
         _ workItemID: UUID,
         serviceID: PersistentIdentifier,
         priceInput: String,
-        for visitHorseID: PersistentIdentifier
+        for visitHorseID: PersistentIdentifier,
+        locale: Locale = .current
     ) -> Bool {
-        guard let amountMinorUnits = try? USDPriceParser.parse(priceInput) else {
-            return false
-        }
         guard
             var updatedDraft = draft,
             let horseIndex = updatedDraft.horses.firstIndex(where: { $0.id == visitHorseID }),
@@ -407,6 +413,13 @@ final class VisitEditorModel {
         }
 
         let current = updatedDraft.horses[horseIndex].workItems[workItemIndex]
+        guard let amountMinorUnits = try? MoneyInputParser.parse(
+            priceInput,
+            currencyCode: current.currencyCode,
+            locale: locale
+        ) else {
+            return false
+        }
         if current.serviceID != serviceID {
             guard replaceWorkItem(workItemID, with: serviceID, for: visitHorseID) else {
                 return false

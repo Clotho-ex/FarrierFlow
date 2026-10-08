@@ -165,7 +165,11 @@ struct ApplyVisitWorkView: View {
     }
 
     private func formattedAmount(for workItem: WorkItemDraft) -> String {
-        MoneyFormatter.usd(minorUnits: workItem.amountMinorUnits, locale: locale)
+        MoneyFormatter.currency(
+            minorUnits: workItem.amountMinorUnits,
+            currencyCode: workItem.currencyCode,
+            locale: locale
+        )
             ?? String(localized: "Unavailable", locale: locale)
     }
 

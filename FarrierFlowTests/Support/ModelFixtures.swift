@@ -122,6 +122,7 @@ enum ModelFixtures {
         defaultAppointmentDurationMinutes: Int? = nil,
         defaultInvoiceDueDays: Int? = 14,
         nextInvoiceNumber: Int64 = 1,
+        currencyCode: String = "USD",
         in context: ModelContext
     ) -> BusinessProfile {
         let profile = BusinessProfile(
@@ -132,7 +133,8 @@ enum ModelFixtures {
             defaultInvoiceNote: defaultInvoiceNote,
             defaultAppointmentDurationMinutes: defaultAppointmentDurationMinutes,
             defaultInvoiceDueDays: defaultInvoiceDueDays,
-            nextInvoiceNumber: nextInvoiceNumber
+            nextInvoiceNumber: nextInvoiceNumber,
+            currencyCode: currencyCode
         )
         context.insert(profile)
         return profile
@@ -159,6 +161,7 @@ enum ModelFixtures {
             businessPhoneSnapshot: businessProfile.phone,
             businessEmailSnapshot: businessProfile.email,
             businessAddressSnapshot: businessProfile.address,
+            currencyCode: businessProfile.currencyCode,
             client: client
         )
         context.insert(invoice)

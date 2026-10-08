@@ -376,7 +376,10 @@ struct VisitDetailView: View {
                 Text(workItem.serviceNameSnapshot)
                     .font(Typography.recordMetadata)
                 Spacer(minLength: SpacingTokens.rowContent)
-                Text(formattedAmount(workItem.amountMinorUnits))
+                Text(formattedAmount(
+                    workItem.amountMinorUnits,
+                    currencyCode: workItem.currencyCode
+                ))
                     .font(Typography.recordMetadata)
                     .foregroundStyle(ColorTokens.textSecondary)
             }
@@ -413,7 +416,7 @@ struct VisitDetailView: View {
     private func subtotalText(for subtotal: MoneyAvailability) -> String {
         switch subtotal {
         case let .available(minorUnits):
-            return formattedAmount(minorUnits)
+            return formattedAmount(minorUnits, currencyCode: detailCurrencyCode)
         case .unavailable:
             return String(localized: "Subtotal Unavailable", locale: locale)
         }
@@ -422,20 +425,34 @@ struct VisitDetailView: View {
     private func totalText(for total: MoneyAvailability) -> String {
         switch total {
         case let .available(minorUnits):
-            return formattedAmount(minorUnits)
+            return formattedAmount(minorUnits, currencyCode: detailCurrencyCode)
         case .unavailable:
             return String(localized: "Total Unavailable", locale: locale)
         }
     }
 
-    private func formattedAmount(_ minorUnits: Int64) -> String {
-        MoneyFormatter.usd(minorUnits: minorUnits, locale: locale)
+    private var detailCurrencyCode: String {
+        model.detail?.currencyCode ?? BusinessCurrency.unitedStatesDollar.rawValue
+    }
+
+    private func formattedAmount(
+        _ minorUnits: Int64,
+        currencyCode: String
+    ) -> String {
+        MoneyFormatter.currency(
+            minorUnits: minorUnits,
+            currencyCode: currencyCode,
+            locale: locale
+        )
             ?? String(localized: "Unavailable", locale: locale)
     }
 
     private func workItemAccessibilityValue(_ workItem: VisitWorkItemResult) -> String {
         [
-            formattedAmount(workItem.amountMinorUnits),
+            formattedAmount(
+                workItem.amountMinorUnits,
+                currencyCode: workItem.currencyCode
+            ),
             workItem.serviceIsArchived == true ? String(localized: "Archived", locale: locale) : nil,
         ]
         .compactMap { $0 }

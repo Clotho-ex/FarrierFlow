@@ -66,6 +66,7 @@ enum InvoiceGenerationUseCase {
                 businessPhoneSnapshot: businessProfile.phone,
                 businessEmailSnapshot: businessProfile.email,
                 businessAddressSnapshot: businessProfile.address,
+                currencyCode: businessProfile.currencyCode,
                 client: client
             )
             context.insert(invoice)

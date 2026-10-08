@@ -26,12 +26,18 @@ nonisolated enum ExportValueFormatter {
 
     static func boolean(_ value: Bool) -> String { value ? "true" : "false" }
 
-    static func usdDisplay(minorUnits: Int64, localeIdentifier: String) -> String? {
-        guard minorUnits >= 0 else { return nil }
+    static func currencyDisplay(
+        minorUnits: Int64,
+        currencyCode: String,
+        localeIdentifier: String
+    ) -> String? {
+        guard minorUnits >= 0, BusinessCurrency.isSupported(currencyCode) else {
+            return nil
+        }
         let formatter = NumberFormatter()
         formatter.locale = Locale(identifier: localeIdentifier)
         formatter.numberStyle = .currency
-        formatter.currencyCode = "USD"
+        formatter.currencyCode = currencyCode
         formatter.minimumFractionDigits = 2
         formatter.maximumFractionDigits = 2
         let amount = Decimal(minorUnits) / 100

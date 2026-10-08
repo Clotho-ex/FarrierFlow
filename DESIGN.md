@@ -67,6 +67,12 @@ Business presents its centered hero and identity form as one vertically balanced
 composition: ownership prompt, short trust-led reason, focused field, and centered
 invoice/change-later guidance. The form remains the visual center of gravity
 rather than splitting the screen into unrelated empty regions.
+The same setup includes a native menu picker for the region-derived business
+currency, displaying a localized currency name with its ISO code. My Business
+uses the same control until the first Service or financial record exists, then
+shows the saved currency as read-only with a direct explanation. Monetary entry
+and feedback always name and format the selected currency; they never imply
+conversion or relabel existing amounts.
 Its hero scrolls away into a standard inline navigation title. Subscription uses
 the same title behavior, one capsule Monthly/Yearly selector, and one raised
 detail panel that changes billing/value context without inventing entitlement

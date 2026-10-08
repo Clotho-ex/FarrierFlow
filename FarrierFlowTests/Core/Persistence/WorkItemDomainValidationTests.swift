@@ -82,7 +82,7 @@ struct WorkItemDomainValidationTests {
         case "amount":
             service.defaultAmountMinorUnits = -1
         case "currency":
-            service.currencyCode = "EUR"
+            service.currencyCode = "JPY"
         default:
             Issue.record("Unexpected Service mutation")
         }
@@ -129,7 +129,7 @@ struct WorkItemDomainValidationTests {
         case "amount":
             workItem.amountMinorUnits = -1
         case "currency":
-            workItem.currencyCode = "EUR"
+            workItem.currencyCode = "JPY"
         case "service":
             workItem.service = nil
         case "owner":
@@ -139,6 +139,38 @@ struct WorkItemDomainValidationTests {
         }
 
         #expect(throws: expectedViolation) {
+            try DomainGraphValidator.validateAll(in: graph.context)
+        }
+    }
+
+    @Test
+    func supportedNonUSDCurrencyPassesWhenProfileServiceAndWorkItemMatch() throws {
+        let graph = try makeVisitGraph(completed: false)
+        _ = ModelFixtures.makeBusinessProfile(currencyCode: "GBP", in: graph.context)
+        let service = ModelFixtures.makeService(currencyCode: "GBP", in: graph.context)
+        _ = ModelFixtures.makeWorkItem(
+            service: service,
+            visitHorse: graph.visitHorse,
+            currencyCode: "GBP",
+            in: graph.context
+        )
+
+        try DomainGraphValidator.validateAll(in: graph.context)
+    }
+
+    @Test
+    func rejectsCurrencyMismatchBetweenServiceAndWorkItem() throws {
+        let graph = try makeVisitGraph(completed: false)
+        _ = ModelFixtures.makeBusinessProfile(currencyCode: "GBP", in: graph.context)
+        let service = ModelFixtures.makeService(currencyCode: "GBP", in: graph.context)
+        _ = ModelFixtures.makeWorkItem(
+            service: service,
+            visitHorse: graph.visitHorse,
+            currencyCode: "EUR",
+            in: graph.context
+        )
+
+        #expect(throws: DomainGraphViolation.workItemCurrencyInvalid) {
             try DomainGraphValidator.validateAll(in: graph.context)
         }
     }

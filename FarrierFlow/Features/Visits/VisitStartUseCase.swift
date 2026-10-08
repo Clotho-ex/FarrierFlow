@@ -105,7 +105,7 @@ enum VisitStartUseCase {
                     let workItem = WorkItem(
                         serviceNameSnapshot: serviceNameSnapshot,
                         amountMinorUnits: service.defaultAmountMinorUnits,
-                        currencyCode: "USD",
+                        currencyCode: service.currencyCode,
                         service: service,
                         visitHorse: visitHorse
                     )

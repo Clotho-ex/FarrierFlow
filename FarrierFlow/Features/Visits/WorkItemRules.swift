@@ -6,12 +6,14 @@ nonisolated enum WorkItemDraftViolation: Error, Equatable {
     case serviceNameSnapshotRequired
     case negativeAmount
     case unsupportedCurrency
+    case mixedCurrency
     case subtotalOverflow
 }
 
 nonisolated enum WorkItemRules {
     static func violation(in workItems: [WorkItemDraft]) -> WorkItemDraftViolation? {
         var serviceIDs = Set<PersistentIdentifier>()
+        var currencyCode: String?
         for workItem in workItems {
             guard serviceIDs.insert(workItem.serviceID).inserted else {
                 return .duplicateService
@@ -22,9 +24,13 @@ nonisolated enum WorkItemRules {
             guard workItem.amountMinorUnits >= 0 else {
                 return .negativeAmount
             }
-            guard workItem.currencyCode == "USD" else {
+            guard BusinessCurrency.isSupported(workItem.currencyCode) else {
                 return .unsupportedCurrency
             }
+            if let currencyCode, currencyCode != workItem.currencyCode {
+                return .mixedCurrency
+            }
+            currencyCode = workItem.currencyCode
         }
         return nil
     }

@@ -12,6 +12,7 @@ nonisolated struct InvoiceSelectionSummary: Equatable {
     let visitCount: Int
     let recordedServiceCount: Int
     let totalMinorUnits: Int64
+    let currencyCode: String
 }
 
 @MainActor
@@ -50,6 +51,8 @@ final class InvoiceCreationModel {
             draft.selectedVisitIDs.contains($0.id)
         }
         guard !selectedChoices.isEmpty,
+              let currencyCode = selectedChoices.first?.currencyCode,
+              selectedChoices.allSatisfy({ $0.currencyCode == currencyCode }),
               let total = try? InvoiceDomainRules.checkedTotal(
                   selectedChoices.map(\.subtotalMinorUnits)
               )
@@ -61,7 +64,8 @@ final class InvoiceCreationModel {
             recordedServiceCount: selectedChoices.reduce(0) {
                 $0 + $1.eligibleWorkItemCount
             },
-            totalMinorUnits: total
+            totalMinorUnits: total,
+            currencyCode: currencyCode
         )
     }
 
@@ -238,7 +242,8 @@ final class InvoiceCreationModel {
                 address: profile.address ?? "",
                 defaultInvoiceNote: profile.defaultInvoiceNote ?? "",
                 defaultAppointmentDurationMinutes: profile.defaultAppointmentDurationMinutes,
-                defaultInvoiceDueDays: profile.defaultInvoiceDueDays
+                defaultInvoiceDueDays: profile.defaultInvoiceDueDays,
+                currencyCode: profile.currencyCode
             )
         ) else {
             return false
@@ -251,5 +256,6 @@ final class InvoiceCreationModel {
             && values.defaultAppointmentDurationMinutes
                 == profile.defaultAppointmentDurationMinutes
             && values.defaultInvoiceDueDays == profile.defaultInvoiceDueDays
+            && values.currencyCode == profile.currencyCode
     }
 }

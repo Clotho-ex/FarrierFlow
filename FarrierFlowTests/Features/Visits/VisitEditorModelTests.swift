@@ -120,13 +120,15 @@ struct VisitEditorModelTests {
             defaultWorkItem.id,
             serviceID: defaultWorkItem.serviceID,
             priceInput: "$140.25",
-            for: milo.id
+            for: milo.id,
+            locale: Locale(identifier: "en_US")
         ))
         #expect(!model.updateWorkItem(
             defaultWorkItem.id,
             serviceID: defaultWorkItem.serviceID,
             priceInput: "12.345",
-            for: milo.id
+            for: milo.id,
+            locale: Locale(identifier: "en_US")
         ))
         #expect(model.saveProgress())
 

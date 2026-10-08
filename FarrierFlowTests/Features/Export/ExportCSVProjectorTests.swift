@@ -17,9 +17,10 @@ struct ExportCSVProjectorTests {
         #expect(ExportValueFormatter.local(date, context: context) == "2024-08-30T02:40:00.123456-04:00")
         #expect(ExportValueFormatter.boolean(true) == "true")
         #expect(ExportValueFormatter.boolean(false) == "false")
-        #expect(ExportValueFormatter.usdDisplay(minorUnits: 0, localeIdentifier: "en_US") == "$0.00")
-        #expect(ExportValueFormatter.usdDisplay(minorUnits: 1_234_567_890, localeIdentifier: "en_US") == "$12,345,678.90")
-        #expect(ExportValueFormatter.usdDisplay(minorUnits: 123_456, localeIdentifier: "de_DE") == "1.234,56\u{00A0}$")
+        #expect(ExportValueFormatter.currencyDisplay(minorUnits: 0, currencyCode: "USD", localeIdentifier: "en_US") == "$0.00")
+        #expect(ExportValueFormatter.currencyDisplay(minorUnits: 1_234_567_890, currencyCode: "USD", localeIdentifier: "en_US") == "$12,345,678.90")
+        #expect(ExportValueFormatter.currencyDisplay(minorUnits: 123_456, currencyCode: "USD", localeIdentifier: "de_DE") == "1.234,56\u{00A0}$")
+        #expect(ExportValueFormatter.currencyDisplay(minorUnits: 12_500, currencyCode: "GBP", localeIdentifier: "en_GB") == "£125.00")
     }
 
     @Test func projectsEveryVersionOneTableWithExactWidthsAndOptionalEmpties() throws {
@@ -122,8 +123,22 @@ struct ExportCSVProjectorTests {
         #expect(throws: ExportFormatError.unsupportedInvoiceStatus("unknown")) {
             _ = try ExportCSVProjector.tables(from: Self.snapshot(status: "unknown"), photographResults: [Self.photographUUID: .unavailable])
         }
-        #expect(throws: ExportFormatError.unsupportedCurrencyCode("EUR")) {
-            _ = try ExportCSVProjector.tables(from: Self.snapshot(currencyCode: "EUR"), photographResults: [Self.photographUUID: .unavailable])
+        let euroTables = try ExportCSVProjector.tables(
+            from: Self.snapshot(currencyCode: "EUR"),
+            photographResults: [Self.photographUUID: .unavailable]
+        )
+        #expect(euroTables[11].rows[0][15] == .raw("EUR"))
+        #expect(throws: ExportFormatError.unsupportedCurrencyCode("JPY")) {
+            _ = try ExportCSVProjector.tables(from: Self.snapshot(currencyCode: "JPY"), photographResults: [Self.photographUUID: .unavailable])
+        }
+        #expect(throws: ExportFormatError.inconsistentCurrencyCode(expected: "GBP", actual: "EUR")) {
+            _ = try ExportCSVProjector.tables(
+                from: Self.snapshot(
+                    currencyCode: "GBP",
+                    workItemCurrencyCode: "EUR"
+                ),
+                photographResults: [Self.photographUUID: .unavailable]
+            )
         }
         #expect(throws: ExportFormatError.invalidMonetaryValue(-1)) {
             _ = try ExportCSVProjector.tables(from: Self.snapshot(minorUnits: -1), photographResults: [Self.photographUUID: .unavailable])
@@ -149,11 +164,11 @@ struct ExportCSVProjectorTests {
         try .init(entity: entity, ordinal: 1)
     }
 
-    private static func snapshot(outcome: String = "serviced", status: String = "paid", currencyCode: String = "USD", minorUnits: Int64 = 12_500, nextInvoiceNumber: Int64 = 7, invoiceNumber: Int64 = 7) throws -> ExportSnapshot {
+    private static func snapshot(outcome: String = "serviced", status: String = "paid", currencyCode: String = "USD", workItemCurrencyCode: String? = nil, minorUnits: Int64 = 12_500, nextInvoiceNumber: Int64 = 7, invoiceNumber: Int64 = 7) throws -> ExportSnapshot {
         let businessProfile = try id(.businessProfile), client = try id(.client), location = try id(.serviceLocation), horse = try id(.horse), appointment = try id(.appointment), appointmentHorse = try id(.appointmentHorse), visit = try id(.visit), visitHorse = try id(.visitHorse), photograph = try id(.photograph), service = try id(.service), workItem = try id(.workItem), invoice = try id(.invoice), payment = try id(.payment), invoiceVisit = try id(.invoiceVisit), invoiceLineItem = try id(.invoiceLineItem)
         return .init(
             context: context,
-            businessProfiles: [.init(id: businessProfile, name: "Farrier = Co", phone: "555-0100", email: nil, address: nil, defaultInvoiceNote: nil, defaultAppointmentDurationMinutes: 45, defaultInvoiceDueDays: nil, nextInvoiceNumber: nextInvoiceNumber)],
+            businessProfiles: [.init(id: businessProfile, name: "Farrier = Co", phone: "555-0100", email: nil, address: nil, defaultInvoiceNote: nil, defaultAppointmentDurationMinutes: 45, defaultInvoiceDueDays: nil, nextInvoiceNumber: nextInvoiceNumber, currencyCode: currencyCode)],
             clients: [.init(id: client, name: "Client", phone: nil, email: "client@example.com", notes: "=formula")],
             serviceLocations: [.init(id: location, name: "North Field", address: nil, contactNotes: "Gate code")],
             horses: [.init(id: horse, name: "Milo", safetyNotes: nil, appointmentIntervalWeeks: 6, clientID: client, currentServiceLocationID: location, defaultServiceID: nil)],
@@ -163,7 +178,7 @@ struct ExportCSVProjectorTests {
             visitHorses: [.init(id: visitHorse, outcomeRawValue: outcome, workNotes: "Done", visitID: visit, horseID: horse)],
             photographs: [.init(id: photograph, photographID: photographUUID, createdAt: date, pixelWidth: 1200, pixelHeight: 900, byteCount: 42, visitHorseID: visitHorse)],
             services: [.init(id: service, name: "Trim", defaultAmountMinorUnits: minorUnits, currencyCode: currencyCode, isArchived: false)],
-            workItems: [.init(id: workItem, serviceNameSnapshot: "Trim", amountMinorUnits: minorUnits, currencyCode: currencyCode, serviceID: service, visitHorseID: visitHorse, invoiceLineItemID: nil)],
+            workItems: [.init(id: workItem, serviceNameSnapshot: "Trim", amountMinorUnits: minorUnits, currencyCode: workItemCurrencyCode ?? currencyCode, serviceID: service, visitHorseID: visitHorse, invoiceLineItemID: nil)],
             invoices: [.init(id: invoice, number: invoiceNumber, invoiceDate: date, dueDate: nil, note: nil, statusRawValue: status, clientNameSnapshot: "Client", clientPhoneSnapshot: nil, clientEmailSnapshot: nil, businessNameSnapshot: "Farrier = Co", businessPhoneSnapshot: nil, businessEmailSnapshot: nil, businessAddressSnapshot: nil, currencyCode: currencyCode, clientID: client)],
             payments: [.init(id: payment, invoiceID: invoice, sourceRawValue: "manual", methodRawValue: "bankTransfer", amountMinorUnits: minorUnits, currencyCode: currencyCode, receivedAt: date, otherDescription: nil, reference: "BANK-42", note: "Internal")],
             invoiceVisits: [.init(id: invoiceVisit, visitDateSnapshot: date, serviceLocationNameSnapshot: "North Field", serviceLocationAddressSnapshot: nil, invoiceID: invoice, sourceVisitID: visit)],

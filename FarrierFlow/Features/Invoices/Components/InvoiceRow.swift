@@ -58,7 +58,11 @@ struct InvoiceRow: View {
     private var formattedTotal: String {
         switch summary.total {
         case .available(let amount):
-            MoneyFormatter.usd(minorUnits: amount, locale: locale)
+            MoneyFormatter.currency(
+                minorUnits: amount,
+                currencyCode: summary.currencyCode,
+                locale: locale
+            )
                 ?? String(localized: "Unavailable", locale: locale)
         case .unavailable:
             String(localized: "Unavailable", locale: locale)

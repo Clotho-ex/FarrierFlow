@@ -13,14 +13,18 @@ nonisolated enum BusinessProfileEditorLoadState: Equatable {
 final class BusinessProfileEditorModel {
     var draft = BusinessProfileDraft()
     private(set) var loadState: BusinessProfileEditorLoadState = .loading
+    private(set) var isCurrencyLocked = false
     var alert: FeatureAlert?
+
+    private var originalCurrencyCode = "USD"
 
     var canSave: Bool {
         loadState == .loaded
+            && (!isCurrencyLocked || draft.currencyCode == originalCurrencyCode)
             && (try? BusinessProfileRules.validated(draft)) != nil
     }
 
-    func load(in context: ModelContext) {
+    func load(in context: ModelContext, locale: Locale = .current) {
         loadState = .loading
         do {
             let profiles = try fetchProfiles(in: context)
@@ -29,7 +33,9 @@ final class BusinessProfileEditorModel {
                 return
             }
 
+            isCurrencyLocked = try hasCurrencyBearingRecords(in: context)
             if let profile = profiles.first {
+                originalCurrencyCode = profile.currencyCode
                 draft = BusinessProfileDraft(
                     name: profile.name,
                     phone: profile.phone ?? "",
@@ -37,10 +43,14 @@ final class BusinessProfileEditorModel {
                     address: profile.address ?? "",
                     defaultInvoiceNote: profile.defaultInvoiceNote ?? "",
                     defaultAppointmentDurationMinutes: profile.defaultAppointmentDurationMinutes,
-                    defaultInvoiceDueDays: profile.defaultInvoiceDueDays
+                    defaultInvoiceDueDays: profile.defaultInvoiceDueDays,
+                    currencyCode: profile.currencyCode
                 )
             } else {
-                draft = BusinessProfileDraft()
+                originalCurrencyCode = isCurrencyLocked
+                    ? BusinessCurrency.unitedStatesDollar.rawValue
+                    : BusinessCurrency.defaultCode(for: locale)
+                draft = BusinessProfileDraft(currencyCode: originalCurrencyCode)
             }
             alert = nil
             loadState = .loaded
@@ -62,6 +72,12 @@ final class BusinessProfileEditorModel {
             guard profiles.count <= 1 else {
                 throw BusinessProfileEditorError.multipleProfiles
             }
+            let currencyIsLocked = try hasCurrencyBearingRecords(in: context)
+            let persistedCurrencyCode = profiles.first?.currencyCode
+                ?? BusinessCurrency.unitedStatesDollar.rawValue
+            guard !currencyIsLocked || values.currencyCode == persistedCurrencyCode else {
+                throw BusinessProfileEditorError.currencyLocked
+            }
 
             let profile: BusinessProfile
             if let existing = profiles.first {
@@ -69,7 +85,8 @@ final class BusinessProfileEditorModel {
             } else {
                 profile = BusinessProfile(
                     name: values.name,
-                    nextInvoiceNumber: 1
+                    nextInvoiceNumber: 1,
+                    currencyCode: values.currencyCode
                 )
                 context.insert(profile)
             }
@@ -81,10 +98,20 @@ final class BusinessProfileEditorModel {
             profile.defaultInvoiceNote = values.defaultInvoiceNote
             profile.defaultAppointmentDurationMinutes = values.defaultAppointmentDurationMinutes
             profile.defaultInvoiceDueDays = values.defaultInvoiceDueDays
+            profile.currencyCode = values.currencyCode
 
             try DomainGraphValidator.save(context)
+            originalCurrencyCode = values.currencyCode
+            isCurrencyLocked = currencyIsLocked
             alert = nil
             return true
+        } catch BusinessProfileEditorError.currencyLocked {
+            context.rollback()
+            alert = FeatureAlert(
+                title: "Currency Can’t Be Changed",
+                message: "Your business currency is locked after services or financial records exist."
+            )
+            return false
         } catch {
             context.rollback()
             alert = FeatureAlert(
@@ -102,8 +129,17 @@ final class BusinessProfileEditorModel {
         descriptor.fetchLimit = 2
         return try context.fetch(descriptor)
     }
+
+    private func hasCurrencyBearingRecords(in context: ModelContext) throws -> Bool {
+        try context.fetchCount(FetchDescriptor<Service>()) > 0
+            || context.fetchCount(FetchDescriptor<WorkItem>()) > 0
+            || context.fetchCount(FetchDescriptor<Invoice>()) > 0
+            || context.fetchCount(FetchDescriptor<InvoiceLineItem>()) > 0
+            || context.fetchCount(FetchDescriptor<Payment>()) > 0
+    }
 }
 
 private enum BusinessProfileEditorError: Error {
     case multipleProfiles
+    case currencyLocked
 }

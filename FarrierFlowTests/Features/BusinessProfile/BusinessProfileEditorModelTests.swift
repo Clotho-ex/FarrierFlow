@@ -12,10 +12,11 @@ struct BusinessProfileEditorModelTests {
         let context = container.mainContext
         let model = BusinessProfileEditorModel()
 
-        model.load(in: context)
+        model.load(in: context, locale: Locale(identifier: "en_GB"))
 
         #expect(model.loadState == .loaded)
-        #expect(model.draft == BusinessProfileDraft())
+        #expect(model.draft == BusinessProfileDraft(currencyCode: "GBP"))
+        #expect(!model.isCurrencyLocked)
         #expect(!model.canSave)
 
         model.draft = BusinessProfileDraft(
@@ -25,7 +26,8 @@ struct BusinessProfileEditorModelTests {
             address: " 1 Main Street ",
             defaultInvoiceNote: " Thank you. ",
             defaultAppointmentDurationMinutes: 45,
-            defaultInvoiceDueDays: 30
+            defaultInvoiceDueDays: 30,
+            currencyCode: "GBP"
         )
 
         #expect(model.canSave)
@@ -42,6 +44,7 @@ struct BusinessProfileEditorModelTests {
         #expect(profile.defaultAppointmentDurationMinutes == 45)
         #expect(profile.defaultInvoiceDueDays == 30)
         #expect(profile.nextInvoiceNumber == 1)
+        #expect(profile.currencyCode == "GBP")
     }
 
     @Test
@@ -152,6 +155,28 @@ struct BusinessProfileEditorModelTests {
         #expect(graph.invoice.businessEmailSnapshot == "original@example.com")
         #expect(graph.invoice.businessAddressSnapshot == "1 Main Street")
         #expect(graph.invoice.note == "Original invoice note.")
+    }
+
+    @Test
+    func existingFinancialRecordsLockCurrencyChanges() throws {
+        let container = try ModelContainerFactory.inMemoryTest()
+        let context = container.mainContext
+        let profile = ModelFixtures.makeBusinessProfile(
+            currencyCode: "USD",
+            in: context
+        )
+        _ = ModelFixtures.makeService(currencyCode: "USD", in: context)
+        try DomainGraphValidator.save(context)
+        let model = BusinessProfileEditorModel()
+
+        model.load(in: context, locale: Locale(identifier: "en_GB"))
+
+        #expect(model.isCurrencyLocked)
+        #expect(model.draft.currencyCode == "USD")
+        model.draft.currencyCode = "EUR"
+        #expect(!model.save(in: context))
+        #expect(profile.currencyCode == "USD")
+        #expect(model.alert != nil)
     }
 
     private func makeInvoiceGraph() throws -> (

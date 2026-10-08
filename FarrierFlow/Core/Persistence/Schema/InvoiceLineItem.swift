@@ -1,6 +1,6 @@
 import SwiftData
 
-extension FarrierFlowSchemaV1 {
+extension FarrierFlowSchemaV2 {
     @Model
     final class InvoiceLineItem {
         private(set) var horseNameSnapshot: String

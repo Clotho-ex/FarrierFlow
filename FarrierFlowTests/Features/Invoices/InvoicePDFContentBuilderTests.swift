@@ -6,6 +6,79 @@ import Testing
 @Suite("Invoice PDF content builder", .serialized)
 @MainActor
 struct InvoicePDFContentBuilderTests {
+    @Test func preservesSupportedBusinessCurrencyInPDFContent() throws {
+        let graph = try makeGraph(currencyCode: "GBP")
+
+        let content = try InvoicePDFContentBuilder.build(
+            invoiceID: graph.invoice.persistentModelID,
+            in: graph.context
+        )
+
+        #expect(content.currencyCode == "GBP")
+    }
+
+    @Test func rejectsLineItemCurrencyThatDoesNotMatchTheInvoice() throws {
+        let graph = try makeGraph(currencyCode: "GBP")
+        let invoiceVisit = try #require(graph.invoice.invoiceVisits.first)
+        let original = try #require(invoiceVisit.lineItems.first)
+        let sourceWorkItem = try #require(original.sourceWorkItem)
+        invoiceVisit.lineItems.removeAll()
+        sourceWorkItem.invoiceLineItem = nil
+        graph.context.delete(original)
+        let inconsistent = InvoiceLineItem(
+            horseNameSnapshot: "Milo",
+            serviceNameSnapshot: "Full Set",
+            amountMinorUnits: 12_500,
+            currencyCode: "EUR",
+            invoiceVisit: invoiceVisit,
+            sourceWorkItem: sourceWorkItem
+        )
+        graph.context.insert(inconsistent)
+        invoiceVisit.lineItems.append(inconsistent)
+        sourceWorkItem.invoiceLineItem = inconsistent
+
+        #expect(throws: InvoiceDomainRuleError.inconsistentCurrency) {
+            _ = try InvoiceProjection.summary(
+                from: graph.invoice,
+                locale: Locale(identifier: "en_GB")
+            )
+        }
+        #expect(throws: InvoiceDomainRuleError.inconsistentCurrency) {
+            _ = try InvoicePDFContentBuilder.build(
+                invoiceID: graph.invoice.persistentModelID,
+                in: graph.context
+            )
+        }
+    }
+
+    @Test func preservesTotalUnavailableErrorForInvalidAmounts() throws {
+        let graph = try makeGraph()
+        let invoiceVisit = try #require(graph.invoice.invoiceVisits.first)
+        let original = try #require(invoiceVisit.lineItems.first)
+        let sourceWorkItem = try #require(original.sourceWorkItem)
+        invoiceVisit.lineItems.removeAll()
+        sourceWorkItem.invoiceLineItem = nil
+        graph.context.delete(original)
+        let invalid = InvoiceLineItem(
+            horseNameSnapshot: "Milo",
+            serviceNameSnapshot: "Full Set",
+            amountMinorUnits: -1,
+            currencyCode: "USD",
+            invoiceVisit: invoiceVisit,
+            sourceWorkItem: sourceWorkItem
+        )
+        graph.context.insert(invalid)
+        invoiceVisit.lineItems.append(invalid)
+        sourceWorkItem.invoiceLineItem = invalid
+
+        #expect(throws: InvoicePDFContentBuilderError.totalUnavailable) {
+            _ = try InvoicePDFContentBuilder.build(
+                invoiceID: graph.invoice.persistentModelID,
+                in: graph.context
+            )
+        }
+    }
+
     @Test func buildsCompleteContentFromPersistedInvoiceSnapshots() throws {
         let graph = try makeGraph()
 
@@ -87,7 +160,8 @@ struct InvoicePDFContentBuilderTests {
 
     private func makeGraph(
         includeOptionalValues: Bool = true,
-        status: InvoiceStatus = .paid
+        status: InvoiceStatus = .paid,
+        currencyCode: String = "USD"
     ) throws -> Graph {
         let container = try ModelContainerFactory.inMemoryTest()
         let context = container.mainContext
@@ -120,11 +194,13 @@ struct InvoicePDFContentBuilderTests {
             email: includeOptionalValues ? "office@example.com" : nil,
             address: includeOptionalValues ? "1 Main Street" : nil,
             nextInvoiceNumber: 2,
+            currencyCode: currencyCode,
             in: context
         )
         let service = ModelFixtures.makeService(
             name: "Full Set",
             defaultAmountMinorUnits: 12_500,
+            currencyCode: currencyCode,
             in: context
         )
         let visit = ModelFixtures.makeVisit(

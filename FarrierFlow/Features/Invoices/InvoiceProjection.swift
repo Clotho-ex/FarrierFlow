@@ -4,10 +4,8 @@ import SwiftData
 @MainActor
 enum InvoiceProjection {
     static func summary(from invoice: Invoice, locale: Locale) throws -> InvoiceSummary {
-        let total = total(for: invoice)
-        guard case .available(let totalMinorUnits) = total else {
-            throw CheckedMoneyTotalError.overflow
-        }
+        let totalMinorUnits = try total(for: invoice)
+        let total = MoneyAvailability.available(totalMinorUnits)
         let status = try InvoiceDomainRules.validatedStatus(
             rawValue: invoice.statusRawValue,
             payments: invoice.payments,
@@ -20,15 +18,14 @@ enum InvoiceProjection {
             clientName: invoice.clientNameSnapshot,
             invoiceDate: invoice.invoiceDate,
             total: total,
+            currencyCode: invoice.currencyCode,
             status: status
         )
     }
 
     static func detail(from invoice: Invoice, locale: Locale) throws -> InvoiceDetail {
-        let total = total(for: invoice)
-        guard case .available(let totalMinorUnits) = total else {
-            throw CheckedMoneyTotalError.overflow
-        }
+        let totalMinorUnits = try total(for: invoice)
+        let total = MoneyAvailability.available(totalMinorUnits)
         let status = try InvoiceDomainRules.validatedStatus(
             rawValue: invoice.statusRawValue,
             payments: invoice.payments,
@@ -95,11 +92,10 @@ enum InvoiceProjection {
         )
     }
 
-    private static func total(for invoice: Invoice) -> MoneyAvailability {
-        let amounts = invoice.invoiceVisits.flatMap(\.lineItems).map(\.amountMinorUnits)
-        guard let total = try? InvoiceDomainRules.checkedTotal(amounts) else {
-            return .unavailable
-        }
-        return .available(total)
+    private static func total(for invoice: Invoice) throws -> Int64 {
+        try InvoiceDomainRules.checkedTotal(
+            lineItems: invoice.invoiceVisits.flatMap(\.lineItems),
+            currencyCode: invoice.currencyCode
+        )
     }
 }

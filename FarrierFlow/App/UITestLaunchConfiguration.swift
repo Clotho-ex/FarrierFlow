@@ -14,6 +14,8 @@ struct UITestLaunchConfiguration {
         "FARRIERFLOW_UI_TEST_COLOR_SCHEME"
     static let subscriptionAccessEnvironmentKey =
         "FARRIERFLOW_UI_TEST_SUBSCRIPTION_ACCESS"
+    static let businessCurrencyEnvironmentKey =
+        "FARRIERFLOW_UI_TEST_BUSINESS_CURRENCY"
 
     let storeURL: URL?
     let forcesCameraUnavailable: Bool
@@ -21,6 +23,7 @@ struct UITestLaunchConfiguration {
     let dynamicTypeSize: DynamicTypeSize?
     let colorScheme: ColorScheme?
     let subscriptionAccess: SubscriptionUITestAccess
+    let businessCurrencyCode: String
 
     var onboardingDefaults: UserDefaults {
         guard let storeURL else { return .standard }
@@ -55,6 +58,11 @@ struct UITestLaunchConfiguration {
             Self.subscriptionAccessEnvironmentKey
         ]
         .flatMap(SubscriptionUITestAccess.init(rawValue:)) ?? .full
+        businessCurrencyCode = processInfo.environment[
+            Self.businessCurrencyEnvironmentKey
+        ]
+        .flatMap { BusinessCurrency.isSupported($0) ? $0.uppercased() : nil }
+            ?? BusinessCurrency.unitedStatesDollar.rawValue
         guard let rawName = processInfo.environment[Self.storeNameEnvironmentKey] else {
             storeURL = nil
             return
@@ -87,6 +95,7 @@ struct UITestLaunchConfiguration {
             try UITestFixtures.seed(
                 scenario,
                 in: container,
+                currencyCode: businessCurrencyCode,
                 photographRootURL: storeURL
                     .deletingPathExtension()
                     .appending(
