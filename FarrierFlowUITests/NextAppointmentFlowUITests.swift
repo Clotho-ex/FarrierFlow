@@ -60,7 +60,7 @@ final class NextAppointmentFlowUITests: XCTestCase {
         assertAppointmentSelection(notServicedHorseName, selected: true, in: app)
         app.navigationBars["New Appointment"].buttons["Save"].tap()
 
-        XCTAssertTrue(app.navigationBars[barnName].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Appointment"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.cells.staticTexts[laterHorseName].exists)
         XCTAssertTrue(app.cells.staticTexts[notServicedHorseName].exists)
 

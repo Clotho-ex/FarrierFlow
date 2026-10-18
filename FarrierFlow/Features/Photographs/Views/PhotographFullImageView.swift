@@ -4,6 +4,7 @@ import UIKit
 struct PhotographFullImageView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
+    @Environment(\.backupSync) private var backupSync
     let item: PhotographItem
     let url: URL
     let horseName: String
@@ -61,6 +62,8 @@ struct PhotographFullImageView: View {
             protectedDataIsAvailable = UIApplication.shared.isProtectedDataAvailable
             loadFinished = protectedDataIsAvailable
         }
+        .onChange(of: item.availability) { _, _ in reloadToken += 1 }
+        .onChange(of: backupSync?.runtime?.photographsVersion) { _, _ in reloadToken += 1 }
         .onReceive(
             NotificationCenter.default.publisher(
                 for: UIApplication.protectedDataWillBecomeUnavailableNotification

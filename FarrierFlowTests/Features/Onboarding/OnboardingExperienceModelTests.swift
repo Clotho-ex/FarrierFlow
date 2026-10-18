@@ -6,6 +6,24 @@ import Testing
 @MainActor
 struct OnboardingExperienceModelTests {
     @Test
+    func cloudBusinessRestoreCompletesAnAlreadyStartedBriefingWithoutPurchase() throws {
+        try withDefaults { defaults in
+            let analytics = AnalyticsSpy()
+            let model = OnboardingExperienceModel(defaults: defaults)
+            model.resolve(hasValidBusinessProfile: false, analyticsClient: analytics)
+            model.cloudBusinessDidRestore(hasValidBusinessProfile: false)
+            #expect(model.step == .briefing)
+            model.cloudBusinessDidRestore(hasValidBusinessProfile: true)
+            #expect(model.step == .completed)
+            #expect(SubscriptionRootRules.state(access: .free, hasIdentity: true,
+                hasExistingBusinessData: true) == .app(readOnly: true))
+            #expect(analytics.events == [.onboardingStarted])
+            let reopened = OnboardingExperienceModel(defaults: defaults)
+            reopened.resolve(hasValidBusinessProfile: true)
+            #expect(reopened.step == .completed)
+        }
+    }
+    @Test
     func freshOnboardingStartEmitsOnceAcrossResolutionAndReconstruction() throws {
         try withDefaults { defaults in
             let analytics = AnalyticsSpy()

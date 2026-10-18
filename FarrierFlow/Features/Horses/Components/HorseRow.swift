@@ -1,7 +1,22 @@
 import SwiftUI
 
+enum HorseRowContext {
+    case collection
+    case clientDetail
+    case serviceLocationDetail
+}
+
 struct HorseRow: View {
     let horse: Horse
+    let context: HorseRowContext
+
+    init(
+        horse: Horse,
+        context: HorseRowContext = .collection
+    ) {
+        self.horse = horse
+        self.context = context
+    }
 
     private var clientName: String {
         horse.client?.name ?? String(localized: "Client unavailable")
@@ -15,11 +30,22 @@ struct HorseRow: View {
         VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
             Text(horse.name)
                 .font(Typography.recordTitle)
-            Text("\(clientName) · \(barnName)")
+            Text(metadata)
                 .font(Typography.recordMetadata)
                 .foregroundStyle(ColorTokens.textSecondary)
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("horse-row-\(horse.name)")
+    }
+
+    private var metadata: String {
+        switch context {
+        case .collection:
+            "\(clientName) · \(barnName)"
+        case .clientDetail:
+            barnName
+        case .serviceLocationDetail:
+            clientName
+        }
     }
 }

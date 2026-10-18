@@ -6,6 +6,8 @@
 //
 
 import Foundation
+import AuthenticationServices
+import Combine
 import OSLog
 import SwiftData
 import SwiftUI
@@ -21,11 +23,17 @@ struct RootView: View {
     @Environment(SubscriptionAccessModel.self) private var subscription
     @Environment(\.analyticsClient) private var analyticsClient
     @Environment(\.modelContext) private var context
+    @Environment(\.backupSync) private var backupSync
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var selectedTab = AppTab.today
     @State private var setupModel = OwnerSetupReadinessModel()
     @State private var onboarding: OnboardingExperienceModel
+    @State private var showsBackupInvitation = false
+    private let onboardingDefaults: UserDefaults
 
     init(onboardingDefaults: UserDefaults = .standard) {
+        self.onboardingDefaults = onboardingDefaults
         _onboarding = State(
             initialValue: OnboardingExperienceModel(defaults: onboardingDefaults)
         )
@@ -77,6 +85,41 @@ struct RootView: View {
             resolveInitialSetup()
             await reconcilePhotographs()
         }
+        .task(id: scenePhase) {
+            if scenePhase == .active { await backupSync?.restore() }
+            else if scenePhase == .background { backupSync?.runtime?.stop() }
+        }
+        .task(id: backupSync?.authenticationObservationID) { await backupSync?.observeAuthentication() }
+        .task {
+            for await connected in SyncConnectivity.changes() {
+                guard !Task.isCancelled else { return }
+                if connected, scenePhase == .active { await backupSync?.connectionBecameAvailable() }
+            }
+        }
+        .task(id: cloudObservationScope) {
+            if scenePhase == .active { await backupSync?.observeWorkspace() }
+        }
+        .task(id: backupInvitationReady) {
+            if backupInvitationReady, backupSync?.consumeInvitation() == true { showsBackupInvitation = true }
+        }
+        .sheet(isPresented: $showsBackupInvitation) {
+            BackupSyncSheet().dynamicTypeSize(dynamicTypeSize)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)
+            .filter { backupSync?.runtime?.acceptsSaveNotification($0) == true }) {
+            backupSync?.runtime?.didSave($0)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: ASAuthorizationAppleIDProvider.credentialRevokedNotification)) { _ in
+            Task { await backupSync?.signOut() }
+        }
+        .onChange(of: backupSync?.runtime?.recordsVersion) { _, _ in
+            resolveInitialSetup()
+        }
+        .onChange(of: backupSync?.runtime?.restoredBusinessVersion) { _, version in
+            guard version != nil else { return }
+            resolveInitialSetup()
+            onboarding.cloudBusinessDidRestore(hasValidBusinessProfile: setupModel.hasValidIdentity)
+        }
         .onReceive(
             NotificationCenter.default.publisher(
                 for: UIApplication.protectedDataDidBecomeAvailableNotification
@@ -84,8 +127,20 @@ struct RootView: View {
         ) { _ in
             Task {
                 await reconcilePhotographs()
+                await backupSync?.retry()
             }
         }
+    }
+
+    private var cloudObservationScope: CloudObservationScope {
+        .init(account: backupSync?.session?.accountID, workspace: backupSync?.runtime?.workspaceID,
+              active: scenePhase == .active)
+    }
+
+    private var backupInvitationReady: Bool {
+        onboarding.step == .completed && setupModel.hasValidIdentity &&
+            onboardingDefaults.bool(forKey: "backupSync.newBusinessSetup") &&
+            backupSync?.shouldOfferInvitation == true
     }
 
     private var appTabs: some View {
@@ -107,6 +162,9 @@ struct RootView: View {
     private func resolveInitialSetup() {
         setupModel.load(in: context)
         if setupModel.loadState == .loaded {
+            if !setupModel.hasValidIdentity && !setupModel.hasExistingBusinessData {
+                onboardingDefaults.set(true, forKey: "backupSync.newBusinessSetup")
+            }
             onboarding.resolve(
                 hasValidBusinessProfile: setupModel.hasValidIdentity,
                 hasExistingBusinessData: setupModel.hasExistingBusinessData,
@@ -124,6 +182,12 @@ struct RootView: View {
             )
         }
     }
+}
+
+private struct CloudObservationScope: Hashable {
+    let account: UUID?
+    let workspace: UUID?
+    let active: Bool
 }
 
 private struct RootPreview: View {

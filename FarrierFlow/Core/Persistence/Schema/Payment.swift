@@ -23,9 +23,13 @@ nonisolated enum PaymentRecordSource: String, Codable, Sendable {
     case manual
 }
 
-extension FarrierFlowSchemaV2 {
+extension FarrierFlowSchemaV5 {
     @Model
-    final class Payment {
+    final class Payment: SyncRecordIdentifying {
+        var syncID: UUID? { id }
+
+        func initializeSyncIdentity() { }
+
         @Attribute(.unique) private(set) var id: UUID
         private(set) var amountMinorUnits: Int64
         private(set) var currencyCode: String

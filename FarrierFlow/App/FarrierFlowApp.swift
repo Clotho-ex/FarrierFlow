@@ -58,7 +58,9 @@ struct FarrierFlowApp: App {
                     subscriptionAccessModel: SubscriptionAccessModel(
                         client: UITestSubscriptionClient(configuration: uiTestConfiguration)
                     ),
-                    onboardingDefaults: onboardingDefaults
+                    onboardingDefaults: onboardingDefaults,
+                    cloudEnabled: false,
+                    backupSyncOverride: try BackupSyncUITestFixtures.make(container: container, preferences: onboardingDefaults)
                 )
             case .invalidScreenshot:
                 throw ScreenshotLaunchError.invalidConfiguration
@@ -103,6 +105,7 @@ struct FarrierFlowApp: App {
                         .uiTestColorScheme(uiTestColorScheme)
                         .uiTestAppClock(referenceDate: uiTestReferenceDate)
                         .environment(dependencies.subscriptionAccessModel)
+                        .environment(\.backupSync, dependencies.backupSyncModel)
                 case .failure:
                     ModelContainerFailureView()
                 }
@@ -157,4 +160,18 @@ private struct AppDependencies {
     let photographLibrary: PhotographLibrary
     let subscriptionAccessModel: SubscriptionAccessModel
     let onboardingDefaults: UserDefaults
+    let backupSyncModel: BackupSyncModel
+
+    init(container: ModelContainer, analyticsClient: any AnalyticsClient,
+         photographLibrary: PhotographLibrary, subscriptionAccessModel: SubscriptionAccessModel,
+         onboardingDefaults: UserDefaults, cloudEnabled: Bool = true,
+         backupSyncOverride: BackupSyncModel? = nil) {
+        self.container = container
+        self.analyticsClient = analyticsClient
+        self.photographLibrary = photographLibrary
+        self.subscriptionAccessModel = subscriptionAccessModel
+        self.onboardingDefaults = onboardingDefaults
+        backupSyncModel = backupSyncOverride ?? (cloudEnabled ? BackupSyncModel.configured(container: container,
+            library: photographLibrary, preferences: onboardingDefaults) : BackupSyncModel())
+    }
 }

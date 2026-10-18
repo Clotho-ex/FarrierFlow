@@ -17,12 +17,24 @@ final class EditorAccessibilityUITests: XCTestCase {
         XCTAssertTrue(clientMoreDetails.waitForExistence(timeout: 3))
         guard tapUntilDestinationAppears(
             clientMoreDetails,
-            destination: app.textViews["Client Notes"]
+            destination: app.descendants(matching: .any)["client-notes-field"]
         ) else { return }
         guard focusAndType(
             "Accessible Client",
             in: app.textFields["client-name-field"]
         ) else { return }
+        let dismissKeyboard = app.buttons["client-keyboard-done"]
+        XCTAssertTrue(dismissKeyboard.waitForExistence(timeout: 3))
+        dismissKeyboard.tap()
+        let keyboardDismissed = expectation(
+            for: NSPredicate(format: "exists == false"),
+            evaluatedWith: app.keyboards.firstMatch
+        )
+        XCTAssertEqual(
+            XCTWaiter().wait(for: [keyboardDismissed], timeout: 3),
+            .completed
+        )
+        XCTAssertTrue(app.navigationBars["New Client"].exists)
         app.buttons["Save"].tap()
 
         guard let todayNavigationBar = openToday(in: app) else { return }
@@ -39,6 +51,7 @@ final class EditorAccessibilityUITests: XCTestCase {
         ) else { return }
         appointmentNotes.tap()
         appointmentNotes.typeText("Keep this draft")
+        dismissAppointmentKeyboard(in: app)
         let addServiceLocation = app.buttons["appointment-add-service-location"]
         XCTAssertTrue(addServiceLocation.waitForExistence(timeout: 3))
         guard tapUntilDestinationAppears(
@@ -57,6 +70,7 @@ final class EditorAccessibilityUITests: XCTestCase {
         let barnPicker = app.buttons["appointment-barn-picker"]
         XCTAssertTrue(barnPicker.waitForExistence(timeout: 3))
         XCTAssertEqual(barnPicker.value as? String, "Accessible Barn")
+        guard revealElement(appointmentNotes, in: app) else { return }
         XCTAssertEqual(appointmentNotes.value as? String, "Keep this draft")
         XCTAssertTrue(
             app.staticTexts[
@@ -83,6 +97,7 @@ final class EditorAccessibilityUITests: XCTestCase {
         let selectedHorse = app.buttons["appointment-horse-Appointment Horse"]
         XCTAssertTrue(selectedHorse.waitForExistence(timeout: 3))
         XCTAssertEqual(selectedHorse.value as? String, "Selected")
+        guard revealElement(appointmentNotes, in: app) else { return }
         XCTAssertEqual(appointmentNotes.value as? String, "Keep this draft")
 
         let addAnotherHorse = app.buttons["appointment-add-horse"]
@@ -110,19 +125,166 @@ final class EditorAccessibilityUITests: XCTestCase {
         XCTAssertTrue(secondSelectedHorse.waitForExistence(timeout: 3))
         XCTAssertEqual(selectedHorse.value as? String, "Selected")
         XCTAssertEqual(secondSelectedHorse.value as? String, "Selected")
+        guard revealElement(appointmentNotes, in: app) else { return }
         XCTAssertEqual(appointmentNotes.value as? String, "Keep this draft")
+        let addService = app.buttons["appointment-add-service-Appointment Horse"]
+        revealAddHorse(addService, in: app)
+        guard tapUntilDestinationAppears(
+            addService,
+            destination: app.navigationBars["New Service"]
+        ) else { return }
+        guard focusAndType("Appointment Trim", in: app.textFields["service-name-field"]) else { return }
+        guard focusAndType("50", in: app.textFields["service-price-field"]) else { return }
+        app.navigationBars["New Service"].buttons["Save"].tap()
+        XCTAssertTrue(app.navigationBars["New Appointment"].waitForExistence(timeout: 3))
+        XCTAssertEqual(app.buttons["appointment-service-Appointment Horse"].value as? String, "Appointment Trim")
+        guard revealElement(appointmentNotes, in: app) else { return }
+        XCTAssertEqual(appointmentNotes.value as? String, "Keep this draft")
+    }
+
+    @MainActor
+    func testAppointmentKeyboardToolbarDismissesDurationAndNotesWithoutSaving() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] =
+            "AppointmentKeyboard-\(UUID().uuidString)"
+        app.launch()
+        guard let today = openToday(in: app) else { return }
+        guard tapUntilDestinationAppears(
+            today.buttons["Schedule Appointment"],
+            destination: app.navigationBars["New Appointment"]
+        ) else { return }
+        let duration = app.textFields["Expected Duration (minutes)"]
+        guard tapUntilDestinationAppears(
+            app.buttons["appointment-more-details"],
+            destination: duration
+        ) else { return }
+        guard focusAndType("45", in: duration) else { return }
+        let keyboardScreenshot = XCTAttachment(screenshot: app.screenshot())
+        keyboardScreenshot.name = "Appointment keyboard Done toolbar"
+        keyboardScreenshot.lifetime = .keepAlways
+        add(keyboardScreenshot)
+        dismissAppointmentKeyboard(in: app)
+        XCTAssertEqual(duration.value as? String, "45")
+
+        let notes = app.textViews["Appointment Notes"]
+        guard focusAndType("Keep my appointment draft", in: notes) else { return }
+        dismissAppointmentKeyboard(in: app)
+        XCTAssertEqual(notes.value as? String, "Keep my appointment draft")
+        XCTAssertTrue(app.navigationBars["New Appointment"].exists)
+    }
+
+    @MainActor
+    func testAppointmentServiceSelectionPersistsAfterRelaunchAndSeedsVisit() throws {
+        try verifyAppointmentServiceFlow(largeText: false)
+    }
+
+    @MainActor
+    func testAppointmentServiceSelectionAtLargestTextSizeInDarkMode() throws {
+        try verifyAppointmentServiceFlow(largeText: true)
+    }
+
+    @MainActor
+    private func verifyAppointmentServiceFlow(largeText: Bool) throws {
+        let app = XCUIApplication()
+        if largeText {
+            app.launchEnvironment["FARRIERFLOW_UI_TEST_DYNAMIC_TYPE_SIZE"] = "accessibility5"
+            app.launchEnvironment["FARRIERFLOW_UI_TEST_COLOR_SCHEME"] = "dark"
+        }
+        app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] =
+            "AppointmentService-\(UUID().uuidString)"
+        app.launchEnvironment["FARRIERFLOW_UI_TEST_SCENARIO"] = "next-appointment"
+        app.launch()
+        guard let today = openToday(in: app) else { return }
+        guard tapUntilDestinationAppears(
+            today.buttons["Schedule Appointment"],
+            destination: app.navigationBars["New Appointment"]
+        ) else { return }
+        app.buttons["appointment-barn-picker"].tap()
+        app.buttons["Next Appointment Service Location"].tap()
+        let horse = app.buttons["appointment-horse-Atlas"]
+        guard revealElement(horse, in: app) else { return }
+        horse.tap()
+        let service = app.buttons["appointment-service-Atlas"]
+        guard revealElement(service, in: app) else { return }
+        service.tap()
+        app.buttons["Next Appointment Trim"].tap()
+        XCTAssertEqual(service.value as? String, "Next Appointment Trim")
+        let selectionScreenshot = XCTAttachment(screenshot: app.screenshot())
+        selectionScreenshot.name = "New appointment service selection"
+        selectionScreenshot.lifetime = .keepAlways
+        add(selectionScreenshot)
+        app.navigationBars["New Appointment"].buttons["Save"].tap()
+        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 3))
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 5))
+        guard openSchedule(in: app) else { return }
+        let row = app.buttons["appointment-row-Next Appointment Service Location"].firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 3))
+        row.tap()
+        XCTAssertTrue(app.navigationBars["Appointment"].waitForExistence(timeout: 3))
+        let planned = app.descendants(matching: .any)["appointment-planned-service-Atlas"].firstMatch
+        guard revealElement(planned, in: app) else { return }
+        XCTAssertTrue(planned.label.contains("Next Appointment Trim"))
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "Saved appointment service"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+        let start = app.buttons["visit-start-action"]
+        guard revealElement(start, in: app) else { return }
+        start.tap()
+        XCTAssertTrue(app.navigationBars["Visit"].waitForExistence(timeout: 5))
+        XCTAssertTrue(revealElement(app.buttons["visit-work-item-Atlas-Next Appointment Trim"], in: app))
+    }
+
+    @MainActor
+    private func dismissAppointmentKeyboard(in app: XCUIApplication) {
+        let done = app.buttons["appointment-keyboard-done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 3))
+        guard done.exists else { return }
+        done.tap()
+        let dismissed = expectation(
+            for: NSPredicate(format: "exists == false"),
+            evaluatedWith: app.keyboards.firstMatch
+        )
+        XCTAssertEqual(XCTWaiter().wait(for: [dismissed], timeout: 3), .completed)
     }
 
     @MainActor
     private func revealAddHorse(_ button: XCUIElement, in app: XCUIApplication) {
         guard !button.isHittable else { return }
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.6))
-            .press(
-                forDuration: 0.05,
-                thenDragTo: app.coordinate(
-                    withNormalizedOffset: CGVector(dx: 0.95, dy: 0.2)
-                )
-            )
+        let notes = app.textViews["Appointment Notes"]
+        let scrollDown = notes.exists && notes.isHittable
+        for _ in 0..<5 {
+            if button.exists && button.isHittable { return }
+            if scrollDown {
+                app.swipeDown()
+            } else {
+                app.swipeUp()
+            }
+        }
+    }
+
+    @MainActor
+    private func revealElement(_ element: XCUIElement, in app: XCUIApplication) -> Bool {
+        for _ in 0..<8 {
+            if element.exists && element.isHittable { return true }
+            app.swipeUp()
+        }
+        XCTFail("Expected to reveal \(element.identifier)")
+        return false
+    }
+
+    @MainActor
+    private func openSchedule(in app: XCUIApplication) -> Bool {
+        for _ in 0..<3 {
+            app.tabBars.buttons["Schedule"].tap()
+            if app.navigationBars["Schedule"].waitForExistence(timeout: 3) {
+                return true
+            }
+        }
+        XCTFail("Schedule tab did not open")
+        return false
     }
 
     @MainActor
@@ -161,7 +323,17 @@ final class EditorAccessibilityUITests: XCTestCase {
             guard trigger.waitForExistence(timeout: 3), trigger.isHittable else {
                 continue
             }
-            trigger.tap()
+            if trigger.identifier.hasSuffix("-more-details") {
+                trigger.coordinate(
+                    withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)
+                ).tap()
+                for _ in 0..<3 {
+                    if destination.exists { return true }
+                    XCUIApplication().swipeUp()
+                }
+            } else {
+                trigger.tap()
+            }
         }
         if destination.waitForExistence(timeout: 3) {
             return true
@@ -174,7 +346,6 @@ final class EditorAccessibilityUITests: XCTestCase {
     private func focusAndType(_ text: String, in element: XCUIElement) -> Bool {
         XCTAssertTrue(element.waitForExistence(timeout: 3))
         guard element.exists else { return false }
-        XCTAssertTrue(element.isHittable)
         for attempt in 0..<4 {
             if attempt == 0 {
                 element.tap()

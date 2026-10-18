@@ -13,8 +13,11 @@ enum SpacingTokens {
     static let related: CGFloat = 12
     static let standard: CGFloat = 16
     static let section: CGFloat = 24
+    static let recordSection: CGFloat = 28
     static let generous: CGFloat = 32
     static let hero: CGFloat = 48
+
+    static let minimumTouchTarget: CGFloat = 44
 
     static let rowContent = tight
 }

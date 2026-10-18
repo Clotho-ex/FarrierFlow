@@ -71,6 +71,26 @@ struct HorseEditorModelTests {
     }
 
     @Test
+    func selectingCreatedServiceLocationPreservesTheHorseDraft() throws {
+        let container = try ModelContainerFactory.inMemoryTest()
+        let context = container.mainContext
+        let editor = HorseEditorModel()
+        editor.loadChoices(in: context)
+        editor.draft.name = "Copper"
+        editor.draft.safetyNotes = "Needs a quiet handler"
+        let barn = Barn(name: "Main Barn")
+        context.insert(barn)
+        try context.save()
+
+        editor.selectCreatedBarn(barn.persistentModelID, in: context)
+
+        #expect(editor.choicesLoadState == .loaded)
+        #expect(editor.draft.barnID == barn.persistentModelID)
+        #expect(editor.draft.name == "Copper")
+        #expect(editor.draft.safetyNotes == "Needs a quiet handler")
+    }
+
+    @Test
     func loadsOnlyActiveValidServiceChoices() throws {
         let graph = try makeHorseGraph()
         let active = ModelFixtures.makeService(name: "Trim", defaultAmountMinorUnits: 7_500, in: graph.context)

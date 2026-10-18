@@ -12,6 +12,7 @@ struct InvoiceDetailView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.analyticsClient) private var analyticsClient
     @Environment(SubscriptionAccessModel.self) private var subscription
+    @Environment(\.backupSync) private var backupSync
     @Environment(OnboardingExperienceModel.self) private var onboarding
     @State private var model: InvoiceDetailModel
     @State private var actionConfirmation: InvoiceActionConfirmation?
@@ -164,6 +165,7 @@ struct InvoiceDetailView: View {
             }
         }
         .task(id: invoiceID, reload)
+        .onChange(of: backupSync?.runtime?.recordsVersion) { _, _ in reload() }
         .onDisappear(perform: cancelPDFPreparation)
     }
 

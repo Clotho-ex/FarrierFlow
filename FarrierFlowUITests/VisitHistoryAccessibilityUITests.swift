@@ -117,6 +117,12 @@ final class VisitHistoryAccessibilityUITests: XCTestCase {
             XCTFail("Milo's Visit history did not appear")
             return false
         }
+        let historyText = accessibilityText(of: history)
+        XCTAssertTrue(historyText.contains("Serviced"))
+        XCTAssertTrue(historyText.contains("service"))
+        XCTAssertTrue(historyText.contains("View Visit"))
+        XCTAssertFalse(historyText.contains("Work Notes"))
+        XCTAssertFalse(historyText.contains("Subtotal"))
         history.tap()
 
         guard app.navigationBars["Visit"].waitForExistence(timeout: 3) else {

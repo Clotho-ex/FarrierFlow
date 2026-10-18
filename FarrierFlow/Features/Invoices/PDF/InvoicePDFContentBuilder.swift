@@ -15,6 +15,10 @@ enum InvoicePDFContentBuilder {
         guard let invoice = try context.existingModel(Invoice.self, for: invoiceID) else {
             throw InvoicePDFContentBuilderError.invoiceUnavailable
         }
+        return try build(invoice: invoice)
+    }
+
+    static func build(invoice: Invoice) throws -> InvoicePDFContent {
         let total: Int64
         do {
             total = try InvoiceDomainRules.checkedTotal(

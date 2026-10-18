@@ -2,20 +2,73 @@ import Foundation
 import Observation
 import SwiftData
 
+struct AppointmentDetail: Equatable {
+    struct Horse: Equatable, Identifiable {
+        let id: PersistentIdentifier
+        let name: String?
+        let clientName: String?
+        let clientPhone: String?
+        let safetyNotes: String?
+        let plannedServiceName: String?
+    }
+
+    struct Visit: Equatable {
+        let id: PersistentIdentifier
+        let completedAt: Date?
+    }
+
+    let id: PersistentIdentifier
+    let startDate: Date
+    let barnName: String?
+    let barnAddress: String?
+    let barnContactNotes: String?
+    let expectedDurationMinutes: Int?
+    let notes: String?
+    let horses: [Horse]
+    let visit: Visit?
+
+    init(appointment: Appointment) {
+        id = appointment.persistentModelID
+        startDate = appointment.startDate
+        barnName = appointment.barn?.name
+        barnAddress = appointment.barn?.address
+        barnContactNotes = appointment.barn?.contactNotes
+        expectedDurationMinutes = appointment.expectedDurationMinutes
+        notes = appointment.notes
+        horses = appointment.appointmentHorses.map { membership in
+            let horse = membership.horse
+            return Horse(
+                id: membership.persistentModelID,
+                name: horse?.name,
+                clientName: horse?.client?.name,
+                clientPhone: horse?.client?.phone,
+                safetyNotes: horse?.safetyNotes,
+                plannedServiceName: membership.plannedService?.name
+            )
+        }
+        visit = appointment.visit.map {
+            Visit(id: $0.persistentModelID, completedAt: $0.completedAt)
+        }
+    }
+}
+
 @MainActor
 @Observable
 final class AppointmentDetailModel {
-    @ObservationIgnored
-    private var displayContext: ModelContext?
-    private(set) var appointment: Appointment?
+    private(set) var detail: AppointmentDetail?
     private(set) var appointmentID: PersistentIdentifier?
     var visitPresentation: VisitPresentation?
     var alert: FeatureAlert?
 
     func load(id: PersistentIdentifier, in context: ModelContext) {
-        displayContext = context
         appointmentID = id
-        appointment = context.model(for: id) as? Appointment
+        guard
+            let appointment = try? context.existingModel(Appointment.self, for: id)
+        else {
+            detail = nil
+            return
+        }
+        detail = AppointmentDetail(appointment: appointment)
     }
 
     func delete(
@@ -24,7 +77,7 @@ final class AppointmentDetailModel {
             try RecordDeletionRules.delete(appointment, in: context)
         }
     ) -> Bool {
-        guard appointment != nil, let appointmentID else { return false }
+        guard detail != nil, let appointmentID else { return false }
         let actionAppointment: Appointment?
         do {
             actionAppointment = try context.existingModel(
@@ -32,7 +85,6 @@ final class AppointmentDetailModel {
                 for: appointmentID
             )
         } catch {
-            displayContext = context
             alert = FeatureAlert(
                 title: "Couldn’t Delete Appointment",
                 message: "The appointment wasn’t deleted. Try again."
@@ -40,7 +92,7 @@ final class AppointmentDetailModel {
             return false
         }
         guard let appointment = actionAppointment else {
-            self.appointment = nil
+            detail = nil
             alert = FeatureAlert(
                 title: "Appointment Unavailable",
                 message: "The appointment couldn’t be found. Try again."
@@ -49,15 +101,13 @@ final class AppointmentDetailModel {
         }
         do {
             try deleting(appointment, context)
-            self.appointment = nil
+            detail = nil
             self.appointmentID = nil
-            displayContext = nil
             return true
         } catch let block as RecordDeletionBlock {
             alert = block.alert
             return false
         } catch {
-            displayContext = context
             alert = FeatureAlert(
                 title: "Couldn’t Delete Appointment",
                 message: "The appointment wasn’t deleted. Try again."
@@ -71,11 +121,11 @@ final class AppointmentDetailModel {
         in container: ModelContainer,
         analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()
     ) {
-        guard let appointment else { return }
+        guard let appointmentID else { return }
 
         do {
             let visitID = try VisitStartUseCase.start(
-                appointmentID: appointment.persistentModelID,
+                appointmentID: appointmentID,
                 now: now,
                 in: container,
                 analyticsClient: analyticsClient
@@ -89,10 +139,10 @@ final class AppointmentDetailModel {
         }
     }
 
-    func present(_ visit: Visit) {
-        let presentation: VisitPresentation = visit.completedAt == nil
-            ? .editor(visit.persistentModelID)
-            : .detail(visit.persistentModelID)
+    func present(visitID: PersistentIdentifier, completedAt: Date?) {
+        let presentation: VisitPresentation = completedAt == nil
+            ? .editor(visitID)
+            : .detail(visitID)
         visitPresentation = presentation
     }
 

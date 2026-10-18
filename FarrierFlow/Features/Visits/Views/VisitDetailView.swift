@@ -9,6 +9,7 @@ struct VisitDetailView: View {
     @Environment(\.locale) private var locale
     @Environment(PhotographLibrary.self) private var photographLibrary
     @Environment(SubscriptionAccessModel.self) private var subscription
+    @Environment(\.backupSync) private var backupSync
     @State private var model: VisitDetailModel
     @State private var nextAppointmentModel: NextAppointmentAssistantModel
     @State private var showsEditor = false
@@ -87,6 +88,7 @@ struct VisitDetailView: View {
         .onAppear {
             loadVisitDetail()
         }
+        .onChange(of: backupSync?.runtime?.recordsVersion) { _, _ in loadVisitDetail() }
         .sheet(isPresented: $showsEditor, onDismiss: {
             loadVisitDetail()
         }) {

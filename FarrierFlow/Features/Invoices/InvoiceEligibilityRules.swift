@@ -100,7 +100,8 @@ enum InvoiceEligibilityRules {
                 else {
                     throw InvoiceEligibilityError.invalidWorkItem
                 }
-                guard horse.client === client, workItem.invoiceLineItem == nil else {
+                guard horse.client === client, workItem.invoiceLineItem == nil,
+                      workItem.billingHoldID == nil else {
                     continue
                 }
                 workItems.append(workItem)

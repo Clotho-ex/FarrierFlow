@@ -6,6 +6,7 @@ struct ClientDetailView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
+    @Environment(\.backupSync) private var backupSync
     @State private var model = ClientDetailModel()
     @State private var showsEditor = false
     @State private var showsHorseEditor = false
@@ -17,7 +18,21 @@ struct ClientDetailView: View {
         Group {
             if let client = model.client {
                 List {
-                    Section("Client") {
+                    Section {
+                        VStack(
+                            alignment: .leading,
+                            spacing: SpacingTokens.tight
+                        ) {
+                            Text(client.name)
+                                .font(.title2.weight(.semibold))
+                                .foregroundStyle(ColorTokens.textPrimary)
+                                .accessibilityAddTraits(.isHeader)
+                            Text("Client profile")
+                                .font(Typography.recordMetadata)
+                                .foregroundStyle(ColorTokens.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
                         if let phone = client.phone {
                             LabeledContent("Phone", value: phone)
                         }
@@ -27,22 +42,26 @@ struct ClientDetailView: View {
                         if let notes = client.notes {
                             LabeledContent("Notes", value: notes)
                         }
+
+                        if !hasContactDetails(client),
+                           subscription.allowsMutations {
+                            Button(
+                                "Add Contact Details",
+                                systemImage: "person.crop.circle.badge.plus"
+                            ) {
+                                showsEditor = true
+                            }
+                        }
                     }
                     .listRowBackground(ColorTokens.surface)
-                    Section("Horses") {
+
+                    Section {
                         if client.horses.isEmpty {
-                            ContentUnavailableView {
-                                Label("No Horses", systemImage: "figure.equestrian.sports")
-                            } description: {
-                                Text("Add this client’s first horse to start scheduling work.")
-                            } actions: {
-                                if subscription.allowsMutations {
-                                Button("Add Horse") {
-                                    showsHorseEditor = true
-                                }
-                                .farrierFlowPrimaryAction()
-                                }
-                            }
+                            Label(
+                                "No horses yet",
+                                systemImage: "figure.equestrian.sports"
+                            )
+                            .foregroundStyle(ColorTokens.textSecondary)
                         } else {
                             ForEach(
                                 client.horses.sorted {
@@ -51,28 +70,27 @@ struct ClientDetailView: View {
                                 id: \.persistentModelID
                             ) { horse in
                                 RecordNavigationLink(value: ClientRoute.horse(horse.persistentModelID)) {
-                                    HorseRow(horse: horse)
+                                    HorseRow(
+                                        horse: horse,
+                                        context: .clientDetail
+                                    )
                                 }
                             }
                         }
+                    } header: {
+                        horsesSectionHeader
+                        .textCase(nil)
                     }
                     .listRowBackground(ColorTokens.surface)
+
                     if !model.invoices.isEmpty {
-                        Section("Invoices") {
+                        Section {
                             ForEach(model.invoices) { invoice in
                                 RecordNavigationLink(value: InvoiceRoute.detail(invoice.id)) {
-                                    VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
-                                        Text("Invoice \(invoice.number)")
-                                            .font(Typography.recordTitle)
-                                        Text(invoice.invoiceDate, format: .dateTime.month().day().year())
-                                            .font(Typography.recordMetadata)
-                                            .foregroundStyle(ColorTokens.textSecondary)
-                                        if dynamicTypeSize.isAccessibilitySize {
-                                            Text(invoice.status.displayName)
-                                                .font(Typography.recordMetadata)
-                                                .foregroundStyle(invoice.status == .paid ? ColorTokens.success : ColorTokens.textSecondary)
-                                        }
-                                    }
+                                    InvoiceRow(
+                                        summary: invoice,
+                                        showsClientName: false
+                                    )
                                 }
                                 .badge(
                                     dynamicTypeSize.isAccessibilitySize ? nil : Text(invoice.status.displayName)
@@ -80,9 +98,13 @@ struct ClientDetailView: View {
                                 )
                                 .accessibilityIdentifier("client-invoice-\(invoice.number)")
                             }
+                        } header: {
+                            Text("Invoices")
+                                .textCase(nil)
                         }
                         .listRowBackground(ColorTokens.surface)
                     }
+
                     if model.hasInvoiceableWork, subscription.allowsMutations {
                         Section("Ready to Invoice") {
                             RecordNavigationLink(value: InvoiceRoute.create(clientID)) {
@@ -93,25 +115,35 @@ struct ClientDetailView: View {
                         .listRowBackground(ColorTokens.surface)
                     }
                 }
+                .listSectionSpacing(
+                    .custom(SpacingTokens.recordSection)
+                )
                 .farrierFlowScrollBackground()
-                .navigationTitle(client.name)
+                .navigationTitle("Client")
+                .toolbarTitleDisplayMode(.inline)
                 .toolbar {
                     if subscription.allowsMutations {
-                    ToolbarItemGroup(placement: .topBarTrailing) {
-                        Button("Add Horse", systemImage: "plus") {
-                            showsHorseEditor = true
-                        }
-                        Menu {
-                            Button("Edit", systemImage: "pencil") { showsEditor = true }
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Menu {
+                                Button("Edit", systemImage: "pencil") {
+                                    showsEditor = true
+                                }
                                 .tint(ColorTokens.textSecondary)
-                            Button("Delete", systemImage: "trash", role: .destructive) {
-                                showsDeleteConfirmation = true
+                                Button(
+                                    "Delete",
+                                    systemImage: "trash",
+                                    role: .destructive
+                                ) {
+                                    showsDeleteConfirmation = true
+                                }
+                            } label: {
+                                Label(
+                                    "Actions",
+                                    systemImage: "ellipsis.circle"
+                                )
                             }
-                        } label: {
-                            Label("Actions", systemImage: "ellipsis.circle")
+                            .tint(ColorTokens.textSecondary)
                         }
-                        .tint(ColorTokens.textSecondary)
-                    }
                     }
                 }
                 .sheet(isPresented: $showsEditor, onDismiss: reload) {
@@ -135,6 +167,7 @@ struct ClientDetailView: View {
             }
         }
         .onAppear(perform: reload)
+        .onChange(of: backupSync?.runtime?.recordsVersion) { _, _ in reload() }
         .alert(item: $model.alert) {
             Alert(title: Text($0.title), message: Text($0.message))
         }
@@ -142,5 +175,36 @@ struct ClientDetailView: View {
 
     private func reload() {
         model.load(id: clientID, in: context)
+    }
+
+    private func hasContactDetails(_ client: Client) -> Bool {
+        client.phone != nil || client.email != nil || client.notes != nil
+    }
+
+    @ViewBuilder
+    private var horsesSectionHeader: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: SpacingTokens.tight) {
+                Text("Horses")
+                addHorseButton
+            }
+        } else {
+            HStack(spacing: SpacingTokens.compact) {
+                Text("Horses")
+                Spacer(minLength: SpacingTokens.compact)
+                addHorseButton
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var addHorseButton: some View {
+        if subscription.allowsMutations {
+            Button("Add Horse", systemImage: "plus") {
+                showsHorseEditor = true
+            }
+            .font(.subheadline.weight(.semibold))
+            .frame(minHeight: SpacingTokens.minimumTouchTarget)
+        }
     }
 }

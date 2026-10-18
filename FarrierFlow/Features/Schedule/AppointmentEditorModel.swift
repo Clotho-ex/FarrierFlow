@@ -49,6 +49,7 @@ final class AppointmentEditorModel {
     var draft: AppointmentDraft
     private(set) var barns: [Barn] = []
     private(set) var eligibleHorses: [Horse] = []
+    private(set) var services: [Service] = []
     private(set) var loadState = AppointmentEditorLoadState.loading
     private(set) var hasVisit = false
     private(set) var lockedBarnName: String?
@@ -114,6 +115,12 @@ final class AppointmentEditorModel {
             notes: appointment?.notes ?? "",
             expectedDurationText: appointment?.expectedDurationMinutes.map(String.init) ?? ""
         )
+        for membership in appointment?.appointmentHorses ?? [] {
+            if let horseID = membership.horse?.persistentModelID,
+               let serviceID = membership.plannedService?.persistentModelID {
+                draft.serviceIDsByHorse[horseID] = serviceID
+            }
+        }
         updateVisitLock(from: appointment)
     }
 
@@ -139,6 +146,9 @@ final class AppointmentEditorModel {
             } else {
                 try applyOwnerDefaultIfNeeded(in: context)
             }
+            services = try context.fetch(FetchDescriptor<Service>(
+                sortBy: [SortDescriptor(\.name, comparator: .localizedStandard)]
+            ))
             let loadedBarns = try barnFetcher(context)
             if
                 let barnID = draft.barnID,
@@ -172,6 +182,9 @@ final class AppointmentEditorModel {
         guard !hasVisit else { return }
         loadState = .loading
         do {
+            services = try context.fetch(FetchDescriptor<Service>(
+                sortBy: [SortDescriptor(\.name, comparator: .localizedStandard)]
+            ))
             let loadedBarns = try barnFetcher(context)
             guard loadedBarns.contains(where: { $0.persistentModelID == id }) else {
                 throw AppointmentEditorLoadError.appointmentUnavailable
@@ -205,6 +218,7 @@ final class AppointmentEditorModel {
         guard !hasVisit else { return }
         if draft.selectedHorseIDs.contains(id) {
             draft.selectedHorseIDs.remove(id)
+            draft.serviceIDsByHorse.removeValue(forKey: id)
         } else {
             draft.selectedHorseIDs.insert(id)
         }
@@ -286,6 +300,32 @@ final class AppointmentEditorModel {
             return nil
         }
 
+        var plannedServices: [PersistentIdentifier: Service] = [:]
+        do {
+            for horse in horses {
+                let horseID = horse.persistentModelID
+                guard let serviceID = draft.serviceIDsByHorse[horseID] else { continue }
+                guard let service = try context.existingModel(Service.self, for: serviceID),
+                      !service.isArchived || existingAppointment?.appointmentHorses.contains(where: {
+                          $0.horse?.persistentModelID == horseID
+                              && $0.plannedService?.persistentModelID == serviceID
+                      }) == true else {
+                    alert = FeatureAlert(
+                        title: "Review Selected Services",
+                        message: "Choose an active service for each selected horse."
+                    )
+                    return nil
+                }
+                plannedServices[horseID] = service
+            }
+        } catch {
+            alert = FeatureAlert(
+                title: "Review Selected Services",
+                message: "The selected services couldn’t be verified. Choose them again."
+            )
+            return nil
+        }
+
         let appointment: Appointment
         if let existingAppointment {
             appointment = existingAppointment
@@ -318,6 +358,12 @@ final class AppointmentEditorModel {
             context.insert(join)
             appointment.appointmentHorses.append(join)
             horse.appointmentHorses.append(join)
+        }
+
+        for membership in appointment.appointmentHorses {
+            if let horseID = membership.horse?.persistentModelID {
+                membership.plannedService = plannedServices[horseID]
+            }
         }
 
         do {
@@ -390,10 +436,12 @@ final class AppointmentEditorModel {
         guard draft.barnID != nil else {
             eligibleHorses = []
             draft.selectedHorseIDs = []
+            draft.serviceIDsByHorse = [:]
             return
         }
         let eligibleIDs = Set(eligibleHorses.map(\.persistentModelID))
         draft.selectedHorseIDs.formIntersection(eligibleIDs)
+        draft.serviceIDsByHorse = draft.serviceIDsByHorse.filter { draft.selectedHorseIDs.contains($0.key) }
     }
 
     private var lockedDraftMatchesPersistedMembership: Bool {

@@ -1,8 +1,17 @@
 import SwiftData
 import SwiftUI
 
+private enum BusinessProfileLayout {
+    static let subtitleGap: CGFloat = 4
+    static let rowGap: CGFloat = 8
+    static let contentGap: CGFloat = 12
+    static let sectionGap: CGFloat = 28
+    static let symbolSide: CGFloat = 24
+    static let rowMinimumHeight: CGFloat = 52
+}
+
 struct BusinessProfileEditorView: View {
-    enum Mode {
+    enum Mode: Equatable {
         case full
         case identity
     }
@@ -13,6 +22,7 @@ struct BusinessProfileEditorView: View {
     @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model = BusinessProfileEditorModel()
     @State private var identityContinueFeedbackTrigger = 0
+    @State private var showsCurrencyLockExplanation = false
     @FocusState private var focusedField: Field?
 
     private let onSaved: (() -> Void)?
@@ -48,7 +58,8 @@ struct BusinessProfileEditorView: View {
             }
         }
         .navigationTitle(mode == .identity ? "Your Business" : "My Business")
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbarTitleDisplayMode(.inline)
+        .toolbarVisibility(mode == .full ? .hidden : .automatic, for: .tabBar)
         .toolbar {
             if allowsEditing,
                model.loadState == .loaded,
@@ -234,55 +245,80 @@ struct BusinessProfileEditorView: View {
 
     private var fullForm: some View {
         Form {
-            Section {
-                TextField(
-                    "Business or Farrier Name",
-                    text: $model.draft.name
-                )
-                .textContentType(.organizationName)
-                .textInputAutocapitalization(.words)
-                .submitLabel(.next)
-                .focused($focusedField, equals: .name)
-                .onSubmit {
-                    focusedField = .phone
+            if !allowsEditing {
+                Section {
+                    readOnlyNotice
                 }
-                .accessibilityIdentifier("business-profile-name-field")
-                .accessibilityHint("Required. Used on future invoices.")
+                .listRowBackground(ColorTokens.surface)
+            }
 
-                if !model.draft.name.isEmpty,
-                   TextNormalization.required(model.draft.name) == nil {
-                    Text("Enter a business or farrier name.")
+            Section {
+                VStack(alignment: .leading, spacing: BusinessProfileLayout.subtitleGap) {
+                    labeledField("Business or farrier name") {
+                        TextField(
+                            "Business or farrier name",
+                            text: $model.draft.name,
+                            prompt: Text("Add business name")
+                                .foregroundStyle(ColorTokens.brandActionText)
+                        )
+                        .foregroundStyle(ColorTokens.textPrimary)
+                        .textContentType(.organizationName)
+                        .textInputAutocapitalization(.words)
+                        .submitLabel(.next)
+                        .focused($focusedField, equals: .name)
+                        .onSubmit {
+                            focusedField = .phone
+                        }
+                        .accessibilityLabel("Business or farrier name")
+                        .accessibilityIdentifier("business-profile-name-field")
+                        .accessibilityHint("Required. Used on future invoices.")
+                        .disabled(!allowsEditing)
+                    }
+
+                    if allowsEditing,
+                       !model.draft.name.isEmpty,
+                       TextNormalization.required(model.draft.name) == nil {
+                        Label(
+                            "Enter a business or farrier name.",
+                            systemImage: "exclamationmark.circle"
+                        )
                         .font(.footnote)
                         .foregroundStyle(ColorTokens.destructive)
+                        .accessibilityIdentifier("business-profile-name-error")
+                    }
                 }
-            } header: {
-                Text("Business")
-            } footer: {
-                Text("A business or farrier name is required.")
-            }
-            .listRowBackground(ColorTokens.surface)
 
-            Section {
                 currencyControl
             } header: {
-                Text("Currency")
-            } footer: {
-                if model.isCurrencyLocked {
-                    Text("Currency is locked because services or financial records already exist.")
-                } else {
-                    Text("Used for future services, invoices, payments, PDFs, and exports. No currency conversion is performed.")
-                }
+                Text("Business Details")
             }
             .listRowBackground(ColorTokens.surface)
 
             Section {
-                TextField("Phone", text: $model.draft.phone)
+                labeledField("Phone") {
+                    TextField(
+                        "Phone",
+                        text: $model.draft.phone,
+                        prompt: Text("Add phone")
+                            .foregroundStyle(ColorTokens.brandActionText)
+                    )
+                    .foregroundStyle(ColorTokens.textPrimary)
                     .textContentType(.telephoneNumber)
                     .keyboardType(.phonePad)
                     .focused($focusedField, equals: .phone)
+                    .accessibilityLabel("Phone")
                     .accessibilityIdentifier("business-profile-phone-field")
+                    .disabled(!allowsEditing)
+                }
 
-                TextField("Email", text: $model.draft.email)
+                labeledField("Email") {
+                    TextField(
+                        "Email",
+                        text: $model.draft.email,
+                        prompt: Text("Add email")
+                            .foregroundStyle(ColorTokens.brandActionText)
+                    )
+                    .foregroundStyle(ColorTokens.textPrimary)
                     .textContentType(.emailAddress)
                     .keyboardType(.emailAddress)
                     .textInputAutocapitalization(.never)
@@ -292,27 +328,37 @@ struct BusinessProfileEditorView: View {
                     .onSubmit {
                         focusedField = .address
                     }
+                    .accessibilityLabel("Email")
                     .accessibilityIdentifier("business-profile-email-field")
+                    .disabled(!allowsEditing)
+                }
 
-                TextField(
-                    "Address",
-                    text: $model.draft.address,
-                    axis: .vertical
-                )
-                .textContentType(.fullStreetAddress)
-                .lineLimit(2...4)
-                .focused($focusedField, equals: .address)
-                .accessibilityIdentifier("business-profile-address-field")
+                labeledField("Address") {
+                    TextField(
+                        "Address",
+                        text: $model.draft.address,
+                        prompt: Text("Add address")
+                            .foregroundStyle(ColorTokens.brandActionText),
+                        axis: .vertical
+                    )
+                    .foregroundStyle(ColorTokens.textPrimary)
+                    .textContentType(.fullStreetAddress)
+                    .lineLimit(2...4)
+                    .focused($focusedField, equals: .address)
+                    .accessibilityLabel("Address")
+                    .accessibilityIdentifier("business-profile-address-field")
+                    .disabled(!allowsEditing)
+                }
             } header: {
                 Text("Contact Information")
             } footer: {
-                Text("Phone, email, and address are optional.")
+                Text("Optional business contact details.")
             }
             .listRowBackground(ColorTokens.surface)
 
             Section {
                 Picker(
-                    "Usual Appointment",
+                    "Appointment Duration",
                     selection: $model.draft.defaultAppointmentDurationMinutes
                 ) {
                     Text("Ask Every Time").tag(Int?.none)
@@ -320,6 +366,8 @@ struct BusinessProfileEditorView: View {
                         Text("\(minutes) minutes").tag(Int?.some(minutes))
                     }
                 }
+                .tint(ColorTokens.brandActionText)
+                .disabled(!allowsEditing)
 
                 Picker(
                     "Invoice Due",
@@ -330,28 +378,86 @@ struct BusinessProfileEditorView: View {
                         Text("\(days) days").tag(Int?.some(days))
                     }
                 }
+                .tint(ColorTokens.brandActionText)
+                .disabled(!allowsEditing)
 
-                TextField(
-                    "Default Invoice Note",
-                    text: $model.draft.defaultInvoiceNote,
-                    axis: .vertical
-                )
-                .lineLimit(3...6)
-                .focused($focusedField, equals: .defaultInvoiceNote)
-                .accessibilityHint("Used on future invoices.")
-                .accessibilityIdentifier(
-                    "business-profile-default-invoice-note-field"
-                )
+                labeledField("Default Invoice Note") {
+                    TextField(
+                        "Default Invoice Note",
+                        text: $model.draft.defaultInvoiceNote,
+                        prompt: Text("Add default note")
+                            .foregroundStyle(ColorTokens.brandActionText),
+                        axis: .vertical
+                    )
+                    .foregroundStyle(ColorTokens.textPrimary)
+                    .lineLimit(3...6)
+                    .focused($focusedField, equals: .defaultInvoiceNote)
+                    .accessibilityLabel("Default Invoice Note")
+                    .accessibilityHint("Used on future invoices.")
+                    .accessibilityIdentifier(
+                        "business-profile-default-invoice-note-field"
+                    )
+                    .disabled(!allowsEditing)
+                }
             } header: {
-                Text("Usual Settings")
+                Text("Appointment & Invoice Defaults")
             } footer: {
-                Text("Defaults prefill new drafts. You can change or clear them before saving.")
+                Text("Defaults prefill new drafts and can be adjusted individually.")
             }
             .listRowBackground(ColorTokens.surface)
         }
+        .listSectionSpacing(.custom(BusinessProfileLayout.sectionGap))
+        .environment(
+            \.defaultMinListRowHeight,
+            BusinessProfileLayout.rowMinimumHeight
+        )
         .farrierFlowScrollBackground()
-        .disabled(!allowsEditing)
         .scrollDismissesKeyboard(.interactively)
+    }
+
+    private var readOnlyNotice: some View {
+        HStack(alignment: .top, spacing: BusinessProfileLayout.contentGap) {
+            Image(systemName: subscription.access == .unavailable ? "wifi.exclamationmark" : "lock")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(ColorTokens.textSecondary)
+                .frame(
+                    width: BusinessProfileLayout.symbolSide,
+                    height: BusinessProfileLayout.symbolSide
+                )
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: BusinessProfileLayout.subtitleGap) {
+                Text("Read Only")
+                    .font(.headline)
+                    .foregroundStyle(ColorTokens.textPrimary)
+                Text(readOnlyMessage)
+                    .font(.subheadline)
+                    .foregroundStyle(ColorTokens.textSecondary)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("business-profile-read-only-notice")
+    }
+
+    private var readOnlyMessage: LocalizedStringKey {
+        if subscription.access == .unavailable {
+            return "Subscription status couldn’t be verified. Your saved business details remain available."
+        }
+        return "Your saved business details remain available. Subscribe to make changes."
+    }
+
+    private func labeledField<Content: View>(
+        _ title: LocalizedStringKey,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: BusinessProfileLayout.subtitleGap) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(ColorTokens.textSecondary)
+                .accessibilityHidden(true)
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func save() {
@@ -381,6 +487,76 @@ struct BusinessProfileEditorView: View {
 
     @ViewBuilder
     private var currencyControl: some View {
+        switch mode {
+        case .full:
+            fullFormCurrencyControl
+        case .identity:
+            identityCurrencyControl
+        }
+    }
+
+    @ViewBuilder
+    private var fullFormCurrencyControl: some View {
+        if model.isCurrencyLocked {
+            labeledField("Currency") {
+                HStack(spacing: BusinessProfileLayout.contentGap) {
+                    Text(currencyLabel(for: model.draft.currencyCode))
+                        .foregroundStyle(ColorTokens.textPrimary)
+                    Spacer(minLength: BusinessProfileLayout.contentGap)
+                    Button {
+                        showsCurrencyLockExplanation = true
+                    } label: {
+                        HStack(spacing: BusinessProfileLayout.rowGap) {
+                            Image(systemName: "lock.fill")
+                                .font(.body.weight(.semibold))
+                                .frame(
+                                    width: BusinessProfileLayout.symbolSide,
+                                    height: BusinessProfileLayout.symbolSide
+                                )
+                                .accessibilityHidden(true)
+                            Text("Locked")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(ColorTokens.textSecondary)
+                    .contentShape(Rectangle())
+                    .accessibilityLabel("Why currency is locked")
+                    .alert(
+                        "Currency is Locked",
+                        isPresented: $showsCurrencyLockExplanation
+                    ) {
+                        Button("OK", role: .cancel) {}
+                    } message: {
+                        Text(
+                            "Currency can’t be changed after services or financial records have been added."
+                        )
+                    }
+                }
+            }
+            .accessibilityIdentifier("business-profile-currency-locked")
+        } else {
+            labeledField("Currency") {
+                Picker("Currency", selection: $model.draft.currencyCode) {
+                    ForEach(BusinessCurrency.allCases) { currency in
+                        Text(currencyLabel(for: currency.rawValue))
+                            .tag(currency.rawValue)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .tint(ColorTokens.brandActionText)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .disabled(!allowsEditing)
+                .accessibilityLabel("Currency")
+                .accessibilityIdentifier("business-profile-currency-picker")
+                .accessibilityHint("Choose the currency used for business amounts.")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var identityCurrencyControl: some View {
         if model.isCurrencyLocked {
             LabeledContent(
                 "Business Currency",

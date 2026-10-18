@@ -7,6 +7,73 @@ import Testing
 @MainActor
 struct InvoiceGenerationUseCaseTests {
     @Test
+    func secondarySyncPhoneCannotIssueOrAdvanceInvoiceSequence() throws {
+        let graph = try makeGenerationGraph()
+        let device = UUID()
+        let store = SyncJournalStore(container: graph.container)
+        try store.bind(accountID: UUID(), workspaceID: UUID(), deviceID: device)
+        try store.update { $0.invoicingDeviceID = UUID(); $0.invoicingGeneration = 1 }
+        #expect(throws: InvoiceGenerationError.notDesignatedInvoicingPhone) {
+            try InvoiceGenerationUseCase.generate(draft(for: graph.alexID, visitID: graph.mixedVisitID),
+                in: ModelContext(graph.container), deviceIDProvider: { device })
+        }
+        let context = ModelContext(graph.container)
+        #expect(try context.fetchCount(FetchDescriptor<Invoice>()) == 0)
+        #expect(try context.fetch(FetchDescriptor<BusinessProfile>()).first?.nextInvoiceNumber == 1)
+    }
+
+    @Test
+    func designatedPhoneCanIssueOfflineWithoutAnActiveAccountSession() throws {
+        let graph = try makeGenerationGraph()
+        let device = UUID()
+        let store = SyncJournalStore(container: graph.container)
+        try store.bind(accountID: UUID(), workspaceID: UUID(), deviceID: device)
+        try store.update { $0.invoicingDeviceID = device; $0.invoicingGeneration = 1 }
+        let invoiceID = try InvoiceGenerationUseCase.generate(draft(for: graph.alexID, visitID: graph.mixedVisitID),
+            in: ModelContext(graph.container), deviceIDProvider: { device })
+        #expect((ModelContext(graph.container).model(for: invoiceID) as? Invoice)?.number == 1)
+    }
+
+    @Test
+    func accountFreeGenerationDoesNotRequireOrCreateKeychainIdentity() throws {
+        let graph = try makeGenerationGraph()
+        _ = try InvoiceGenerationUseCase.generate(draft(for: graph.alexID, visitID: graph.mixedVisitID),
+            in: ModelContext(graph.container), deviceIDProvider: { throw SyncDeviceIdentityError.corruptIdentity })
+        #expect(try ModelContext(graph.container).fetchCount(FetchDescriptor<Invoice>()) == 1)
+    }
+
+    @Test
+    func retainedLocalBusinessCanInvoiceAfterCloudDeletionWithoutReopeningCloudAccess() throws {
+        let graph = try makeGenerationGraph()
+        let account = UUID(), workspace = UUID()
+        let store = SyncJournalStore(container: graph.container)
+        try store.bind(accountID: account, workspaceID: workspace, deviceID: UUID())
+        try store.update { $0.invoicingDeviceID = UUID(); $0.invoicingGeneration = 1 }
+        let intent = try CloudDeletionIntent(accountID: account, workspaceID: workspace)
+        try store.recordCloudDeletion(intent, status: .pending(intent.operationID))
+        _ = try InvoiceGenerationUseCase.generate(draft(for: graph.alexID, visitID: graph.mixedVisitID),
+            in: ModelContext(graph.container), deviceIDProvider: { throw SyncDeviceIdentityError.corruptIdentity })
+        #expect(try ModelContext(graph.container).fetchCount(FetchDescriptor<Invoice>()) == 1)
+        #expect(throws: SyncJournalStoreError.cloudAccountDeleted) { try store.stage() }
+    }
+
+    @Test
+    func changedAuthorityIsReadFromCommittedMetadataNotACachedEditorContext() throws {
+        let graph = try makeGenerationGraph()
+        let device = UUID()
+        let store = SyncJournalStore(container: graph.container)
+        try store.bind(accountID: UUID(), workspaceID: UUID(), deviceID: device)
+        try store.update { $0.invoicingDeviceID = device; $0.invoicingGeneration = 1 }
+        let context = ModelContext(graph.container)
+        _ = try SyncJournalStore.read(in: context)
+        try store.update { $0.invoicingDeviceID = UUID(); $0.invoicingGeneration = 2 }
+        #expect(throws: InvoiceGenerationError.notDesignatedInvoicingPhone) {
+            try InvoiceGenerationUseCase.generate(draft(for: graph.alexID, visitID: graph.mixedVisitID),
+                in: context, deviceIDProvider: { device })
+        }
+    }
+
+    @Test
     func generatesInvoiceSnapshotsInTheBusinessCurrency() throws {
         let graph = try makeGenerationGraph(currencyCode: "GBP")
 

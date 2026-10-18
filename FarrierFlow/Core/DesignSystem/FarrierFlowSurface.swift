@@ -5,6 +5,14 @@ extension View {
         modifier(FarrierFlowPrimaryActionModifier())
     }
 
+    func farrierFlowBorderedAction(tint: Color = ColorTokens.textSecondary) -> some View {
+        buttonStyle(.bordered)
+            .controlSize(.regular)
+            .tint(tint)
+            .frame(maxWidth: .infinity, minHeight: SpacingTokens.minimumTouchTarget)
+            .contentShape(Rectangle())
+    }
+
     func farrierFlowScreenBackground() -> some View {
         frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(ColorTokens.background.ignoresSafeArea())

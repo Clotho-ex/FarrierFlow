@@ -6,6 +6,7 @@ import UIKit
 
 struct PhotographCollectionView: View {
     @Environment(SubscriptionAccessModel.self) private var subscription
+    @Environment(\.backupSync) private var backupSync
     @State private var model: PhotographCollectionModel
     @State private var pickerItem: PhotosPickerItem?
     @State private var showsPhotoPicker = false
@@ -50,6 +51,13 @@ struct PhotographCollectionView: View {
             }
             .task {
                 model.load()
+            }
+            .onChange(of: backupSync?.runtime?.recordsVersion) { _, _ in model.load() }
+            .onChange(of: backupSync?.runtime?.photographsVersion) { _, _ in
+                model.load()
+                if let selectedPhotograph {
+                    self.selectedPhotograph = model.items.first { $0.id == selectedPhotograph.id }
+                }
             }
             .onReceive(
                 NotificationCenter.default.publisher(

@@ -1,0 +1,2 @@
+#include "PostHog.xcconfig"
+#include "Supabase.xcconfig"

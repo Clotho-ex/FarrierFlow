@@ -89,7 +89,10 @@ enum VisitStartUseCase {
             appointment.visit = visit
             barn.visits.append(visit)
 
-            for horse in horses {
+            for membership in appointment.appointmentHorses {
+                guard let horse = membership.horse else {
+                    throw DomainGraphViolation.appointmentHorseMissingHorse
+                }
                 let visitHorse = VisitHorse(
                     outcomeRawValue: VisitOutcome.pending.rawValue,
                     visit: visit,
@@ -99,7 +102,7 @@ enum VisitStartUseCase {
                 visit.visitHorses.append(visitHorse)
                 horse.visitHorses.append(visitHorse)
 
-                if let service = horse.defaultService {
+                if let service = membership.plannedService ?? horse.defaultService {
                     guard
                         let serviceNameSnapshot = TextNormalization.required(service.name),
                         !visitHorse.workItems.contains(where: { $0.service === service })

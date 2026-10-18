@@ -1,9 +1,13 @@
 import Foundation
 import SwiftData
 
-extension FarrierFlowSchemaV2 {
+extension FarrierFlowSchemaV5 {
     @Model
-    final class Photograph {
+    final class Photograph: SyncRecordIdentifying {
+        var syncID: UUID? { id }
+
+        func initializeSyncIdentity() { }
+
         @Attribute(.unique) var id: UUID
         var createdAt: Date
         var pixelWidth: Int

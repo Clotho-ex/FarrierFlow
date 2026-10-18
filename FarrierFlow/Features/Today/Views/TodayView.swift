@@ -5,6 +5,7 @@ struct TodayView: View {
     @Environment(OnboardingExperienceModel.self) private var onboarding
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
+    @Environment(\.backupSync) private var backupSync
     @Environment(\.appClock) private var appClock
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -31,7 +32,7 @@ struct TodayView: View {
             )
             .toolbar {
                 if subscription.allowsMutations {
-                    ToolbarItem(placement: .topBarTrailing) {
+                    ToolbarItemGroup(placement: .topBarTrailing) {
                         Button("Schedule Appointment", systemImage: "plus") {
                             presentedSheet = .appointment
                         }
@@ -69,6 +70,7 @@ struct TodayView: View {
                 }
             }
             .onAppear(perform: reload)
+            .onChange(of: backupSync?.runtime?.recordsVersion) { _, _ in reload() }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { reload() }
             }
@@ -89,13 +91,8 @@ struct TodayView: View {
                 .listRowBackground(ColorTokens.surface)
             }
 
-            if dynamicTypeSize.isAccessibilitySize {
-                primaryActionContent
-                identityContent
-            } else {
-                identityContent
-                primaryActionContent
-            }
+            identityContent
+            primaryActionContent
 
             if !model.remainingAppointments.isEmpty {
                 Section("Today’s Stops") {
@@ -120,7 +117,7 @@ struct TodayView: View {
                 }
             }
         }
-        .listSectionSpacing(.custom(SpacingTokens.standard))
+        .listSectionSpacing(.custom(SpacingTokens.related))
         .padding(.top, SpacingTokens.compact)
         .farrierFlowScrollBackground()
         .refreshable { reload() }
@@ -128,17 +125,12 @@ struct TodayView: View {
 
     private var identityContent: some View {
         Section {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(model.businessName)
-                    .font(.headline)
-                Text(
-                    appClock.now(),
-                    format: .dateTime.weekday(.wide).month(.abbreviated).day()
-                )
-                .font(.subheadline)
-                .foregroundStyle(ColorTokens.textSecondary)
-            }
-            .accessibilityElement(children: .combine)
+            Text(
+                appClock.now(),
+                format: .dateTime.weekday(.wide).month(.wide).day()
+            )
+            .font(.subheadline)
+            .foregroundStyle(ColorTokens.textSecondary)
         }
         .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)
@@ -563,7 +555,7 @@ private struct TodayRunSheetBand: View {
 
     private func scheduledContent(_ appointment: TodayAppointmentSummary) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            statusHeader(title: "Next Stop", status: "Scheduled")
+            statusHeader(title: "Next Appointment", status: "Scheduled")
             Text(appointment.startDate, format: .dateTime.hour().minute())
                 .font(
                     dynamicTypeSize.isAccessibilitySize
@@ -581,7 +573,7 @@ private struct TodayRunSheetBand: View {
                 .foregroundStyle(ColorTokens.brandActionText)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Next stop, \(appointment.serviceLocationName)")
+        .accessibilityLabel("Next appointment, \(appointment.serviceLocationName)")
         .accessibilityValue(scheduledAccessibilityValue(appointment))
         .accessibilityHint("Opens appointment details.")
     }

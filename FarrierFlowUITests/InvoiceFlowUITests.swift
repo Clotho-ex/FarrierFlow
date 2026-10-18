@@ -279,7 +279,7 @@ final class InvoiceFlowUITests: XCTestCase {
         XCTAssertTrue(referenceDetail.waitForExistence(timeout: 3))
         detail.tap()
 
-        app.navigationBars.buttons["Invoice Client"].tap()
+        app.navigationBars.buttons["Client"].tap()
         XCTAssertTrue(
             app.buttons["client-create-invoice-action"]
                 .waitForNonExistence(timeout: 3)

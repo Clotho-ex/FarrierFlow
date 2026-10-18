@@ -1,9 +1,15 @@
 import Foundation
 import SwiftData
 
-extension FarrierFlowSchemaV2 {
+extension FarrierFlowSchemaV5 {
     @Model
-    final class Visit {
+    final class Visit: SyncRecordIdentifying {
+        private(set) var syncID: UUID?
+
+        func initializeSyncIdentity() {
+            if syncID == nil { syncID = UUID() }
+        }
+
         var startedAt: Date
         var completedAt: Date?
         var serviceLocationNameSnapshot: String
@@ -22,6 +28,7 @@ extension FarrierFlowSchemaV2 {
         var invoiceVisits: [InvoiceVisit] = []
 
         init(
+            syncID: UUID = UUID(),
             startedAt: Date,
             completedAt: Date? = nil,
             serviceLocationNameSnapshot: String,
@@ -29,6 +36,7 @@ extension FarrierFlowSchemaV2 {
             appointment: Appointment,
             barn: Barn
         ) {
+            self.syncID = syncID
             self.startedAt = startedAt
             self.completedAt = completedAt
             self.serviceLocationNameSnapshot = serviceLocationNameSnapshot

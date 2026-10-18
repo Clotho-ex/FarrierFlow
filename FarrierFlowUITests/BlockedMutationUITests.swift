@@ -50,7 +50,7 @@ final class BlockedMutationUITests: XCTestCase {
         app.alerts.buttons["OK"].tap()
 
         guard tapUntilDestinationAppears(
-            app.navigationBars.buttons[clientName],
+            app.navigationBars.buttons["Client"],
             destination: app.buttons["Actions"]
         ) else { return }
         app.buttons["Actions"].tap()
@@ -90,12 +90,23 @@ final class BlockedMutationUITests: XCTestCase {
         XCTAssertTrue(app.buttons["appointment-row-\(firstBarn)"].waitForExistence(timeout: 3))
         guard tapUntilDestinationAppears(
             app.buttons["appointment-row-\(firstBarn)"],
-            destination: app.buttons["Delete"]
+            destination: app.buttons["appointment-actions-menu"]
         ) else { return }
-        app.buttons["Delete"].tap()
-        app.buttons["Delete Appointment"].firstMatch.tap()
+        app.buttons["appointment-actions-menu"].tap()
+        app.buttons["appointment-delete-action"].tap()
+        let deleteAppointment = app.buttons["appointment-delete-confirmation"]
+        XCTAssertTrue(deleteAppointment.waitForExistence(timeout: 3))
+        deleteAppointment.tap()
         XCTAssertTrue(
-            app.staticTexts["No scheduled appointments"].waitForExistence(timeout: 3)
+            app.staticTexts["No upcoming appointments"].waitForExistence(timeout: 3)
+        )
+        XCTAssertTrue(
+            app.staticTexts["Tap + to schedule an appointment."].exists
+        )
+        XCTAssertEqual(
+            app.buttons.matching(identifier: "Schedule Appointment").count,
+            1,
+            "The empty Schedule should expose only the toolbar creation action."
         )
     }
 

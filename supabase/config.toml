@@ -1,0 +1,8 @@
+# Declarative source for the Safari-administered project; no linked CLI project.
+project_id = "FarrierFlow"
+
+[functions.delete-cloud-account]
+# Auth removal makes a user JWT unavailable for later receipt confirmation.
+# request verifies a live owner session + fresh Apple proof; run verifies a
+# separate server-only capability; status verifies a random device-held receipt.
+verify_jwt = false

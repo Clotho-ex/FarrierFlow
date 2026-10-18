@@ -532,8 +532,11 @@ final class VisitCompletionUITests: XCTestCase {
         app.buttons["visit-start-action"].tap()
         app.buttons["Cancel"].tap()
 
-        app.navigationBars[graph.primaryBarnName].buttons["Delete"].tap()
-        app.buttons["appointment-delete-confirmation"].firstMatch.tap()
+        app.buttons["appointment-actions-menu"].tap()
+        app.buttons["appointment-delete-action"].tap()
+        let deleteAppointment = app.buttons["appointment-delete-confirmation"].firstMatch
+        XCTAssertTrue(deleteAppointment.waitForExistence(timeout: 3))
+        deleteAppointment.tap()
         XCTAssertTrue(app.alerts["Can’t Delete Appointment"].waitForExistence(timeout: 3))
         app.alerts.buttons["OK"].tap()
 

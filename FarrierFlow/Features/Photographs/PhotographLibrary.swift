@@ -115,6 +115,75 @@ final class PhotographLibrary {
         fileStore.canonicalURL(for: id)
     }
 
+    func canonicalPayloadForSync(record: SyncRecord) async throws -> SyncPhotoPayload? {
+        try await coordinator.withExclusiveOperation { @MainActor [self] in
+            try Task.checkCancellation()
+            guard protectedDataAvailable() else { throw PhotographLibraryError.protectedDataUnavailable }
+            try requireCurrentSyncPhoto(record)
+            try fileStore.prepareDirectories()
+            let url = fileStore.canonicalURL(for: record.id)
+            guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+            guard try fileStore.canonicalFileIsAvailable(for: record.id) else {
+                throw PhotographFileStoreError.expectedRegularFile
+            }
+            return try SyncPhotoPayload.validate(data: Data(contentsOf: url), record: record)
+        }
+    }
+
+    func restoreForSync(
+        payload: SyncPhotoPayload, record: SyncRecord,
+        checking: @escaping @MainActor @Sendable () throws -> Void
+    ) async throws -> Bool {
+        try await coordinator.withExclusiveOperation { @MainActor [self] in
+            try Task.checkCancellation()
+            try checking()
+            guard protectedDataAvailable() else { throw PhotographLibraryError.protectedDataUnavailable }
+            try requireCurrentSyncPhoto(record)
+            guard payload.id == record.id else { throw SyncPhotoPayloadError.invalidMetadata }
+            _ = try SyncPhotoPayload.validate(data: payload.data, record: record, expectedDigest: payload.digest)
+            try fileStore.prepareDirectories()
+            let canonical = fileStore.canonicalURL(for: record.id)
+            if FileManager.default.fileExists(atPath: canonical.path) {
+                guard try fileStore.canonicalFileIsAvailable(for: record.id) else {
+                    throw PhotographFileStoreError.expectedRegularFile
+                }
+                _ = try SyncPhotoPayload.validate(data: Data(contentsOf: canonical), record: record,
+                                                  expectedDigest: payload.digest)
+                try fileStore.applyCompleteProtection(to: canonical)
+                return false
+            }
+            if let capacity = try fileStore.availableCapacityForImportantUsage(),
+               capacity < Int64(payload.data.count) * 2 {
+                throw PhotographLibraryError.insufficientStorage
+            }
+            let temporary = fileStore.temporaryURL(photoID: record.id, operationID: UUID())
+            do {
+                try payload.data.write(to: temporary, options: [.atomic, .completeFileProtection])
+                try fileStore.applyCompleteProtection(to: temporary)
+                try checking()
+                try Task.checkCancellation()
+                try fileStore.moveWithoutOverwriting(from: temporary, to: canonical)
+                try fileStore.applyCompleteProtection(to: canonical)
+                return true
+            } catch {
+                do { try removeIfManagedFileExists(at: temporary) }
+                catch { throw PhotographLibraryError.rollbackCleanupFailed }
+                throw mappedAddError(error)
+            }
+        }
+    }
+
+    private func requireCurrentSyncPhoto(_ record: SyncRecord) throws {
+        let id = record.id
+        let context = ModelContext(container)
+        let matches = try context.fetch(FetchDescriptor<Photograph>(predicate: #Predicate { $0.id == id }))
+        guard let photo = matches.first else { throw PhotographLibraryError.photographUnavailable }
+        guard matches.count == 1, photo.visitHorse?.visit != nil, photo.visitHorse?.horse != nil,
+              try SyncGraphCodec.photographRecord(photo) == record else {
+            throw PhotographLibraryError.invalidPhotographGraph
+        }
+    }
+
     private func addExclusive(
         sourceData: Data,
         to visitHorseID: PersistentIdentifier,

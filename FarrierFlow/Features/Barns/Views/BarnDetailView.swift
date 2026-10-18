@@ -3,8 +3,10 @@ import SwiftUI
 
 struct BarnDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
+    @Environment(\.backupSync) private var backupSync
     @State private var model = BarnDetailModel()
     @State private var showsEditor = false
     @State private var showsHorseEditor = false
@@ -17,54 +19,94 @@ struct BarnDetailView: View {
         Group {
             if let barn = model.barn {
                 List {
-                    if barn.address != nil || barn.contactNotes != nil {
-                        Section("Service Location") {
+                    Section {
+                        VStack(
+                            alignment: .leading,
+                            spacing: SpacingTokens.tight
+                        ) {
+                            Text(barn.name)
+                                .font(.title2.weight(.semibold))
+                                .foregroundStyle(ColorTokens.textPrimary)
+                                .accessibilityAddTraits(.isHeader)
                             if let address = barn.address {
-                                LabeledContent("Address", value: address)
-                            }
-                            if let contactNotes = barn.contactNotes {
-                                LabeledContent("Contact Notes", value: contactNotes)
+                                Text(address)
+                                    .font(Typography.recordMetadata)
+                                    .foregroundStyle(ColorTokens.textSecondary)
                             }
                         }
-                        .listRowBackground(ColorTokens.surface)
-                    }
-                    Section("Horses") {
-                        ForEach(
-                            barn.horses.sorted {
-                                $0.name.localizedStandardCompare($1.name) == .orderedAscending
-                            },
-                            id: \.persistentModelID
-                        ) { horse in
-                            RecordNavigationLink(value: ClientRoute.horse(horse.persistentModelID)) {
-                                HorseRow(horse: horse)
-                            }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                        if let contactNotes = barn.contactNotes {
+                            LabeledContent("Contact Notes", value: contactNotes)
                         }
                     }
                     .listRowBackground(ColorTokens.surface)
+
+                    Section {
+                        if barn.horses.isEmpty {
+                            Label(
+                                "No horses yet",
+                                systemImage: "figure.equestrian.sports"
+                            )
+                            .foregroundStyle(ColorTokens.textSecondary)
+                        } else {
+                            ForEach(
+                                barn.horses.sorted {
+                                    $0.name.localizedStandardCompare($1.name) == .orderedAscending
+                                },
+                                id: \.persistentModelID
+                            ) { horse in
+                                RecordNavigationLink(
+                                    value: ClientRoute.horse(
+                                        horse.persistentModelID
+                                    )
+                                ) {
+                                    HorseRow(
+                                        horse: horse,
+                                        context: .serviceLocationDetail
+                                    )
+                                }
+                            }
+                        }
+                    } header: {
+                        horsesSectionHeader
+                            .textCase(nil)
+                    }
+                    .listRowBackground(ColorTokens.surface)
                 }
+                .listSectionSpacing(
+                    .custom(SpacingTokens.recordSection)
+                )
                 .farrierFlowScrollBackground()
-                .navigationTitle(barn.name)
+                .navigationTitle("Service Location")
+                .toolbarTitleDisplayMode(.inline)
                 .toolbar {
                     if subscription.allowsMutations {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Menu {
-                            Button("Add Horse", systemImage: "plus") {
-                                showsHorseEditor = true
-                            }
-                            Button("Add Existing Horse", systemImage: "arrow.right") {
-                                showsExistingHorsePicker = true
-                            }
-                            Divider()
-                            Button("Edit", systemImage: "pencil") { showsEditor = true }
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Menu {
+                                Button(
+                                    "Add Existing Horse",
+                                    systemImage: "arrow.right"
+                                ) {
+                                    showsExistingHorsePicker = true
+                                }
+                                Button("Edit", systemImage: "pencil") {
+                                    showsEditor = true
+                                }
                                 .tint(ColorTokens.textSecondary)
-                            Button("Delete", systemImage: "trash", role: .destructive) {
-                                showsDeleteConfirmation = true
+                                Divider()
+                                Button(
+                                    "Delete",
+                                    systemImage: "trash",
+                                    role: .destructive
+                                ) {
+                                    showsDeleteConfirmation = true
+                                }
+                            } label: {
+                                Label("Actions", systemImage: "ellipsis.circle")
                             }
-                        } label: {
-                            Label("Actions", systemImage: "ellipsis.circle")
+                            .tint(ColorTokens.textSecondary)
                         }
-                        .tint(ColorTokens.textSecondary)
-                    }
                     }
                 }
                 .sheet(isPresented: $showsEditor, onDismiss: reload) {
@@ -94,6 +136,7 @@ struct BarnDetailView: View {
             }
         }
         .onAppear(perform: reload)
+        .onChange(of: backupSync?.runtime?.recordsVersion) { _, _ in reload() }
         .alert(item: $model.alert) {
             Alert(title: Text($0.title), message: Text($0.message))
         }
@@ -101,5 +144,32 @@ struct BarnDetailView: View {
 
     private func reload() {
         model.load(id: barnID, in: context)
+    }
+
+    @ViewBuilder
+    private var horsesSectionHeader: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: SpacingTokens.tight) {
+                Text("Horses")
+                addHorseButton
+            }
+        } else {
+            HStack(spacing: SpacingTokens.compact) {
+                Text("Horses")
+                Spacer(minLength: SpacingTokens.compact)
+                addHorseButton
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var addHorseButton: some View {
+        if subscription.allowsMutations {
+            Button("Add Horse", systemImage: "plus") {
+                showsHorseEditor = true
+            }
+            .font(.subheadline.weight(.semibold))
+            .frame(minHeight: SpacingTokens.minimumTouchTarget)
+        }
     }
 }

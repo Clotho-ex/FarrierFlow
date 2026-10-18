@@ -6,6 +6,7 @@ struct HorseDetailView: View {
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
+    @Environment(\.backupSync) private var backupSync
     @State private var model = HorseDetailModel()
     @State private var showsEditor = false
     @State private var showsDeleteConfirmation = false
@@ -97,6 +98,7 @@ struct HorseDetailView: View {
             }
         }
         .onAppear(perform: reload)
+        .onChange(of: backupSync?.runtime?.recordsVersion) { _, _ in reload() }
         .alert(item: $model.alert) {
             Alert(title: Text($0.title), message: Text($0.message))
         }

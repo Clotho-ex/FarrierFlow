@@ -11,6 +11,93 @@ struct AppointmentEditorModelTests {
     }
 
     @Test
+    func appointmentServiceOverridesDefaultWithoutChangingHorseAndCarriesIntoVisit() throws {
+        let fixture = try makeTwoHorseFixture()
+        let horse = fixture.horses[0]
+        let usual = ModelFixtures.makeService(name: "Usual Trim", in: fixture.context)
+        let planned = ModelFixtures.makeService(name: "Full Set", in: fixture.context)
+        horse.defaultService = usual
+        try DomainGraphValidator.save(fixture.context)
+        let editor = AppointmentEditorModel()
+        editor.load(in: fixture.context)
+        editor.selectBarn(fixture.barn.persistentModelID, in: fixture.context)
+        editor.toggleHorse(horse.persistentModelID)
+        editor.draft.serviceIDsByHorse[horse.persistentModelID] = planned.persistentModelID
+        let id = try #require(editor.save(in: fixture.context))
+        let appointment = try #require(try fixture.context.existingModel(Appointment.self, for: id))
+        #expect(appointment.appointmentHorses.first?.plannedService === planned)
+        #expect(horse.defaultService === usual)
+        let reopened = AppointmentEditorModel(appointment: appointment)
+        reopened.load(in: fixture.context)
+        #expect(reopened.draft.serviceIDsByHorse[horse.persistentModelID] == planned.persistentModelID)
+        let visitID = try VisitStartUseCase.start(appointmentID: id, now: .now, in: fixture.container)
+        let check = ModelContext(fixture.container)
+        let visit = try #require(try check.existingModel(Visit.self, for: visitID))
+        #expect(visit.visitHorses.first?.workItems.first?.serviceNameSnapshot == "Full Set")
+        #expect(visit.visitHorses.first?.horse?.defaultService?.name == "Usual Trim")
+    }
+
+    @Test
+    func deselectingHorseClearsItsAppointmentServiceAndChangingBarnClearsPlans() throws {
+        let fixture = try makeTwoHorseFixture()
+        let editor = AppointmentEditorModel()
+        editor.load(in: fixture.context)
+        editor.selectBarn(fixture.barn.persistentModelID, in: fixture.context)
+        let horseID = fixture.horses[0].persistentModelID
+        let service = ModelFixtures.makeService(in: fixture.context)
+        try DomainGraphValidator.save(fixture.context)
+        editor.toggleHorse(horseID)
+        editor.draft.serviceIDsByHorse[horseID] = service.persistentModelID
+        editor.toggleHorse(horseID)
+        #expect(editor.draft.serviceIDsByHorse.isEmpty)
+        editor.toggleHorse(horseID)
+        editor.draft.serviceIDsByHorse[horseID] = service.persistentModelID
+        editor.selectBarn(nil, in: fixture.context)
+        #expect(editor.draft.serviceIDsByHorse.isEmpty)
+    }
+
+    @Test
+    func archivedOrMissingNewServiceCannotCreatePartialAppointment() throws {
+        let fixture = try makeTwoHorseFixture()
+        let service = ModelFixtures.makeService(isArchived: true, in: fixture.context)
+        try DomainGraphValidator.save(fixture.context)
+        let editor = AppointmentEditorModel()
+        editor.load(in: fixture.context)
+        editor.selectBarn(fixture.barn.persistentModelID, in: fixture.context)
+        editor.toggleHorse(fixture.horses[0].persistentModelID)
+        editor.draft.serviceIDsByHorse[fixture.horses[0].persistentModelID] = service.persistentModelID
+        #expect(editor.save(in: fixture.context) == nil)
+        #expect(editor.alert != nil)
+        #expect(try fixture.context.fetchCount(FetchDescriptor<Appointment>()) == 0)
+    }
+
+    @Test
+    func scheduledServiceCannotBeDeletedButCanBeArchivedWithoutLosingPlan() throws {
+        let fixture = try makeTwoHorseFixture()
+        let service = ModelFixtures.makeService(in: fixture.context)
+        try DomainGraphValidator.save(fixture.context)
+        let editor = AppointmentEditorModel()
+        editor.load(in: fixture.context)
+        editor.selectBarn(fixture.barn.persistentModelID, in: fixture.context)
+        let horseID = fixture.horses[0].persistentModelID
+        editor.toggleHorse(horseID)
+        editor.draft.serviceIDsByHorse[horseID] = service.persistentModelID
+        let id = try #require(editor.save(in: fixture.context))
+        #expect(throws: RecordDeletionBlock.serviceHasPlannedAppointments) {
+            try RecordDeletionRules.delete(service, in: fixture.context)
+        }
+        try RecordDeletionRules.archive(service, in: fixture.context)
+        let appointment = try #require(try fixture.context.existingModel(Appointment.self, for: id))
+        let reopened = AppointmentEditorModel(appointment: appointment)
+        reopened.load(in: fixture.context)
+        #expect(reopened.save(in: fixture.context) == id)
+        let visitID = try VisitStartUseCase.start(appointmentID: id, now: .now, in: fixture.container)
+        let check = ModelContext(fixture.container)
+        let visit = try #require(try check.existingModel(Visit.self, for: visitID))
+        #expect(visit.visitHorses.first?.workItems.first?.serviceNameSnapshot == "Front Shoes")
+    }
+
+    @Test
     func newDraftStartsAtTheNextHalfHour() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try #require(TimeZone(identifier: "UTC"))

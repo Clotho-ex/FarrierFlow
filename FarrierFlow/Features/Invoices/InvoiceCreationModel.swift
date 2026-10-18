@@ -203,7 +203,8 @@ final class InvoiceCreationModel {
     @discardableResult
     func generate(
         in context: ModelContext,
-        analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()
+        analyticsClient: any AnalyticsClient = NoOpAnalyticsClient(),
+        deviceIDProvider: @Sendable () throws -> UUID = { try SyncDeviceIdentity.loadOrCreate() }
     ) -> PersistentIdentifier? {
         guard let draft, canGenerate else {
             return nil
@@ -212,10 +213,22 @@ final class InvoiceCreationModel {
         defer { isGenerating = false }
 
         do {
-            let invoiceID = try InvoiceGenerationUseCase.generate(draft, in: context)
+            let invoiceID = try InvoiceGenerationUseCase.generate(draft, in: context, deviceIDProvider: deviceIDProvider)
             alert = nil
             analyticsClient.track(.invoiceCreated)
             return invoiceID
+        } catch InvoiceGenerationError.notDesignatedInvoicingPhone {
+            alert = FeatureAlert(
+                title: LocalizedStringResource("backupSync.invoicePhone.required.title", defaultValue: "Invoice phone required"),
+                message: LocalizedStringResource("backupSync.invoicePhone.required.message", defaultValue: "This business uses one invoicing iPhone. Open Backup & Sync to choose this phone.")
+            )
+            return nil
+        } catch InvoiceGenerationError.invoicingAuthorityUnavailable {
+            alert = FeatureAlert(
+                title: LocalizedStringResource("backupSync.invoicePhone.unavailable.title", defaultValue: "Invoice phone unavailable"),
+                message: LocalizedStringResource("backupSync.invoicePhone.unavailable.message", defaultValue: "FarrierFlow couldn’t check this iPhone’s invoice setting. Open Backup & Sync and try again.")
+            )
+            return nil
         } catch {
             alert = FeatureAlert(
                 title: "Couldn’t Generate Invoice",

@@ -9,16 +9,20 @@ nonisolated enum InvoiceGenerationError: Error, Equatable {
     case visitUnavailable
     case visitNoLongerEligible
     case invoiceNumberOverflow
+    case notDesignatedInvoicingPhone
+    case invoicingAuthorityUnavailable
 }
 
 @MainActor
 enum InvoiceGenerationUseCase {
     static func generate(
         _ draft: InvoiceCreationDraft,
-        in context: ModelContext
+        in context: ModelContext,
+        deviceIDProvider: @Sendable () throws -> UUID = { try SyncDeviceIdentity.loadOrCreate() }
     ) throws -> PersistentIdentifier {
         do {
             try DomainGraphValidator.validateAll(in: context)
+            try requireInvoicingAuthority(in: context, deviceIDProvider: deviceIDProvider)
             guard !draft.selectedVisitIDs.isEmpty else {
                 throw InvoiceGenerationError.noVisitsSelected
             }
@@ -112,6 +116,30 @@ enum InvoiceGenerationUseCase {
             context.rollback()
             throw error
         }
+    }
+
+    private static func requireInvoicingAuthority(
+        in context: ModelContext, deviceIDProvider: @Sendable () throws -> UUID
+    ) throws {
+        let journal: SyncJournal
+        do {
+            // Sync metadata may have changed while an invoice editor remained
+            // open. Do not trust its cached SwiftData identity map for authority.
+            journal = try SyncJournalStore.read(in: ModelContext(context.container))
+        } catch SyncJournalStoreError.unbound {
+            return
+        } catch SyncJournalStoreError.cloudAccountDeleted {
+            // Cloud deletion retains a usable local-only business. It must not
+            // retain remote invoicing authority or reopen the deleted dataset.
+            return
+        }
+        guard journal.invoicingGeneration > 0, let designated = journal.invoicingDeviceID else {
+            throw InvoiceGenerationError.invoicingAuthorityUnavailable
+        }
+        let device: UUID
+        do { device = try deviceIDProvider() }
+        catch { throw InvoiceGenerationError.invoicingAuthorityUnavailable }
+        guard device == designated else { throw InvoiceGenerationError.notDesignatedInvoicingPhone }
     }
 
     private static func soleBusinessProfile(

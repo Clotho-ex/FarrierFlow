@@ -2,15 +2,28 @@ import SwiftData
 import SwiftUI
 
 struct AppointmentEditorView: View {
+    private enum Field: Hashable {
+        case duration
+        case notes
+    }
+
+    private enum Layout {
+        static let minimumRowHeight: CGFloat = 56
+    }
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.analyticsClient) private var analyticsClient
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
+    @FocusState private var focusedField: Field?
     @State private var model: AppointmentEditorModel
     @State private var showsBarnEditor = false
     @State private var createdBarnID: PersistentIdentifier?
     @State private var showsHorseEditor = false
     @State private var createdHorseID: PersistentIdentifier?
+    @State private var showsServiceEditor = false
+    @State private var createdServiceID: PersistentIdentifier?
+    @State private var serviceHorseID: PersistentIdentifier?
     @State private var showsMoreDetails: Bool
     private let onSaved: ((PersistentIdentifier) -> Void)?
 
@@ -46,6 +59,7 @@ struct AppointmentEditorView: View {
                             Text("Add a service location before scheduling an appointment.")
                                 .foregroundStyle(ColorTokens.textSecondary)
                             Button("Add Service Location", systemImage: "plus") {
+                                focusedField = nil
                                 showsBarnEditor = true
                             }
                             .accessibilityIdentifier("appointment-add-service-location")
@@ -82,36 +96,22 @@ struct AppointmentEditorView: View {
                             .font(.footnote)
                             .foregroundStyle(ColorTokens.textSecondary)
                     }
-                    DisclosureGroup(
-                        "More Details",
-                        isExpanded: $showsMoreDetails
-                    ) {
-                        TextField(
-                            "Expected Duration (minutes)",
-                            text: $model.draft.expectedDurationText
-                        )
-                        .keyboardType(.numberPad)
-                        if model.appliedOwnerDurationDefault {
-                            Text("Your typical appointment duration was prefilled. You can change or clear it.")
-                                .font(.footnote)
-                                .foregroundStyle(ColorTokens.textSecondary)
-                        }
-                        appointmentRequirementGuidance
-                        TextEditor(text: $model.draft.notes)
-                            .frame(minHeight: 88)
-                            .accessibilityLabel("Appointment Notes")
-                    }
-                    .accessibilityIdentifier("appointment-more-details")
                 }
                 .listRowBackground(ColorTokens.surface)
                 loadStateSection
                 if model.loadState == .loaded {
-                    Section("Horses") {
+                    Section {
                         if model.hasVisit {
                             Text(model.lockedHorseNames.formatted(.list(type: .and)))
                         } else if model.draft.barnID == nil {
-                            Text("Select a service location to choose horses.")
-                                .foregroundStyle(ColorTokens.textSecondary)
+                            Label {
+                                Text("Choose a service location above to see its horses.")
+                            } icon: {
+                                Image(systemName: "info.circle")
+                                    .accessibilityHidden(true)
+                            }
+                            .font(.footnote)
+                            .foregroundStyle(ColorTokens.textSecondary)
                         } else {
                             if model.eligibleHorses.isEmpty {
                                 Text(
@@ -131,6 +131,9 @@ struct AppointmentEditorView: View {
                                     .accessibilityIdentifier(
                                         "appointment-horse-\(horse.name)"
                                     )
+                                    if model.draft.selectedHorseIDs.contains(horse.persistentModelID) {
+                                        servicePicker(for: horse)
+                                    }
                                 }
                                 if model.saveRequirement == .horse {
                                     Text("Select at least one horse.")
@@ -138,22 +141,72 @@ struct AppointmentEditorView: View {
                                 }
                             }
                             Button("Add Horse", systemImage: "plus") {
+                                focusedField = nil
                                 showsHorseEditor = true
                             }
                             .accessibilityIdentifier("appointment-add-horse")
                         }
+                    } header: {
+                        HStack {
+                            Text("Horses")
+                            Spacer()
+                            if showsHorseSelectionCount {
+                                Text(
+                                    "\(model.draft.selectedHorseIDs.count) of \(model.eligibleHorses.count) selected"
+                                )
+                                .textCase(nil)
+                            }
+                        }
                     }
                     .listRowBackground(ColorTokens.surface)
                 }
+                Section {
+                    DisclosureGroup(
+                        "More Details",
+                        isExpanded: $showsMoreDetails
+                    ) {
+                        TextField(
+                            "Expected Duration (minutes)",
+                            text: $model.draft.expectedDurationText
+                        )
+                        .keyboardType(.numberPad)
+                        .focused($focusedField, equals: .duration)
+                        if model.appliedOwnerDurationDefault {
+                            Text("Your typical appointment duration was prefilled. You can change or clear it.")
+                                .font(.footnote)
+                                .foregroundStyle(ColorTokens.textSecondary)
+                        }
+                        appointmentRequirementGuidance
+                        TextEditor(text: $model.draft.notes)
+                            .frame(minHeight: 88)
+                            .focused($focusedField, equals: .notes)
+                            .accessibilityLabel("Appointment Notes")
+                    }
+                    .accessibilityIdentifier("appointment-more-details")
+                }
+                .listRowBackground(ColorTokens.surface)
             }
+            .environment(
+                \.defaultMinListRowHeight,
+                Layout.minimumRowHeight
+            )
+            .listSectionSpacing(.custom(SpacingTokens.recordSection))
             .farrierFlowScrollBackground()
+            .scrollDismissesKeyboard(.interactively)
             .disabled(!subscription.allowsMutations)
             .navigationTitle(model.appointmentID == nil ? "New Appointment" : "Edit Appointment")
-            .navigationBarTitleDisplayMode(.inline)
+            .toolbarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                         .tint(ColorTokens.textSecondary)
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { focusedField = nil }
+                        .font(.subheadline.weight(.semibold))
+                        .accessibilityHint("Dismisses the keyboard without saving")
+                        .accessibilityIdentifier("appointment-keyboard-done")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
@@ -166,6 +219,8 @@ struct AppointmentEditorView: View {
                             dismiss()
                         }
                     }
+                    .fontWeight(.semibold)
+                    .tint(ColorTokens.brandActionText)
                     .disabled(!subscription.allowsMutations || !model.canSave)
                 }
             }
@@ -178,6 +233,9 @@ struct AppointmentEditorView: View {
             .sheet(isPresented: $showsBarnEditor, onDismiss: selectCreatedBarn) {
                 BarnEditorView(createdBarnID: $createdBarnID)
             }
+            .sheet(isPresented: $showsServiceEditor, onDismiss: selectCreatedService) {
+                ServiceEditorView(createdServiceID: $createdServiceID)
+            }
             .sheet(isPresented: $showsHorseEditor, onDismiss: selectCreatedHorse) {
                 HorseEditorView(
                     preselectedBarnID: model.draft.barnID,
@@ -188,6 +246,63 @@ struct AppointmentEditorView: View {
                 Alert(title: Text($0.title), message: Text($0.message))
             }
         }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+    }
+
+    @ViewBuilder
+    private func servicePicker(for horse: Horse) -> some View {
+        let horseID = horse.persistentModelID
+        let selection = Binding<PersistentIdentifier?>(
+            get: { model.draft.serviceIDsByHorse[horseID] },
+            set: { model.draft.serviceIDsByHorse[horseID] = $0 }
+        )
+        Picker("Service", selection: selection) {
+            if let service = horse.defaultService {
+                Text("Horse Default: \(service.name)")
+                    .tag(PersistentIdentifier?.none)
+            } else {
+                Text("Choose During Visit").tag(PersistentIdentifier?.none)
+            }
+            ForEach(model.services.filter {
+                !$0.isArchived || $0.persistentModelID == selection.wrappedValue
+            }, id: \.persistentModelID) { service in
+                Text(service.name).tag(Optional(service.persistentModelID))
+            }
+        }
+        .accessibilityLabel("Service for \(horse.name)")
+        .accessibilityValue(
+            model.services.first { $0.persistentModelID == selection.wrappedValue }?.name
+                ?? horse.defaultService?.name
+                ?? String(localized: "Choose During Visit")
+        )
+        .accessibilityIdentifier("appointment-service-\(horse.name)")
+        if model.services.allSatisfy(\.isArchived) {
+            Button("Add Service", systemImage: "plus") {
+                focusedField = nil
+                serviceHorseID = horseID
+                showsServiceEditor = true
+            }
+            .accessibilityIdentifier("appointment-add-service-\(horse.name)")
+        }
+    }
+
+    private func selectCreatedService() {
+        defer {
+            createdServiceID = nil
+            serviceHorseID = nil
+        }
+        guard let serviceID = createdServiceID, let horseID = serviceHorseID else { return }
+        model.load(in: context)
+        if model.draft.selectedHorseIDs.contains(horseID) {
+            model.draft.serviceIDsByHorse[horseID] = serviceID
+        }
+    }
+
+    private var showsHorseSelectionCount: Bool {
+        !model.hasVisit
+            && model.draft.barnID != nil
+            && !model.eligibleHorses.isEmpty
     }
 
     private func selectCreatedBarn() {

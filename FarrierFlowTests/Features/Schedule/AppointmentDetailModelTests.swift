@@ -7,6 +7,44 @@ import Testing
 @MainActor
 struct AppointmentDetailModelTests {
     @Test
+    func deleteKeepsOnlyValueDetailReadableWhilePersistingDeletion() throws {
+        let container = try ModelContainerFactory.inMemoryTest()
+        let setupContext = container.mainContext
+        let client = Client(name: "Alex")
+        let barn = Barn(name: "North Field")
+        setupContext.insert(client)
+        setupContext.insert(barn)
+
+        let horse = Horse(name: "Milo", client: client, currentBarn: barn)
+        setupContext.insert(horse)
+        client.horses.append(horse)
+        barn.horses.append(horse)
+
+        let appointment = ModelFixtures.makeAppointment(
+            barn: barn,
+            horses: [horse],
+            in: setupContext
+        )
+        try DomainGraphValidator.save(setupContext)
+
+        let displayContext = ModelContext(container)
+        let deletionContext = ModelContext(container)
+        let model = AppointmentDetailModel()
+        model.load(id: appointment.persistentModelID, in: displayContext)
+        let expectedStartDate = appointment.startDate
+        var detailStayedReadableAfterStoreDeletion = false
+
+        let deleted = model.delete(in: deletionContext) { resolvedAppointment, context in
+            try RecordDeletionRules.delete(resolvedAppointment, in: context)
+            detailStayedReadableAfterStoreDeletion = model.detail?.startDate == expectedStartDate
+        }
+
+        #expect(deleted)
+        #expect(detailStayedReadableAfterStoreDeletion)
+        #expect(model.detail == nil)
+    }
+
+    @Test
     func deleteResolvesTheDisplayedAppointmentInTheDeletionContext() throws {
         let container = try ModelContainerFactory.inMemoryTest()
         let setupContext = container.mainContext
@@ -66,7 +104,7 @@ struct AppointmentDetailModelTests {
         model.load(id: appointment.persistentModelID, in: context)
 
         #expect(!model.delete(in: context))
-        #expect(model.appointment?.persistentModelID == appointment.persistentModelID)
+        #expect(model.detail?.id == appointment.persistentModelID)
         let alert = try #require(model.alert)
         let expectedAlert = RecordDeletionBlock.appointmentHasVisit.alert
         #expect(alert.title == expectedAlert.title)

@@ -106,6 +106,20 @@ final class HorseEditorModel {
         draft.clientID = id
     }
 
+    func selectCreatedBarn(
+        _ id: PersistentIdentifier,
+        in context: ModelContext
+    ) {
+        loadChoices(in: context)
+        guard
+            choicesLoadState == .loaded,
+            barns.contains(where: { $0.persistentModelID == id })
+        else {
+            return
+        }
+        draft.barnID = id
+    }
+
     func save(
         in context: ModelContext,
         analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()

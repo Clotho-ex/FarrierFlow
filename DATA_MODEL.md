@@ -1,5 +1,35 @@
 # FarrierFlow Data Model
 
+## Appointment service planning (V5)
+
+V5 adds an optional `AppointmentHorse.plannedService` relationship, separate
+from `Horse.defaultService`. A selected service applies only to that appointment
+and takes precedence when the visit starts; an absent choice preserves the
+existing horse-default behavior. Services and prices become WorkItem snapshots
+when work starts. Appointment membership and service choices remain fixed after
+a visit starts. V1–V4 schemas remain frozen; V4 upgrades through a lightweight
+migration. Sync includes the optional `plannedService` service UUID and accepts
+legacy records that omit it. The matching backend contract was deployed to FarrierFlow Dev on 2026-10-18.
+Production configuration and physical-device release acceptance remain separate.
+
+## Unreleased V4 sync and recovery addendum
+
+The first-shipping description below is historical. Development preserves V1,
+V2 and V3 and upgrades into V4 in the same `FarrierFlowV1` store. V3 adds stable
+record UUIDs and a SyncState journal; V4 adds `WorkItem.billingHoldID: UUID?`.
+Legacy absent/null means unheld. A non-null hold is permanent for that exact
+identity: an opaque UUID, not an Invoice foreign key. Existing committed invoice
+lines may remain, but new local/server billing against held work is refused.
+
+SyncState JSON retains exact pending batches/protocol, baseline revisions,
+conflict/rejection proof, photo receipts, deletion fences and version-1 local
+invoice archives. Archives bind account/workspace and preserve a complete graph,
+selected invoice-to-work UUID mapping, Int64 amounts, currency, payments and
+issued snapshots. They contain metadata, not duplicate JPEGs, and never sync.
+Recovery archives, holds, active graph and journal save atomically or all roll
+back. Local history remains independently readable after sign-out/deletion and
+is explicitly not cloud-protected.
+
 ## Scope
 
 This document defines the implemented first-shipping SwiftData contract through

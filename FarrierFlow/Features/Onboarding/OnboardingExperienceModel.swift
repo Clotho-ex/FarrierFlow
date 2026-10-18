@@ -129,6 +129,13 @@ final class OnboardingExperienceModel {
         }
     }
 
+    func cloudBusinessDidRestore(hasValidBusinessProfile: Bool) {
+        guard hasValidBusinessProfile else { return }
+        // Restoring existing records is not a new business setup or purchase.
+        // The root's existing access rules still make free use read-only.
+        complete()
+    }
+
     func briefingDidFinish(
         analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()
     ) {

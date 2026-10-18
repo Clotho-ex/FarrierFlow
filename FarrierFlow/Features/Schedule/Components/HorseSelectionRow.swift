@@ -10,14 +10,19 @@ struct HorseSelectionRow: View {
             HStack {
                 HorseRow(horse: horse)
                 Spacer()
-                if isSelected {
-                    Image(systemName: "checkmark")
-                        .foregroundStyle(ColorTokens.brandActionText)
-                }
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundStyle(
+                        isSelected
+                            ? ColorTokens.brandActionText
+                            : ColorTokens.textSecondary
+                    )
+                    .accessibilityHidden(true)
             }
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }

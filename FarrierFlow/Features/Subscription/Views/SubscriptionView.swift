@@ -1,6 +1,15 @@
 import StoreKit
 import SwiftUI
 
+private enum SubscriptionLayout {
+    static let subtitleGap: CGFloat = 4
+    static let rowGap: CGFloat = 8
+    static let contentGap: CGFloat = 12
+    static let sectionGap: CGFloat = 28
+    static let cardRadius: CGFloat = 20
+    static let symbolSide: CGFloat = 24
+}
+
 struct SubscriptionView: View {
     enum Presentation: Equatable {
         case standard(showsManageSubscriptionButton: Bool)
@@ -54,12 +63,16 @@ struct SubscriptionView: View {
     }
 
     private var standardSubscriptionList: some View {
-        List {
+        Form {
             Section {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("FarrierFlow Pro")
-                        .font(.title2.bold())
-                    Text("Run appointments, horse history, work, photos, invoices, and follow-up in one field-ready workflow.")
+                VStack(alignment: .leading, spacing: SubscriptionLayout.rowGap) {
+                    VStack(alignment: .leading, spacing: SubscriptionLayout.subtitleGap) {
+                        Text("FarrierFlow Pro")
+                            .font(.headline)
+                        Text(
+                            "Run appointments, horse history, work, photos, invoices, and follow-up in one field-ready workflow."
+                        )
+                    }
                     Text("Your records stay on this iPhone. Cancel anytime; existing records remain available read only.")
                         .font(.footnote)
                         .foregroundStyle(ColorTokens.textSecondary)
@@ -70,36 +83,38 @@ struct SubscriptionView: View {
 
             if subscription.access == .pro {
                 Section {
-                    Label(
-                        "FarrierFlow Pro is active",
-                        systemImage: "checkmark.seal.fill"
+                    standardStatusRow(
+                        Text("FarrierFlow Pro is active"),
+                        systemImage: "checkmark.seal",
+                        tint: ColorTokens.success
                     )
-                    .foregroundStyle(ColorTokens.success)
                     .accessibilityIdentifier("subscription-active-pro")
                 }
                 .listRowBackground(ColorTokens.surface)
             } else if subscription.access == .unavailable {
                 Section {
-                    ContentUnavailableView {
-                        Label(
-                            "Subscription Status Unavailable",
-                            systemImage: "wifi.exclamationmark"
-                        )
-                    } description: {
-                        Text("FarrierFlow couldn’t verify your subscription. Try again.")
-                    } actions: {
-                        Button("Retry") {
-                            Task { await subscription.refresh() }
-                        }
-                        .accessibilityIdentifier("subscription-retry")
-                    }
+                    standardAvailabilityMessage(
+                        title: "Subscription Status Unavailable",
+                        message: "FarrierFlow couldn’t verify your subscription. Try again."
+                    )
                 }
                 .listRowBackground(ColorTokens.surface)
             } else if subscription.planLoadState == .loading {
                 Section {
-                    ProgressView("Loading Subscription Plans…")
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .accessibilityIdentifier("subscription-plans-loading")
+                    HStack(spacing: SubscriptionLayout.contentGap) {
+                        ProgressView()
+                            .controlSize(.small)
+                            .frame(
+                                width: SubscriptionLayout.symbolSide,
+                                height: SubscriptionLayout.symbolSide
+                            )
+                            .accessibilityHidden(true)
+                        Text("Loading Subscription Plans…")
+                            .font(.subheadline)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("subscription-plans-loading")
                 }
                 .listRowBackground(ColorTokens.surface)
             } else if subscription.paywallIsAvailable {
@@ -115,6 +130,7 @@ struct SubscriptionView: View {
                         } label: {
                             SubscriptionPlanRow(plan: plan)
                         }
+                        .buttonStyle(.plain)
                         .disabled(subscription.operation != .idle)
                         .accessibilityIdentifier(
                             "subscription-plan-\(plan.kind.accessibilityID)"
@@ -128,19 +144,10 @@ struct SubscriptionView: View {
                 .listRowBackground(ColorTokens.surface)
             } else {
                 Section {
-                    ContentUnavailableView {
-                        Label(
-                            "Plans Unavailable",
-                            systemImage: "wifi.exclamationmark"
-                        )
-                    } description: {
-                        Text("Connect to the internet and try loading subscription plans again.")
-                    } actions: {
-                        Button("Retry") {
-                            Task { await subscription.refresh() }
-                        }
-                        .accessibilityIdentifier("subscription-retry")
-                    }
+                    standardAvailabilityMessage(
+                        title: "Plans Unavailable",
+                        message: "Connect to the internet and try loading subscription plans again."
+                    )
                 }
                 .listRowBackground(ColorTokens.surface)
             }
@@ -148,49 +155,158 @@ struct SubscriptionView: View {
             if let errorMessage = subscription.errorMessage,
                subscription.access != .unavailable {
                 Section {
-                    Text(errorMessage)
-                        .foregroundStyle(ColorTokens.textSecondary)
-                        .accessibilityIdentifier("subscription-error")
+                    standardStatusRow(
+                        Text(errorMessage),
+                        systemImage: "exclamationmark.circle",
+                        tint: ColorTokens.textSecondary
+                    )
+                    .accessibilityIdentifier("subscription-error")
                 }
                 .listRowBackground(ColorTokens.surface)
             }
 
             Section {
-                Button("Restore Purchases") {
-                    Task {
-                        await subscription.restorePurchases(
-                            analyticsClient: analyticsClient
+                VStack(spacing: SubscriptionLayout.contentGap) {
+                    Button {
+                        Task {
+                            await subscription.restorePurchases(
+                                analyticsClient: analyticsClient
+                            )
+                        }
+                    } label: {
+                        standardBorderedActionLabel(
+                            "Restore Purchases",
+                            systemImage: "arrow.clockwise"
                         )
                     }
-                }
-                .disabled(subscription.operation != .idle)
-                .accessibilityIdentifier("subscription-restore")
+                    .farrierFlowBorderedAction()
+                    .disabled(subscription.operation != .idle)
+                    .accessibilityIdentifier("subscription-restore")
 
-                if showsManageSubscriptionButton {
-                    Button("Manage Subscription") {
-                        presentsManageSubscriptions = true
+                    if showsManageSubscriptionButton {
+                        Button {
+                            presentsManageSubscriptions = true
+                        } label: {
+                            standardBorderedActionLabel(
+                                "Manage Subscription",
+                                systemImage: "creditcard"
+                            )
+                        }
+                        .farrierFlowBorderedAction()
+                        .accessibilityIdentifier("subscription-manage")
                     }
-                    .accessibilityIdentifier("subscription-manage")
                 }
-
+                .padding(.vertical, 4)
             }
             .listRowBackground(ColorTokens.surface)
 
-            Section("Legal") {
-                if let termsURL = URL(
-                    string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
-                ) {
-                    Link("Terms of Use", destination: termsURL)
-                }
-                if let privacyURL = URL(
-                    string: "https://farrierflow.vercel.app/privacy/"
-                ) {
-                    Link("Privacy Policy", destination: privacyURL)
-                }
-            }
-            .listRowBackground(ColorTokens.surface)
+            legalSection
         }
+        .listSectionSpacing(.custom(SubscriptionLayout.sectionGap))
         .farrierFlowScrollBackground()
+        .toolbarTitleDisplayMode(.inline)
+        .toolbarVisibility(.hidden, for: .tabBar)
+    }
+
+    private func standardStatusRow(
+        _ title: Text,
+        systemImage: String,
+        tint: Color
+    ) -> some View {
+        HStack(spacing: SubscriptionLayout.contentGap) {
+            Image(systemName: systemImage)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(tint)
+                .frame(
+                    width: SubscriptionLayout.symbolSide,
+                    height: SubscriptionLayout.symbolSide
+                )
+                .accessibilityHidden(true)
+            title
+                .font(.headline)
+                .foregroundStyle(ColorTokens.textPrimary)
+        }
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func standardAvailabilityMessage(
+        title: LocalizedStringKey,
+        message: LocalizedStringKey
+    ) -> some View {
+        VStack(alignment: .leading, spacing: SubscriptionLayout.contentGap) {
+            HStack(alignment: .top, spacing: SubscriptionLayout.contentGap) {
+                Image(systemName: "wifi.exclamationmark")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(ColorTokens.textSecondary)
+                    .frame(
+                        width: SubscriptionLayout.symbolSide,
+                        height: SubscriptionLayout.symbolSide
+                    )
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: SubscriptionLayout.subtitleGap) {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundStyle(ColorTokens.textPrimary)
+                    Text(message)
+                        .font(.subheadline)
+                        .foregroundStyle(ColorTokens.textSecondary)
+                }
+            }
+            .accessibilityElement(children: .combine)
+
+            Button {
+                Task { await subscription.refresh() }
+            } label: {
+                standardBorderedActionLabel(
+                    "Retry",
+                    systemImage: "arrow.clockwise"
+                )
+            }
+            .farrierFlowBorderedAction()
+            .accessibilityIdentifier("subscription-retry")
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func standardBorderedActionLabel(
+        _ title: LocalizedStringKey,
+        systemImage: String
+    ) -> some View {
+        HStack(spacing: SubscriptionLayout.rowGap) {
+            Image(systemName: systemImage)
+                .font(.body.weight(.semibold))
+                .frame(
+                    width: SubscriptionLayout.symbolSide,
+                    height: SubscriptionLayout.symbolSide
+                )
+                .accessibilityHidden(true)
+            Text(title)
+                .font(.body.weight(.semibold))
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func standardLinkLabel(_ title: LocalizedStringKey) -> some View {
+        HStack(spacing: SubscriptionLayout.rowGap) {
+            Text(title)
+                .lineLimit(nil)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: SubscriptionLayout.contentGap)
+            Image(systemName: "arrow.up.right")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(ColorTokens.textSecondary)
+                .frame(
+                    width: SubscriptionLayout.symbolSide,
+                    height: SubscriptionLayout.symbolSide
+                )
+                .accessibilityHidden(true)
+        }
+        .foregroundStyle(ColorTokens.brandActionText)
+        .padding(.horizontal, SubscriptionLayout.contentGap)
+        .padding(.vertical, SubscriptionLayout.rowGap)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .contentShape(Rectangle())
     }
 
     private var onboardingSubscriptionList: some View {
@@ -428,19 +544,41 @@ struct SubscriptionView: View {
     }
 
     private var legalSection: some View {
-        Section("Legal") {
-            if let termsURL = URL(
-                string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
-            ) {
-                Link("Terms of Use", destination: termsURL)
+        Section {
+            VStack(spacing: 0) {
+                if let termsURL = URL(
+                    string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
+                ) {
+                    Link(destination: termsURL) {
+                        standardLinkLabel("Terms of Use")
+                    }
+                }
+                if URL(
+                    string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
+                ) != nil,
+                   URL(string: "https://farrierflow.vercel.app/privacy/") != nil {
+                    Divider()
+                        .padding(.horizontal, SubscriptionLayout.contentGap)
+                }
+                if let privacyURL = URL(
+                    string: "https://farrierflow.vercel.app/privacy/"
+                ) {
+                    Link(destination: privacyURL) {
+                        standardLinkLabel("Privacy Policy")
+                    }
+                }
             }
-            if let privacyURL = URL(
-                string: "https://farrierflow.vercel.app/privacy/"
-            ) {
-                Link("Privacy Policy", destination: privacyURL)
-            }
+            .padding(.vertical, SubscriptionLayout.subtitleGap)
+            .background(
+                ColorTokens.surface,
+                in: RoundedRectangle(cornerRadius: SubscriptionLayout.cardRadius, style: .continuous)
+            )
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+        } header: {
+            Text("Legal")
         }
-        .listRowBackground(ColorTokens.surface)
     }
 
     private var displayedPlans: [SubscriptionPlan] {
@@ -748,6 +886,7 @@ private struct SubscriptionPlanRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(plan.kind == .annual ? "Annual" : "Monthly")
                     .font(.headline)
+                    .foregroundStyle(ColorTokens.textPrimary)
                 Text("Billed \(plan.localizedPrice) every \(plan.subscriptionPeriod)")
                     .font(.subheadline)
                     .foregroundStyle(ColorTokens.textSecondary)
@@ -761,7 +900,9 @@ private struct SubscriptionPlanRow: View {
             Text(plan.localizedPrice)
                 .font(.headline)
                 .monospacedDigit()
+                .foregroundStyle(ColorTokens.textPrimary)
         }
+        .frame(minHeight: 52)
         .contentShape(Rectangle())
     }
 }

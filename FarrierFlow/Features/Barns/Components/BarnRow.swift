@@ -7,13 +7,17 @@ struct BarnRow: View {
         VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
             Text(barn.name)
                 .font(Typography.recordTitle)
-            if let address = barn.address {
-                Text(address)
-                    .font(Typography.recordMetadata)
-                    .foregroundStyle(ColorTokens.textSecondary)
-            }
+            Text(horseCountLabel)
+                .font(Typography.recordMetadata)
+                .foregroundStyle(ColorTokens.textSecondary)
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("barn-row-\(barn.name)")
+    }
+
+    private var horseCountLabel: LocalizedStringKey {
+        barn.horses.count == 1
+            ? "1 horse"
+            : "\(barn.horses.count) horses"
     }
 }

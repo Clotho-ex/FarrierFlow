@@ -20,6 +20,7 @@ struct OnboardingFlowView: View {
     @Environment(SubscriptionAccessModel.self) private var subscription
     @Environment(\.analyticsClient) private var analyticsClient
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ScaledMetric(relativeTo: .largeTitle) private var brandTitleSize = 48
 
     @Bindable var model: OnboardingExperienceModel
@@ -27,6 +28,7 @@ struct OnboardingFlowView: View {
     @State private var path: [OnboardingRoute]
     @State private var revealedBriefingStep: OnboardingBriefingRevealStep = .mark
     @State private var isBriefingContinueEnabled = false
+    @State private var showsBackup = false
 
     init(
         model: OnboardingExperienceModel,
@@ -40,10 +42,17 @@ struct OnboardingFlowView: View {
     var body: some View {
         NavigationStack(path: $path) {
             rootContent
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(BackupSyncCopy.restoreBusiness) { showsBackup = true }
+                            .accessibilityIdentifier("backup-sync-restore")
+                    }
+                }
                 .navigationDestination(for: OnboardingRoute.self) { route in
                     destination(for: route)
                 }
         }
+        .sheet(isPresented: $showsBackup) { BackupSyncSheet().dynamicTypeSize(dynamicTypeSize) }
         .onChange(of: model.step) {
             let resolvedPath = model.navigationPath
             if path != resolvedPath {

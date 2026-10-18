@@ -12,6 +12,7 @@ nonisolated struct AppointmentDraft: Equatable {
     var barnID: PersistentIdentifier?
     var startDate: Date
     var selectedHorseIDs: Set<PersistentIdentifier>
+    var serviceIDsByHorse: [PersistentIdentifier: PersistentIdentifier] = [:]
     var notes = ""
     var expectedDurationText = ""
 

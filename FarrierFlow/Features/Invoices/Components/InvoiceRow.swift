@@ -4,6 +4,15 @@ struct InvoiceRow: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.locale) private var locale
     let summary: InvoiceSummary
+    let showsClientName: Bool
+
+    init(
+        summary: InvoiceSummary,
+        showsClientName: Bool = true
+    ) {
+        self.summary = summary
+        self.showsClientName = showsClientName
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
@@ -31,9 +40,11 @@ struct InvoiceRow: View {
         VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
             Text("Invoice \(summary.number)")
                 .font(Typography.recordTitle)
-            Text(summary.clientName)
-                .font(Typography.recordMetadata)
-                .foregroundStyle(ColorTokens.textSecondary)
+            if showsClientName {
+                Text(summary.clientName)
+                    .font(Typography.recordMetadata)
+                    .foregroundStyle(ColorTokens.textSecondary)
+            }
             Text(
                 summary.invoiceDate,
                 format: .dateTime.month(.abbreviated).day().year()
@@ -49,6 +60,12 @@ struct InvoiceRow: View {
         let date = summary.invoiceDate.formatted(
             .dateTime.month(.abbreviated).day().year().locale(locale)
         )
+        guard showsClientName else {
+            return String(
+                localized: "Invoice \(summary.number), \(date)",
+                locale: locale
+            )
+        }
         return String(
             localized: "Invoice \(summary.number), \(summary.clientName), \(date)",
             locale: locale

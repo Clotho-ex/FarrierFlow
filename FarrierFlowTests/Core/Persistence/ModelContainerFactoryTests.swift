@@ -28,6 +28,7 @@ struct ModelContainerFactoryTests {
             "InvoiceVisit",
             "InvoiceLineItem",
             "Payment",
+            "SyncState",
         ])
         #expect(try container.mainContext.fetchCount(FetchDescriptor<Client>()) == 0)
 

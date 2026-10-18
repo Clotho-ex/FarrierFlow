@@ -1,0 +1,4 @@
+// Development only. These values are public client configuration, not secrets.
+// Release does not include this file; no production project is configured yet.
+SUPABASE_URL = https:/$()/xufledziawaapvrifbfv.supabase.co
+SUPABASE_PUBLISHABLE_KEY = sb_publishable_EMoFMWBtnhj966PrRRv5EA_MpXqEV-G

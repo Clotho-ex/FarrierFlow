@@ -16,6 +16,7 @@ nonisolated enum RecordDeletionBlock: Error, Equatable {
     case workItemHasInvoiceLineItem
     case businessProfileCannotBeDeleted
     case serviceHasHorseDefaults
+    case serviceHasPlannedAppointments
     case serviceHasWorkItems
     case serviceHasHorseDefaultsAndWorkItems
 
@@ -85,6 +86,11 @@ nonisolated enum RecordDeletionBlock: Error, Equatable {
             FeatureAlert(
                 title: "Can’t Delete Business Profile",
                 message: "Edit the existing business profile instead."
+            )
+        case .serviceHasPlannedAppointments:
+            FeatureAlert(
+                title: "Service Is Scheduled",
+                message: "This service is referenced by appointments. Archive it to keep their service choices."
             )
         case .serviceHasHorseDefaults:
             FeatureAlert(
@@ -195,6 +201,9 @@ enum RecordDeletionRules {
     }
 
     static func delete(_ service: Service, in context: ModelContext) throws {
+        guard service.plannedAppointments.isEmpty else {
+            throw RecordDeletionBlock.serviceHasPlannedAppointments
+        }
         switch (service.horsesUsingAsDefault.isEmpty, service.workItems.isEmpty) {
         case (false, false):
             throw RecordDeletionBlock.serviceHasHorseDefaultsAndWorkItems

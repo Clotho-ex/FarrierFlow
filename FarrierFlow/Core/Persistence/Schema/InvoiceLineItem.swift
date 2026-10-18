@@ -1,8 +1,15 @@
+import Foundation
 import SwiftData
 
-extension FarrierFlowSchemaV2 {
+extension FarrierFlowSchemaV5 {
     @Model
-    final class InvoiceLineItem {
+    final class InvoiceLineItem: SyncRecordIdentifying {
+        private(set) var syncID: UUID?
+
+        func initializeSyncIdentity() {
+            if syncID == nil { syncID = UUID() }
+        }
+
         private(set) var horseNameSnapshot: String
         private(set) var serviceNameSnapshot: String
         private(set) var amountMinorUnits: Int64
@@ -11,6 +18,7 @@ extension FarrierFlowSchemaV2 {
         private(set) var sourceWorkItem: WorkItem?
 
         init(
+            syncID: UUID = UUID(),
             horseNameSnapshot: String,
             serviceNameSnapshot: String,
             amountMinorUnits: Int64,
@@ -18,6 +26,7 @@ extension FarrierFlowSchemaV2 {
             invoiceVisit: InvoiceVisit,
             sourceWorkItem: WorkItem
         ) {
+            self.syncID = syncID
             self.horseNameSnapshot = horseNameSnapshot
             self.serviceNameSnapshot = serviceNameSnapshot
             self.amountMinorUnits = amountMinorUnits

@@ -7,6 +7,24 @@ import Testing
 @MainActor
 struct InvoiceCreationModelTests {
     @Test
+    func secondaryPhoneExplainsRecoveryAndKeepsVisitSelection() throws {
+        let graph = try makeCreationGraph(hasBusinessProfile: true)
+        let device = UUID()
+        let store = SyncJournalStore(container: graph.context.container)
+        try store.bind(accountID: UUID(), workspaceID: UUID(), deviceID: device)
+        try store.update { $0.invoicingDeviceID = UUID(); $0.invoicingGeneration = 1 }
+        let model = InvoiceCreationModel(clientID: graph.clientID)
+        model.load(in: graph.context)
+        model.selectAll()
+        let before = model.draft
+        #expect(model.generate(in: graph.context, deviceIDProvider: { device }) == nil)
+        #expect(model.draft?.selectedVisitIDs == before?.selectedVisitIDs)
+        let message = model.alert.map { String(localized: $0.message) }
+        #expect(message?.contains("Backup & Sync") == true)
+        #expect(try graph.context.fetchCount(FetchDescriptor<Invoice>()) == 0)
+    }
+
+    @Test
     func loadDefaultsDatesAndNoteThenSelectAllKeepsOnlyVisitSelectionState() throws {
         let graph = try makeCreationGraph(hasBusinessProfile: true)
         var calendar = Calendar(identifier: .gregorian)

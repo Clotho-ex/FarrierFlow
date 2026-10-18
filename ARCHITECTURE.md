@@ -1,5 +1,17 @@
 # FarrierFlow Architecture
 
+## Appointment service planning (V5)
+
+V5 adds an optional `AppointmentHorse.plannedService` relationship, separate
+from `Horse.defaultService`. A selected service applies only to that appointment
+and takes precedence when the visit starts; an absent choice preserves the
+existing horse-default behavior. Services and prices become WorkItem snapshots
+when work starts. Appointment membership and service choices remain fixed after
+a visit starts. V1–V4 schemas remain frozen; V4 upgrades through a lightweight
+migration. Sync includes the optional `plannedService` service UUID and accepts
+legacy records that omit it. The matching backend contract was deployed to FarrierFlow Dev on 2026-10-18.
+Production configuration and physical-device release acceptance remain separate.
+
 ## Architectural Goals
 
 FarrierFlow is a local-first, iPhone-only SwiftUI application. Slices 1 through
@@ -12,6 +24,31 @@ while RevenueCat supplies entitlement, Offering, purchase, and restore state
 behind FarrierFlow's subscription boundary. The app adds no FarrierFlow server,
 CloudKit, account, business-data synchronization, or analytics SDK; RevenueCat
 is its sole third-party package and network service.
+
+### Unreleased solo backup and sync
+
+Current development adds optional, free Apple authentication and the approved
+Supabase SDK. SwiftData stays authoritative offline. Account-free use and Pro
+mutation gates are unchanged. Workspace RPCs use stable UUIDs, durable exact
+operation retries, full-transaction cursors and conservative merges. Private
+original JPEG protection is acknowledged separately from metadata.
+
+Reviewed recovery archives original invoices locally, outside cloud batches,
+and applies permanent exact-WorkItem billing holds. Protocol 2 refuses new
+billing against committed holds. Explicit profile review and one atomic local
+save preserve original numbers, currency and payment snapshots. Unacknowledged
+holds and local-only history never imply whole-business cloud protection.
+Independent archive details/PDFs need no session or SDK, including after cloud
+deletion. Read-only archive projections disable autosave; foreign validation
+save notifications are filtered at publication before SwiftUI can buffer them
+beyond their container lifetimes. General dependency conflicts review the exact
+deferred transaction and save only a fully validated chosen graph and cursor.
+On iOS 18, history and recovery use native independent navigation-stack sheets
+to avoid a reproduced deep-stack collection layout loop; iOS 26 retains pushes.
+
+This is not a release or real Apple/two-iPhone acceptance. Server-only deletion
+secrets and retry scheduling remain configuration gates. Current evidence is in
+`docs/handoffs/solo-sync-backend.md`.
 
 The dependency direction is:
 

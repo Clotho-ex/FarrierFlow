@@ -1,9 +1,15 @@
 import Foundation
 import SwiftData
 
-extension FarrierFlowSchemaV2 {
+extension FarrierFlowSchemaV5 {
     @Model
-    final class Invoice {
+    final class Invoice: SyncRecordIdentifying {
+        private(set) var syncID: UUID?
+
+        func initializeSyncIdentity() {
+            if syncID == nil { syncID = UUID() }
+        }
+
         @Attribute(.unique) private(set) var number: Int64
         private(set) var invoiceDate: Date
         private(set) var dueDate: Date?
@@ -30,6 +36,7 @@ extension FarrierFlowSchemaV2 {
         private(set) var payments: [Payment] = []
 
         init(
+            syncID: UUID = UUID(),
             number: Int64,
             invoiceDate: Date,
             dueDate: Date? = nil,
@@ -44,6 +51,7 @@ extension FarrierFlowSchemaV2 {
             currencyCode: String = "USD",
             client: Client
         ) {
+            self.syncID = syncID
             self.number = number
             self.invoiceDate = invoiceDate
             self.dueDate = dueDate

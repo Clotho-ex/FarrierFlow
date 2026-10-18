@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 
 struct PhotographThumbnailView: View {
+    @Environment(\.backupSync) private var backupSync
     let item: PhotographItem
     let url: URL
     let position: Int
@@ -39,6 +40,8 @@ struct PhotographThumbnailView: View {
             protectedDataIsAvailable = UIApplication.shared.isProtectedDataAvailable
             loadFinished = protectedDataIsAvailable
         }
+        .onChange(of: item.availability) { _, _ in reloadToken += 1 }
+        .onChange(of: backupSync?.runtime?.photographsVersion) { _, _ in reloadToken += 1 }
         .onReceive(
             NotificationCenter.default.publisher(
                 for: UIApplication.protectedDataWillBecomeUnavailableNotification

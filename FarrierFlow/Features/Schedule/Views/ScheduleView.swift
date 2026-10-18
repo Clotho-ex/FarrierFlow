@@ -5,6 +5,7 @@ struct ScheduleView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
+    @Environment(\.backupSync) private var backupSync
     @Environment(\.appClock) private var appClock
     @State private var path = NavigationPath()
     @State private var model = ScheduleModel()
@@ -15,14 +16,11 @@ struct ScheduleView: View {
             Group {
                 if model.sections.isEmpty {
                     ContentUnavailableView {
-                        Label("No scheduled appointments", systemImage: "calendar")
+                        Label("No upcoming appointments", systemImage: "calendar")
                     } description: {
-                        Text("Today and future appointments will appear here.")
-                    } actions: {
                         if subscription.allowsMutations {
-                        Button("Schedule Appointment", systemImage: "plus") {
-                            showsEditor = true
-                        }
+                            Text("Tap + to schedule an appointment.")
+                                .frame(maxWidth: 320)
                         }
                     }
                 } else {
@@ -62,11 +60,11 @@ struct ScheduleView: View {
             )
             .toolbar {
                 if subscription.allowsMutations {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Schedule Appointment", systemImage: "plus") {
-                        showsEditor = true
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Schedule Appointment", systemImage: "plus") {
+                            showsEditor = true
+                        }
                     }
-                }
                 }
             }
             .navigationDestination(for: ScheduleRoute.self) { route in
@@ -79,6 +77,7 @@ struct ScheduleView: View {
                 AppointmentEditorView()
             }
             .onAppear(perform: reload)
+            .onChange(of: backupSync?.runtime?.recordsVersion) { _, _ in reload() }
             .alert(item: $model.alert) {
                 Alert(title: Text($0.title), message: Text($0.message))
             }

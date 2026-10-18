@@ -5,6 +5,7 @@ struct ServiceListView: View {
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
+    @Environment(\.backupSync) private var backupSync
     @State private var model = ServiceListModel()
     @State private var showsEditor = false
 
@@ -35,6 +36,7 @@ struct ServiceListView: View {
             ServiceEditorView()
         }
         .onAppear(perform: reload)
+        .onChange(of: backupSync?.runtime?.recordsVersion) { _, _ in reload() }
     }
 
     @ViewBuilder

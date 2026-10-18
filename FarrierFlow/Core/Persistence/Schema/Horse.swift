@@ -1,8 +1,15 @@
+import Foundation
 import SwiftData
 
-extension FarrierFlowSchemaV2 {
+extension FarrierFlowSchemaV5 {
     @Model
-    final class Horse {
+    final class Horse: SyncRecordIdentifying {
+        private(set) var syncID: UUID?
+
+        func initializeSyncIdentity() {
+            if syncID == nil { syncID = UUID() }
+        }
+
         var name: String
         var safetyNotes: String?
         var appointmentIntervalWeeks: Int = 6
@@ -18,6 +25,7 @@ extension FarrierFlowSchemaV2 {
         var defaultService: Service?
 
         init(
+            syncID: UUID = UUID(),
             name: String,
             safetyNotes: String? = nil,
             appointmentIntervalWeeks: Int = 6,
@@ -25,6 +33,7 @@ extension FarrierFlowSchemaV2 {
             currentBarn: Barn,
             defaultService: Service? = nil
         ) {
+            self.syncID = syncID
             self.name = name
             self.safetyNotes = safetyNotes
             self.appointmentIntervalWeeks = appointmentIntervalWeeks

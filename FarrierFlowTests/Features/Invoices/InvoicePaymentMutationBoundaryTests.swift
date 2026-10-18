@@ -43,6 +43,7 @@ struct InvoicePaymentMutationBoundaryTests {
         let files = try swiftSources()
         let aggregatePath = "Core/Persistence/Schema/Invoice.swift"
         let useCasePath = "Features/Invoices/InvoicePaymentUseCase.swift"
+        let restorePath = "Features/BackupSync/SyncGraphCodec.swift"
 
         for (path, source) in files {
             if path.hasPrefix("Core/Persistence/Migrations/") {
@@ -56,7 +57,9 @@ struct InvoicePaymentMutationBoundaryTests {
                 #expect(!source.contains("payments.append("), "Unauthorized payment append in \(path)")
                 #expect(!source.contains("payments.removeAll("), "Unauthorized payment removal in \(path)")
             }
-            if path != aggregatePath, path != useCasePath {
+            // A complete validated cloud/history restore uses the same aggregate
+            // transitions, without invoking an independently saving UI use case.
+            if path != aggregatePath, path != useCasePath, path != restorePath {
                 #expect(!source.contains("recordCompletedPayment("), "Unauthorized paid transition in \(path)")
                 #expect(!source.contains("removeCompletedPayment("), "Unauthorized unpaid transition in \(path)")
             }
@@ -65,6 +68,9 @@ struct InvoicePaymentMutationBoundaryTests {
         let invoice = try #require(files[aggregatePath])
         #expect(invoice.contains("private(set) var statusRawValue"))
         #expect(invoice.contains("private(set) var payments"))
+        let restore = try #require(files[restorePath])
+        #expect(restore.contains("try DomainGraphValidator.validateAll(in: validationStore.mainContext)"))
+        #expect(restore.contains("context.rollback()"))
     }
 
     private func swiftSources() throws -> [String: String] {

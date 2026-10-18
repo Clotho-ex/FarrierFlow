@@ -5,6 +5,7 @@ struct ClientListView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
+    @Environment(\.backupSync) private var backupSync
     @State private var path = NavigationPath()
     @State private var model = ClientListModel()
     @State private var showsEditor = false
@@ -19,20 +20,33 @@ struct ClientListView: View {
                         Text("Add a client to begin keeping connected horse records.")
                     } actions: {
                         if subscription.allowsMutations {
-                        Button("Add Client", systemImage: "plus") {
-                            showsEditor = true
-                        }
+                            Button("Add Client", systemImage: "plus") {
+                                showsEditor = true
+                            }
                         }
                     }
                 } else {
-                    List(model.clients, id: \.persistentModelID) { client in
-                        RecordNavigationLink(value: ClientRoute.detail(client.persistentModelID)) {
-                            ClientRow(client: client)
+                    List {
+                        Section {
+                            ForEach(
+                                model.clients,
+                                id: \.persistentModelID
+                            ) { client in
+                                RecordNavigationLink(
+                                    value: ClientRoute.detail(
+                                        client.persistentModelID
+                                    )
+                                ) {
+                                    ClientRow(client: client)
+                                }
+                                .listRowBackground(ColorTokens.surface)
+                            }
+                        } header: {
+                            Text(clientCountLabel)
+                                .textCase(nil)
                         }
-                        .listRowBackground(ColorTokens.surface)
                     }
-                    .listSectionSpacing(.custom(SpacingTokens.standard))
-                    .padding(.top, SpacingTokens.compact)
+                    .listSectionSpacing(.custom(SpacingTokens.related))
                     .farrierFlowScrollBackground()
                 }
             }
@@ -44,28 +58,42 @@ struct ClientListView: View {
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     if subscription.allowsMutations {
-                    Button("Add Client", systemImage: "plus") {
-                        showsEditor = true
-                    }
+                        Button("Add Client", systemImage: "plus") {
+                            showsEditor = true
+                        }
                     }
                     Menu {
-                        Button("Service Locations", systemImage: "mappin.and.ellipse") {
-                            path.append(BarnRoute.list)
+                        Section("Business Tools") {
+                            Button("Service Locations", systemImage: "mappin.and.ellipse") {
+                                path.append(BarnRoute.list)
+                            }
+                            Button("Services", systemImage: "wrench.and.screwdriver") {
+                                path.append(ServiceRoute.list)
+                            }
+                            Button("Invoices", systemImage: "doc.text") {
+                                path.append(InvoiceRoute.list)
+                            }
                         }
-                        Button("Services", systemImage: "wrench.and.screwdriver") {
-                            path.append(ServiceRoute.list)
-                        }
-                        Button("Invoices", systemImage: "doc.text") {
-                            path.append(InvoiceRoute.list)
-                        }
-                        Button(
-                            "My Business",
-                            systemImage: "person.text.rectangle"
-                        ) {
-                            path.append(BusinessProfileRoute.editor)
-                        }
-                        Button("Subscription", systemImage: "creditcard") {
-                            path.append(SubscriptionRoute.store)
+                        Section("Settings") {
+                            Button(
+                                "My Business",
+                                systemImage: "person.text.rectangle"
+                            ) {
+                                path.append(BusinessProfileRoute.editor)
+                            }
+                            Button("Subscription", systemImage: "creditcard") {
+                                path.append(SubscriptionRoute.store)
+                            }
+                            Button {
+                                path.append(BackupSyncRoute.account)
+                            } label: {
+                                Label {
+                                    Text(BackupSyncCopy.title)
+                                } icon: {
+                                    Image(systemName: "icloud")
+                                }
+                            }
+                            .accessibilityIdentifier("backup-sync-open")
                         }
                     } label: {
                         Label("More", systemImage: "ellipsis.circle")
@@ -119,19 +147,36 @@ struct ClientListView: View {
                 switch route {
                 case .list:
                     InvoiceListView()
+                case .history:
+                    InvoiceHistoryView(container: context.container)
                 case .detail(let id):
                     InvoiceDetailView(invoiceID: id)
                 case .create(let clientID):
                     InvoiceCreationView(clientID: clientID) { invoiceID in
-                        path.removeLast()
+                        if path.count > 0 { path.removeLast() }
                         path.append(InvoiceRoute.detail(invoiceID))
                     }
+                }
+            }
+            .navigationDestination(for: BackupSyncRoute.self) { _ in
+                BackupSyncView()
+            }
+            .navigationDestination(for: InvoiceHistoryRoute.self) { route in
+                switch route {
+                case .list:
+                    InvoiceHistoryView(container: context.container)
+                case .detail(let identity):
+                    InvoiceHistoryDetailView(
+                        identity: identity,
+                        container: context.container
+                    )
                 }
             }
             .sheet(isPresented: $showsEditor, onDismiss: reload) {
                 ClientEditorView()
             }
             .onAppear(perform: reload)
+            .onChange(of: backupSync?.runtime?.recordsVersion) { _, _ in reload() }
             .alert(item: $model.alert) {
                 Alert(title: Text($0.title), message: Text($0.message))
             }
@@ -141,6 +186,13 @@ struct ClientListView: View {
     private func reload() {
         model.load(in: context)
     }
+
+    private var clientCountLabel: LocalizedStringKey {
+        model.clients.count == 1
+            ? "1 client"
+            : "\(model.clients.count) clients"
+    }
+
 }
 
 #Preview("Clients — Empty, Accessibility") {

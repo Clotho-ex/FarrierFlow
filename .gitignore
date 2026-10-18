@@ -1,2 +1,11 @@
 Configuration/PostHog.local.xcconfig
 output/screenshots/
+supabase/functions/.env
+supabase/functions/.env.local
+*.p8
+
+# Generated build, test, and release output.
+.artifacts/
+.derivedData/
+.asc/artifacts/
+.asc/release/
