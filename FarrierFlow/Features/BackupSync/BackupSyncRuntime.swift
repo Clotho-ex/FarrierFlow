@@ -181,6 +181,13 @@ final class BackupSyncRuntime {
         if !identifiers.isEmpty {
             guard identifiers.contains(where: { $0.entityName != "SyncState" }) else { return }
         }
+        // Local-only screens still need invalidation, but protection counts are
+        // read on demand when Backup & Sync opens. Avoid capturing the entire
+        // business graph on every save after sign-out.
+        guard accountID != nil else {
+            recordsVersion = UUID()
+            return
+        }
         do {
             let changed = try refreshStatus()
             if !identifiers.isEmpty || changed { requestSync() }

@@ -33,9 +33,11 @@ nonisolated enum SyncBatchPlanner {
         for mutation in mutations { graph[mutation.id] = mutation.record }
         var references: [UUID: Set<UUID>] = [:]
         var children: [UUID: Set<UUID>] = [:]
+        var dependents: [UUID: Set<UUID>] = [:]
         for record in baseline + mutations.compactMap(\.record) {
             let ids = try referencedIDs(record)
             references[record.id, default: []].formUnion(ids)
+            for id in ids { dependents[id, default: []].insert(record.id) }
             for (parentKind, relationships) in ownedChildren {
                 for (childKind, field) in relationships where record.kind == childKind {
                     if let parent = try reference(record.fields[field]) {
@@ -44,6 +46,12 @@ nonisolated enum SyncBatchPlanner {
                         }
                     }
                 }
+            }
+        }
+        var membershipsByHorse: [UUID: Set<UUID>] = [:]
+        for record in graph.values where record.kind == .appointmentHorse {
+            if let horse = try reference(record.fields["horse"]) {
+                membershipsByHorse[horse, default: []].insert(record.id)
             }
         }
         let sizes = try Dictionary(uniqueKeysWithValues: mutations.map {
@@ -69,18 +77,12 @@ nonisolated enum SyncBatchPlanner {
                     visiting.append(contentsOf: references[id] ?? [])
                     visiting.append(contentsOf: children[id] ?? [])
                     if mutation.record == nil {
-                        for (dependent, refs) in references where refs.contains(id) {
-                            visiting.append(dependent)
-                        }
+                        visiting.append(contentsOf: dependents[id] ?? [])
                     }
                     if mutation.kind == .horse,
                        old[id]?.fields["currentBarn"] != mutation.record?.fields["currentBarn"],
                        old[id] != nil {
-                        for record in graph.values where record.kind == .appointmentHorse {
-                            if try reference(record.fields["horse"]) == id {
-                                visiting.append(record.id)
-                            }
-                        }
+                        visiting.append(contentsOf: membershipsByHorse[id] ?? [])
                     }
                     if mutation.kind == .businessProfile {
                         let currency = mutation.record?.fields["currencyCode"]

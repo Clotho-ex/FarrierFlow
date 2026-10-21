@@ -195,6 +195,56 @@ struct BackupSyncRuntimeTests {
         #expect(try fixture.store.journal()?.baseline.first?.fields["name"] == .string("Actual didSave"))
     }
 
+    @Test(arguments: [false, true])
+    func localOnlySaveInvalidatesScreensWithoutCapturingProtectionStatus(hasIdentifiers: Bool) async throws {
+        let fixture = try makeFixture()
+        let version = fixture.runtime.recordsVersion
+        fixture.client.name = "Saved locally"
+        try fixture.container.mainContext.save()
+        fixture.runtime.didSave(Notification(name: ModelContext.didSave, object: fixture.container.mainContext,
+            userInfo: hasIdentifiers ? [ModelContext.NotificationKey.updatedIdentifiers.rawValue: [fixture.client.persistentModelID]] : nil))
+        #expect(fixture.runtime.recordsVersion != version)
+        #expect(fixture.runtime.status == nil)
+        #expect(fixture.runtime.state == .localOnly)
+        await fixture.runtime.waitUntilIdle()
+        #expect(await fixture.transport.bootstrapCount == 0)
+        #expect(await fixture.photos.manifestCount == 0)
+    }
+
+    @Test
+    func editsAfterSignOutRefreshScreensAndUploadOnReconnect() async throws {
+        let fixture = try makeFixture()
+        let account = UUID()
+        try fixture.runtime.connect(accountID: account)
+        await fixture.runtime.waitUntilIdle()
+        fixture.runtime.stop()
+        let version = fixture.runtime.recordsVersion
+        fixture.client.name = "Saved after sign-out"
+        try fixture.container.mainContext.save()
+        fixture.runtime.didSave(Notification(name: ModelContext.didSave, object: fixture.container.mainContext,
+            userInfo: [ModelContext.NotificationKey.updatedIdentifiers.rawValue: [fixture.client.persistentModelID]]))
+        #expect(fixture.runtime.recordsVersion != version)
+        #expect(fixture.runtime.state == .localOnly)
+        #expect(await fixture.transport.batches.count == 1)
+        try fixture.runtime.connect(accountID: account)
+        await fixture.runtime.waitUntilIdle()
+        #expect(fixture.runtime.state == .upToDate)
+        #expect(try fixture.store.journal()?.baseline.first?.fields["name"] == .string("Saved after sign-out"))
+    }
+
+    @Test
+    func signedOutJournalCheckpointsDoNotInvalidateScreens() throws {
+        let fixture = try makeFixture()
+        try fixture.store.bind(accountID: UUID(), workspaceID: fixture.transport.workspaceID, deviceID: UUID())
+        let journalID = try #require(try ModelContext(fixture.container)
+            .fetch(FetchDescriptor<FarrierFlowSchemaV5.SyncState>()).first?.persistentModelID)
+        let version = fixture.runtime.recordsVersion
+        fixture.runtime.didSave(Notification(name: ModelContext.didSave, object: fixture.container.mainContext,
+            userInfo: [ModelContext.NotificationKey.updatedIdentifiers.rawValue: [journalID]]))
+        #expect(fixture.runtime.recordsVersion == version)
+        #expect(fixture.runtime.status == nil)
+    }
+
     private func makeFixture() throws -> Fixture {
         let container = try ModelContainerFactory.inMemoryTest()
         let client = Client(name: "Pat")

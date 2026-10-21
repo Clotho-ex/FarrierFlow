@@ -323,27 +323,34 @@ final class PhotographLibrary {
             throw mappedAddError(error)
         }
 
-        let photograph = Photograph(
-            id: id,
-            createdAt: createdAt,
-            pixelWidth: normalized.pixelWidth,
-            pixelHeight: normalized.pixelHeight,
-            byteCount: normalized.byteCount,
-            visitHorse: visitHorse
-        )
-        context.insert(photograph)
-        visitHorse.photographs.append(photograph)
+        // Sync can remove the destination while normalization is suspended.
+        // Commit through a fresh context rather than the pre-import snapshot.
+        let committingContext = ModelContext(container)
         do {
-            try saving(context)
+            try Task.checkCancellation()
+            guard protectedDataAvailable() else { throw PhotographLibraryError.protectedDataUnavailable }
+            guard let current = try committingContext.existingModel(VisitHorse.self, for: visitHorseID),
+                  current.visit != nil, current.horse != nil else {
+                throw PhotographLibraryError.visitHorseUnavailable
+            }
+            let photograph = Photograph(
+                id: id,
+                createdAt: createdAt,
+                pixelWidth: normalized.pixelWidth,
+                pixelHeight: normalized.pixelHeight,
+                byteCount: normalized.byteCount,
+                visitHorse: current
+            )
+            committingContext.insert(photograph)
+            current.photographs.append(photograph)
+            do { try saving(committingContext) }
+            catch { throw PhotographLibraryError.persistenceFailed }
             return id
         } catch {
-            context.rollback()
-            do {
-                try fileStore.removeManagedFile(at: canonicalURL)
-            } catch {
-                throw PhotographLibraryError.rollbackCleanupFailed
-            }
-            throw PhotographLibraryError.persistenceFailed
+            committingContext.rollback()
+            do { try fileStore.removeManagedFile(at: canonicalURL) }
+            catch { throw PhotographLibraryError.rollbackCleanupFailed }
+            throw error
         }
     }
 

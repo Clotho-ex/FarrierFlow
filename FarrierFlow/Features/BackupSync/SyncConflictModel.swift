@@ -39,8 +39,10 @@ final class SyncConflictModel {
         confirmedRejection = journal.confirmedRejection
         needsInvoiceRecovery = confirmedRejection != nil
         var tentative = journal
+        var localChoices = current
         if let transaction = deferredRemote {
             let merged = try tentative.receive(transaction, current: current)
+            localChoices = merged
             let graph = try SyncJournal.index(current)
             if let localProfile = current.first(where: { $0.kind == .businessProfile }),
                let cloudProfile = tentative.baseline.first(where: { $0.kind == .businessProfile }),
@@ -63,6 +65,11 @@ final class SyncConflictModel {
                 !conflicts.contains(where: { $0.id == mutation.id }) && graph[mutation.id] != mutation.record
             }.map { .init(id: $0.id, kind: $0.kind, local: graph[$0.id], remote: $0.record) }
         } else { relatedChanges = []; conflicts = tentative.conflicts }
+        let localByID = try SyncJournal.index(localChoices)
+        conflicts = conflicts.map {
+            SyncConflict(id: $0.id, kind: $0.kind, local: localByID[$0.id], remote: $0.remote,
+                         unresolvedFields: $0.unresolvedFields)
+        }
         reviewedCloudGraph = tentative.baseline
     }
 

@@ -7,6 +7,25 @@ import Testing
 @MainActor
 struct PhotographConcurrencyTests {
     @Test
+    func syncDeletionDuringImportRejectsThePhotoAndRemovesItsFile() async throws {
+        let gate = SuspensionPoint()
+        let fixture = try makeFixture(hooks: .init(afterAddCanonicalMove: { await gate.suspend() }))
+        let id = UUID()
+        let data = try PhotographTestFixtures.jpeg()
+        let add = Task { try await fixture.library.add(sourceData: data, to: fixture.graph.visitHorseID, id: id) }
+        await gate.waitUntilSuspended()
+        defer { gate.resume() }
+        let records = try SyncGraphCodec.capture(in: fixture.graph.container.mainContext)
+        let deletedKinds: Set<SyncRecordKind> = [.appointment, .appointmentHorse, .visit, .visitHorse]
+        try SyncGraphCodec.apply(records.filter { !deletedKinds.contains($0.kind) }, in: fixture.graph.container.mainContext)
+        gate.resume()
+        await #expect(throws: PhotographLibraryError.visitHorseUnavailable) { try await add.value }
+        #expect(try ModelContext(fixture.graph.container).fetchCount(FetchDescriptor<Photograph>()) == 0)
+        #expect(!FileManager.default.fileExists(atPath: fixture.store.canonicalURL(for: id).path))
+        try DomainGraphValidator.validateAll(in: ModelContext(fixture.graph.container))
+    }
+
+    @Test
     func reconciliationWaitsUntilAddMetadataSaveCompletes() async throws {
         let gate = SuspensionPoint()
         let events = EventRecorder()

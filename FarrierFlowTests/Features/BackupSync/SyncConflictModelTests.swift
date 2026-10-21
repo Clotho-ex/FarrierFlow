@@ -135,6 +135,21 @@ struct SyncConflictModelTests {
         #expect(next.mutations.first?.record?.fields["notes"] == .string("Unrelated local note"))
     }
 
+    @Test(arguments: [false, true])
+    func reviewShowsTheCurrentLocalChoiceAfterAConflictWasRecorded(deleted: Bool) throws {
+        let fixture = try makeFixture()
+        if deleted { fixture.container.mainContext.delete(fixture.client) }
+        else { fixture.client.name = "Latest saved edit" }
+        try fixture.container.mainContext.save()
+        let model = SyncConflictModel(container: fixture.container)
+        try model.load(accountID: fixture.account)
+        let conflict = try #require(model.conflicts.first)
+        #expect(conflict.local?.fields["name"] == (deleted ? nil : .string("Latest saved edit")))
+        try model.resolve([fixture.id: .keepIPhone], accountID: fixture.account)
+        let current = try SyncGraphCodec.capture(in: ModelContext(fixture.container))
+        #expect(current.first { $0.id == fixture.id }?.fields["name"] == (deleted ? nil : .string("Latest saved edit")))
+    }
+
     @Test
     func choosingCloudUpdatesTheSameObjectAndKeepsIndependentLookalikes() throws {
         let fixture = try makeFixture()
