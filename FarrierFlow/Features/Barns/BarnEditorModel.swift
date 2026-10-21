@@ -6,6 +6,7 @@ import SwiftData
 @Observable
 final class BarnEditorModel {
     var draft: BarnDraft
+    @ObservationIgnored private var originalDraft = BarnDraft()
     let barnID: PersistentIdentifier?
     var alert: FeatureAlert?
 
@@ -18,6 +19,7 @@ final class BarnEditorModel {
             address: barn?.address ?? "",
             contactNotes: barn?.contactNotes ?? ""
         )
+        originalDraft = draft
     }
 
     func save(
@@ -37,17 +39,27 @@ final class BarnEditorModel {
                     )
                     return nil
                 }
+                let current = BarnEditorModel(barn: existing).draft
+                let proposed = BarnDraft(name: name, address: TextNormalization.optional(draft.address) ?? "", contactNotes: TextNormalization.optional(draft.contactNotes) ?? "")
+                guard let merged = try? DraftSaveRules.mergeFields(original: originalDraft, proposed: proposed,
+                    current: current, fields: [\.name, \.address, \.contactNotes]) else {
+                    alert = DraftSaveRules.changedAlert
+                    return nil
+                }
+                draft = merged
                 barn = existing
             } else {
                 barn = Barn(name: name)
                 context.insert(barn)
             }
 
-            barn.name = name
+            barn.name = TextNormalization.required(draft.name) ?? name
             barn.address = TextNormalization.optional(draft.address)
             barn.contactNotes = TextNormalization.optional(draft.contactNotes)
 
             try DomainGraphValidator.save(context)
+            draft = BarnEditorModel(barn: barn).draft
+            originalDraft = draft
             if isCreating {
                 analyticsClient.track(.serviceLocationCreated)
             }

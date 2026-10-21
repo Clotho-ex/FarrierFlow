@@ -1,6 +1,28 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "editor.recordChanged.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Record Changed"
+          }
+        }
+      }
+    },
+    "editor.recordChanged.message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This record changed while this form was open. Your draft is still here. Close this form and reopen the record to review the latest details before saving."
+          }
+        }
+      }
+    },
     "%@ · %@" : {
       "comment" : "Horse count followed by appointment status in a Today stop’s metadata.",
       "localizations" : {

@@ -76,6 +76,10 @@ final class VisitCompletionUITests: XCTestCase {
             to: graph.secondaryBarnName,
             in: app
         )
+        let confirmation = app.alerts["Move to Another Location?"]
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 3))
+        confirmation.buttons["Move Horse"].tap()
+        XCTAssertTrue(app.navigationBars["Edit Horse"].waitForNonExistence(timeout: 3))
         let location = app.descendants(matching: .any)["horse-detail-service-location"]
         XCTAssertTrue(location.waitForExistence(timeout: 3))
         XCTAssertTrue(accessibilityText(of: location).contains(graph.secondaryBarnName))
@@ -570,6 +574,7 @@ final class VisitCompletionUITests: XCTestCase {
         forcesCameraUnavailable: Bool = false
     ) -> XCUIApplication {
         let app = XCUIApplication()
+        app.launchArguments += ["-AppleLocale", "en_US"]
         app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] = storeName
         if forcesCameraUnavailable {
             app.launchEnvironment["FARRIERFLOW_UI_TEST_CAMERA_UNAVAILABLE"] = "1"
@@ -1019,7 +1024,14 @@ final class VisitCompletionUITests: XCTestCase {
         if app.descendants(matching: .any)["horse-detail-service-location"].exists {
             return
         }
-        app.tabBars.buttons["Clients"].tap()
+        let stopDetails = app.navigationBars.buttons["Stop Details"]
+        if stopDetails.exists { stopDetails.tap() }
+        let closeStop = app.buttons["stop-details-close"]
+        if closeStop.waitForExistence(timeout: 1) {
+            closeStop.tap()
+            XCTAssertTrue(closeStop.waitForNonExistence(timeout: 3))
+        }
+        app.selectFarrierFlowTab("Clients")
         if app.descendants(matching: .any)["horse-detail-service-location"].exists {
             return
         }
@@ -1196,11 +1208,17 @@ final class VisitCompletionUITests: XCTestCase {
     private func focusAndType(_ text: String, in element: XCUIElement) {
         XCTAssertTrue(element.waitForExistence(timeout: 3))
         XCTAssertTrue(element.isHittable)
-        element.tap()
-        if !waitForKeyboardFocus(in: element) {
-            element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        for attempt in 0..<4 {
+            if attempt == 0 { element.tap() }
+            else {
+                element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85)).tap()
+            }
+            if waitForKeyboardFocus(in: element) {
+                element.typeText(text)
+                return
+            }
         }
-        element.typeText(text)
+        XCTFail("Expected keyboard focus before entering text")
     }
 
     @MainActor

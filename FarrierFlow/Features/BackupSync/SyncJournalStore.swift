@@ -86,7 +86,7 @@ final class SyncJournalStore {
         }
         let records = try review.resolved(settings: settings)
         if let archive = review.archive { try journal.addArchive(archive) }
-        try journal.recoverCloudBaseline(review.cloud)
+        try journal.recoverCloudBaseline(review.cloud, current: records, resolvingConflictIDs: review.resolvedConflictIDs)
         if let archive = review.archive {
             try SyncGraphCodec.applyRecovery(records, archive: archive, in: container.mainContext, journal: journal)
         } else { try SyncGraphCodec.apply(records, in: container.mainContext, journal: journal) }

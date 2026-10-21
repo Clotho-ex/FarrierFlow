@@ -158,11 +158,11 @@ final class BackupSyncUITests: XCTestCase {
         app.buttons["backup-sync-invoice-recovery"].tap()
         XCTAssertTrue(app.navigationBars["Review Invoice History"].waitForExistence(timeout: 5))
         let save = app.buttons["invoice-recovery-continue"]
-        for _ in 0..<10 where !save.isHittable { app.swipeUp() }
+        for _ in 0..<10 where !save.isHittable || save.frame.maxY > app.frame.maxY - 44 { app.swipeUp() }
         XCTAssertTrue(save.exists && !save.isEnabled)
         for _ in 0..<8 where !app.buttons["Use Cloud Settings"].isHittable { app.swipeDown() }
         app.buttons["Use Cloud Settings"].tap()
-        for _ in 0..<10 where !save.isHittable { app.swipeUp() }
+        for _ in 0..<10 where !save.isHittable || save.frame.maxY > app.frame.maxY - 44 { app.swipeUp() }
         XCTAssertTrue(save.isEnabled)
         save.tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@",

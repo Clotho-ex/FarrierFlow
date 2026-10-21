@@ -204,6 +204,19 @@ struct SyncInvoiceRecoveryTests {
         #expect(try SyncGraphCodec.capture(in: ModelContext(f.local.container)) == f.original)
     }
 
+    @Test
+    func recoveryQueuesPhotoTombstonesEvenWhenTheyWereNeverInTheLocalBaseline() async throws {
+        let f = try fixture(status: .unpaid)
+        let account = try #require(try f.store.journal()).accountID
+        let photoID = UUID()
+        let model = SyncInvoiceRecoveryModel(container: f.local.container,
+            transport: TombstoneRecoveryTransport(cloud: f.cloud, photoID: photoID), currentAccount: { account })
+        try await model.load(accountID: account)
+        #expect(model.review?.cloud.deletedPhotoIDs == [photoID])
+        try await model.confirm(accountID: account, settings: .useCloud)
+        #expect(try f.store.journal()?.pendingPhotoDeletionIDs == [photoID])
+    }
+
     private func fixture(status: InvoiceStatus, confirmed: Bool = true,
                          cloudCurrency: String = "GBP") throws -> (
         local: InvoiceActionGraph, store: SyncJournalStore, original: [SyncRecord],
@@ -247,5 +260,30 @@ private actor RecoveryTransport: SyncTransport {
         return SyncPullPage(workspaceID: cloud.workspaceID, cursor: cloud.revision, hasMore: false,
             transactions: transactions, invoicingDeviceID: cloud.invoicingDeviceID,
             invoicingGeneration: cloud.invoicingGeneration)
+    }
+}
+
+private actor TombstoneRecoveryTransport: SyncTransport {
+    let cloud: SyncRecoveryCloudSnapshot
+    let photoID: UUID
+    init(cloud: SyncRecoveryCloudSnapshot, photoID: UUID) { self.cloud = cloud; self.photoID = photoID }
+    func bootstrap(deviceID: UUID) -> SyncWorkspaceInfo {
+        .init(workspaceID: cloud.workspaceID, deviceID: deviceID, invoicingDeviceID: cloud.invoicingDeviceID,
+              invoicingGeneration: cloud.invoicingGeneration, revision: 2)
+    }
+    func push(_ batch: SyncBatch) throws -> SyncPushReceipt { throw SyncTransportError.unsupportedOperation }
+    func pull(workspaceID: UUID, cursor: Int64) throws -> SyncPullPage {
+        let member = try #require(cloud.records.first { $0.kind == .visitHorse })
+        let photo = SyncRecord(id: photoID, kind: .photograph, fields: [
+            "createdAt": .string("100.0"), "pixelWidth": .integer(10), "pixelHeight": .integer(10),
+            "byteCount": .integer(10), "visitHorse": .string(member.id.uuidString.lowercased())])
+        let created = SyncRemoteTransaction(workspaceID: workspaceID, revision: 1, mutations: (cloud.records + [photo]).map {
+            .init(id: $0.id, kind: $0.kind, expectedRevision: 0, record: $0)
+        })
+        let deleted = SyncRemoteTransaction(workspaceID: workspaceID, revision: 2, mutations: [
+            .init(id: photoID, kind: .photograph, expectedRevision: 1, record: nil)])
+        return .init(workspaceID: workspaceID, cursor: 2, hasMore: false,
+            transactions: cursor == 0 ? [created, deleted] : [],
+            invoicingDeviceID: cloud.invoicingDeviceID, invoicingGeneration: cloud.invoicingGeneration)
     }
 }

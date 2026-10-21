@@ -46,7 +46,7 @@ final class VisitEditorModel {
     )
 
     @ObservationIgnored
-    private let context: ModelContext
+    private var context: ModelContext
     @ObservationIgnored
     private let loading: (PersistentIdentifier, ModelContext) throws -> VisitDraft
     @ObservationIgnored
@@ -488,13 +488,17 @@ final class VisitEditorModel {
         }
 
         do {
-            let savedDraft = try completing(draft, completedAt, context)
+            let reconciled = try reconciledForSaving(draft)
+            let savedDraft = try completing(reconciled, completedAt, context)
             self.draft = savedDraft
             lastSavedDraft = savedDraft
             didCompleteVisit = true
             alert = nil
             analyticsClient.track(.visitCompleted)
             return true
+        } catch DraftSaveError.changedSinceEditing {
+            alert = DraftSaveRules.changedAlert
+            return false
         } catch {
             Self.logger.error("Failed to complete visit: \(error, privacy: .public)")
             alert = FeatureAlert(
@@ -512,11 +516,15 @@ final class VisitEditorModel {
         }
 
         do {
-            let savedDraft = try correcting(draft, context)
+            let reconciled = try reconciledForSaving(draft)
+            let savedDraft = try correcting(reconciled, context)
             self.draft = savedDraft
             lastSavedDraft = savedDraft
             alert = nil
             return true
+        } catch DraftSaveError.changedSinceEditing {
+            alert = DraftSaveRules.changedAlert
+            return false
         } catch {
             Self.logger.error("Failed to save visit correction: \(error, privacy: .public)")
             alert = FeatureAlert(
@@ -559,12 +567,17 @@ final class VisitEditorModel {
         surfacesFailureImmediately: Bool
     ) -> Bool {
         do {
-            let savedDraft = try saving(draft, context)
+            let reconciled = try reconciledForSaving(draft)
+            let savedDraft = try saving(reconciled, context)
             self.draft = savedDraft
             lastSavedDraft = savedDraft
             backgroundSaveErrorPending = false
             alert = nil
             return true
+        } catch DraftSaveError.changedSinceEditing {
+            if surfacesFailureImmediately { alert = DraftSaveRules.changedAlert }
+            else { backgroundSaveErrorPending = true }
+            return false
         } catch {
             Self.logger.error("Failed to save visit progress: \(error, privacy: .public)")
             if surfacesFailureImmediately {
@@ -574,6 +587,19 @@ final class VisitEditorModel {
             }
             return false
         }
+    }
+
+    private func reconciledForSaving(_ proposed: VisitDraft) throws -> VisitDraft {
+        guard let original = lastSavedDraft else { throw DraftSaveError.changedSinceEditing }
+        let reading = ModelContext(context.container)
+        guard try VisitSaveUseCase.editorMode(visitID: visitID, in: reading) == mode else {
+            throw DraftSaveError.changedSinceEditing
+        }
+        let current = try Self.loadDraft(visitID: visitID, in: reading)
+        let merged = try DraftSaveRules.merge(original: original, proposed: proposed, current: current)
+        context.rollback()
+        context = reading
+        return merged
     }
 
     private var saveErrorAlert: FeatureAlert {

@@ -23,6 +23,9 @@ final class BusinessProfileEditorModel {
     private(set) var isCurrencyLocked = false
     var alert: FeatureAlert?
 
+    @ObservationIgnored private var originalDraft: BusinessProfileDraft?
+    @ObservationIgnored private var originalProfileID: PersistentIdentifier?
+
     private var originalCurrencyCode = "USD"
 
     var canSave: Bool {
@@ -45,22 +48,15 @@ final class BusinessProfileEditorModel {
             isCurrencyLocked = try hasCurrencyBearingRecords(in: context)
             if let profile = profiles.first {
                 originalCurrencyCode = profile.currencyCode
-                draft = BusinessProfileDraft(
-                    name: profile.name,
-                    phone: profile.phone ?? "",
-                    email: profile.email ?? "",
-                    address: profile.address ?? "",
-                    defaultInvoiceNote: profile.defaultInvoiceNote ?? "",
-                    defaultAppointmentDurationMinutes: profile.defaultAppointmentDurationMinutes,
-                    defaultInvoiceDueDays: profile.defaultInvoiceDueDays,
-                    currencyCode: profile.currencyCode
-                )
+                draft = Self.snapshot(profile)
             } else {
                 originalCurrencyCode = isCurrencyLocked
                     ? BusinessCurrency.unitedStatesDollar.rawValue
                     : BusinessCurrency.defaultCode(for: locale)
                 draft = BusinessProfileDraft(currencyCode: originalCurrencyCode)
             }
+            originalDraft = draft
+            originalProfileID = profiles.first?.persistentModelID
             alert = nil
             loadState = .loaded
         } catch {
@@ -101,7 +97,7 @@ final class BusinessProfileEditorModel {
     func save(in context: ModelContext) -> Bool {
         guard
             loadState == .loaded,
-            let values = try? BusinessProfileRules.validated(draft)
+            (try? BusinessProfileRules.validated(draft)) != nil
         else {
             return false
         }
@@ -111,6 +107,13 @@ final class BusinessProfileEditorModel {
             guard profiles.count <= 1 else {
                 throw BusinessProfileEditorError.multipleProfiles
             }
+            if let originalDraft {
+                guard originalProfileID == profiles.first?.persistentModelID else { throw DraftSaveError.changedSinceEditing }
+                if let profile = profiles.first {
+                    draft = try DraftSaveRules.merge(original: originalDraft, proposed: draft, current: Self.snapshot(profile))
+                }
+            }
+            let values = try BusinessProfileRules.validated(draft)
             let newServices = try setupServices.map { try ServiceRules.validated(serviceDraft($0), locale: locale) }
             let currencyIsLocked = try hasCurrencyBearingRecords(in: context)
             let persistedCurrencyCode = profiles.first?.currencyCode
@@ -148,10 +151,16 @@ final class BusinessProfileEditorModel {
             }
             try DomainGraphValidator.save(context)
             setupServices = []
+            draft = Self.snapshot(profile)
+            originalDraft = draft
+            originalProfileID = profile.persistentModelID
             originalCurrencyCode = values.currencyCode
             isCurrencyLocked = currencyIsLocked || !newServices.isEmpty
             alert = nil
             return true
+        } catch DraftSaveError.changedSinceEditing {
+            alert = DraftSaveRules.changedAlert
+            return false
         } catch BusinessProfileEditorError.currencyLocked {
             context.rollback()
             alert = FeatureAlert(
@@ -167,6 +176,19 @@ final class BusinessProfileEditorModel {
             )
             return false
         }
+    }
+
+    private static func snapshot(_ profile: BusinessProfile) -> BusinessProfileDraft {
+        BusinessProfileDraft(
+            name: profile.name,
+            phone: profile.phone ?? "",
+            email: profile.email ?? "",
+            address: profile.address ?? "",
+            defaultInvoiceNote: profile.defaultInvoiceNote ?? "",
+            defaultAppointmentDurationMinutes: profile.defaultAppointmentDurationMinutes,
+            defaultInvoiceDueDays: profile.defaultInvoiceDueDays,
+            currencyCode: profile.currencyCode
+        )
     }
 
     private func fetchProfiles(

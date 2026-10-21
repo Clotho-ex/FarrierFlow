@@ -13,6 +13,7 @@ nonisolated struct SyncRecoveryCloudSnapshot: Equatable, Sendable {
     let revisions: [UUID: Int64]
     let invoicingDeviceID: UUID?
     let invoicingGeneration: Int64
+    var deletedPhotoIDs: Set<UUID> = []
 }
 
 nonisolated struct SyncInvoiceRecoveryReview: Equatable, Sendable {
@@ -86,22 +87,34 @@ nonisolated struct SyncInvoiceRecoveryReview: Equatable, Sendable {
         return review
     }
 
+    private var archivedRecordIDs: Set<UUID> {
+        let invoices = Set(archive?.invoiceIDs ?? [])
+        let groups = Set(current.filter { $0.kind == .invoiceVisit &&
+            Self.reference($0.fields["invoice"]).map(invoices.contains) == true }.map(\.id))
+        return Set(current.filter { record in
+            invoices.contains(record.id) || groups.contains(record.id) ||
+                (record.kind == .invoiceLineItem && Self.reference(record.fields["invoiceVisit"]).map(groups.contains) == true) ||
+                (record.kind == .payment && Self.reference(record.fields["invoice"]).map(invoices.contains) == true)
+        }.map(\.id))
+    }
+
+    var resolvedConflictIDs: Set<UUID> {
+        archivedRecordIDs.union([localProfile.id, cloudProfile.id])
+    }
+
     @MainActor
     func resolved(settings: SyncRecoverySettingsChoice) throws -> [SyncRecord] {
         let local = try SyncJournal.index(current), remote = try SyncJournal.index(cloud.records)
         let base = try SyncJournal.index(journal.baseline)
-        let heldInvoices = Set(archive?.invoiceIDs ?? [])
-        let heldGroups = Set(current.filter { $0.kind == .invoiceVisit &&
-            Self.reference($0.fields["invoice"]).map(heldInvoices.contains) == true }.map(\.id))
-        let removed = Set(current.filter { record in
-            heldInvoices.contains(record.id) || heldGroups.contains(record.id) ||
-                (record.kind == .invoiceLineItem && Self.reference(record.fields["invoiceVisit"]).map(heldGroups.contains) == true) ||
-                (record.kind == .payment && Self.reference(record.fields["invoice"]).map(heldInvoices.contains) == true)
-        }.map(\.id))
+        let removed = archivedRecordIDs
+        let unresolved = Set(journal.conflicts.map(\.id)).subtracting(resolvedConflictIDs)
         var combined: [UUID: SyncRecord] = [:]
         for id in Set(local.keys).union(remote.keys) {
             if removed.contains(id) || id == localProfile.id || id == cloudProfile.id { continue }
             let l = local[id], r = remote[id]
+            // Invoice/settings confirmation does not choose a version of an
+            // unrelated conflicted record. Keep it intact for conflict review.
+            if unresolved.contains(id) { combined[id] = l; continue }
             if r == nil, cloud.revisions[id] != nil, l != nil, base[id] == nil {
                 throw SyncInvoiceRecoveryError.incompatibleGraph
             }

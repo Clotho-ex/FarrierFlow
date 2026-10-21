@@ -7,6 +7,7 @@ import SwiftData
 final class ServiceEditorModel {
     @ObservationIgnored private let locale: Locale
     var draft: ServiceDraft
+    @ObservationIgnored private var originalDraft: ServiceDraft?
     let serviceID: PersistentIdentifier?
     var alert: FeatureAlert?
     private(set) var hasLoadedBusinessCurrency = false
@@ -29,6 +30,7 @@ final class ServiceEditorModel {
             } ?? "",
             currencyCode: service?.currencyCode ?? "USD"
         )
+        originalDraft = service == nil ? nil : draft
     }
 
     func loadBusinessCurrency(in context: ModelContext) {
@@ -60,6 +62,17 @@ final class ServiceEditorModel {
         in context: ModelContext,
         analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()
     ) -> PersistentIdentifier? {
+        if let originalDraft, let serviceID {
+            do {
+                if let current = try ModelContext(context.container).existingModel(Service.self, for: serviceID) {
+                    draft = try DraftSaveRules.merge(original: originalDraft, proposed: draft,
+                        current: ServiceEditorModel(service: current, locale: locale).draft)
+                }
+            } catch {
+                alert = DraftSaveRules.changedAlert
+                return nil
+            }
+        }
         let values: ServiceValues
         do {
             values = try ServiceRules.validated(draft, locale: locale)
@@ -110,6 +123,8 @@ final class ServiceEditorModel {
             service.currencyCode = values.currencyCode
 
             try DomainGraphValidator.save(context)
+            draft = ServiceEditorModel(service: service, locale: locale).draft
+            originalDraft = draft
             if isCreating {
                 analyticsClient.track(.serviceCreated)
             }

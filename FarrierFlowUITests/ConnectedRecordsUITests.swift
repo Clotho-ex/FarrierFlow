@@ -128,13 +128,19 @@ final class ConnectedRecordsUITests: XCTestCase {
     private func focusAndType(_ text: String, in element: XCUIElement) {
         XCTAssertTrue(element.waitForExistence(timeout: 3))
         XCTAssertTrue(element.isHittable)
-        element.tap()
-        if !waitForKeyboardFocus(in: element) {
-            element.coordinate(
-                withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
-            ).tap()
+        for attempt in 0..<4 {
+            if attempt == 0 { element.tap() }
+            else {
+                element.coordinate(
+                    withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85)
+                ).tap()
+            }
+            if waitForKeyboardFocus(in: element) {
+                element.typeText(text)
+                return
+            }
         }
-        element.typeText(text)
+        XCTFail("Expected keyboard focus before entering text")
     }
 
     @MainActor

@@ -194,9 +194,9 @@ final class EditorAccessibilityUITests: XCTestCase {
             "AppointmentService-\(UUID().uuidString)"
         app.launchEnvironment["FARRIERFLOW_UI_TEST_SCENARIO"] = "next-appointment"
         app.launch()
-        guard let today = openToday(in: app) else { return }
+        guard openSchedule(in: app) else { return }
         guard tapUntilDestinationAppears(
-            today.buttons["Schedule Appointment"],
+            app.navigationBars["Schedule"].buttons["Schedule Appointment"],
             destination: app.navigationBars["New Appointment"]
         ) else { return }
         app.buttons["appointment-barn-picker"].tap()
@@ -214,7 +214,7 @@ final class EditorAccessibilityUITests: XCTestCase {
         selectionScreenshot.lifetime = .keepAlways
         add(selectionScreenshot)
         app.navigationBars["New Appointment"].buttons["Save"].tap()
-        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.navigationBars["Schedule"].waitForExistence(timeout: 3))
         app.terminate()
         app.launch()
         XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 5))

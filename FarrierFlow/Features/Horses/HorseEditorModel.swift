@@ -25,6 +25,7 @@ final class HorseEditorModel {
     private let serviceFetcher: (ModelContext) throws -> [Service]
 
     var draft: HorseDraft
+    @ObservationIgnored private var originalDraft: HorseDraft?
     let horseID: PersistentIdentifier?
     private(set) var clients: [HorseDetailSnapshot.Reference] = []
     private(set) var barns: [HorseDetailSnapshot.Reference] = []
@@ -73,6 +74,7 @@ final class HorseEditorModel {
             barnID: horse?.currentBarn?.persistentModelID ?? preselectedBarnID,
             defaultServiceID: horse?.defaultService?.persistentModelID
         )
+        originalDraft = horse == nil ? nil : draft
     }
 
     func loadChoices(in context: ModelContext) {
@@ -127,6 +129,17 @@ final class HorseEditorModel {
         confirming relocation: HorseRelocationConfirmation? = nil
     ) -> PersistentIdentifier? {
         pendingRelocation = nil
+        if let originalDraft, let horseID {
+            do {
+                if let current = try ModelContext(context.container).existingModel(Horse.self, for: horseID) {
+                    draft = try DraftSaveRules.merge(original: originalDraft, proposed: draft,
+                        current: HorseEditorModel(horse: current).draft)
+                }
+            } catch {
+                alert = DraftSaveRules.changedAlert
+                return nil
+            }
+        }
         guard
             let name = TextNormalization.required(draft.name),
             draft.appointmentIntervalWeeks > 0,
@@ -222,6 +235,8 @@ final class HorseEditorModel {
             }
 
             try DomainGraphValidator.save(context)
+            draft = HorseEditorModel(horse: horse).draft
+            originalDraft = draft
             if isCreating {
                 analyticsClient.track(.horseCreated)
             }

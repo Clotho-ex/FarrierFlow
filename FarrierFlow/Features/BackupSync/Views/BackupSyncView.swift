@@ -230,7 +230,7 @@ struct BackupSyncView: View {
 
     private func refreshHistory() {
         do {
-            localHistoryCount = try InvoiceHistoryArchiveReader(container: context.container).archives().reduce(0) { $0 + $1.invoiceIDs.count }
+            localHistoryCount = try InvoiceHistoryArchiveReader(container: context.container).invoiceCount()
             historyUnavailable = false
         } catch { historyUnavailable = true }
     }

@@ -6,6 +6,7 @@ import SwiftData
 @Observable
 final class ClientEditorModel {
     var draft: ClientDraft
+    @ObservationIgnored private var originalDraft = ClientDraft()
     let clientID: PersistentIdentifier?
     var alert: FeatureAlert?
 
@@ -19,6 +20,7 @@ final class ClientEditorModel {
             email: client?.email ?? "",
             notes: client?.notes ?? ""
         )
+        originalDraft = draft
     }
 
     func save(
@@ -38,18 +40,28 @@ final class ClientEditorModel {
                     )
                     return nil
                 }
+                let current = ClientEditorModel(client: existing).draft
+                let proposed = ClientDraft(name: name, phone: TextNormalization.optional(draft.phone) ?? "", email: TextNormalization.optional(draft.email) ?? "", notes: TextNormalization.optional(draft.notes) ?? "")
+                guard let merged = try? DraftSaveRules.mergeFields(original: originalDraft, proposed: proposed,
+                    current: current, fields: [\.name, \.phone, \.email, \.notes]) else {
+                    alert = DraftSaveRules.changedAlert
+                    return nil
+                }
+                draft = merged
                 client = existing
             } else {
                 client = Client(name: name)
                 context.insert(client)
             }
 
-            client.name = name
+            client.name = TextNormalization.required(draft.name) ?? name
             client.phone = TextNormalization.optional(draft.phone)
             client.email = TextNormalization.optional(draft.email)
             client.notes = TextNormalization.optional(draft.notes)
 
             try DomainGraphValidator.save(context)
+            draft = ClientEditorModel(client: client).draft
+            originalDraft = draft
             if isCreating {
                 analyticsClient.track(.clientCreated)
             }

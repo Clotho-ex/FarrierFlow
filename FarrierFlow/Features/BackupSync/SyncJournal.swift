@@ -32,20 +32,38 @@ nonisolated struct SyncJournal: Codable, Equatable, Sendable {
         confirmedRejection = SyncConfirmedRejection(batch: pending, protocolVersion: pendingProtocol, reason: reason)
     }
 
-    mutating func recoverCloudBaseline(_ cloud: SyncRecoveryCloudSnapshot) throws {
+    mutating func recoverCloudBaseline(_ cloud: SyncRecoveryCloudSnapshot, current: [SyncRecord],
+                                      resolvingConflictIDs: Set<UUID>) throws {
         guard cloud.workspaceID == workspaceID, cloud.revision >= cursor else { throw SyncJournalError.invalidCursor }
+        let local = try Self.index(current), remote = try Self.index(cloud.records)
+        guard cloud.deletedPhotoIDs.allSatisfy({ remote[$0] == nil && cloud.revisions[$0] != nil }) else {
+            throw SyncTransportError.invalidResponse
+        }
+        let knownPhotos = Set(baseline.filter { $0.kind == .photograph }.map(\.id))
+            .union(verifiedPhotoReceipts.map(\.id))
+        let deletedPhotos = cloud.deletedPhotoIDs.union(knownPhotos.filter {
+            remote[$0] == nil && cloud.revisions[$0] != nil
+        })
         if let pending {
             guard confirmedRejection?.batch == pending, confirmedRejection?.protocolVersion == pendingProtocol else {
                 throw SyncJournalError.pendingUpload
             }
             try reject(operationID: pending.operationID)
         }
+        if !deletedPhotos.isEmpty {
+            photoDeletions = Set(pendingPhotoDeletionIDs).union(deletedPhotos).sorted { $0.uuidString < $1.uuidString }
+            photoReceipts?.removeAll { deletedPhotos.contains($0.id) }
+        }
         baseline = cloud.records
         revisions = cloud.revisions
         cursor = cloud.revision
         invoicingDeviceID = cloud.invoicingDeviceID
         invoicingGeneration = cloud.invoicingGeneration
-        conflicts = []
+        // The baseline can jump over several commits. Keep the whole local
+        // choice protected until these remaining records are explicitly reviewed.
+        conflicts = conflicts.filter { !resolvingConflictIDs.contains($0.id) }.map {
+            SyncConflict(id: $0.id, kind: $0.kind, local: local[$0.id], remote: remote[$0.id])
+        }
         deferredRemote = nil
         confirmedRejection = nil
     }

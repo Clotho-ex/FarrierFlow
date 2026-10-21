@@ -47,6 +47,7 @@ final class AppointmentEditorModel {
     private let horseFetcher: (ModelContext) throws -> [Horse]
 
     var draft: AppointmentDraft
+    @ObservationIgnored private var originalDraft: AppointmentDraft?
     private(set) var barns: [Barn] = []
     private(set) var eligibleHorses: [Horse] = []
     private(set) var services: [Service] = []
@@ -122,6 +123,7 @@ final class AppointmentEditorModel {
             }
         }
         updateVisitLock(from: appointment)
+        originalDraft = appointment == nil ? nil : draft
     }
 
     func load(in context: ModelContext) {
@@ -228,6 +230,18 @@ final class AppointmentEditorModel {
         in context: ModelContext,
         analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()
     ) -> PersistentIdentifier? {
+        if let originalDraft, let appointmentID {
+            do {
+                guard let current = try ModelContext(context.container).existingModel(Appointment.self, for: appointmentID) else {
+                    throw DraftSaveError.changedSinceEditing
+                }
+                draft = try DraftSaveRules.merge(original: originalDraft, proposed: draft,
+                    current: AppointmentEditorModel(appointment: current).draft)
+            } catch {
+                alert = DraftSaveRules.changedAlert
+                return nil
+            }
+        }
         guard
             draft.isValid,
             let barnID = draft.barnID,
@@ -264,6 +278,8 @@ final class AppointmentEditorModel {
                 existing.expectedDurationMinutes = draft.expectedDurationMinutes
                 do {
                     try DomainGraphValidator.save(context)
+                    draft = AppointmentEditorModel(appointment: existing).draft
+                    originalDraft = draft
                     return existing.persistentModelID
                 } catch {
                     context.rollback()
@@ -368,6 +384,8 @@ final class AppointmentEditorModel {
 
         do {
             try DomainGraphValidator.save(context)
+            draft = AppointmentEditorModel(appointment: appointment).draft
+            originalDraft = draft
             if existingAppointment == nil {
                 analyticsClient.track(.appointmentCreated)
                 if isNextAppointmentAssisted {

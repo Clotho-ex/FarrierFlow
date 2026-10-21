@@ -44,6 +44,24 @@ struct ClientDraftAndModelTests {
     }
 
     @Test
+    func overlappingRemoteEditKeepsTheDraftAndDoesNotWriteAnyFields() throws {
+        let container = try ModelContainerFactory.inMemoryTest()
+        let client = Client(name: "Original", phone: "111")
+        container.mainContext.insert(client)
+        try container.mainContext.save()
+        let model = ClientEditorModel(client: client)
+        model.draft.phone = "Local phone"
+        model.draft.notes = "Unsaved notes"
+        client.phone = "Cloud phone"
+        try container.mainContext.save()
+        #expect(model.save(in: container.mainContext) == nil)
+        #expect(client.phone == "Cloud phone" && client.notes == nil)
+        #expect(model.draft.phone == "Local phone" && model.draft.notes == "Unsaved notes")
+        #expect(model.alert != nil)
+        #expect(!container.mainContext.hasChanges)
+    }
+
+    @Test
     func failedCreateDoesNotEmitAnalytics() throws {
         let container = try ModelContainerFactory.inMemoryTest()
         let context = container.mainContext

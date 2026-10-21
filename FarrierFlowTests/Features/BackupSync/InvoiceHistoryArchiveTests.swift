@@ -24,6 +24,18 @@ struct InvoiceHistoryArchiveTests {
     }
 
     @Test
+    func countingLocalHistoryDoesNotRebuildArchivedGraphs() throws {
+        let f = try fixture(status: .paid)
+        try f.store.update { try $0.addArchive(f.archive) }
+        let reader = InvoiceHistoryArchiveReader(container: f.graph.container, makeGraph: { _ in
+            throw UnexpectedGraphRebuild.expected
+        })
+        #expect(try reader.invoiceCount() == 1)
+        #expect(try reader.invoiceCount() == 1)
+        #expect(throws: UnexpectedGraphRebuild.expected) { try reader.content(archiveID: f.archive.id, invoiceID: f.invoiceID) }
+    }
+
+    @Test
     func archiveCannotBeReplaced() throws {
         let f = try fixture(status: .unpaid)
         try f.store.update { try $0.addArchive(f.archive) }
@@ -44,6 +56,7 @@ struct InvoiceHistoryArchiveTests {
         #expect(throws: SyncJournalStoreError.cloudAccountDeleted) { try f.store.journal() }
         let reader = InvoiceHistoryArchiveReader(container: f.graph.container)
         #expect(try reader.archives() == [f.archive])
+        #expect(try reader.invoiceCount() == 1)
         #expect(try reader.content(archiveID: f.archive.id, invoiceID: f.invoiceID).totalMinorUnits == 12_500)
         #expect(try f.store.retainedDeletion()?.completed == true)
     }
@@ -63,9 +76,59 @@ struct InvoiceHistoryArchiveTests {
         #expect(throws: (any Error).self) {
             try InvoiceHistoryArchiveReader(container: f.graph.container).archives()
         }
+        #expect(throws: (any Error).self) {
+            try InvoiceHistoryArchiveReader(container: f.graph.container).invoiceCount()
+        }
         #expect(try ModelContext(f.graph.container)
             .fetch(FetchDescriptor<FarrierFlowSchemaV5.SyncState>()).first?.journalData == invalid)
     }
+
+    @Test(arguments: ["version", "account", "duplicateInvoice"])
+    func countRejectsInvalidArchiveHeaders(corruption: String) throws {
+        let f = try fixture(status: .unpaid)
+        try f.store.update { try $0.addArchive(f.archive) }
+        let context = ModelContext(f.graph.container)
+        let state = try #require(context.fetch(FetchDescriptor<FarrierFlowSchemaV5.SyncState>()).first)
+        let data = try #require(state.journalData)
+        var object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        var archives = try #require(object["invoiceHistory"] as? [[String: Any]])
+        switch corruption {
+        case "version": archives[0]["version"] = 99
+        case "account": archives[0]["accountID"] = UUID().uuidString
+        default: archives[0]["invoiceIDs"] = [f.invoiceID.uuidString, f.invoiceID.uuidString]
+        }
+        object["invoiceHistory"] = archives
+        state.journalData = try JSONSerialization.data(withJSONObject: object)
+        try context.save()
+        #expect(throws: (any Error).self) {
+            try InvoiceHistoryArchiveReader(container: f.graph.container).invoiceCount()
+        }
+    }
+
+    @Test
+    func countingHeadersDoesNotBypassValidationWhenFinancialHistoryIsOpened() throws {
+        let f = try fixture(status: .unpaid)
+        try f.store.update { try $0.addArchive(f.archive) }
+        let context = ModelContext(f.graph.container)
+        let state = try #require(context.fetch(FetchDescriptor<FarrierFlowSchemaV5.SyncState>()).first)
+        let data = try #require(state.journalData)
+        var object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        var archives = try #require(object["invoiceHistory"] as? [[String: Any]])
+        var records = try #require(archives[0]["records"] as? [[String: Any]])
+        let index = try #require(records.firstIndex { $0["kind"] as? String == "invoiceLineItem" })
+        var fields = try #require(records[index]["fields"] as? [String: Any])
+        fields["amountMinorUnits"] = -1
+        records[index]["fields"] = fields
+        archives[0]["records"] = records
+        object["invoiceHistory"] = archives
+        state.journalData = try JSONSerialization.data(withJSONObject: object)
+        try context.save()
+        let reader = InvoiceHistoryArchiveReader(container: f.graph.container)
+        #expect(try reader.invoiceCount() == 1)
+        #expect(throws: (any Error).self) { try reader.content(archiveID: f.archive.id, invoiceID: f.invoiceID) }
+    }
+
+    private enum UnexpectedGraphRebuild: Error { case expected }
 
     private func fixture(status: InvoiceStatus) throws -> (
         graph: InvoiceActionGraph, store: SyncJournalStore, account: UUID,

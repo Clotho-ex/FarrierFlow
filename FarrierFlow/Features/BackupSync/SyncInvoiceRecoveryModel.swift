@@ -47,6 +47,7 @@ final class SyncInvoiceRecoveryModel {
         var records = try SyncJournal.index(journal.baseline)
         var revisions = journal.revisions
         var cursor = journal.cursor
+        var deletedPhotoIDs: Set<UUID> = []
         var page: SyncPullPage
         repeat {
             page = try await transport.pull(workspaceID: journal.workspaceID, cursor: cursor, protocolVersion: .deletion)
@@ -65,6 +66,7 @@ final class SyncInvoiceRecoveryModel {
                           records[mutation.id]?.kind == nil || records[mutation.id]?.kind == mutation.kind else {
                         throw SyncJournalError.invalidMutation
                     }
+                    if mutation.kind == .photograph, mutation.record == nil { deletedPhotoIDs.insert(mutation.id) }
                     records[mutation.id] = mutation.record
                     revisions[mutation.id] = transaction.revision
                 }
@@ -84,7 +86,8 @@ final class SyncInvoiceRecoveryModel {
               !container.mainContext.hasChanges else { throw SyncInvoiceRecoveryError.changedSinceReview }
         let snapshot = SyncRecoveryCloudSnapshot(workspaceID: journal.workspaceID, revision: cursor,
             records: records.values.sorted { $0.id.uuidString < $1.id.uuidString }, revisions: revisions,
-            invoicingDeviceID: latest.invoicingDeviceID, invoicingGeneration: latest.invoicingGeneration)
+            invoicingDeviceID: latest.invoicingDeviceID, invoicingGeneration: latest.invoicingGeneration,
+            deletedPhotoIDs: deletedPhotoIDs)
         review = try SyncInvoiceRecoveryReview.make(current: original, journal: journal,
             cloud: snapshot, capturedAt: Date())
     }
