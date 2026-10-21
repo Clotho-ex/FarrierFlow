@@ -6,7 +6,7 @@ nonisolated final class SyncTestAuthStorage: AuthLocalStorage {
     private let values = Mutex<[String: Data]>([:])
     func store(key: String, value: Data) throws { values.withLock { $0[key] = value } }
     func retrieve(key: String) throws -> Data? { values.withLock { $0[key] } }
-    func remove(key: String) throws { values.withLock { $0.removeValue(forKey: key) } }
+    func remove(key: String) throws { values.withLock { $0[key] = nil } }
 }
 
 // URLProtocol requires restating its inherited unchecked conformance. Its

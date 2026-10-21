@@ -3,7 +3,6 @@ import SwiftUI
 
 struct CompletedVisitListView: View {
     @Environment(\.modelContext) private var context
-    @Environment(\.backupSync) private var backupSync
     @Environment(\.locale) private var locale
     @State private var model = CompletedVisitListModel()
     let period: DateInterval
@@ -57,10 +56,11 @@ struct CompletedVisitListView: View {
         .navigationTitle("Completed Visits")
         .onAppear(perform: reload)
         .onChange(of: locale) { _, _ in reload() }
-        .onChange(of: backupSync?.runtime?.recordsVersion) { _, _ in reload() }
-        .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)) { notification in
-            guard let savedContext = notification.object as? ModelContext,
-                  savedContext.container === context.container else { return }
+        .onReceive(
+            ModelSaveChanges.publisher(in: context.container, entities: [
+                "Visit", "VisitHorse", "Horse"
+            ])
+        ) {
             reload()
         }
     }

@@ -5,7 +5,6 @@ struct ScheduleView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
-    @Environment(\.backupSync) private var backupSync
     @Environment(\.appClock) private var appClock
     @State private var path = NavigationPath()
     @State private var model = ScheduleModel()
@@ -77,10 +76,11 @@ struct ScheduleView: View {
                 AppointmentEditorView()
             }
             .onAppear(perform: reload)
-            .onChange(of: backupSync?.runtime?.recordsVersion) { _, _ in reload() }
-            .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)) { notification in
-                guard let savedContext = notification.object as? ModelContext,
-                      savedContext.container === context.container else { return }
+            .onReceive(
+                ModelSaveChanges.publisher(in: context.container, entities: [
+                    "Appointment", "AppointmentHorse", "Barn", "Horse", "Visit"
+                ])
+            ) {
                 reload()
             }
             .alert(item: $model.alert) {

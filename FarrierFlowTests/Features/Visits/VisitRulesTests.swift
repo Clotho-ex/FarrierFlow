@@ -207,7 +207,7 @@ struct VisitRulesTests {
             to: targetIDs,
             in: original
         )
-        let updated = try #require(try result.get())
+        let updated = try result.get()
 
         #expect(updated.horses[0] == source)
         for targetID in targetIDs {

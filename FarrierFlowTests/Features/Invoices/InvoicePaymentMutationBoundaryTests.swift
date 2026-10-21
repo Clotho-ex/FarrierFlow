@@ -44,6 +44,7 @@ struct InvoicePaymentMutationBoundaryTests {
         let aggregatePath = "Core/Persistence/Schema/Invoice.swift"
         let useCasePath = "Features/Invoices/InvoicePaymentUseCase.swift"
         let restorePath = "Features/BackupSync/SyncGraphCodec.swift"
+        let deletionPath = "Core/Persistence/RecordDeletionPlan.swift"
 
         for (path, source) in files {
             if path.hasPrefix("Core/Persistence/Migrations/") {
@@ -61,7 +62,11 @@ struct InvoicePaymentMutationBoundaryTests {
             // transitions, without invoking an independently saving UI use case.
             if path != aggregatePath, path != useCasePath, path != restorePath {
                 #expect(!source.contains("recordCompletedPayment("), "Unauthorized paid transition in \(path)")
-                #expect(!source.contains("removeCompletedPayment("), "Unauthorized unpaid transition in \(path)")
+                // Explicit Invoice deletion removes its Payment through the same
+                // aggregate transition before atomically deleting the Invoice.
+                if path != deletionPath {
+                    #expect(!source.contains("removeCompletedPayment("), "Unauthorized unpaid transition in \(path)")
+                }
             }
         }
 
@@ -80,13 +85,14 @@ struct InvoicePaymentMutationBoundaryTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .appending(path: "FarrierFlow", directoryHint: .isDirectory)
+            .resolvingSymlinksInPath()
         let enumerator = try #require(FileManager.default.enumerator(
             at: root,
             includingPropertiesForKeys: nil
         ))
         var sources: [String: String] = [:]
         for case let file as URL in enumerator where file.pathExtension == "swift" {
-            let path = String(file.path.dropFirst(root.path.count + 1))
+            let path = String(file.resolvingSymlinksInPath().path.dropFirst(root.path.count + 1))
             sources[path] = try String(contentsOf: file, encoding: .utf8)
         }
         return sources

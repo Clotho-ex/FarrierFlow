@@ -85,23 +85,23 @@ final class SyncPhotographTransfer {
         _ record: SyncRecord, manifest: SyncPhotoManifestEntry?, workspaceID: UUID,
         checking: @escaping @MainActor @Sendable () throws -> Void
     ) async throws -> SyncPhotoManifestEntry? {
-        let local = try await library.canonicalPayloadForSync(record: record)
-        try check(checking)
         if let manifest {
             guard record.fields["byteCount"] == .integer(manifest.byteCount) else {
                 throw SyncPhotoPayloadError.invalidMetadata
             }
-            if let local {
-                guard local.digest == manifest.digest else { throw SyncPhotoPayloadError.digestMismatch }
-            } else {
+            let isLocal = try await library.verifyPhotoForSync(record: record, receipt: manifest)
+            try check(checking)
+            if !isLocal {
                 let bytes = try await transport.download(workspaceID: workspaceID, photoID: record.id)
                 try check(checking)
-                let payload = try SyncPhotoPayload.validate(data: bytes, record: record, expectedDigest: manifest.digest)
+                let payload = try await validated(bytes, record: record, digest: manifest.digest)
                 _ = try await library.restoreForSync(payload: payload, record: record, checking: checking)
                 try check(checking)
             }
             return manifest
         }
+        let local = try await library.canonicalPayloadForSync(record: record)
+        try check(checking)
         guard let local else { return nil }
         do {
             try await transport.upload(workspaceID: workspaceID, payload: local)
@@ -113,7 +113,7 @@ final class SyncPhotographTransfer {
             // object without its manifest. Verify it, never overwrite it.
             let bytes = try await transport.download(workspaceID: workspaceID, photoID: record.id)
             try check(checking)
-            _ = try SyncPhotoPayload.validate(data: bytes, record: record, expectedDigest: local.digest)
+            _ = try await validated(bytes, record: record, digest: local.digest)
         }
         let stillLocal = try await library.canonicalPayloadForSync(record: record)
         try check(checking)
@@ -125,6 +125,13 @@ final class SyncPhotographTransfer {
         _ = try await library.canonicalPayloadForSync(record: record)
         try check(checking)
         return receipt
+    }
+
+    private func validated(_ data: Data, record: SyncRecord, digest: String) async throws -> SyncPhotoPayload {
+        try await Task.detached(priority: .utility) {
+            try Task.checkCancellation()
+            return try SyncPhotoPayload.validate(data: data, record: record, expectedDigest: digest)
+        }.value
     }
 
     private func flush(

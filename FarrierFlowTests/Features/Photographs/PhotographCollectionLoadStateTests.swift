@@ -44,15 +44,15 @@ struct PhotographCollectionLoadStateTests {
     @Test
     func retrySuccessReplacesFailureState() throws {
         let fixture = try makeFixture()
-        var shouldFail = true
+        let failure = LoadSwitch(shouldFail: true)
         let item = makeItem()
         let model = PhotographCollectionModel(
             visitHorseID: fixture.graph.visitHorseID,
             horseName: "Milo",
             library: fixture.library,
             itemsLoader: { _ in
-                defer { shouldFail = false }
-                if shouldFail { throw LoadFailure.expected }
+                defer { failure.shouldFail = false }
+                if failure.shouldFail { throw LoadFailure.expected }
                 return [item]
             }
         )
@@ -68,20 +68,20 @@ struct PhotographCollectionLoadStateTests {
     @Test
     func refreshFailureRetainsLoadedItemsAndExposesFailure() throws {
         let fixture = try makeFixture()
-        var shouldFail = false
+        let failure = LoadSwitch(shouldFail: false)
         let item = makeItem()
         let model = PhotographCollectionModel(
             visitHorseID: fixture.graph.visitHorseID,
             horseName: "Milo",
             library: fixture.library,
             itemsLoader: { _ in
-                if shouldFail { throw LoadFailure.expected }
+                if failure.shouldFail { throw LoadFailure.expected }
                 return [item]
             }
         )
 
         model.load()
-        shouldFail = true
+        failure.shouldFail = true
         model.load()
 
         #expect(model.loadState == .failed)
@@ -168,4 +168,10 @@ private struct CollectionFixture {
 
 private enum LoadFailure: Error {
     case expected
+}
+
+@MainActor
+private final class LoadSwitch {
+    var shouldFail: Bool
+    init(shouldFail: Bool) { self.shouldFail = shouldFail }
 }

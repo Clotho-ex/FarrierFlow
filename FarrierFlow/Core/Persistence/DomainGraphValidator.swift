@@ -141,16 +141,23 @@ enum DomainGraphValidator {
         }
 
         let businessCurrencyCode = businessProfiles.first?.currencyCode
+        let serviceWorkItems = Dictionary(uniqueKeysWithValues: services.map {
+            (ObjectIdentifier($0), Set($0.workItems.map(ObjectIdentifier.init)))
+        })
+        let serviceHorseDefaults = Dictionary(uniqueKeysWithValues: services.map {
+            (ObjectIdentifier($0), Set($0.horsesUsingAsDefault.map(ObjectIdentifier.init)))
+        })
         for service in services {
             try validate(service, businessCurrencyCode: businessCurrencyCode)
         }
 
         for horse in horses {
-            try validate(horse)
+            try validate(horse, serviceHorseDefaults: serviceHorseDefaults)
         }
 
         for workItem in workItems {
-            try validate(workItem, businessCurrencyCode: businessCurrencyCode)
+            try validate(workItem, businessCurrencyCode: businessCurrencyCode,
+                         serviceWorkItems: serviceWorkItems)
         }
 
         var lineItemsByInvoiceVisit = [PersistentIdentifier: [InvoiceLineItem]]()
@@ -253,7 +260,9 @@ enum DomainGraphValidator {
         }
     }
 
-    private static func validate(_ horse: Horse) throws {
+    private static func validate(
+        _ horse: Horse, serviceHorseDefaults: [ObjectIdentifier: Set<ObjectIdentifier>]
+    ) throws {
         guard horse.client != nil else {
             throw DomainGraphViolation.horseMissingClient
         }
@@ -264,7 +273,7 @@ enum DomainGraphValidator {
             guard !service.isArchived else {
                 throw DomainGraphViolation.horseDefaultServiceArchived
             }
-            guard service.horsesUsingAsDefault.contains(where: { $0 === horse }) else {
+            guard serviceHorseDefaults[ObjectIdentifier(service)]?.contains(ObjectIdentifier(horse)) == true else {
                 throw DomainGraphViolation.horseDefaultServiceInverseMismatch
             }
         }
@@ -313,7 +322,8 @@ enum DomainGraphValidator {
 
     private static func validate(
         _ workItem: WorkItem,
-        businessCurrencyCode: String?
+        businessCurrencyCode: String?,
+        serviceWorkItems: [ObjectIdentifier: Set<ObjectIdentifier>]
     ) throws {
         guard let service = workItem.service else {
             throw DomainGraphViolation.workItemMissingService
@@ -321,7 +331,7 @@ enum DomainGraphValidator {
         guard let visitHorse = workItem.visitHorse else {
             throw DomainGraphViolation.workItemMissingVisitHorse
         }
-        guard service.workItems.contains(where: { $0 === workItem }) else {
+        guard serviceWorkItems[ObjectIdentifier(service)]?.contains(ObjectIdentifier(workItem)) == true else {
             throw DomainGraphViolation.workItemServiceInverseMismatch
         }
         guard visitHorse.workItems.contains(where: { $0 === workItem }) else {

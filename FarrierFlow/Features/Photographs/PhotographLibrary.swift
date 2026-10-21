@@ -14,6 +14,7 @@ final class PhotographLibrary {
     @ObservationIgnored private let saving: @MainActor (ModelContext) throws -> Void
     @ObservationIgnored private let discarding: @MainActor (Visit, ModelContext) throws -> Void
     @ObservationIgnored private let hooks: PhotographOperationHooks
+    @ObservationIgnored private let syncPhotoReader = SyncPhotoFileReader()
 
     init(
         container: ModelContainer,
@@ -45,11 +46,12 @@ final class PhotographLibrary {
         try await coordinator.withExclusiveOperation { @MainActor [self] in
             try fileStore.prepareDirectories()
             try await hooks.beforeReconciliationInspection()
-            try PhotographReconciler.reconcile(
+            let retained = try PhotographReconciler.reconcile(
                 in: container,
                 fileStore: fileStore,
                 protectedDataIsAvailable: protectedDataAvailable()
             )
+            await syncPhotoReader.retain(retained)
         }
     }
 
@@ -165,7 +167,26 @@ final class PhotographLibrary {
             guard try fileStore.canonicalFileIsAvailable(for: record.id) else {
                 throw PhotographFileStoreError.expectedRegularFile
             }
-            return try SyncPhotoPayload.validate(data: Data(contentsOf: url), record: record)
+            let payload = try await syncPhotoReader.payload(url: url, record: record)
+            try Task.checkCancellation()
+            guard protectedDataAvailable() else { throw PhotographLibraryError.protectedDataUnavailable }
+            try requireCurrentSyncPhoto(record)
+            return payload
+        }
+    }
+
+    func verifyPhotoForSync(record: SyncRecord, receipt: SyncPhotoManifestEntry) async throws -> Bool {
+        try await coordinator.withExclusiveOperation { @MainActor [self] in
+            try Task.checkCancellation()
+            guard protectedDataAvailable() else { throw PhotographLibraryError.protectedDataUnavailable }
+            try requireCurrentSyncPhoto(record)
+            let url = fileStore.canonicalURL(for: record.id)
+            guard FileManager.default.fileExists(atPath: url.path) else { return false }
+            try await syncPhotoReader.verify(url: url, record: record, receipt: receipt)
+            try Task.checkCancellation()
+            guard protectedDataAvailable() else { throw PhotographLibraryError.protectedDataUnavailable }
+            try requireCurrentSyncPhoto(record)
+            return true
         }
     }
 
@@ -179,15 +200,25 @@ final class PhotographLibrary {
             guard protectedDataAvailable() else { throw PhotographLibraryError.protectedDataUnavailable }
             try requireCurrentSyncPhoto(record)
             guard payload.id == record.id else { throw SyncPhotoPayloadError.invalidMetadata }
-            _ = try SyncPhotoPayload.validate(data: payload.data, record: record, expectedDigest: payload.digest)
+            try await Task.detached(priority: .utility) {
+                _ = try SyncPhotoPayload.validate(data: payload.data, record: record, expectedDigest: payload.digest)
+            }.value
+            try Task.checkCancellation()
+            guard protectedDataAvailable() else { throw PhotographLibraryError.protectedDataUnavailable }
+            try checking()
+            try requireCurrentSyncPhoto(record)
             try fileStore.prepareDirectories()
             let canonical = fileStore.canonicalURL(for: record.id)
             if FileManager.default.fileExists(atPath: canonical.path) {
                 guard try fileStore.canonicalFileIsAvailable(for: record.id) else {
                     throw PhotographFileStoreError.expectedRegularFile
                 }
-                _ = try SyncPhotoPayload.validate(data: Data(contentsOf: canonical), record: record,
-                                                  expectedDigest: payload.digest)
+                try await syncPhotoReader.verify(url: canonical, record: record,
+                    receipt: .init(id: payload.id, digest: payload.digest, byteCount: Int64(payload.data.count)))
+                try Task.checkCancellation()
+                guard protectedDataAvailable() else { throw PhotographLibraryError.protectedDataUnavailable }
+                try checking()
+                try requireCurrentSyncPhoto(record)
                 try fileStore.applyCompleteProtection(to: canonical)
                 return false
             }

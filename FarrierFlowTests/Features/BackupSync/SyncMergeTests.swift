@@ -122,6 +122,99 @@ struct SyncMergeTests {
     }
 
     @Test
+    func laterRemoteEditsCannotClearAnUnreviewedConflict() throws {
+        let workspace = UUID(), id = UUID()
+        var journal = SyncJournal(accountID: UUID(), workspaceID: workspace, deviceID: UUID())
+        func transaction(_ revision: Int64, _ record: SyncRecord?) -> SyncRemoteTransaction {
+            .init(workspaceID: workspace, revision: revision, mutations: [
+                .init(id: id, kind: .client, expectedRevision: revision - 1, record: record)
+            ])
+        }
+        _ = try journal.receive(transaction(1, client(id, name: "Original")), current: [])
+        let local = client(id, name: "Local")
+        let first = try journal.receive(transaction(2, client(id, name: "Cloud")), current: [local])
+        journal = try JSONDecoder().decode(SyncJournal.self, from: JSONEncoder().encode(journal))
+        let latestCloud = client(id, name: "Cloud", notes: "New remote note")
+        let merged = try journal.receive(transaction(3, latestCloud), current: first)
+        #expect(merged == [client(id, name: "Local", notes: "New remote note")])
+        #expect(journal.conflicts.count == 1)
+        #expect(journal.conflicts.first?.remote == latestCloud)
+        #expect(journal.conflicts.first?.local == merged.first)
+        #expect(throws: SyncJournalError.unresolvedConflicts) { try journal.stage(merged) }
+        let resolved = try journal.resolveConflicts([id: .keepIPhone], current: merged)
+        let batch = try #require(try journal.stage(resolved))
+        #expect(batch.mutations.first?.expectedRevision == 3)
+        #expect(batch.mutations.first?.record == client(id, name: "Local", notes: "New remote note"))
+    }
+
+    @Test(arguments: [false, true])
+    func unresolvedConflictTracksLatestRemoteValueUntilExplicitReview(deleted: Bool) throws {
+        let workspace = UUID(), id = UUID()
+        var journal = SyncJournal(accountID: UUID(), workspaceID: workspace, deviceID: UUID())
+        func transaction(_ revision: Int64, _ record: SyncRecord?) -> SyncRemoteTransaction {
+            .init(workspaceID: workspace, revision: revision, mutations: [
+                .init(id: id, kind: .client, expectedRevision: revision - 1, record: record)
+            ])
+        }
+        _ = try journal.receive(transaction(1, client(id, name: "Original")), current: [])
+        let local = client(id, name: "Local")
+        let first = try journal.receive(transaction(2, client(id, name: "Cloud")), current: [local])
+        let latest = deleted ? nil : local
+        let current = try journal.receive(transaction(3, latest), current: first)
+        #expect(journal.conflicts.count == 1)
+        #expect(journal.conflicts.first?.remote == latest)
+        let resolved = try journal.resolveConflicts([id: .useCloud], current: current)
+        #expect(resolved == (deleted ? [] : [local]))
+        #expect(journal.conflicts.isEmpty)
+    }
+
+    @Test
+    func legacyConflictWithoutFieldMetadataRetainsTheEntireLocalChoice() throws {
+        let workspace = UUID(), id = UUID()
+        var journal = SyncJournal(accountID: UUID(), workspaceID: workspace, deviceID: UUID())
+        func transaction(_ revision: Int64, _ name: String) -> SyncRemoteTransaction {
+            .init(workspaceID: workspace, revision: revision, mutations: [
+                .init(id: id, kind: .client, expectedRevision: revision - 1, record: client(id, name: name))
+            ])
+        }
+        _ = try journal.receive(transaction(1, "Original"), current: [])
+        let local = client(id, name: "Local")
+        _ = try journal.receive(transaction(2, "Cloud"), current: [local])
+        var encoded = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(journal)) as? [String: Any])
+        var conflicts = try #require(encoded["conflicts"] as? [[String: Any]])
+        conflicts[0].removeValue(forKey: "unresolvedFields")
+        encoded["conflicts"] = conflicts
+        journal = try JSONDecoder().decode(SyncJournal.self, from: JSONSerialization.data(withJSONObject: encoded))
+        let current = try journal.receive(transaction(3, "Local"), current: [local])
+        let later = try journal.receive(transaction(4, "Changed"), current: current)
+        #expect(later == [local])
+        #expect(journal.conflicts.first?.local == local)
+        #expect(journal.conflicts.first?.remote == client(id, name: "Changed"))
+    }
+
+    @Test
+    func cloudConvergenceThenDivergenceCannotReplaceTheUnreviewedLocalChoice() throws {
+        let workspace = UUID(), id = UUID()
+        var journal = SyncJournal(accountID: UUID(), workspaceID: workspace, deviceID: UUID())
+        func transaction(_ revision: Int64, _ name: String, notes: String = "") -> SyncRemoteTransaction {
+            .init(workspaceID: workspace, revision: revision, mutations: [
+                .init(id: id, kind: .client, expectedRevision: revision - 1,
+                      record: client(id, name: name, notes: notes))
+            ])
+        }
+        _ = try journal.receive(transaction(1, "Original"), current: [])
+        let first = try journal.receive(transaction(2, "Cloud"), current: [client(id, name: "Local")])
+        let converged = try journal.receive(transaction(3, "Local"), current: first)
+        journal = try JSONDecoder().decode(SyncJournal.self, from: JSONEncoder().encode(journal))
+        let current = try journal.receive(transaction(4, "Changed", notes: "Latest note"), current: converged)
+        #expect(current == [client(id, name: "Local", notes: "Latest note")])
+        #expect(journal.conflicts.first?.local == current.first)
+        #expect(journal.conflicts.first?.remote == client(id, name: "Changed", notes: "Latest note"))
+        let resolved = try journal.resolveConflicts([id: .keepIPhone], current: current)
+        #expect(resolved == [client(id, name: "Local", notes: "Latest note")])
+    }
+
+    @Test
     func malformedRemoteRevisionAndKindCannotCorruptAcknowledgedIdentity() throws {
         let workspace = UUID()
         let id = UUID()

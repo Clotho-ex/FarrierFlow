@@ -6,6 +6,57 @@ import Testing
 @Suite("Sync photos share local storage coordination", .serialized)
 @MainActor
 struct SyncPhotoLibraryTests {
+    @Test(arguments: ["read", "verify", "restore"])
+    func lockingDuringWorkerValidationCannotReturnBytesOrRestoreFiles(operation: String) async throws {
+        let access = PhotoAccessState()
+        let fixture = try await makeFixture(protectedDataAvailable: { access.check() })
+        let payload = try SyncPhotoPayload.validate(data: fixture.data, record: fixture.record)
+        let url = fixture.library.canonicalURL(for: fixture.record.id)
+        if operation == "restore" { try fixture.library.fileStore.removeManagedFile(at: url) }
+        access.checksBeforeLock = 1
+        await #expect(throws: PhotographLibraryError.protectedDataUnavailable) {
+            switch operation {
+            case "read": _ = try await fixture.library.canonicalPayloadForSync(record: fixture.record)
+            case "verify":
+                _ = try await fixture.library.verifyPhotoForSync(record: fixture.record,
+                    receipt: .init(id: payload.id, digest: payload.digest, byteCount: Int64(payload.data.count)))
+            default: _ = try await fixture.library.restoreForSync(payload: payload, record: fixture.record, checking: {})
+            }
+        }
+        if operation == "restore" { #expect(!FileManager.default.fileExists(atPath: url.path)) }
+    }
+
+    @Test
+    func verifiedPhotoDetectsSameSizeCorruptionEvenWhenModificationDateIsRestored() async throws {
+        let fixture = try await makeFixture()
+        let receipt = SyncPhotoManifestEntry(id: fixture.record.id,
+            digest: try SyncPhotoPayload.validate(data: fixture.data, record: fixture.record).digest,
+            byteCount: Int64(fixture.data.count))
+        #expect(try await fixture.library.verifyPhotoForSync(record: fixture.record, receipt: receipt))
+        #expect(try await fixture.library.verifyPhotoForSync(record: fixture.record, receipt: receipt))
+        let url = fixture.library.canonicalURL(for: fixture.record.id)
+        let modified = try #require(FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date)
+        try Data(repeating: 0, count: fixture.data.count).write(to: url)
+        try FileManager.default.setAttributes([.modificationDate: modified], ofItemAtPath: url.path)
+        await #expect(throws: SyncPhotoPayloadError.corruptPhoto) {
+            try await fixture.library.verifyPhotoForSync(record: fixture.record, receipt: receipt)
+        }
+    }
+
+    @Test
+    func verifiedPhotoStillRequiresMatchingCloudDigestAndAnAvailableFile() async throws {
+        let fixture = try await makeFixture()
+        let digest = try SyncPhotoPayload.validate(data: fixture.data, record: fixture.record).digest
+        let receipt = SyncPhotoManifestEntry(id: fixture.record.id, digest: digest, byteCount: Int64(fixture.data.count))
+        #expect(try await fixture.library.verifyPhotoForSync(record: fixture.record, receipt: receipt))
+        let wrong = SyncPhotoManifestEntry(id: receipt.id, digest: String(repeating: "0", count: 64), byteCount: receipt.byteCount)
+        await #expect(throws: SyncPhotoPayloadError.digestMismatch) {
+            try await fixture.library.verifyPhotoForSync(record: fixture.record, receipt: wrong)
+        }
+        try fixture.library.fileStore.removeManagedFile(at: fixture.library.canonicalURL(for: fixture.record.id))
+        #expect(try await !fixture.library.verifyPhotoForSync(record: fixture.record, receipt: receipt))
+    }
+
     @Test
     func readingCanonicalPhotoDoesNotRecompressAndMissingFileIsDistinct() async throws {
         let fixture = try await makeFixture()
@@ -88,13 +139,26 @@ struct SyncPhotoLibraryTests {
         #expect(try Data(contentsOf: url) == corrupt)
     }
 
-    private func makeFixture() async throws -> (library: PhotographLibrary, record: SyncRecord, data: Data) {
+    private func makeFixture(
+        protectedDataAvailable: @escaping @MainActor () -> Bool = { true }
+    ) async throws -> (library: PhotographLibrary, record: SyncRecord, data: Data) {
         let graph = try PhotographTestFixtures.makeVisitGraph()
         let directory = try TemporaryStoreFixtures.makeDirectory(prefix: "Sync-Photos-")
-        let library = PhotographTestFixtures.makeLibrary(graph: graph, rootURL: directory.appending(path: "HoofPhotographs"))
+        let library = PhotographTestFixtures.makeLibrary(graph: graph, rootURL: directory.appending(path: "HoofPhotographs"),
+                                                        protectedDataAvailable: protectedDataAvailable)
         let id = try await library.add(sourceData: PhotographTestFixtures.jpeg(), to: graph.visitHorseID)
         let records = try SyncGraphCodec.capture(in: ModelContext(graph.container))
         let record = try #require(records.first { $0.id == id })
         return (library, record, try Data(contentsOf: library.canonicalURL(for: id)))
+    }
+}
+
+@MainActor
+private final class PhotoAccessState {
+    var checksBeforeLock: Int?
+    func check() -> Bool {
+        guard let remaining = checksBeforeLock else { return true }
+        checksBeforeLock = max(0, remaining - 1)
+        return remaining > 0
     }
 }

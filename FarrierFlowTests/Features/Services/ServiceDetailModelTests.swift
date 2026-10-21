@@ -56,8 +56,9 @@ struct ServiceDetailModelTests {
         #expect(!model.archive(in: context))
         #expect(!service.isArchived)
         #expect(horse.defaultService === service)
-        #expect(!model.delete(in: context))
-        #expect(horse.defaultService === service)
+        #expect(model.delete(in: context))
+        #expect(horse.defaultService == nil)
+        #expect(try context.fetchCount(FetchDescriptor<Service>()) == 0)
     }
 
     @Test
@@ -74,7 +75,7 @@ struct ServiceDetailModelTests {
     }
 
     @Test
-    func deletesOnlyAnUnreferencedService() throws {
+    func deletingReferencedAndUnreferencedServicesRemovesTheirWork() throws {
         let container = try ModelContainerFactory.inMemoryTest()
         let context = container.mainContext
         let unreferenced = ModelFixtures.makeService(in: context)
@@ -89,7 +90,10 @@ struct ServiceDetailModelTests {
         let referencedContext = referencedContainer.mainContext
         let referencedModel = ServiceDetailModel()
         referencedModel.load(id: referenced.persistentModelID, in: referencedContext)
-        #expect(!referencedModel.delete(in: referencedContext))
+        #expect(referencedModel.delete(in: referencedContext))
+        #expect(try referencedContext.fetchCount(FetchDescriptor<Service>()) == 0)
+        #expect(try referencedContext.fetchCount(FetchDescriptor<WorkItem>()) == 0)
+        try DomainGraphValidator.validateAll(in: referencedContext)
     }
 
     private func serviceWithRecordedWork() throws -> (ModelContainer, Service) {

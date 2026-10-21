@@ -28,7 +28,10 @@ final class BusinessOverviewUITests: XCTestCase {
         app.buttons["Cash"].tap()
         app.buttons["payment-confirm"].tap()
         XCTAssertTrue(app.navigationBars["Invoice 0001"].waitForExistence(timeout: 3))
-        app.navigationBars["Invoice 0001"].buttons.firstMatch.tap()
+        let back = app.navigationBars["Invoice 0001"].buttons.firstMatch
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: back)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 5), .completed, app.debugDescription)
+        back.tap()
         XCTAssertTrue(app.navigationBars["Unpaid Invoices"].waitForExistence(timeout: 3))
         XCTAssertFalse(app.buttons["invoice-row-0001"].exists)
         XCTAssertTrue(app.buttons["invoice-row-0002"].exists)

@@ -1,5 +1,16 @@
 # FarrierFlow Roadmap
 
+## Current Development
+
+The 1.0 release plan and numbered slice histories below describe their original
+scope. Current development includes optional, free Apple/Supabase backup and
+sync, appointment-specific service planning, the Business overview, and explicit
+record deletion with preserved invoice snapshots. Completed Visits can be
+corrected; deleting a Visit also deletes its Appointment and related work/photos.
+These approved additions supersede the corresponding historical exclusions.
+Local tests do not establish production Apple authentication, two-iPhone sync,
+hosted configuration, or release acceptance.
+
 ## Delivery Principle
 
 FarrierFlow is delivered as complete vertical slices. Each slice must produce a
@@ -10,7 +21,7 @@ Later capabilities remain high-level until their product decisions, data
 ownership, and migration behavior are shaped. They must not influence the
 current schema or interface.
 
-FarrierFlow has not shipped. Slice 5 supersedes the historical pre-release
+For the original 1.0 schema baseline, Slice 5 superseded the historical pre-release
 schema stages described in Slices 1 through 3 with one complete first-shipping
 `FarrierFlowSchemaV1`; the app implements no migration from those pre-release
 stores.
@@ -629,9 +640,11 @@ integration uses anonymous App User IDs and adds no FarrierFlow account.
 
 ### Slice 10 — Optional Backup
 
-Evaluate an opt-in backup or synchronization design only after privacy,
-conflict, account, recovery, migration, and operational requirements are
-defined. CloudKit is not assumed.
+**Status:** Implemented locally under
+`docs/superpowers/specs/2026-10-13-solo-backup-sync-design.md`, with stable UUIDs,
+durable conflicts and retries, private original-photo protection, optional Apple
+authentication, and local-preserving cloud-account deletion. Release and hosted
+acceptance are separate gates. CloudKit is not used.
 
 ## Deferred Capabilities
 
@@ -644,14 +657,14 @@ defined. CloudKit is not assumed.
 - Subscription enhancements beyond the approved 1.0 monthly/yearly products,
   including weekly, lifetime, team, metered, promotional, offer-code, win-back,
   or server-managed access.
-- Networking, accounts, integrations, CloudKit, synchronization, and backup.
+- CloudKit and integrations beyond the approved optional Supabase protection.
 - Notifications.
 - Archive or generalized soft deletion.
 - Custom navigation, custom tab bars, or custom iOS 26 visual effects.
 - A generalized Settings destination beyond Business Profile and approved owner
   defaults.
 - Cancellation, no-show, rescheduling, and time-based Appointment resolution.
-- Completed Visit deletion and historical-date correction.
+- Historical-date correction.
 - Background tasks, external Visit draft files, and per-change autosave.
 
 Later slice work must not add fields, routes, empty screens, services, or

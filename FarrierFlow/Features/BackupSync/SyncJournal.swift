@@ -269,18 +269,37 @@ nonisolated struct SyncJournal: Codable, Equatable, Sendable {
                   local[mutation.id]?.kind == nil || local[mutation.id]?.kind == mutation.kind else {
                 throw SyncJournalError.invalidMutation
             }
+            let previousConflict = updated.conflicts.first { $0.id == mutation.id }
+            let newlyConflictingFields = SyncRecordMerge.conflictingFields(
+                base: baseline[mutation.id], local: local[mutation.id], remote: mutation.record)
+            let unresolvedFields: Set<String>?
+            if let previousConflict {
+                unresolvedFields = previousConflict.unresolvedFields.flatMap { previous in
+                    newlyConflictingFields.map { previous.union($0) }
+                }
+            } else { unresolvedFields = newlyConflictingFields }
             updated.conflicts.removeAll { $0.id == mutation.id }
-            switch SyncRecordMerge.merge(
+            let merge = SyncRecordMerge.merge(
                 base: baseline[mutation.id], local: local[mutation.id],
                 remote: mutation.record
-            ) {
+            )
+            switch merge {
             case .merged(let record):
-                local[mutation.id] = record
+                if previousConflict == nil {
+                    local[mutation.id] = record
+                } else if let record, let current = local[mutation.id], let unresolvedFields {
+                    var fields = record.fields
+                    for key in unresolvedFields { fields[key] = current.fields[key] }
+                    local[mutation.id] = SyncRecord(id: record.id, kind: record.kind, fields: fields)
+                }
             case .conflict:
-                updated.conflicts.append(SyncConflict(
-                    id: mutation.id, kind: mutation.kind,
-                    local: local[mutation.id], remote: mutation.record
-                ))
+                break
+            }
+            // Advancing the baseline must not reinterpret an unresolved edit as
+            // a new, uncontested local change on the next remote commit.
+            if previousConflict != nil || merge == .conflict {
+                updated.conflicts.append(SyncConflict(id: mutation.id, kind: mutation.kind,
+                    local: local[mutation.id], remote: mutation.record, unresolvedFields: unresolvedFields))
             }
             baseline[mutation.id] = mutation.record
             updated.revisions[mutation.id] = transaction.revision

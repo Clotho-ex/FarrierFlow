@@ -5,7 +5,6 @@ struct StopDetailsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @Environment(\.backupSync) private var backupSync
     @State private var model: StopDetailsModel
 
     init(stop: TodayStopSummary) {
@@ -47,10 +46,11 @@ struct StopDetailsSheet: View {
             dynamicTypeSize.isAccessibilitySize ? [.large] : [.medium, .large]
         )
         .presentationDragIndicator(.visible)
-        .onChange(of: backupSync?.runtime?.recordsVersion) { _, _ in reload() }
-        .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)) { notification in
-            guard let savedContext = notification.object as? ModelContext,
-                  savedContext.container === context.container else { return }
+        .onReceive(
+            ModelSaveChanges.publisher(in: context.container, entities: [
+                "Appointment", "AppointmentHorse", "Barn", "Horse", "Visit"
+            ])
+        ) {
             reload()
         }
     }

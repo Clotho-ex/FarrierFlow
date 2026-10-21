@@ -6,6 +6,14 @@ nonisolated enum SyncMergeResult: Equatable {
 }
 
 nonisolated enum SyncRecordMerge {
+    static func conflictingFields(base: SyncRecord?, local: SyncRecord?, remote: SyncRecord?) -> Set<String>? {
+        guard let base, let local, let remote else { return nil }
+        return Set(base.fields.keys).union(local.fields.keys).union(remote.fields.keys).filter {
+            local.fields[$0] != base.fields[$0] && remote.fields[$0] != base.fields[$0] &&
+                local.fields[$0] != remote.fields[$0]
+        }
+    }
+
     static func merge(
         base: SyncRecord?, local: SyncRecord?, remote: SyncRecord?
     ) -> SyncMergeResult {
@@ -40,4 +48,6 @@ nonisolated struct SyncConflict: Codable, Equatable, Sendable, Identifiable {
     let kind: SyncRecordKind
     let local: SyncRecord?
     let remote: SyncRecord?
+    // Nil also decodes older journals conservatively as a whole-record conflict.
+    var unresolvedFields: Set<String>? = nil
 }

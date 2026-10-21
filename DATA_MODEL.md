@@ -52,8 +52,8 @@ SwiftData is the local metadata source of truth. Canonical Photograph JPEGs are
 stored in Application Support and resolved only from their UUID. Invoice PDFs
 are generated on demand from persisted snapshots and are not canonical records.
 The Payment model records received-money evidence but does not process payments.
-No model represents subscriptions, cloud synchronization, or app-managed
-backup. RevenueCat entitlement state remains outside SwiftData, and an
+The current schema adds SyncState for the optional sync journal, as described
+above. RevenueCat entitlement state remains outside SwiftData, and an
 access-state transition never mutates this graph.
 
 First-run onboarding state also remains outside SwiftData. Versioned completion,
@@ -563,6 +563,13 @@ again only if no remaining InvoiceLineItem references any of its WorkItems.
 
 ## Ownership and Delete-Rule Matrix
 
+These are the raw SwiftData relationship rules. Current user-controlled deletion
+uses `RecordDeletionPlan` and the photograph coordination boundary to remove
+dependencies, quarantine files, and detach retained invoice snapshots atomically
+before deleting records. A Deny relationship is therefore a persistence guard,
+not a restriction on the confirmed deletion flow. Paid and unpaid Invoices can
+both be explicitly deleted; completed Visits can be deleted with their Appointment.
+
 | Source relationship | Inverse | SwiftData delete rule | Result when source is deleted |
 | --- | --- | --- | --- |
 | `Client.horses` | `Horse.client` | Deny | Client cannot be deleted while the collection is nonempty |
@@ -593,7 +600,7 @@ again only if no remaining InvoiceLineItem references any of its WorkItems.
 | `VisitHorse.workItems` | `WorkItem.visitHorse` | Cascade | Deleting an owned in-progress VisitHorse deletes its WorkItems |
 | `WorkItem.invoiceLineItem` | `InvoiceLineItem.sourceWorkItem` | Deny | A billed WorkItem cannot be deleted or billed again |
 | `Visit.invoiceVisits` | `InvoiceVisit.sourceVisit` | Deny | A Visit with invoice history cannot be deleted |
-| `Invoice.invoiceVisits` | `InvoiceVisit.invoice` | Cascade | Deleting an Unpaid Invoice deletes its Visit snapshots |
+| `Invoice.invoiceVisits` | `InvoiceVisit.invoice` | Cascade | Deleting an Invoice deletes its Visit snapshots |
 | `InvoiceVisit.lineItems` | `InvoiceLineItem.invoiceVisit` | Cascade | Deleting an owned InvoiceVisit deletes its line snapshots and releases WorkItem inverses |
 
 Feature-model preflight checks are required even where the SwiftData delete rule

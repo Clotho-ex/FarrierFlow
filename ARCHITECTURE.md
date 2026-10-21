@@ -33,6 +33,14 @@ mutation gates are unchanged. Workspace RPCs use stable UUIDs, durable exact
 operation retries, full-transaction cursors and conservative merges. Private
 original JPEG protection is acknowledged separately from metadata.
 
+Unresolved same-record conflicts survive later remote commits until explicit
+review, while unrelated fields can continue merging. Photo sync reads, decodes
+and hashes bytes on a feature-owned actor; an in-memory verification cache stores
+only record/digest and file fingerprints, including inode, size, modification
+and change timestamps. Changed or replaced files are fully revalidated. Save
+invalidation filters relevant entities before buffering, coalesces adjacent
+saves, and excludes identifiable journal-only checkpoints from business screens.
+
 Reviewed recovery archives original invoices locally, outside cloud batches,
 and applies exact-WorkItem billing holds. Protocol 2 refuses new
 billing against committed holds. Protocol 3 supports explicit record deletion,

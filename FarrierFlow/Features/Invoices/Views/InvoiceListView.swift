@@ -5,7 +5,6 @@ struct InvoiceListView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
-    @Environment(\.backupSync) private var backupSync
     @State private var model = InvoiceListModel()
     @State private var hasLocalHistory = false
     @State private var showsHistory = false
@@ -35,10 +34,11 @@ struct InvoiceListView: View {
             Alert(title: Text($0.title), message: Text($0.message))
         }
         .onAppear(perform: reload)
-        .onChange(of: backupSync?.runtime?.recordsVersion) { _, _ in reload() }
-        .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)) { notification in
-            guard let savedContext = notification.object as? ModelContext,
-                  savedContext.container === context.container else { return }
+        .onReceive(
+            ModelSaveChanges.publisher(in: context.container, entities: [
+                "Invoice", "InvoiceVisit", "InvoiceLineItem", "Payment"
+            ])
+        ) {
             reload()
         }
     }

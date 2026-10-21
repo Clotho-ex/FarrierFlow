@@ -4,7 +4,6 @@ import SwiftUI
 struct BusinessView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.modelContext) private var context
-    @Environment(\.backupSync) private var backupSync
     @Environment(\.appClock) private var appClock
     @Environment(\.calendar) private var calendar
     @Environment(\.locale) private var locale
@@ -35,13 +34,15 @@ struct BusinessView: View {
                 }
             }
         }
-        .onChange(of: backupSync?.runtime?.recordsVersion) { _, _ in reload() }
         .onChange(of: calendar) { _, _ in reload() }
         .onChange(of: locale) { _, _ in reload() }
         .onChange(of: scenePhase) { _, phase in if phase == .active { reload() } }
-        .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)) { notification in
-            guard let savedContext = notification.object as? ModelContext,
-                  savedContext.container === context.container else { return }
+        .onReceive(
+            ModelSaveChanges.publisher(in: context.container, entities: [
+                "BusinessProfile", "Invoice", "InvoiceVisit", "InvoiceLineItem", "Payment",
+                "Visit", "VisitHorse", "Horse"
+            ])
+        ) {
             reload()
         }
         .task(id: overview.summary?.month.end) {

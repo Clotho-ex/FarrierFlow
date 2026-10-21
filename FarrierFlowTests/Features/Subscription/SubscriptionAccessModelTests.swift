@@ -38,7 +38,7 @@ struct SubscriptionAccessModelTests {
         let client = TestSubscriptionClient(customer: .init(hasActiveProEntitlement: true))
         let model = SubscriptionAccessModel(client: client)
         await model.refresh()
-        await client.setCustomerError(TestError.failed)
+        client.setCustomerError(TestError.failed)
         await model.refresh()
         #expect(model.access == .pro)
         #expect(model.errorMessage != nil)
@@ -46,7 +46,7 @@ struct SubscriptionAccessModelTests {
 
     @Test func validOfferingLoadsAnnualThenMonthly() async {
         let client = TestSubscriptionClient(customer: .init(hasActiveProEntitlement: false))
-        await client.setPlans([Self.monthly, Self.annual])
+        client.setPlans([Self.monthly, Self.annual])
         let model = SubscriptionAccessModel(client: client)
         await model.refresh()
         #expect(model.plans.map(\.kind) == [.annual, .monthly])
@@ -80,7 +80,7 @@ struct SubscriptionAccessModelTests {
 
     @Test func missingOrDuplicatePlanMakesPaywallUnavailable() async {
         let client = TestSubscriptionClient(customer: .init(hasActiveProEntitlement: false))
-        await client.setPlans([Self.monthly, Self.monthly])
+        client.setPlans([Self.monthly, Self.monthly])
         let model = SubscriptionAccessModel(client: client)
         await model.refresh()
         #expect(model.plans.isEmpty)
@@ -91,8 +91,8 @@ struct SubscriptionAccessModelTests {
 
     @Test func successfulPurchaseUsesReturnedCustomerInfo() async {
         let client = TestSubscriptionClient(customer: .init(hasActiveProEntitlement: false))
-        await client.setPlans([Self.monthly, Self.annual])
-        await client.setPurchaseResult(.init(customer: .init(hasActiveProEntitlement: true), wasCancelled: false))
+        client.setPlans([Self.monthly, Self.annual])
+        client.setPurchaseResult(.init(customer: .init(hasActiveProEntitlement: true), wasCancelled: false))
         let model = SubscriptionAccessModel(client: client)
         let analytics = AnalyticsSpy()
         await model.refresh()
@@ -100,7 +100,7 @@ struct SubscriptionAccessModelTests {
         #expect(model.access == .pro)
         #expect(model.operation == .idle)
         #expect(model.errorMessage == nil)
-        #expect(await client.purchasedPlanIDs == [Self.monthly.id])
+        #expect(client.purchasedPlanIDs == [Self.monthly.id])
         #expect(analytics.events == [
             .subscriptionPurchaseStarted(.monthly),
             .subscriptionPurchaseCompleted(.monthly),
@@ -109,8 +109,8 @@ struct SubscriptionAccessModelTests {
 
     @Test func cancelledPurchaseReturnsToIdleWithoutError() async {
         let client = TestSubscriptionClient(customer: .init(hasActiveProEntitlement: false))
-        await client.setPlans([Self.monthly, Self.annual])
-        await client.setPurchaseResult(.init(customer: .init(hasActiveProEntitlement: false), wasCancelled: true))
+        client.setPlans([Self.monthly, Self.annual])
+        client.setPurchaseResult(.init(customer: .init(hasActiveProEntitlement: false), wasCancelled: true))
         let model = SubscriptionAccessModel(client: client)
         let analytics = AnalyticsSpy()
         await model.refresh()
@@ -155,7 +155,7 @@ struct SubscriptionAccessModelTests {
 
     @Test func restoreGrantsProOnlyFromReturnedCustomerInfo() async {
         let client = TestSubscriptionClient(customer: .init(hasActiveProEntitlement: false))
-        await client.setRestoreCustomer(.init(hasActiveProEntitlement: true))
+        client.setRestoreCustomer(.init(hasActiveProEntitlement: true))
         let model = SubscriptionAccessModel(client: client)
         let analytics = AnalyticsSpy()
         await model.refresh()
@@ -183,10 +183,10 @@ struct SubscriptionAccessModelTests {
         let model = SubscriptionAccessModel(client: client)
         model.start()
         model.start()
-        await eventually { await client.listenerCount == 1 && model.access == .free }
-        await client.emit(.init(hasActiveProEntitlement: true))
+        await eventually { client.listenerCount == 1 && model.access == .free }
+        client.emit(.init(hasActiveProEntitlement: true))
         await eventually { model.access == .pro }
-        #expect(await client.customerRequestCount == 1)
+        #expect(client.customerRequestCount == 1)
         #expect(client.offeringsRequestCount == 0)
         #expect(model.planLoadState == .loading)
     }

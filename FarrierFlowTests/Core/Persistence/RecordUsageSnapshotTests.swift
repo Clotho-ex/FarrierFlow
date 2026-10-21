@@ -29,9 +29,12 @@ struct RecordUsageSnapshotTests {
         #expect(visit.serviceNames == ["Trim", "Trim"])
         #expect(visit.invoiceNumbers == ["0042"])
         #expect(visit.isCompleted)
-        #expect(!model.delete(in: graph.context))
+        #expect(model.delete(in: graph.context))
         #expect(try graph.context.fetchCount(FetchDescriptor<Invoice>()) == 1)
-        #expect(try graph.context.fetchCount(FetchDescriptor<WorkItem>()) == 2)
+        #expect(try graph.context.fetchCount(FetchDescriptor<WorkItem>()) == 0)
+        #expect(invoice.invoiceVisits.first?.lineItems.count == 2)
+        #expect(invoice.invoiceVisits.first?.lineItems.allSatisfy { $0.sourceWorkItem == nil } == true)
+        try DomainGraphValidator.validateAll(in: graph.context)
     }
 
     @Test
@@ -43,8 +46,11 @@ struct RecordUsageSnapshotTests {
         #expect(model.history.isEmpty)
         #expect(model.inProgressVisits.map(\.id) == [graph.visit.persistentModelID])
         #expect(model.inProgressVisits.first?.serviceNames == ["Trim"])
-        #expect(!model.delete(in: graph.context))
-        #expect(model.inProgressVisits.count == 1)
+        let horseID = horse.persistentModelID
+        #expect(model.delete(in: graph.context))
+        #expect(try graph.context.existingModel(Horse.self, for: horseID) == nil)
+        #expect(graph.visit.visitHorses.count == 1)
+        try DomainGraphValidator.validateAll(in: graph.context)
     }
 
     @Test

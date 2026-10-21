@@ -338,11 +338,9 @@ final class TodayModel {
                 sortBy: [SortDescriptor(\.name, comparator: .localizedStandard)]
             )
         )
-        return try clients.compactMap { client in
-            guard let firstChoice = try InvoiceEligibilityRules.choices(
-                for: client.persistentModelID,
-                in: context
-            ).first else {
+        let choices = try InvoiceEligibilityRules.firstChoicesByClient(in: context)
+        return clients.compactMap { client in
+            guard let firstChoice = choices[client.persistentModelID] else {
                 return nil
             }
             return TodayInvoiceCandidate(

@@ -7,7 +7,6 @@ struct TodayView: View {
     @Environment(OnboardingExperienceModel.self) private var onboarding
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
-    @Environment(\.backupSync) private var backupSync
     @Environment(\.appClock) private var appClock
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -76,10 +75,13 @@ struct TodayView: View {
             .task(id: scheduledStartDates) {
                 await updateScheduleClock(at: scheduledStartDates)
             }
-            .onChange(of: backupSync?.runtime?.recordsVersion) { _, _ in reload() }
-            .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)) { notification in
-                guard let savedContext = notification.object as? ModelContext,
-                      savedContext.container === context.container else { return }
+            .onReceive(
+                ModelSaveChanges.publisher(in: context.container, entities: [
+                    "BusinessProfile", "Client", "Barn", "Horse", "Service",
+                    "Appointment", "AppointmentHorse", "Visit", "VisitHorse", "WorkItem",
+                    "Invoice", "InvoiceVisit", "InvoiceLineItem", "Payment"
+                ])
+            ) {
                 reload()
             }
             .onChange(of: scenePhase) { _, phase in

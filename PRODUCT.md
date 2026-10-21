@@ -93,7 +93,8 @@ one continuous field workflow rather than separate generic business modules.
 - Apple remains the subscription payment processor. RevenueCat projects the
   `pro` entitlement, localized monthly/yearly Offering, purchase, and restore
   results behind FarrierFlow's application-owned subscription service. Users
-  remain anonymous to RevenueCat; FarrierFlow has no customer account.
+  remain anonymous to RevenueCat; optional Apple sign-in for cloud protection
+  is separate from subscription identity.
 - Without a current entitlement, existing local records remain permanently
   readable. The owner may navigate all history, view photographs, and generate,
   open, print, or share a PDF from an existing Invoice snapshot, but cannot
@@ -108,10 +109,12 @@ one continuous field workflow rather than separate generic business modules.
   the current service-location record changes.
 - Core business records are local-first and must remain usable without a
   network connection. Standard operating-system device backup is permitted;
-  FarrierFlow provides no app-managed backup, synchronization, accounts, or
-  multi-device data behavior. RevenueCat and Apple's StoreKit services require
-  network access to refresh subscription products and receipts, but FarrierFlow
-  business data does not synchronize between devices.
+  optional, free Apple sign-in protects saved business records and original
+  photographs through Supabase and supports restoration and synchronization
+  between the owner's iPhones. Sign-out and cloud-account deletion preserve
+  local business records. RevenueCat and Apple's StoreKit services require
+  network access to refresh subscription products and receipts. Hosted and
+  real-device release acceptance remain separate from local implementation.
 - Invoices have Unpaid or Paid status. A Paid invoice has exactly one manually
   recorded Payment matching its full total and currency; returning it to
   Unpaid removes that evidence. Cash, bank transfer, card, cheque, and Other

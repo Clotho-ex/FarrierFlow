@@ -14,11 +14,12 @@ enum PhotographReconciler {
         category: "PhotographReconciliation"
     )
 
+    @discardableResult
     static func reconcile(
         in container: ModelContainer,
         fileStore: PhotographFileStore,
         protectedDataIsAvailable: Bool
-    ) throws {
+    ) throws -> Set<UUID> {
         guard protectedDataIsAvailable else {
             throw PhotographLibraryError.protectedDataUnavailable
         }
@@ -45,6 +46,7 @@ enum PhotographReconciler {
                 try fileStore.removeManagedFile(at: url)
             }
         }
+        return metadataIDs
     }
 
     static func plan(

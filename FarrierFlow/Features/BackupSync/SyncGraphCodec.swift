@@ -279,18 +279,24 @@ enum SyncGraphCodec {
                 }
             }
         }
-        for old in existing where old.kind == .invoice && archive?.invoiceIDs.contains(old.id) != true {
-            for next in records where next.kind == .invoice && next.id != old.id {
-                guard next.fields["number"] != old.fields["number"] else {
-                    throw SyncGraphError.invoiceNumberCollision
-                }
+        var invoiceIDsByNumber: [Int64: Set<UUID>] = [:]
+        for next in records where next.kind == .invoice {
+            if case .integer(let number) = next.fields["number"] {
+                invoiceIDsByNumber[number, default: []].insert(next.id)
+            }
+        }
+        let archivedInvoiceIDs = Set(archive?.invoiceIDs ?? [])
+        for old in existing where old.kind == .invoice && !archivedInvoiceIDs.contains(old.id) {
+            if case .integer(let number) = old.fields["number"],
+               let ids = invoiceIDsByNumber[number], ids.contains(where: { $0 != old.id }) {
+                throw SyncGraphError.invoiceNumberCollision
             }
         }
         let validationStore = try ModelContainerFactory.inMemoryTest()
         try populate(records, in: validationStore.mainContext)
         try DomainGraphValidator.validateAll(in: validationStore.mainContext)
         do {
-            try populate(records, in: context)
+            try populate(records, in: context, changedRecords: records.filter { existingByID[$0.id] != $0 })
             try DomainGraphValidator.validateAll(in: context)
             if let journal {
                 try SyncJournalStore.write(journal, in: context)
@@ -302,7 +308,10 @@ enum SyncGraphCodec {
         }
     }
 
-    private static func populate(_ records: [SyncRecord], in context: ModelContext) throws {
+    private static func populate(
+        _ records: [SyncRecord], in context: ModelContext, changedRecords: [SyncRecord]? = nil
+    ) throws {
+        let updates = changedRecords ?? records
         let incoming = try SyncJournal.index(records)
         var businessProfiles = try models(BusinessProfile.self, in: context)
         var clients = try models(Client.self, in: context)
@@ -320,13 +329,14 @@ enum SyncGraphCodec {
         var invoiceLineItems = try models(InvoiceLineItem.self, in: context)
         var payments = try models(Payment.self, in: context)
         // Detach retained financial snapshots before deleting their live sources.
-        for (id, model) in invoices where incoming[id]?.fields["client"] == .null {
+        for (id, model) in invoices where model.client != nil && incoming[id]?.fields["client"] == .null {
             model.detachClient()
         }
-        for (id, model) in invoiceVisits where incoming[id]?.fields["sourceVisit"] == .null {
+        for (id, model) in invoiceVisits where model.sourceVisit != nil && incoming[id]?.fields["sourceVisit"] == .null {
             model.detachSourceVisit()
         }
-        for (id, model) in invoiceLineItems where incoming[id]?.fields["sourceWorkItem"] == .null || incoming[id] == nil {
+        for (id, model) in invoiceLineItems where model.sourceWorkItem != nil &&
+            (incoming[id]?.fields["sourceWorkItem"] == .null || incoming[id] == nil) {
             model.detachSourceWorkItem()
         }
         for (id, model) in workItems where incoming[id]?.fields["billingHoldID"] == .null {
@@ -399,7 +409,7 @@ enum SyncGraphCodec {
             context.delete(model)
             businessProfiles.removeValue(forKey: id)
         }
-        for record in records where record.kind == .businessProfile {
+        for record in updates where record.kind == .businessProfile {
             let reader = try SyncRecordReader(record, keys: [
                 "name",
                 "phone",
@@ -440,7 +450,7 @@ enum SyncGraphCodec {
             model.nextInvoiceNumber = try reader.int64("nextInvoiceNumber")
             model.currencyCode = try reader.string("currencyCode")
         }
-        for record in records where record.kind == .client {
+        for record in updates where record.kind == .client {
             let reader = try SyncRecordReader(record, keys: [
                 "name",
                 "phone",
@@ -466,7 +476,7 @@ enum SyncGraphCodec {
             model.email = try reader.optionalString("email")
             model.notes = try reader.optionalString("notes")
         }
-        for record in records where record.kind == .barn {
+        for record in updates where record.kind == .barn {
             let reader = try SyncRecordReader(record, keys: [
                 "name",
                 "address",
@@ -489,7 +499,7 @@ enum SyncGraphCodec {
             model.address = try reader.optionalString("address")
             model.contactNotes = try reader.optionalString("contactNotes")
         }
-        for record in records where record.kind == .service {
+        for record in updates where record.kind == .service {
             let reader = try SyncRecordReader(record, keys: [
                 "name",
                 "defaultAmountMinorUnits",
@@ -515,7 +525,7 @@ enum SyncGraphCodec {
             model.currencyCode = try reader.string("currencyCode")
             model.isArchived = try reader.bool("isArchived")
         }
-        for record in records where record.kind == .horse {
+        for record in updates where record.kind == .horse {
             let reader = try SyncRecordReader(record, keys: [
                 "name",
                 "safetyNotes",
@@ -547,7 +557,7 @@ enum SyncGraphCodec {
             model.currentBarn = try reader.model("currentBarn", from: barns)
             model.defaultService = try reader.optionalModel("defaultService", from: services)
         }
-        for record in records where record.kind == .appointment {
+        for record in updates where record.kind == .appointment {
             let reader = try SyncRecordReader(record, keys: [
                 "startDate",
                 "notes",
@@ -573,7 +583,7 @@ enum SyncGraphCodec {
             model.expectedDurationMinutes = try reader.optionalInt("expectedDurationMinutes")
             model.barn = try reader.model("barn", from: barns)
         }
-        for record in records where record.kind == .appointmentHorse {
+        for record in updates where record.kind == .appointmentHorse {
             let reader = try SyncRecordReader(record, keys: [
                 "appointment",
                 "horse",
@@ -595,7 +605,7 @@ enum SyncGraphCodec {
             model.plannedService = record.fields["plannedService"] == nil
                 ? nil : try reader.optionalModel("plannedService", from: services)
         }
-        for record in records where record.kind == .visit {
+        for record in updates where record.kind == .visit {
             let reader = try SyncRecordReader(record, keys: [
                 "startedAt",
                 "completedAt",
@@ -627,7 +637,7 @@ enum SyncGraphCodec {
             model.appointment = try reader.model("appointment", from: appointments)
             model.barn = try reader.model("barn", from: barns)
         }
-        for record in records where record.kind == .visitHorse {
+        for record in updates where record.kind == .visitHorse {
             let reader = try SyncRecordReader(record, keys: [
                 "outcomeRawValue",
                 "workNotes",
@@ -653,7 +663,7 @@ enum SyncGraphCodec {
             model.visit = try reader.model("visit", from: visits)
             model.horse = try reader.model("horse", from: horses)
         }
-        for record in records where record.kind == .photograph {
+        for record in updates where record.kind == .photograph {
             let reader = try SyncRecordReader(record, keys: [
                 "createdAt",
                 "pixelWidth",
@@ -677,7 +687,7 @@ enum SyncGraphCodec {
                 photographs[record.id] = model
             }
         }
-        for record in records where record.kind == .workItem {
+        for record in updates where record.kind == .workItem {
             let reader = try SyncRecordReader(record, keys: [
                 "serviceNameSnapshot",
                 "amountMinorUnits",
@@ -709,7 +719,7 @@ enum SyncGraphCodec {
                 try model.applyBillingHold(holdID)
             }
         }
-        for record in records where record.kind == .invoice {
+        for record in updates where record.kind == .invoice {
             let reader = try SyncRecordReader(record, keys: [
                 "number",
                 "invoiceDate",
@@ -750,7 +760,7 @@ enum SyncGraphCodec {
                 invoices[record.id] = model
             }
         }
-        for record in records where record.kind == .invoiceVisit {
+        for record in updates where record.kind == .invoiceVisit {
             let reader = try SyncRecordReader(record, keys: [
                 "visitDateSnapshot",
                 "serviceLocationNameSnapshot",
@@ -774,7 +784,7 @@ enum SyncGraphCodec {
                 invoiceVisits[record.id] = model
             }
         }
-        for record in records where record.kind == .invoiceLineItem {
+        for record in updates where record.kind == .invoiceLineItem {
             let reader = try SyncRecordReader(record, keys: [
                 "horseNameSnapshot",
                 "serviceNameSnapshot",
@@ -800,7 +810,7 @@ enum SyncGraphCodec {
                 invoiceLineItems[record.id] = model
             }
         }
-        for record in records where record.kind == .payment {
+        for record in updates where record.kind == .payment {
             let reader = try SyncRecordReader(record, keys: [
                 "amountMinorUnits",
                 "currencyCode",

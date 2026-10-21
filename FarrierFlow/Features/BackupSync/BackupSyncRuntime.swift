@@ -147,7 +147,8 @@ final class BackupSyncRuntime {
         }
     }
 
-    func refreshStatus() throws {
+    @discardableResult
+    func refreshStatus() throws -> Bool {
         let graph = try SyncGraphCodec.capture(in: ModelContext(container))
         let journal = try store.journal()
         workspaceID = journal?.workspaceID
@@ -155,10 +156,12 @@ final class BackupSyncRuntime {
         invoicingGeneration = journal?.invoicingGeneration ?? 0
         status = try SyncProtectionStatus.make(current: graph, journal: journal)
         if state == .upToDate, status?.isActiveDataProtected != true { state = .pending }
-        if graph != lastGraph {
+        let changed = graph != lastGraph
+        if changed {
             lastGraph = graph
             recordsVersion = UUID()
         }
+        return changed
     }
 
     /// Filter synchronously at publication. SwiftUI may buffer a notification
@@ -172,25 +175,16 @@ final class BackupSyncRuntime {
 
     func didSave(_ notification: Notification) {
         guard acceptsSaveNotification(notification) else { return }
-        let keys: [ModelContext.NotificationKey] = [.insertedIdentifiers, .updatedIdentifiers, .deletedIdentifiers]
-        let identifiers = keys.flatMap { key -> [PersistentIdentifier] in
-            let value = notification.userInfo?[key.rawValue] ?? notification.userInfo?[key]
-            if let array = value as? [PersistentIdentifier] { return array }
-            if let set = value as? Set<PersistentIdentifier> { return Array(set) }
-            return []
-        }
+        let identifiers = ModelSaveChanges.identifiers(in: notification)
         // Journal checkpoints are saves too. They must not create an endless
         // upload/checkpoint/upload cycle. Older runtimes may omit identifiers.
         if !identifiers.isEmpty {
             guard identifiers.contains(where: { $0.entityName != "SyncState" }) else { return }
-        } else {
-            do {
-                guard try SyncGraphCodec.capture(in: ModelContext(container)) != lastGraph else { return }
-            } catch { state = .failed; return }
         }
-        do { try refreshStatus() }
-        catch { state = .failed; return }
-        requestSync()
+        do {
+            let changed = try refreshStatus()
+            if !identifiers.isEmpty || changed { requestSync() }
+        } catch { state = .failed }
     }
 
     private func run(generation: UUID, id: UUID) async {

@@ -7,6 +7,26 @@ import Testing
 @MainActor
 struct InvoiceEligibilityRulesTests {
     @Test
+    func oneHistoryPassPreservesEachClientsOldestEligibleWork() throws {
+        let graph = try makeEligibilityGraph()
+        let choices = try InvoiceEligibilityRules.firstChoicesByClient(in: graph.context)
+        #expect(choices.count == 2)
+        #expect(choices[graph.alexID]?.id == graph.earlyVisitID)
+        #expect(choices[graph.alexID]?.subtotalMinorUnits == 4_000)
+        #expect(choices[graph.blairID]?.id == graph.mixedVisitID)
+        #expect(choices[graph.blairID]?.subtotalMinorUnits == 7_000)
+        let work = try graph.context.fetch(FetchDescriptor<WorkItem>()).first {
+            $0.visitHorse?.visit?.persistentModelID == graph.earlyVisitID
+        }
+        try #require(work).applyBillingHold(UUID())
+        try DomainGraphValidator.save(graph.context)
+        let afterHold = try InvoiceEligibilityRules.firstChoicesByClient(in: graph.context)
+        #expect(afterHold[graph.alexID]?.id == graph.mixedVisitID)
+        #expect(afterHold[graph.alexID]?.subtotalMinorUnits == 20_000)
+        #expect(afterHold[graph.blairID]?.subtotalMinorUnits == 7_000)
+    }
+
+    @Test
     func choicesIncludeOnlyCompletedUninvoicedWorkOwnedByTheReceivingClient() throws {
         let graph = try makeEligibilityGraph()
 
