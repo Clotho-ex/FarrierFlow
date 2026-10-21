@@ -736,6 +736,7 @@ final class OwnerSetupUITests: XCTestCase {
         focusAndType(clientName, in: clientNameField, app: app)
         app.buttons["Save"].tap()
 
+        app.tabBars.buttons["Schedule"].tap()
         let schedule = app.buttons["Schedule Appointment"].firstMatch
         XCTAssertTrue(schedule.waitForExistence(timeout: 3))
         schedule.tap()
@@ -789,9 +790,11 @@ final class OwnerSetupUITests: XCTestCase {
         ]
         guard tapUntilDestinationAppears(
             scheduledStop,
-            destination: detailAddress,
+            destination: app.buttons["today-stop-appointment"].firstMatch,
             in: app
         ) else { return }
+        app.buttons["today-stop-appointment"].firstMatch.tap()
+        XCTAssertTrue(detailAddress.waitForExistence(timeout: 3))
         XCTAssertTrue(accessibilityText(of: detailAddress).contains(locationAddress))
         let detailArrivalNotes = app.descendants(matching: .any)[
             "appointment-detail-arrival-notes"

@@ -73,7 +73,9 @@ one continuous field workflow rather than separate generic business modules.
   existing RevenueCat Offering. The briefing communicates the connected Appointment to Payment workflow
   at a glance without adding a tutorial step. Completion and the current step
   are versioned outside the business graph so interruption can resume safely.
-  Existing valid workspaces bypass the sequence.
+  Existing valid workspaces bypass the sequence. Business setup offers optional
+  service names and prices, saved in the shared service catalog with the business
+  currency and available later from My Business.
 - Contact information, operating defaults, Services, and Service Locations stay
   available in their contextual features; new Appointment and Invoice drafts
   reuse saved defaults without hiding record-specific truth.

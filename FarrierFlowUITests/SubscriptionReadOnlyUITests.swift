@@ -129,7 +129,7 @@ final class SubscriptionReadOnlyUITests: XCTestCase {
     @MainActor
     private func openInvoices(in app: XCUIApplication) {
         openClients(in: app)
-        app.buttons["More"].tap()
+        app.openBusinessRoot()
         let invoices = app.buttons["Invoices"]
         XCTAssertTrue(invoices.waitForExistence(timeout: 3))
         invoices.tap()

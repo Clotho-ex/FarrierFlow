@@ -13,6 +13,7 @@ struct VisitDetailView: View {
     @State private var model: VisitDetailModel
     @State private var nextAppointmentModel: NextAppointmentAssistantModel
     @State private var showsEditor = false
+    @State private var showsDeleteConfirmation = false
     @State private var showsNextAppointmentAssistant = false
     private let showsDismissAction: Bool
 
@@ -63,6 +64,14 @@ struct VisitDetailView: View {
         .navigationTitle("Visit")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            if subscription.allowsMutations, model.loadState == .loaded {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Delete Visit", systemImage: "trash", role: .destructive) {
+                        showsDeleteConfirmation = true
+                    }
+                    .accessibilityIdentifier("visit-delete-action")
+                }
+            }
             if showsDismissAction {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") {
@@ -71,8 +80,7 @@ struct VisitDetailView: View {
                     .accessibilityIdentifier("visit-detail-done")
                 }
             }
-            if subscription.allowsMutations, model.loadState == .loaded,
-               (model.editorMode == .inProgress || !model.isCorrectionLocked) {
+            if subscription.allowsMutations, model.loadState == .loaded {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(model.editorMode == .inProgress ? "Resume Visit" : "Edit") {
                         showsEditor = true
@@ -85,6 +93,11 @@ struct VisitDetailView: View {
                 }
             }
         }
+        .recordDeletionSheet(
+            .visit(model.visitID), isPresented: $showsDeleteConfirmation,
+            title: "Delete Visit?", confirmationTitle: "Delete Visit",
+            accessibilityPrefix: "visit-delete", alert: $model.alert
+        ) { dismiss() }
         .onAppear {
             loadVisitDetail()
         }
@@ -144,7 +157,7 @@ struct VisitDetailView: View {
                     .listRowBackground(ColorTokens.surface)
                     if detail.isCorrectionLocked {
                         Section("Invoiced Work") {
-                            Text("This visit has invoiced work and can no longer be corrected.")
+                            Text("This visit has invoiced work. Corrections do not change saved invoices.")
                                 .foregroundStyle(ColorTokens.textSecondary)
                         }
                         .listRowBackground(ColorTokens.surface)
@@ -505,7 +518,7 @@ private struct VisitAccessibilityOverview: View {
 
     private var correctionLockMessage: String {
         String(
-            localized: "This visit has invoiced work and can no longer be corrected.",
+            localized: "This visit has invoiced work. Corrections do not change saved invoices.",
             locale: locale
         )
     }

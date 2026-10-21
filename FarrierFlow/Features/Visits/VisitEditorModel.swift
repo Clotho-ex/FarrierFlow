@@ -86,6 +86,11 @@ final class VisitEditorModel {
         return VisitRules.completionViolation(in: draft)
     }
 
+    var correctionBlocker: VisitDraftViolation? {
+        guard mode == .correction, let draft else { return nil }
+        return VisitRules.correctionViolation(in: draft)
+    }
+
     var canSaveCorrection: Bool {
         guard mode == .correction, loadState == .loaded, let draft else { return false }
         return VisitRules.correctionViolation(in: draft) == nil

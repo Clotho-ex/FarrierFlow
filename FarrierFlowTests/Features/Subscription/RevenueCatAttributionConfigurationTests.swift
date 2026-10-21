@@ -51,7 +51,7 @@ struct RevenueCatAttributionConfigurationTests {
     }
 
     @Test
-    func validConfigurationConstructsRevenueCatClientOnce() {
+    func validConfigurationDefersClientConstructionUntilFirstUseAndReusesIt() async throws {
         var receivedKeys: [String] = []
 
         let client = RevenueCatSubscriptionClientComposition.make(
@@ -62,7 +62,12 @@ struct RevenueCatAttributionConfigurationTests {
             }
         )
 
-        #expect(client is StaticSubscriptionClient)
+        #expect(receivedKeys.isEmpty)
+        #expect(try await client.customerInfo().hasActiveProEntitlement)
+        _ = await client.customerInfoUpdates()
+        #expect(try await client.offerings().count == 2)
+        #expect(try await client.restorePurchases().hasActiveProEntitlement)
+        #expect(try await client.purchase(planID: "annual").customer.hasActiveProEntitlement)
         #expect(receivedKeys == ["appl_test_public_sdk_key"])
     }
 

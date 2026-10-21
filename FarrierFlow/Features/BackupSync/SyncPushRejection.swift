@@ -1,7 +1,7 @@
 import Foundation
 
 nonisolated enum SyncProtocolVersion: Int, Codable, Sendable {
-    case legacy = 1, holds = 2
+    case legacy = 1, holds = 2, deletion = 3
 }
 
 nonisolated enum SyncPushRejectionReason: String, Codable, Sendable {

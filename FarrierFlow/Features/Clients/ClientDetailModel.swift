@@ -5,16 +5,30 @@ import SwiftData
 @MainActor
 @Observable
 final class ClientDetailModel {
-    private(set) var client: Client?
+    private(set) var client: ClientDetailSnapshot?
     private(set) var hasInvoiceableWork = false
     private(set) var invoices: [InvoiceSummary] = []
     var alert: FeatureAlert?
 
     func load(id: PersistentIdentifier, in context: ModelContext) {
-        client = context.model(for: id) as? Client
-        guard client != nil else {
+        let record: Client
+        do {
+            guard let existing = try context.existingModel(Client.self, for: id) else {
+                client = nil
+                hasInvoiceableWork = false
+                invoices = []
+                return
+            }
+            record = existing
+            client = ClientDetailSnapshot(client: record)
+        } catch {
+            client = nil
             hasInvoiceableWork = false
             invoices = []
+            alert = FeatureAlert(
+                title: "Client Unavailable",
+                message: "The client couldn’t be loaded. Try again."
+            )
             return
         }
         do {
@@ -22,14 +36,14 @@ final class ClientDetailModel {
                 for: id,
                 in: context
             ).isEmpty == false
-            invoices = try client?.invoices.map {
+            invoices = try record.invoices.map {
                 try InvoiceProjection.summary(from: $0, locale: .current)
             }.sorted {
                 if $0.invoiceDate != $1.invoiceDate {
                     return $0.invoiceDate > $1.invoiceDate
                 }
                 return $0.number.localizedStandardCompare($1.number) == .orderedDescending
-            } ?? []
+            }
             alert = nil
         } catch {
             hasInvoiceableWork = false
@@ -41,23 +55,41 @@ final class ClientDetailModel {
         }
     }
 
-    func delete(in context: ModelContext) -> Bool {
-        guard let client else { return false }
-        self.client = nil
+    func delete(
+        in context: ModelContext,
+        deleting: (Client, ModelContext) throws -> Void = { record, context in
+            try RecordDeletionRules.delete(record, in: context)
+        }
+    ) -> Bool {
+        guard let displayed = client else {
+            alert = unavailableAlert
+            return false
+        }
         do {
-            try RecordDeletionRules.delete(client, in: context)
+            guard let record = try context.existingModel(Client.self, for: displayed.id) else {
+                alert = unavailableAlert
+                return false
+            }
+            try deleting(record, context)
+            client = nil
+            alert = nil
             return true
         } catch let block as RecordDeletionBlock {
-            self.client = client
             alert = block.alert
             return false
         } catch {
-            self.client = client
             alert = FeatureAlert(
                 title: "Couldn’t Delete Client",
                 message: "The client wasn’t deleted. Try again."
             )
             return false
         }
+    }
+
+    private var unavailableAlert: FeatureAlert {
+        FeatureAlert(
+            title: "Client Unavailable",
+            message: "This client is no longer available."
+        )
     }
 }

@@ -39,7 +39,9 @@ final class BackupSyncUITests: XCTestCase {
         XCTAssertFalse(app.tabBars.element.exists, "The settings detail should hide the app tab bar.")
         let status = app.descendants(matching: .any)["backup-sync-status"]
         XCTAssertTrue(status.exists)
-        XCTAssertTrue(status.label.contains("Everything is backed up"))
+        // This connected-account fixture has no sync runtime or completed backup.
+        XCTAssertTrue(status.label.contains("Waiting to Sync"), status.label)
+        XCTAssertTrue(status.label.contains("No successful sync yet"), status.label)
         let retry = app.buttons["backup-sync-retry"]
         for _ in 0..<8 where !retry.isHittable { app.swipeUp() }
         XCTAssertTrue(retry.isHittable)
@@ -71,8 +73,8 @@ final class BackupSyncUITests: XCTestCase {
         let app = openCloudFixture(state: "connected", dark: true, accessibility: true)
         defer { app.terminate() }
         app.navigationBars.buttons.element(boundBy: 0).tap()
-        app.buttons["More"].tap()
-        app.buttons["My Business"].tap()
+        app.openBusinessRoot()
+        app.buttons["Business Profile"].tap()
         XCTAssertTrue(app.navigationBars["My Business"].waitForExistence(timeout: 3))
         let note = app.textFields["business-profile-default-invoice-note-field"]
         let multiline = app.textViews["business-profile-default-invoice-note-field"]
@@ -250,8 +252,8 @@ final class BackupSyncUITests: XCTestCase {
 
     @MainActor
     private func openInvoiceListHistory(_ app: XCUIApplication) {
-        XCTAssertTrue(app.buttons["More"].waitForExistence(timeout: 3))
-        app.buttons["More"].press(forDuration: 0.15)
+        XCTAssertTrue(app.tabBars.buttons["Business"].waitForExistence(timeout: 3))
+        app.openBusinessRoot()
         XCTAssertTrue(app.buttons["Invoices"].waitForExistence(timeout: 3))
         app.buttons["Invoices"].press(forDuration: 0.15)
         XCTAssertTrue(app.navigationBars["Invoices"].waitForExistence(timeout: 3))
@@ -317,8 +319,8 @@ final class BackupSyncUITests: XCTestCase {
         app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
         selectClients(app)
-        XCTAssertTrue(app.buttons["More"].waitForExistence(timeout: 3))
-        app.buttons["More"].press(forDuration: 0.15)
+        XCTAssertTrue(app.tabBars.buttons["Business"].waitForExistence(timeout: 3))
+        app.openBusinessRoot()
         XCTAssertTrue(app.buttons["backup-sync-open"].waitForExistence(timeout: 3))
         app.buttons["backup-sync-open"].press(forDuration: 0.15)
         XCTAssertTrue(app.navigationBars["Backup & Sync"].waitForExistence(timeout: 3))
@@ -413,7 +415,7 @@ final class BackupSyncUITests: XCTestCase {
         defer { app.terminate() }
         XCTAssertTrue(app.tabBars.buttons["Clients"].waitForExistence(timeout: 5))
         app.tabBars.buttons["Clients"].tap()
-        app.buttons["More"].tap()
+        app.openBusinessRoot()
         let backup = app.buttons["backup-sync-open"]
         XCTAssertTrue(backup.waitForExistence(timeout: 3))
         backup.tap()

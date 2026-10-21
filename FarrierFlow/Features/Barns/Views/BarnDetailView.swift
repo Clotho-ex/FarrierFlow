@@ -54,11 +54,11 @@ struct BarnDetailView: View {
                                 barn.horses.sorted {
                                     $0.name.localizedStandardCompare($1.name) == .orderedAscending
                                 },
-                                id: \.persistentModelID
+                                id: \.id
                             ) { horse in
                                 RecordNavigationLink(
                                     value: ClientRoute.horse(
-                                        horse.persistentModelID
+                                        horse.id
                                     )
                                 ) {
                                     HorseRow(
@@ -110,7 +110,7 @@ struct BarnDetailView: View {
                     }
                 }
                 .sheet(isPresented: $showsEditor, onDismiss: reload) {
-                    BarnEditorView(barn: barn)
+                    BarnEditorDestination(barnID: barn.id)
                 }
                 .sheet(isPresented: $showsHorseEditor, onDismiss: reload) {
                     HorseEditorView(preselectedBarnID: barnID)
@@ -118,16 +118,11 @@ struct BarnDetailView: View {
                 .sheet(isPresented: $showsExistingHorsePicker, onDismiss: reload) {
                     ExistingHorsePickerView(destinationBarnID: barnID)
                 }
-                .confirmationDialog(
-                    "Delete Service Location?",
-                    isPresented: $showsDeleteConfirmation,
-                    titleVisibility: .visible
-                ) {
-                    Button("Delete Service Location", role: .destructive) {
-                        guard subscription.allowsMutations else { return }
-                        if model.delete(in: context) { dismiss() }
-                    }
-                }
+                .recordDeletionSheet(
+                    .barn(barnID), isPresented: $showsDeleteConfirmation,
+                    title: "Delete Service Location?", confirmationTitle: "Delete Service Location",
+                    accessibilityPrefix: "barn-delete", alert: $model.alert
+                ) { dismiss() }
             } else {
                 ContentUnavailableView(
                     "Service Location Unavailable",
@@ -143,7 +138,7 @@ struct BarnDetailView: View {
     }
 
     private func reload() {
-        model.load(id: barnID, in: context)
+        model.load(id: barnID, in: ModelContext(context.container))
     }
 
     @ViewBuilder
@@ -170,6 +165,23 @@ struct BarnDetailView: View {
             }
             .font(.subheadline.weight(.semibold))
             .frame(minHeight: SpacingTokens.minimumTouchTarget)
+        }
+    }
+}
+
+private struct BarnEditorDestination: View {
+    @Environment(\.modelContext) private var context
+
+    let barnID: PersistentIdentifier
+
+    var body: some View {
+        if let record = try? context.existingModel(Barn.self, for: barnID) {
+            BarnEditorView(barn: record)
+        } else {
+            ContentUnavailableView(
+                "Service Location Unavailable",
+                systemImage: "exclamationmark.circle"
+            )
         }
     }
 }

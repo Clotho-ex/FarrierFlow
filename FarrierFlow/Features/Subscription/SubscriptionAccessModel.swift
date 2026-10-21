@@ -7,6 +7,7 @@ final class SubscriptionAccessModel {
     private let client: any SubscriptionClient
     private nonisolated let observationTask = Mutex<Task<Void, Never>?>(nil)
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
+    @ObservationIgnored private var accessRefreshTask: Task<Bool, Never>?
 
     private(set) var access: SubscriptionAccess = .loading
     private(set) var plans: [SubscriptionPlan] = []
@@ -28,7 +29,7 @@ final class SubscriptionAccessModel {
         let client = client
         let task = Task { [weak self, client] in
             let updates = await client.customerInfoUpdates()
-            await self?.refresh()
+            _ = await self?.refreshAccess()
             for await snapshot in updates {
                 guard !Task.isCancelled else { return }
                 self?.apply(snapshot)
@@ -52,19 +53,34 @@ final class SubscriptionAccessModel {
     }
 
     private func performRefresh() async {
-        let verificationFailed: Bool
-        do {
-            apply(try await client.customerInfo())
-            errorMessage = nil
-            verificationFailed = false
-        } catch {
-            if access == .loading { access = .unavailable }
-            errorMessage = "FarrierFlow couldn’t verify your subscription. Try again."
-            verificationFailed = true
-        }
+        let verificationFailed = await refreshAccess()
         await reloadOfferings()
         if verificationFailed {
             errorMessage = "FarrierFlow couldn’t verify your subscription. Try again."
+        }
+    }
+
+    private func refreshAccess() async -> Bool {
+        if let accessRefreshTask { return await accessRefreshTask.value }
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return false }
+            return await self.performAccessRefresh()
+        }
+        accessRefreshTask = task
+        let failed = await task.value
+        accessRefreshTask = nil
+        return failed
+    }
+
+    private func performAccessRefresh() async -> Bool {
+        do {
+            apply(try await client.customerInfo())
+            errorMessage = nil
+            return false
+        } catch {
+            if access == .loading { access = .unavailable }
+            errorMessage = "FarrierFlow couldn’t verify your subscription. Try again."
+            return true
         }
     }
 

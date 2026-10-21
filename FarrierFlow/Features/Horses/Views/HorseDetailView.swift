@@ -3,6 +3,7 @@ import SwiftUI
 
 struct HorseDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
@@ -64,6 +65,30 @@ struct HorseDetailView: View {
                         }
                         .listRowBackground(ColorTokens.surface)
                     }
+                    if !model.usage.appointments.isEmpty {
+                        Section {
+                            ForEach(model.usage.appointments) { appointment in
+                                LinkedAppointmentRow(appointment: appointment)
+                            }
+                        } header: {
+                            Text("Appointments")
+                        } footer: {
+                            Text("Open an appointment to review this horse’s scheduled work.")
+                        }
+                        .listRowBackground(ColorTokens.surface)
+                    }
+                    if !model.inProgressVisits.isEmpty {
+                        Section {
+                            ForEach(model.inProgressVisits) { visit in
+                                LinkedVisitRow(visit: visit)
+                            }
+                        } header: {
+                            Text("In Progress Visits")
+                        } footer: {
+                            Text("These visits also reference this horse, even though they are not yet in completed history.")
+                        }
+                        .listRowBackground(ColorTokens.surface)
+                    }
                     historySection
                 }
                 .farrierFlowScrollBackground()
@@ -81,18 +106,13 @@ struct HorseDetailView: View {
                     }
                 }
                 .sheet(isPresented: $showsEditor, onDismiss: reload) {
-                    HorseEditorView(horse: horse)
+                    HorseEditorDestination(horseID: horse.id)
                 }
-                .confirmationDialog(
-                    "Delete Horse?",
-                    isPresented: $showsDeleteConfirmation,
-                    titleVisibility: .visible
-                ) {
-                    Button("Delete Horse", role: .destructive) {
-                        guard subscription.allowsMutations else { return }
-                        if model.delete(in: context) { dismiss() }
-                    }
-                }
+                .recordDeletionSheet(
+                    .horse(horseID), isPresented: $showsDeleteConfirmation,
+                    title: "Delete Horse?", confirmationTitle: "Delete Horse",
+                    accessibilityPrefix: "horse-delete", alert: $model.alert
+                ) { dismiss() }
             } else {
                 ContentUnavailableView("Horse Unavailable", systemImage: "exclamationmark.circle")
             }
@@ -104,8 +124,10 @@ struct HorseDetailView: View {
         }
     }
 
+
+
     private func reload() {
-        model.load(id: horseID, in: context, locale: locale)
+        model.load(id: horseID, in: ModelContext(context.container), locale: locale)
     }
 
     @ViewBuilder
@@ -181,4 +203,21 @@ private struct HorseHistoryPreview: View {
     HorseHistoryPreview(populated: false)
         .dynamicTypeSize(.accessibility3)
         .preferredColorScheme(.dark)
+}
+
+private struct HorseEditorDestination: View {
+    @Environment(\.modelContext) private var context
+
+    let horseID: PersistentIdentifier
+
+    var body: some View {
+        if let record = try? context.existingModel(Horse.self, for: horseID) {
+            HorseEditorView(horse: record)
+        } else {
+            ContentUnavailableView(
+                "Horse Unavailable",
+                systemImage: "exclamationmark.circle"
+            )
+        }
+    }
 }

@@ -40,6 +40,12 @@ western artifact, veterinary record, or generic SaaS dashboard.
 - Native on iOS 18 and iOS 26, including platform materials and control
   behavior.
 - Quiet at rest; motion and haptics confirm real state changes only.
+- Tab changes use the native selected-tab indicator and light selection haptics.
+  Content stays at full opacity; navigation bars retain system transitions.
+- Today has no generic toolbar creation action. Its centered, scrollable empty
+  state offers one contextual next step: client, horse, appointment, or Schedule.
+  Clear days, first scheduling, and completed stops use distinct messages;
+  completed records and invoice follow-up remain accessible.
 
 Release 1.0 adds a native subscription surface without creating a second visual
 system. FarrierFlow's SwiftUI list projects RevenueCat's current Offering into
@@ -63,10 +69,13 @@ Business Continue, Briefing Continue, and onboarding Subscription Continue use t
 same native prominent control without extra label height, so platform sizing,
 states, and interaction remain consistent.
 
-Business presents its centered hero and identity form as one vertically balanced
+Business presents its centered hero and identity form as one
 composition: ownership prompt, short trust-led reason, focused field, and centered
 invoice/change-later guidance. The form remains the visual center of gravity
-rather than splitting the screen into unrelated empty regions.
+rather than splitting the screen into unrelated empty regions. Optional service names and
+prices follow identity in the same native scrolling setup, using the shared
+service fields and business currency. The pinned Continue stays reachable at
+accessibility sizes; services may also be added later from My Business.
 The same setup includes a native menu picker for the region-derived business
 currency, displaying a localized currency name with its ISO code. My Business
 uses the same control until the first Service or financial record exists, then
@@ -90,6 +99,17 @@ interactions use restrained confirmation and selection feedback. Reduce Motion
 reveals content immediately and suppresses automatic haptics. The system launch
 screen contains only the app mark on a matching adaptive background. There is
 no progress bar, animated splash, carousel, feature grid, or success screen.
+Existing local records appear while subscription verification runs after the
+first content frame; operational editing remains gated until access is verified.
+Business adds a native Support group and a quiet installed-version footer;
+no filler cards or illustrative financial metrics occupy the remaining space.
+Its compact Business Overview is a native grouped section above Operations:
+Outstanding uses real unpaid Invoice totals and opens those Invoices; Completed
+Visits counts this month's completed Visit records and opens their list.
+Use the saved business currency, numeric zero balances, semantic typography,
+and full Dynamic Type wrapping. Position Outstanding and Completed Visits side by
+side in that order, as two equal metric surfaces; stack at accessibility sizes.
+Keep the existing tab layout and native record navigation.
 
 ## Record and Status Alignment
 
@@ -111,6 +131,16 @@ two-column layouts and a leading edge when stacked.
 Use the centralized `ColorTokens` palette: `#BF5700` brand actions, warm cream
 `#F4F0EB` canvases, `#FAF8F5` surfaces, and `#24211E` readable ink. Dark Mode
 uses warm charcoal `#171513` / `#211E1B` / `#2A2622` and `#E06C12` actions.
+Today, Stop Details and Appointment Detail use `recordSurface` for business
+record groups: white in Light Mode, the existing warm `surface` in Dark Mode.
+Grouped settings retain `surface`. The promoted Today appointment uses
+`featuredSurface` (`#FBE6D5` in Light Mode, the existing `#3B2516` in Dark Mode),
+so emphasis comes from the surface rather than repeated orange controls.
+Standalone appointment statuses use the shared neutral/readable
+`RecordStatusPill`; compact record metadata uses plain secondary status text.
+Native list grouping and warm separators define ordinary records without added
+shadows or a custom card geometry. Start Visit keeps its existing treatment.
+
 Green means paid or completed, amber means attention, red means failed or
 destructive, and blue-gray is reserved for neutral system information.
 
@@ -230,6 +260,12 @@ background without introducing nested cards or glass.
 - **Do** use real hoof photographs only in their approved VisitHorse context.
 - **Do** preserve standard `TabView`, `NavigationStack`, `List`, `Form`,
   toolbars, sheets, alerts, and confirmation dialogs.
+- **Do** give Business its own native grouped Operations/Settings list. Today,
+  Schedule, and Clients remain the daily-work tabs; iOS 27 uses the native
+  prominent role to separate Business at the trailing edge. Older systems keep
+  four ordinary tabs. Clients keeps Add Client, while contextual record links
+  remain available throughout the app. At accessibility text sizes, Business
+  uses native text-only row labels so icons do not squeeze long titles.
 - **Do** respect Dynamic Type, VoiceOver, Reduce Motion, Increased Contrast,
   Light Mode, and Dark Mode from the first composition.
 - **Do** show RevenueCat-projected StoreKit pricing and recurring periods in

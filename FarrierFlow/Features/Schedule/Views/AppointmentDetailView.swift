@@ -4,6 +4,7 @@ import SwiftUI
 struct AppointmentDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.modelContext) private var context
     @Environment(\.analyticsClient) private var analyticsClient
     @Environment(SubscriptionAccessModel.self) private var subscription
@@ -11,7 +12,6 @@ struct AppointmentDetailView: View {
     @State private var model = AppointmentDetailModel()
     @State private var showsEditor = false
     @State private var showsDeleteConfirmation = false
-    @State private var deletesAfterConfirmation = false
     @State private var pendingCompletedVisitID: PersistentIdentifier?
     @State private var nextAppointmentVisitID: PersistentIdentifier?
 
@@ -38,6 +38,7 @@ struct AppointmentDetailView: View {
                             status: AppointmentDisplayStatus(visit: detail.visit)
                         )
                     }
+                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
 
@@ -69,7 +70,7 @@ struct AppointmentDetailView: View {
                                 LabeledContent("Notes", value: notes)
                             }
                         }
-                        .listRowBackground(ColorTokens.surface)
+                        .listRowBackground(ColorTokens.recordSurface)
                     }
 
                     Section("Horses") {
@@ -117,7 +118,7 @@ struct AppointmentDetailView: View {
                             }
                         }
                     }
-                    .listRowBackground(ColorTokens.surface)
+                    .listRowBackground(ColorTokens.recordSurface)
                     if detail.visit == nil, subscription.allowsMutations {
                         Section {
                             Button {
@@ -147,10 +148,12 @@ struct AppointmentDetailView: View {
                         .listRowSeparator(.hidden)
                     }
                 }
-                .listSectionSpacing(.custom(SpacingTokens.recordSection))
+                .listSectionSpacing(.custom(SpacingTokens.standard))
+                .contentMargins(.top, 0, for: .scrollContent)
+                .listRowSeparatorTint(ColorTokens.border)
                 .farrierFlowScrollBackground()
                 .navigationTitle("Appointment")
-                .toolbarTitleDisplayMode(.inlineLarge)
+                .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         if let visit = detail.visit {
@@ -200,15 +203,13 @@ struct AppointmentDetailView: View {
                 }
                 .sheet(isPresented: $showsEditor, onDismiss: reload) {
                     AppointmentEditorDestination(appointmentID: appointmentID)
+                        .dynamicTypeSize(dynamicTypeSize)
                 }
-                .sheet(
-                    isPresented: $showsDeleteConfirmation,
-                    onDismiss: handleDeletionSheetDismissal
-                ) {
-                    AppointmentDeletionSheet {
-                        deletesAfterConfirmation = true
-                    }
-                }
+                .recordDeletionSheet(
+                    .appointment(appointmentID), isPresented: $showsDeleteConfirmation,
+                    title: "Delete Appointment?", confirmationTitle: "Delete Appointment",
+                    accessibilityPrefix: "appointment-delete", alert: $model.alert
+                ) { dismiss() }
             } else {
                 ContentUnavailableView(
                     "Appointment Unavailable",
@@ -275,12 +276,7 @@ struct AppointmentDetailView: View {
         onVisitCompleted?()
     }
 
-    private func handleDeletionSheetDismissal() {
-        guard deletesAfterConfirmation else { return }
-        deletesAfterConfirmation = false
-        guard subscription.allowsMutations else { return }
-        if model.delete(in: ModelContext(context.container)) { dismiss() }
-    }
+
 
     private var nextAppointmentIsPresented: Binding<Bool> {
         Binding(
@@ -328,125 +324,50 @@ private struct AppointmentActionLabel: View {
     }
 }
 
-private struct AppointmentDeletionSheet: View {
-    @Environment(\.dismiss) private var dismiss
-
-    let onConfirm: () -> Void
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: SpacingTokens.recordSection) {
-                VStack(spacing: SpacingTokens.related) {
-                    Image(systemName: "trash")
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(ColorTokens.destructive)
-                        .frame(
-                            width: SpacingTokens.hero,
-                            height: SpacingTokens.hero
-                        )
-                        .background(ColorTokens.destructiveTint, in: Circle())
-                        .accessibilityHidden(true)
-
-                    VStack(spacing: SpacingTokens.compact) {
-                        Text("Delete Appointment?")
-                            .font(.title3.weight(.semibold))
-                        Text("This appointment will be removed from your schedule.")
-                            .font(.subheadline)
-                            .foregroundStyle(ColorTokens.textSecondary)
-                            .multilineTextAlignment(.center)
-                    }
-                }
-                .accessibilityElement(children: .combine)
-
-                VStack(spacing: SpacingTokens.related) {
-                    Button(role: .destructive) {
-                        onConfirm()
-                        dismiss()
-                    } label: {
-                        AppointmentActionLabel(
-                            title: "Delete Appointment",
-                            systemImage: "trash"
-                        )
-                    }
-                    .farrierFlowBorderedAction(tint: ColorTokens.destructive)
-                    .accessibilityIdentifier("appointment-delete-confirmation")
-
-                    Button(role: .cancel) { dismiss() } label: {
-                        AppointmentActionLabel(
-                            title: "Cancel",
-                            systemImage: "xmark"
-                        )
-                    }
-                    .farrierFlowBorderedAction()
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, SpacingTokens.section)
-            .frame(maxWidth: .infinity)
-        }
-        .scrollBounceBehavior(.basedOnSize)
-        .farrierFlowScreenBackground()
-        .presentationDetents([.medium])
-        .presentationDragIndicator(.visible)
-        .accessibilityIdentifier("appointment-delete-sheet")
-    }
-}
-
 private struct AppointmentSummaryHeader: View {
     let startDate: Date
     let serviceLocation: String
     let status: AppointmentDisplayStatus
 
     var body: some View {
-        VStack(alignment: .leading, spacing: SpacingTokens.tight) {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(startDate, format: .dateTime.hour().minute())
+                .font(.title.weight(.bold))
+                .monospacedDigit()
+                .accessibilityIdentifier("appointment-summary-time")
+            Text(startDate, format: .dateTime.weekday(.wide).month(.wide).day().year())
+                .font(.subheadline)
+                .foregroundStyle(ColorTokens.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
             ViewThatFits(in: .horizontal) {
-                HStack(alignment: .firstTextBaseline, spacing: SpacingTokens.related) {
-                    dateText
-                    Spacer(minLength: SpacingTokens.compact)
-                    statusBadge
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    statusBadge.fixedSize()
+                    locationText
                 }
-
-                VStack(alignment: .leading, spacing: SpacingTokens.compact) {
-                    dateText
+                VStack(alignment: .leading, spacing: 8) {
                     statusBadge
+                    locationText
                 }
             }
-
-            Text(serviceLocation)
-                .font(.title3)
-                .foregroundStyle(ColorTokens.textSecondary)
         }
         .padding(.vertical, SpacingTokens.tight)
         .accessibilityElement(children: .ignore)
+        .accessibilityIdentifier("appointment-summary")
         .accessibilityLabel(
             "\(startDate.formatted(date: .abbreviated, time: .shortened)), \(serviceLocation)"
         )
         .accessibilityValue(String(localized: status.title))
     }
 
-    private var dateText: some View {
-        Text(
-            startDate,
-            format: .dateTime
-                .weekday(.wide)
-                .month(.abbreviated)
-                .day()
-                .year()
-                .hour()
-                .minute()
-        )
-        .font(.title2.weight(.bold))
-        .monospacedDigit()
-        .fixedSize(horizontal: false, vertical: true)
+    private var locationText: some View {
+        Text(serviceLocation)
+            .font(.headline)
+            .foregroundStyle(ColorTokens.textPrimary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private var statusBadge: some View {
-        Text(status.title)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(status.color)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(status.color.opacity(0.14), in: Capsule())
+        RecordStatusPill(title: status.title, tone: status.tone)
     }
 }
 
@@ -471,11 +392,11 @@ private enum AppointmentDisplayStatus {
         }
     }
 
-    var color: Color {
+    var tone: StatusTone {
         switch self {
-        case .scheduled: ColorTokens.textSecondary
-        case .inProgress: ColorTokens.brandActionText
-        case .completed: ColorTokens.success
+        case .scheduled: .neutral
+        case .inProgress: .active
+        case .completed: .success
         }
     }
 }

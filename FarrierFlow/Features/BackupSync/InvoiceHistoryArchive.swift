@@ -67,14 +67,15 @@ nonisolated struct InvoiceHistoryArchive: Codable, Equatable, Sendable, Identifi
                       case .string(let value) = record.fields["invoiceVisit"],
                       let id = UUID(uuidString: value) else { return false }
                 return groups.contains(id)
-            }.map { record -> UUID in
+            }.compactMap { record -> UUID? in
+                if record.fields["sourceWorkItem"] == .null { return nil }
                 guard case .string(let value) = record.fields["sourceWorkItem"],
                       let id = UUID(uuidString: value), graph[id]?.kind == .workItem else {
                     throw InvoiceHistoryError.invalidArchive
                 }
                 return id
             }
-            guard !groups.isEmpty, !work.isEmpty, Set(work).count == work.count else {
+            guard !groups.isEmpty, Set(work).count == work.count else {
                 throw InvoiceHistoryError.invalidArchive
             }
             result[invoiceID] = work.sorted { $0.uuidString < $1.uuidString }

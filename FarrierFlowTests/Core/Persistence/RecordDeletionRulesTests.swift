@@ -7,21 +7,13 @@ import Testing
 @MainActor
 struct RecordDeletionRulesTests {
     @Test
-    func referencedClientBarnAndHorseAreBlocked() throws {
+    func clientDeletionHandlesHorsesAndAppointments() throws {
         let graph = try makeGraph()
-
-        #expect(throws: RecordDeletionBlock.clientHasHorses) {
-            try RecordDeletionRules.delete(graph.client, in: graph.context)
-        }
-        #expect(throws: RecordDeletionBlock.barnHasHorsesAndAppointments) {
-            try RecordDeletionRules.delete(graph.barn, in: graph.context)
-        }
-        #expect(throws: RecordDeletionBlock.horseHasAppointments) {
-            try RecordDeletionRules.delete(graph.horse, in: graph.context)
-        }
-        #expect(try graph.context.fetchCount(FetchDescriptor<Client>()) == 1)
+        try RecordDeletionRules.delete(graph.client, in: graph.context)
+        #expect(try graph.context.fetchCount(FetchDescriptor<Client>()) == 0)
+        #expect(try graph.context.fetchCount(FetchDescriptor<Horse>()) == 0)
+        #expect(try graph.context.fetchCount(FetchDescriptor<Appointment>()) == 0)
         #expect(try graph.context.fetchCount(FetchDescriptor<Barn>()) == 1)
-        #expect(try graph.context.fetchCount(FetchDescriptor<Horse>()) == 1)
     }
 
     @Test
@@ -69,37 +61,28 @@ struct RecordDeletionRulesTests {
     }
 
     @Test
-    func visitReferencesBlockAppointmentBarnAndHorseDeletion() throws {
+    func barnDeletionHandlesVisitAndHorseDependencies() throws {
         let graph = try makeGraph()
-        let visit = ModelFixtures.makeVisit(appointment: graph.appointment, in: graph.context)
+        _ = ModelFixtures.makeVisit(appointment: graph.appointment, in: graph.context)
         try graph.context.save()
-
-        #expect(throws: RecordDeletionBlock.appointmentHasVisit) {
-            try RecordDeletionRules.delete(graph.appointment, in: graph.context)
-        }
-        #expect(throws: RecordDeletionBlock.barnHasVisits) {
-            try RecordDeletionRules.delete(graph.barn, in: graph.context)
-        }
-        #expect(throws: RecordDeletionBlock.horseHasVisits) {
-            try RecordDeletionRules.delete(graph.horse, in: graph.context)
-        }
-        #expect(visit.completedAt == nil)
+        try RecordDeletionRules.delete(graph.barn, in: graph.context)
+        #expect(try graph.context.fetchCount(FetchDescriptor<Barn>()) == 0)
+        #expect(try graph.context.fetchCount(FetchDescriptor<Horse>()) == 0)
+        #expect(try graph.context.fetchCount(FetchDescriptor<Visit>()) == 0)
+        #expect(try graph.context.fetchCount(FetchDescriptor<Client>()) == 1)
     }
 
     @Test
-    func blockedAppointmentDeletionPreservesItsVisitAndMemberships() throws {
+    func appointmentDeletionRemovesVisitAndMemberships() throws {
         let graph = try makeGraph()
-        let visit = ModelFixtures.makeVisit(appointment: graph.appointment, in: graph.context)
+        _ = ModelFixtures.makeVisit(appointment: graph.appointment, in: graph.context)
         try graph.context.save()
-
-        #expect(throws: RecordDeletionBlock.appointmentHasVisit) {
-            try RecordDeletionRules.delete(graph.appointment, in: graph.context)
-        }
-        #expect(try graph.context.fetchCount(FetchDescriptor<Appointment>()) == 1)
-        #expect(try graph.context.fetchCount(FetchDescriptor<AppointmentHorse>()) == 1)
-        #expect(try graph.context.fetchCount(FetchDescriptor<Visit>()) == 1)
-        #expect(try graph.context.fetchCount(FetchDescriptor<VisitHorse>()) == 1)
-        #expect(graph.appointment.visit === visit)
+        try RecordDeletionRules.delete(graph.appointment, in: graph.context)
+        #expect(try graph.context.fetchCount(FetchDescriptor<Appointment>()) == 0)
+        #expect(try graph.context.fetchCount(FetchDescriptor<AppointmentHorse>()) == 0)
+        #expect(try graph.context.fetchCount(FetchDescriptor<Visit>()) == 0)
+        #expect(try graph.context.fetchCount(FetchDescriptor<VisitHorse>()) == 0)
+        #expect(try graph.context.fetchCount(FetchDescriptor<Horse>()) == 1)
     }
 
     @Test
@@ -112,12 +95,11 @@ struct RecordDeletionRulesTests {
 
         #expect(try graph.context.fetchCount(FetchDescriptor<Visit>()) == 0)
         #expect(try graph.context.fetchCount(FetchDescriptor<VisitHorse>()) == 0)
-        #expect(try graph.context.fetchCount(FetchDescriptor<Appointment>()) == 1)
-        #expect(try graph.context.fetchCount(FetchDescriptor<AppointmentHorse>()) == 1)
+        #expect(try graph.context.fetchCount(FetchDescriptor<Appointment>()) == 0)
+        #expect(try graph.context.fetchCount(FetchDescriptor<AppointmentHorse>()) == 0)
         #expect(try graph.context.fetchCount(FetchDescriptor<Barn>()) == 1)
         #expect(try graph.context.fetchCount(FetchDescriptor<Horse>()) == 1)
         #expect(try graph.context.fetchCount(FetchDescriptor<Client>()) == 1)
-        #expect(graph.appointment.visit == nil)
     }
 
     @Test
@@ -152,7 +134,7 @@ struct RecordDeletionRulesTests {
     }
 
     @Test
-    func completedVisitCannotBeDeleted() throws {
+    func completedVisitCanBeDeleted() throws {
         let graph = try makeGraph()
         let visit = ModelFixtures.makeVisit(
             completedAt: .now,
@@ -163,9 +145,8 @@ struct RecordDeletionRulesTests {
         visitHorse.outcomeRawValue = VisitOutcome.serviced.rawValue
         try graph.context.save()
 
-        #expect(throws: RecordDeletionBlock.completedVisitCannotBeDeleted) {
-            try RecordDeletionRules.delete(visit, in: graph.context)
-        }
+        try RecordDeletionRules.delete(visit, in: graph.context)
+        #expect(try graph.context.fetchCount(FetchDescriptor<Visit>()) == 0)
     }
 
     @Test
@@ -215,7 +196,7 @@ struct RecordDeletionRulesTests {
     }
 
     @Test
-    func deletingServiceRejectsDefaultAndWorkItemReferences() throws {
+    func deletingServiceClearsDefaultsAndRecordedWork() throws {
         let graph = try makeGraph()
         let visit = ModelFixtures.makeVisit(appointment: graph.appointment, in: graph.context)
         let visitHorse = try #require(visit.visitHorses.first)
@@ -228,10 +209,10 @@ struct RecordDeletionRulesTests {
             in: graph.context
         )
 
-        #expect(throws: RecordDeletionBlock.serviceHasHorseDefaultsAndWorkItems) {
-            try RecordDeletionRules.delete(service, in: graph.context)
-        }
-        #expect(try graph.context.fetchCount(FetchDescriptor<Service>()) == 1)
+        try RecordDeletionRules.delete(service, in: graph.context)
+        #expect(try graph.context.fetchCount(FetchDescriptor<Service>()) == 0)
+        #expect(try graph.context.fetchCount(FetchDescriptor<WorkItem>()) == 0)
+        #expect(graph.horse.defaultService == nil)
     }
 
     @Test
@@ -266,7 +247,7 @@ struct RecordDeletionRulesTests {
     }
 
     @Test
-    func invoiceReferencesBlockClientVisitAndWorkItemDeletion() throws {
+    func deletingClientKeepsIndependentInvoiceHistory() throws {
         let graph = try makeGraph()
         let visit = ModelFixtures.makeVisit(
             startedAt: Date(timeIntervalSinceReferenceDate: 100),
@@ -301,17 +282,12 @@ struct RecordDeletionRulesTests {
         )
         try DomainGraphValidator.save(graph.context)
 
-        #expect(throws: RecordDeletionBlock.clientHasInvoices) {
-            try RecordDeletionRules.delete(graph.client, in: graph.context)
-        }
-        #expect(throws: RecordDeletionBlock.visitHasInvoiceLineItems) {
-            try RecordDeletionRules.delete(visit, in: graph.context)
-        }
-        #expect(throws: RecordDeletionBlock.workItemHasInvoiceLineItem) {
-            try RecordDeletionRules.delete(workItem, in: graph.context)
-        }
+        try RecordDeletionRules.delete(graph.client, in: graph.context)
         #expect(try graph.context.fetchCount(FetchDescriptor<Invoice>()) == 1)
-        #expect(try graph.context.fetchCount(FetchDescriptor<WorkItem>()) == 1)
+        #expect(try graph.context.fetchCount(FetchDescriptor<WorkItem>()) == 0)
+        #expect(invoice.client == nil)
+        #expect(invoiceVisit.sourceVisit == nil)
+        #expect(invoiceVisit.lineItems.first?.sourceWorkItem == nil)
     }
 
     @Test

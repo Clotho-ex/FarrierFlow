@@ -5,7 +5,6 @@ nonisolated enum VisitSaveError: Error, Equatable {
     case visitUnavailable
     case visitIsCompleted
     case correctionRequiresCompletedVisit
-    case invoicedVisitCannotBeCorrected
     case completionPredatesStart
 }
 
@@ -18,9 +17,6 @@ enum VisitSaveUseCase {
         guard let visit = try context.existingModel(Visit.self, for: visitID) else {
             throw VisitSaveError.visitUnavailable
         }
-        if visit.completedAt != nil, InvoiceDomainRules.isCorrectionLocked(visit) {
-            throw VisitSaveError.invoicedVisitCannotBeCorrected
-        }
         return visit.completedAt == nil ? .inProgress : .correction
     }
 
@@ -30,9 +26,6 @@ enum VisitSaveUseCase {
     ) throws -> VisitDraft {
         guard let visit = try context.existingModel(Visit.self, for: visitID) else {
             throw VisitSaveError.visitUnavailable
-        }
-        if visit.completedAt != nil, InvoiceDomainRules.isCorrectionLocked(visit) {
-            throw VisitSaveError.invoicedVisitCannotBeCorrected
         }
         try DomainGraphValidator.validateAll(in: context)
 
@@ -187,14 +180,20 @@ enum VisitSaveUseCase {
             guard visit.completedAt != nil else {
                 throw VisitSaveError.correctionRequiresCompletedVisit
             }
-            guard !InvoiceDomainRules.isCorrectionLocked(visit) else {
-                throw VisitSaveError.invoicedVisitCannotBeCorrected
-            }
             if let violation = VisitRules.correctionViolation(in: draft) {
                 throw violation
             }
 
             let immutableState = VisitImmutableState(visit: visit)
+            // Keep billed values frozen in the invoice while correcting the
+            // operational work. The hold prevents accidental repeat billing.
+            for item in visit.visitHorses.flatMap(\.workItems) {
+                if let line = item.invoiceLineItem, let invoice = line.invoiceVisit?.invoice,
+                   let invoiceID = invoice.syncID {
+                    try item.applyBillingHold(invoiceID)
+                    line.detachSourceWorkItem()
+                }
+            }
             try apply(draft, to: visit, in: context)
             guard immutableState.matches(visit) else {
                 throw DomainGraphViolation.visitMembershipMismatch

@@ -61,7 +61,7 @@ struct VisitEditorView: View {
                 if subscription.allowsMutations, model.mode == .inProgress, model.loadState == .loaded {
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {
-                            Button("Discard Visit", role: .destructive) {
+                            Button("Delete Visit", role: .destructive) {
                                 showsDiscardVisitConfirmation = true
                             }
                         } label: {
@@ -171,29 +171,11 @@ struct VisitEditorView: View {
         } message: {
             Text("Changing this outcome will clear its recorded services and Work Notes.")
         }
-        .confirmationDialog(
-            "Discard Visit?",
-            isPresented: $showsDiscardVisitConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Discard Visit", role: .destructive) {
-                guard subscription.allowsMutations else { return }
-                Task {
-                    do {
-                        try await photographLibrary.discardInProgressVisit(id: model.visitID)
-                        dismiss()
-                    } catch {
-                        model.alert = FeatureAlert(
-                            title: "Couldn’t Discard Visit",
-                            message: "The visit and its photos were kept. Try again."
-                        )
-                    }
-                }
-            }
-            Button("Keep Visit", role: .cancel) {}
-        } message: {
-            Text("This will delete the in-progress visit and its recorded outcomes.")
-        }
+        .recordDeletionSheet(
+            .visit(model.visitID), isPresented: $showsDiscardVisitConfirmation,
+            title: "Delete Visit?", confirmationTitle: "Delete Visit",
+            accessibilityPrefix: "visit-delete", alert: $model.alert
+        ) { dismiss() }
         .alert(item: $model.alert) {
             Alert(title: Text($0.title), message: Text($0.message))
         }
@@ -217,6 +199,14 @@ struct VisitEditorView: View {
                         Text(completionGuidance(for: completionBlocker))
                             .foregroundStyle(ColorTokens.textSecondary)
                             .accessibilityIdentifier("visit-completion-requirement")
+                    }
+                    .listRowBackground(ColorTokens.surface)
+                }
+                if model.mode == .correction, let blocker = model.correctionBlocker {
+                    Section("Save Changes") {
+                        Text(completionGuidance(for: blocker))
+                            .foregroundStyle(ColorTokens.textSecondary)
+                            .accessibilityIdentifier("visit-correction-requirement")
                     }
                     .listRowBackground(ColorTokens.surface)
                 }

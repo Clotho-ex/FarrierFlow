@@ -3,7 +3,6 @@ import SwiftUI
 
 private enum InvoiceActionConfirmation {
     case markUnpaid
-    case delete
 }
 
 struct InvoiceDetailView: View {
@@ -20,6 +19,7 @@ struct InvoiceDetailView: View {
     @State private var pdfPreparationTask: Task<Void, Never>?
     @State private var paymentModel: PaymentRecordingModel?
     @State private var showsPaymentSheet = false
+    @State private var showsDeleteConfirmation = false
 
     let invoiceID: PersistentIdentifier
 
@@ -94,7 +94,7 @@ struct InvoiceDetailView: View {
 
                         if model.canDelete {
                             Button("Delete Invoice", systemImage: "trash", role: .destructive) {
-                                actionConfirmation = .delete
+                                showsDeleteConfirmation = true
                             }
                             .accessibilityIdentifier("invoice-delete-action")
                         }
@@ -103,6 +103,11 @@ struct InvoiceDetailView: View {
                 }
             }
         }
+        .recordDeletionSheet(
+            .invoice(invoiceID), isPresented: $showsDeleteConfirmation,
+            title: "Delete Invoice?", confirmationTitle: "Delete Invoice",
+            accessibilityPrefix: "invoice-delete", alert: $model.alert
+        ) { dismiss() }
         .alert(
             actionConfirmationTitle,
             isPresented: actionConfirmationPresented,
@@ -116,21 +121,13 @@ struct InvoiceDetailView: View {
                 }
                 .accessibilityIdentifier("invoice-mark-unpaid-confirmation")
                 Button("Cancel", role: .cancel) { }
-            case .delete:
-                Button("Delete Invoice", role: .destructive) {
-                    guard subscription.allowsMutations else { return }
-                    model.delete(in: context)
-                    if model.didDelete { dismiss() }
-                }
-                .accessibilityIdentifier("invoice-delete-confirmation")
-                Button("Cancel", role: .cancel) { }
+
             }
         } message: { confirmation in
             switch confirmation {
             case .markUnpaid:
                 Text("This removes the recorded payment and makes the invoice outstanding again.")
-            case .delete:
-                Text("Recorded work stays in FarrierFlow and can be added to another invoice.")
+
             }
         }
         .alert(item: $model.alert) {
@@ -282,8 +279,6 @@ struct InvoiceDetailView: View {
         switch actionConfirmation {
         case .markUnpaid:
             "Mark Invoice Unpaid?"
-        case .delete:
-            "Delete Invoice?"
         case nil:
             "Invoice Actions"
         }

@@ -72,7 +72,7 @@ struct AppointmentEditorModelTests {
     }
 
     @Test
-    func scheduledServiceCannotBeDeletedButCanBeArchivedWithoutLosingPlan() throws {
+    func scheduledServiceCanBeArchivedAndLaterDeleted() throws {
         let fixture = try makeTwoHorseFixture()
         let service = ModelFixtures.makeService(in: fixture.context)
         try DomainGraphValidator.save(fixture.context)
@@ -83,9 +83,6 @@ struct AppointmentEditorModelTests {
         editor.toggleHorse(horseID)
         editor.draft.serviceIDsByHorse[horseID] = service.persistentModelID
         let id = try #require(editor.save(in: fixture.context))
-        #expect(throws: RecordDeletionBlock.serviceHasPlannedAppointments) {
-            try RecordDeletionRules.delete(service, in: fixture.context)
-        }
         try RecordDeletionRules.archive(service, in: fixture.context)
         let appointment = try #require(try fixture.context.existingModel(Appointment.self, for: id))
         let reopened = AppointmentEditorModel(appointment: appointment)
@@ -95,6 +92,10 @@ struct AppointmentEditorModelTests {
         let check = ModelContext(fixture.container)
         let visit = try #require(try check.existingModel(Visit.self, for: visitID))
         #expect(visit.visitHorses.first?.workItems.first?.serviceNameSnapshot == "Front Shoes")
+        try RecordDeletionRules.delete(service, in: fixture.context)
+        let updated = ModelContext(fixture.container)
+        #expect(try updated.fetch(FetchDescriptor<AppointmentHorse>()).allSatisfy { $0.plannedService == nil })
+        #expect(try updated.fetchCount(FetchDescriptor<WorkItem>()) == 0)
     }
 
     @Test

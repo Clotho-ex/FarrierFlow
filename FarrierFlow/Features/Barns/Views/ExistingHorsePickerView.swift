@@ -12,9 +12,9 @@ struct ExistingHorsePickerView: View {
     var body: some View {
         NavigationStack {
             List(selection: $model.selectedHorseID) {
-                ForEach(model.horses, id: \.persistentModelID) { horse in
+                ForEach(model.horses, id: \.id) { horse in
                     HorseRow(horse: horse)
-                        .tag(horse.persistentModelID)
+                        .tag(horse.id)
                         .listRowBackground(ColorTokens.surface)
                 }
             }
@@ -31,7 +31,7 @@ struct ExistingHorsePickerView: View {
                         Button("Retry") {
                             model.load(
                                 destinationBarnID: destinationBarnID,
-                                in: context
+                                in: ModelContext(context.container)
                             )
                         }
                     }
@@ -55,10 +55,7 @@ struct ExistingHorsePickerView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     if subscription.allowsMutations {
                     Button("Move") {
-                        guard subscription.allowsMutations else { return }
-                        if model.move(to: destinationBarnID, in: context) {
-                            dismiss()
-                        }
+                        move()
                     }
                     .disabled(
                         model.loadState != .loaded
@@ -68,11 +65,26 @@ struct ExistingHorsePickerView: View {
                 }
             }
             .onAppear {
-                model.load(destinationBarnID: destinationBarnID, in: context)
+                model.load(destinationBarnID: destinationBarnID, in: ModelContext(context.container))
             }
             .alert(item: $model.alert) {
-                Alert(title: Text($0.title), message: Text($0.message))
+                if let relocation = model.pendingRelocation {
+                    Alert(
+                        title: Text($0.title), message: Text($0.message),
+                        primaryButton: .default(Text("Move Horse")) { move(confirming: relocation) },
+                        secondaryButton: .cancel()
+                    )
+                } else {
+                    Alert(title: Text($0.title), message: Text($0.message))
+                }
             }
         }
     }
+    private func move(confirming relocation: HorseRelocationConfirmation? = nil) {
+        guard subscription.allowsMutations else { return }
+        if model.move(to: destinationBarnID, in: ModelContext(context.container), confirming: relocation) {
+            dismiss()
+        }
+    }
+
 }

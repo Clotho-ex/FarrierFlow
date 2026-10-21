@@ -156,6 +156,18 @@ struct ExportCSVProjectorTests {
         }
     }
 
+    @Test func detachedInvoiceSourcesExportAsEmptyReferencesWithFinancialSnapshotsIntact() throws {
+        let tables = try ExportCSVProjector.tables(from: Self.snapshot(detachedSources: true),
+            photographResults: [Self.photographUUID: .unavailable])
+        #expect(tables[11].rows[0][16] == .empty)
+        #expect(tables[13].rows[0][6] == .empty)
+        #expect(tables[14].rows[0][7] == .empty)
+        #expect(tables[11].rows[0][8] == .userText("Client"))
+        #expect(tables[14].rows[0][1] == .userText("Milo"))
+        #expect(tables[14].rows[0][3] == .raw("12500"))
+        #expect(tables[12].rows[0][4] == .raw("12500"))
+    }
+
     private static let date = Date(timeIntervalSince1970: 1_725_000_000.123456)
     private static let photographUUID = UUID(uuidString: "01234567-89AB-CDEF-0123-456789ABCDEF")!
     private static let context = ExportContext(createdAt: date, localeIdentifier: "en_US_POSIX", calendarIdentifier: .gregorian, timeZoneIdentifier: "America/New_York")
@@ -164,7 +176,7 @@ struct ExportCSVProjectorTests {
         try .init(entity: entity, ordinal: 1)
     }
 
-    private static func snapshot(outcome: String = "serviced", status: String = "paid", currencyCode: String = "USD", workItemCurrencyCode: String? = nil, minorUnits: Int64 = 12_500, nextInvoiceNumber: Int64 = 7, invoiceNumber: Int64 = 7) throws -> ExportSnapshot {
+    private static func snapshot(outcome: String = "serviced", status: String = "paid", currencyCode: String = "USD", workItemCurrencyCode: String? = nil, minorUnits: Int64 = 12_500, nextInvoiceNumber: Int64 = 7, invoiceNumber: Int64 = 7, detachedSources: Bool = false) throws -> ExportSnapshot {
         let businessProfile = try id(.businessProfile), client = try id(.client), location = try id(.serviceLocation), horse = try id(.horse), appointment = try id(.appointment), appointmentHorse = try id(.appointmentHorse), visit = try id(.visit), visitHorse = try id(.visitHorse), photograph = try id(.photograph), service = try id(.service), workItem = try id(.workItem), invoice = try id(.invoice), payment = try id(.payment), invoiceVisit = try id(.invoiceVisit), invoiceLineItem = try id(.invoiceLineItem)
         return .init(
             context: context,
@@ -179,10 +191,10 @@ struct ExportCSVProjectorTests {
             photographs: [.init(id: photograph, photographID: photographUUID, createdAt: date, pixelWidth: 1200, pixelHeight: 900, byteCount: 42, visitHorseID: visitHorse)],
             services: [.init(id: service, name: "Trim", defaultAmountMinorUnits: minorUnits, currencyCode: currencyCode, isArchived: false)],
             workItems: [.init(id: workItem, serviceNameSnapshot: "Trim", amountMinorUnits: minorUnits, currencyCode: workItemCurrencyCode ?? currencyCode, serviceID: service, visitHorseID: visitHorse, invoiceLineItemID: nil)],
-            invoices: [.init(id: invoice, number: invoiceNumber, invoiceDate: date, dueDate: nil, note: nil, statusRawValue: status, clientNameSnapshot: "Client", clientPhoneSnapshot: nil, clientEmailSnapshot: nil, businessNameSnapshot: "Farrier = Co", businessPhoneSnapshot: nil, businessEmailSnapshot: nil, businessAddressSnapshot: nil, currencyCode: currencyCode, clientID: client)],
+            invoices: [.init(id: invoice, number: invoiceNumber, invoiceDate: date, dueDate: nil, note: nil, statusRawValue: status, clientNameSnapshot: "Client", clientPhoneSnapshot: nil, clientEmailSnapshot: nil, businessNameSnapshot: "Farrier = Co", businessPhoneSnapshot: nil, businessEmailSnapshot: nil, businessAddressSnapshot: nil, currencyCode: currencyCode, clientID: detachedSources ? nil : client)],
             payments: [.init(id: payment, invoiceID: invoice, sourceRawValue: "manual", methodRawValue: "bankTransfer", amountMinorUnits: minorUnits, currencyCode: currencyCode, receivedAt: date, otherDescription: nil, reference: "BANK-42", note: "Internal")],
-            invoiceVisits: [.init(id: invoiceVisit, visitDateSnapshot: date, serviceLocationNameSnapshot: "North Field", serviceLocationAddressSnapshot: nil, invoiceID: invoice, sourceVisitID: visit)],
-            invoiceLineItems: [.init(id: invoiceLineItem, horseNameSnapshot: "Milo", serviceNameSnapshot: "Trim", amountMinorUnits: minorUnits, currencyCode: currencyCode, invoiceVisitID: invoiceVisit, sourceWorkItemID: workItem)],
+            invoiceVisits: [.init(id: invoiceVisit, visitDateSnapshot: date, serviceLocationNameSnapshot: "North Field", serviceLocationAddressSnapshot: nil, invoiceID: invoice, sourceVisitID: detachedSources ? nil : visit)],
+            invoiceLineItems: [.init(id: invoiceLineItem, horseNameSnapshot: "Milo", serviceNameSnapshot: "Trim", amountMinorUnits: minorUnits, currencyCode: currencyCode, invoiceVisitID: invoiceVisit, sourceWorkItemID: detachedSources ? nil : workItem)],
             invoiceDocuments: []
         )
     }

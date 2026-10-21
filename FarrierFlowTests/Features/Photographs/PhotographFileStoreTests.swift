@@ -72,6 +72,56 @@ struct PhotographFileStoreTests {
     }
 
     @Test
+    func moveIntoMissingCanonicalDestinationUsesResolvedParent() throws {
+        let directory = try TemporaryStoreFixtures.makeDirectory(
+            prefix: "FarrierFlow-Photograph-Missing-Destination-"
+        )
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = PhotographFileStore(applicationSupportURL: directory)
+        try store.prepareDirectories()
+        let source = store.temporaryURL(photoID: photoID, operationID: operationID)
+        let destination = store.canonicalURL(for: photoID)
+        try Data("jpeg".utf8).write(to: source)
+
+        try store.moveWithoutOverwriting(from: source, to: destination)
+        try store.applyCompleteProtection(to: destination)
+        #expect(try Data(contentsOf: destination) == Data("jpeg".utf8))
+        try store.removeManagedFile(at: destination)
+        #expect(!FileManager.default.fileExists(atPath: destination.path))
+    }
+
+    @Test
+    func containmentRejectsOutsidePathsAndEscapingSymbolicLinks() throws {
+        let directory = try TemporaryStoreFixtures.makeDirectory(
+            prefix: "FarrierFlow-Photograph-Containment-"
+        )
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = PhotographFileStore(applicationSupportURL: directory)
+        try store.prepareDirectories()
+        let outside = directory.appending(path: "HoofPhotographs-Outside", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        let source = store.temporaryURL(photoID: photoID, operationID: operationID)
+        let outsideFile = outside.appending(path: "outside.jpg")
+        try Data("managed".utf8).write(to: source)
+        try Data("outside".utf8).write(to: outsideFile)
+        let link = store.rootURL.appending(path: "escape", directoryHint: .isDirectory)
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: outside)
+        let fileLink = store.rootURL.appending(path: "outside.jpg")
+        try FileManager.default.createSymbolicLink(at: fileLink, withDestinationURL: outsideFile)
+
+        for destination in [outsideFile, link.appending(path: "missing.jpg")] {
+            #expect(throws: PhotographFileStoreError.unmanagedURL) {
+                try store.moveWithoutOverwriting(from: source, to: destination)
+            }
+        }
+        #expect(throws: PhotographFileStoreError.unmanagedURL) {
+            try store.removeManagedFile(at: fileLink)
+        }
+        #expect(try Data(contentsOf: outsideFile) == Data("outside".utf8))
+        #expect(try Data(contentsOf: source) == Data("managed".utf8))
+    }
+
+    @Test
     func inspectionRecognizesOnlyExactManagedRegularFiles() throws {
         let applicationSupport = try TemporaryStoreFixtures.makeDirectory(
             prefix: "FarrierFlow-Photograph-Inspection-"

@@ -106,6 +106,29 @@ struct HorseDraftAndRelocationTests {
     }
 
     @Test
+    func completedNotServicedHistoryAllowsConfirmedMoveWithoutRewritingHistory() throws {
+        let graph = try makeCompletedRelocationGraph()
+        let context = ModelContext(graph.container)
+        let visit = try #require(try context.existingModel(Visit.self, for: graph.visitID))
+        var draft = try VisitSaveUseCase.loadDraft(visitID: graph.visitID, in: context)
+        draft.horses[0].outcome = .notServiced
+        draft.horses[0].workItems = []
+        draft.horses[0].workNotes = ""
+        _ = try VisitSaveUseCase.saveCorrection(draft: draft, in: context)
+        let snapshot = visit.serviceLocationNameSnapshot
+        let picker = ExistingHorsePickerModel()
+        picker.load(destinationBarnID: graph.destinationBarnID, in: context)
+        #expect(picker.horses.map(\.id).contains(graph.horseID))
+        picker.selectedHorseID = graph.horseID
+        #expect(!picker.move(to: graph.destinationBarnID, in: context))
+        let confirmation = try #require(picker.pendingRelocation)
+        #expect(picker.move(to: graph.destinationBarnID, in: context, confirming: confirmation))
+        #expect(visit.serviceLocationNameSnapshot == snapshot)
+        #expect(visit.barn?.name == "Barn A")
+        #expect(visit.visitHorses.first?.horse?.currentBarn?.name == "Barn B")
+    }
+
+    @Test
     func blockedEditorMoveLeavesAppointmentGraphUnchanged() throws {
         let graph = try makeReferencedHorseGraph()
         let originalBarn = graph.horse.currentBarn
@@ -343,6 +366,10 @@ struct HorseDraftAndRelocationTests {
             #expect(!failingPicker.move(
                 to: destinationBarnID,
                 in: relocationContext
+            ))
+            let confirmation = try #require(failingPicker.pendingRelocation)
+            #expect(!failingPicker.move(
+                to: destinationBarnID, in: relocationContext, confirming: confirmation
             ))
             #expect(observedRelocationBeforeFailure)
             #expect(relocationHorse.currentBarn === relocationOriginalBarn)

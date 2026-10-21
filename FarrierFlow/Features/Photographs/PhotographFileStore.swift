@@ -273,8 +273,13 @@ nonisolated struct PhotographFileStore: Sendable {
     }
 
     private func requireContained(_ url: URL) throws {
-        let rootPath = rootURL.standardizedFileURL.path
-        let candidatePath = url.standardizedFileURL.path
+        let rootPath = rootURL.resolvingSymlinksInPath().standardizedFileURL.path
+        let resolvedURL = url.resolvingSymlinksInPath()
+        // A missing destination can retain /private/var while its existing root
+        // resolves to /var on iOS. Resolve the existing parent before comparison.
+        let candidatePath = resolvedURL.deletingLastPathComponent()
+            .resolvingSymlinksInPath().standardizedFileURL
+            .appending(path: resolvedURL.lastPathComponent).standardizedFileURL.path
         guard candidatePath == rootPath || candidatePath.hasPrefix("\(rootPath)/") else {
             throw PhotographFileStoreError.unmanagedURL
         }

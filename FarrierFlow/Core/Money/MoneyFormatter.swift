@@ -4,12 +4,13 @@ nonisolated enum MoneyFormatter {
     static func currency(
         minorUnits: Int64,
         currencyCode: String,
-        locale: Locale = .current
+        locale: Locale = .current,
+        showsZeroAsComplimentary: Bool = true
     ) -> String? {
         guard minorUnits >= 0, BusinessCurrency.isSupported(currencyCode) else {
             return nil
         }
-        guard minorUnits != 0 else {
+        guard minorUnits != 0 || !showsZeroAsComplimentary else {
             return String(localized: "Complimentary")
         }
 

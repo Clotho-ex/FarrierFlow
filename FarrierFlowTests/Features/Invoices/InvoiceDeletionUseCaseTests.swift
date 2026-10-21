@@ -12,7 +12,7 @@ struct InvoiceDeletionUseCaseTests {
         let visit = try #require(graph.context.model(for: graph.visitID) as? Visit)
         #expect(InvoiceDomainRules.isCorrectionLocked(visit))
 
-        try InvoiceDeletionUseCase.deleteUnpaid(invoiceID: graph.invoiceID, in: graph.context)
+        try InvoiceDeletionUseCase.delete(invoiceID: graph.invoiceID, in: graph.context)
 
         #expect(try graph.context.fetchCount(FetchDescriptor<Invoice>()) == 0)
         #expect((try #require(graph.context.model(for: graph.workItemID) as? WorkItem)).invoiceLineItem == nil)
@@ -21,13 +21,14 @@ struct InvoiceDeletionUseCaseTests {
     }
 
     @Test
-    func paidInvoicesCannotBeDeleted() throws {
+    func paidInvoiceDeletionRemovesPaymentAndKeepsWork() throws {
         let graph = try InvoiceActionGraph.make(status: .paid)
 
-        #expect(throws: InvoiceDeletionError.invoicePaid) {
-            try InvoiceDeletionUseCase.deleteUnpaid(invoiceID: graph.invoiceID, in: graph.context)
-        }
-        #expect(graph.context.model(for: graph.invoiceID) as? Invoice != nil)
+        try InvoiceDeletionUseCase.delete(invoiceID: graph.invoiceID, in: graph.context)
+        #expect(try graph.context.fetchCount(FetchDescriptor<Invoice>()) == 0)
+        #expect(try graph.context.fetchCount(FetchDescriptor<Payment>()) == 0)
+        #expect(try graph.context.fetchCount(FetchDescriptor<WorkItem>()) == 1)
+        try DomainGraphValidator.validateAll(in: graph.context)
     }
 }
 

@@ -135,11 +135,11 @@ final class InvoiceFlowUITests: XCTestCase {
 
         app.navigationBars["Invoice 0001"].buttons.firstMatch.tap()
         openClients(in: app)
-        for _ in 0..<2 where !app.buttons["My Business"].exists {
-            app.buttons["More"].tap()
-            _ = app.buttons["My Business"].waitForExistence(timeout: 2)
+        for _ in 0..<2 where !app.buttons["Business Profile"].exists {
+            app.openBusinessRoot()
+            _ = app.buttons["Business Profile"].waitForExistence(timeout: 2)
         }
-        app.buttons["My Business"].tap()
+        app.buttons["Business Profile"].tap()
         XCTAssertTrue(
             app.descendants(matching: .any)["business-profile-currency-locked"]
                 .waitForExistence(timeout: 3)
@@ -155,14 +155,14 @@ final class InvoiceFlowUITests: XCTestCase {
         openClients(in: app)
         let invoices = app.buttons["Invoices"]
         for _ in 0..<2 where !invoices.exists {
-            app.buttons["More"].tap()
+            app.openBusinessRoot()
             _ = invoices.waitForExistence(timeout: 2)
         }
         XCTAssertTrue(invoices.exists)
-        XCTAssertTrue(app.buttons["My Business"].exists)
+        XCTAssertTrue(app.buttons["Business Profile"].exists)
         openInvoices(in: app)
         XCTAssertTrue(app.staticTexts["No Invoices"].waitForExistence(timeout: 3))
-        let invoicesBackButton = app.navigationBars.buttons["Clients"]
+        let invoicesBackButton = app.tabBars.buttons["Clients"]
         invoicesBackButton.tap()
 
         let clientRow = app.buttons["client-row-Invoice Client"]
@@ -303,7 +303,7 @@ final class InvoiceFlowUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Status, Paid"].exists)
 
         app.navigationBars.buttons["Invoices"].tap()
-        app.navigationBars.buttons["Clients"].tap()
+        app.selectFarrierFlowTab("Clients")
         app.buttons["client-row-Invoice Client"].tap()
         XCTAssertTrue(app.buttons["client-invoice-0001"].waitForExistence(timeout: 3))
         app.buttons["horse-row-Milo"].tap()
@@ -311,10 +311,10 @@ final class InvoiceFlowUITests: XCTestCase {
         XCTAssertTrue(history.waitForExistence(timeout: 3))
         history.tap()
         XCTAssertTrue(
-            app.staticTexts["This visit has invoiced work and can no longer be corrected."]
+            app.staticTexts["This visit has invoiced work. Corrections do not change saved invoices."]
                 .waitForExistence(timeout: 3)
         )
-        XCTAssertFalse(app.buttons["visit-edit-action"].exists)
+        XCTAssertTrue(app.buttons["visit-edit-action"].exists)
         XCTAssertTrue(app.buttons["visit-invoice-0001"].waitForExistence(timeout: 3))
         app.buttons["visit-invoice-0001"].tap()
         let paidMoreActions = app.buttons["invoice-more-actions"]
@@ -410,28 +410,12 @@ final class InvoiceFlowUITests: XCTestCase {
 
     @MainActor
     private func openInvoices(in app: XCUIApplication) {
+        if app.navigationBars["Invoices"].exists { return }
+        app.openBusinessRoot()
         let invoices = app.buttons["Invoices"]
-        for _ in 0..<3 {
-            if app.navigationBars["Invoices"].exists {
-                return
-            }
-            if invoices.waitForExistence(timeout: 1) {
-                invoices.tap()
-                if app.navigationBars["Invoices"].waitForExistence(timeout: 2) {
-                    return
-                }
-            }
-            if app.buttons["More"].waitForExistence(timeout: 1) {
-                app.buttons["More"].tap()
-                if invoices.waitForExistence(timeout: 2) {
-                    invoices.tap()
-                    if app.navigationBars["Invoices"].waitForExistence(timeout: 2) {
-                        return
-                    }
-                }
-            }
-        }
-        XCTFail("Invoices did not open")
+        XCTAssertTrue(invoices.waitForExistence(timeout: 3))
+        invoices.tap()
+        XCTAssertTrue(app.navigationBars["Invoices"].waitForExistence(timeout: 3))
     }
 
     @MainActor

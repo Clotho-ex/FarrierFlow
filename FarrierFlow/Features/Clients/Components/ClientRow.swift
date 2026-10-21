@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ClientRow: View {
-    let client: Client
+    let client: ClientDetailSnapshot
 
     var body: some View {
         VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {

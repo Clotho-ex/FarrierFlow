@@ -9,6 +9,11 @@ struct InvoiceListView: View {
     @State private var model = InvoiceListModel()
     @State private var hasLocalHistory = false
     @State private var showsHistory = false
+    private let filter: InvoiceListFilter
+
+    init(filter: InvoiceListFilter = .all) {
+        self.filter = filter
+    }
 
     var body: some View {
         Group {
@@ -22,7 +27,7 @@ struct InvoiceListView: View {
             }
         }
         .farrierFlowScreenBackground()
-        .navigationTitle("Invoices")
+        .navigationTitle(filter == .unpaid ? Text("Unpaid Invoices") : Text("Invoices"))
         .sheet(isPresented: $showsHistory) {
             InvoiceHistorySheet(container: context.container).dynamicTypeSize(dynamicTypeSize)
         }
@@ -31,15 +36,28 @@ struct InvoiceListView: View {
         }
         .onAppear(perform: reload)
         .onChange(of: backupSync?.runtime?.recordsVersion) { _, _ in reload() }
+        .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)) { notification in
+            guard let savedContext = notification.object as? ModelContext,
+                  savedContext.container === context.container else { return }
+            reload()
+        }
     }
 
     @ViewBuilder
     private var content: some View {
         if model.summaries.isEmpty && !hasLocalHistory {
             ContentUnavailableView {
-                Label("No Invoices", systemImage: "doc.text")
+                if filter == .unpaid {
+                    Label("No Unpaid Invoices", systemImage: "doc.text")
+                } else {
+                    Label("No Invoices", systemImage: "doc.text")
+                }
             } description: {
-                Text("Create an invoice from a client after recording completed work.")
+                if filter == .unpaid {
+                    Text("You have no unpaid invoices.")
+                } else {
+                    Text("Create an invoice from a client after recording completed work.")
+                }
             }
         } else {
             List {
@@ -76,7 +94,8 @@ struct InvoiceListView: View {
     }
 
     private func reload() {
-        model.load(in: context, locale: locale)
+        model.load(in: context, locale: locale, filter: filter)
+        guard filter == .all else { hasLocalHistory = false; return }
         do { hasLocalHistory = try !InvoiceHistoryArchiveReader(container: context.container).archives().isEmpty }
         catch {
             hasLocalHistory = true

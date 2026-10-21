@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ServiceRow: View {
     @Environment(\.locale) private var locale
-    let service: Service
+    let service: ServiceDetailSnapshot
 
     private var amount: String {
         MoneyFormatter.currency(

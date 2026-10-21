@@ -58,11 +58,6 @@ struct AppointmentEditorView: View {
                         if model.barns.isEmpty {
                             Text("Add a service location before scheduling an appointment.")
                                 .foregroundStyle(ColorTokens.textSecondary)
-                            Button("Add Service Location", systemImage: "plus") {
-                                focusedField = nil
-                                showsBarnEditor = true
-                            }
-                            .accessibilityIdentifier("appointment-add-service-location")
                         } else {
                             Picker(
                                 "Service Location",
@@ -83,6 +78,13 @@ struct AppointmentEditorView: View {
                                 }?.name ?? String(localized: "Select Service Location")
                             )
                         }
+                    }
+                    if !model.hasVisit, model.loadState == .loaded {
+                        Button("Add Service Location", systemImage: "plus") {
+                            focusedField = nil
+                            showsBarnEditor = true
+                        }
+                        .accessibilityIdentifier("appointment-add-service-location")
                     }
                     DatePicker(
                         "Starts",
@@ -157,6 +159,23 @@ struct AppointmentEditorView: View {
                                 .textCase(nil)
                             }
                         }
+                    }
+                    .listRowBackground(ColorTokens.surface)
+                }
+                if !model.hasVisit, model.loadState == .loaded,
+                   model.services.allSatisfy(\.isArchived) {
+                    Section {
+                        Text("What services do you offer?")
+                        Button("Add Service", systemImage: "plus") {
+                            focusedField = nil
+                            serviceHorseID = nil
+                            showsServiceEditor = true
+                        }
+                        .accessibilityIdentifier("appointment-add-service")
+                    } header: {
+                        Text("Your Services")
+                    } footer: {
+                        Text("Save services and prices for your business. You can also choose a service during the visit.")
                     }
                     .listRowBackground(ColorTokens.surface)
                 }
@@ -277,7 +296,7 @@ struct AppointmentEditorView: View {
                 ?? String(localized: "Choose During Visit")
         )
         .accessibilityIdentifier("appointment-service-\(horse.name)")
-        if model.services.allSatisfy(\.isArchived) {
+        if !model.services.allSatisfy(\.isArchived) {
             Button("Add Service", systemImage: "plus") {
                 focusedField = nil
                 serviceHorseID = horseID
@@ -292,9 +311,9 @@ struct AppointmentEditorView: View {
             createdServiceID = nil
             serviceHorseID = nil
         }
-        guard let serviceID = createdServiceID, let horseID = serviceHorseID else { return }
+        guard let serviceID = createdServiceID else { return }
         model.load(in: context)
-        if model.draft.selectedHorseIDs.contains(horseID) {
+        if let horseID = serviceHorseID, model.draft.selectedHorseIDs.contains(horseID) {
             model.draft.serviceIDsByHorse[horseID] = serviceID
         }
     }

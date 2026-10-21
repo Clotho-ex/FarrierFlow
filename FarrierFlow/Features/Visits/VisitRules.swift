@@ -83,7 +83,12 @@ nonisolated enum VisitRules {
     }
 
     static func correctionViolation(in draft: VisitDraft) -> VisitDraftViolation? {
-        completionViolation(in: draft)
+        if let violation = progressViolation(in: draft) { return violation }
+        if draft.horses.contains(where: { $0.outcome == .pending }) { return .pendingOutcomePreventsCompletion }
+        if draft.horses.contains(where: { $0.outcome == .serviced && $0.workItems.isEmpty }) {
+            return .servicedHorseRequiresWorkItem
+        }
+        return nil
     }
 
     static func requiresWorkNotesClearConfirmation(

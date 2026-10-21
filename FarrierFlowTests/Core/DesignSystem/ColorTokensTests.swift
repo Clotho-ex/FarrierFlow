@@ -7,6 +7,29 @@ import UIKit
 @MainActor
 struct ColorTokensTests {
     @Test
+    func recordSurfacesSeparateLightContentAndPreserveDarkTones() {
+        let light = UITraitCollection(userInterfaceStyle: .light)
+        let dark = UITraitCollection(userInterfaceStyle: .dark)
+        expect(ColorTokens.Palette.recordSurface, hex: 0xFFFFFF, traits: light)
+        expect(ColorTokens.Palette.recordSurface, hex: 0x211E1B, traits: dark)
+        expect(ColorTokens.Palette.featuredSurface, hex: 0xFBE6D5, traits: light)
+        expect(ColorTokens.Palette.featuredSurface, hex: 0x3B2516, traits: dark)
+        for style: UIUserInterfaceStyle in [.light, .dark] {
+            for contrastMode: UIAccessibilityContrast in [.normal, .high] {
+                let traits = UITraitCollection { traits in
+                    traits.userInterfaceStyle = style
+                    traits.accessibilityContrast = contrastMode
+                }
+                for surface in [ColorTokens.Palette.recordSurface, ColorTokens.Palette.featuredSurface] {
+                    #expect(contrast(ColorTokens.Palette.textPrimary, surface, traits: traits) >= 7)
+                    #expect(contrast(ColorTokens.Palette.textSecondary, surface, traits: traits) >= 4.5)
+                }
+                #expect(contrast(ColorTokens.Palette.brandActionText, ColorTokens.Palette.featuredSurface, traits: traits) >= 4.5)
+            }
+        }
+    }
+
+    @Test
     func swiftUISurfacesFollowTheirAppearanceEnvironment() {
         var environment = EnvironmentValues()
         environment.colorScheme = .light
@@ -22,6 +45,7 @@ struct ColorTokensTests {
         let colors = [
             ColorTokens.Palette.brandPrimary, ColorTokens.Palette.brandActionText,
             ColorTokens.Palette.background, ColorTokens.Palette.surface, ColorTokens.Palette.textPrimary,
+            ColorTokens.Palette.recordSurface, ColorTokens.Palette.featuredSurface,
             ColorTokens.Palette.successTint, ColorTokens.Palette.warningTint, ColorTokens.Palette.destructiveTint,
             ElevationTokens.raisedShadowColor,
         ]

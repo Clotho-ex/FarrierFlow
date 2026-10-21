@@ -67,9 +67,9 @@ struct ClientDetailView: View {
                                 client.horses.sorted {
                                     $0.name.localizedStandardCompare($1.name) == .orderedAscending
                                 },
-                                id: \.persistentModelID
+                                id: \.id
                             ) { horse in
-                                RecordNavigationLink(value: ClientRoute.horse(horse.persistentModelID)) {
+                                RecordNavigationLink(value: ClientRoute.horse(horse.id)) {
                                     HorseRow(
                                         horse: horse,
                                         context: .clientDetail
@@ -147,21 +147,16 @@ struct ClientDetailView: View {
                     }
                 }
                 .sheet(isPresented: $showsEditor, onDismiss: reload) {
-                    ClientEditorView(client: client)
+                    ClientEditorDestination(clientID: client.id)
                 }
                 .sheet(isPresented: $showsHorseEditor, onDismiss: reload) {
                     HorseEditorView(preselectedClientID: clientID)
                 }
-                .confirmationDialog(
-                    "Delete Client?",
-                    isPresented: $showsDeleteConfirmation,
-                    titleVisibility: .visible
-                ) {
-                    Button("Delete Client", role: .destructive) {
-                        guard subscription.allowsMutations else { return }
-                        if model.delete(in: context) { dismiss() }
-                    }
-                }
+                .recordDeletionSheet(
+                    .client(clientID), isPresented: $showsDeleteConfirmation,
+                    title: "Delete Client?", confirmationTitle: "Delete Client",
+                    accessibilityPrefix: "client-delete", alert: $model.alert
+                ) { dismiss() }
             } else {
                 ContentUnavailableView("Client Unavailable", systemImage: "exclamationmark.circle")
             }
@@ -174,10 +169,12 @@ struct ClientDetailView: View {
     }
 
     private func reload() {
-        model.load(id: clientID, in: context)
+        model.load(id: clientID, in: ModelContext(context.container))
     }
 
-    private func hasContactDetails(_ client: Client) -> Bool {
+
+
+    private func hasContactDetails(_ client: ClientDetailSnapshot) -> Bool {
         client.phone != nil || client.email != nil || client.notes != nil
     }
 
@@ -205,6 +202,23 @@ struct ClientDetailView: View {
             }
             .font(.subheadline.weight(.semibold))
             .frame(minHeight: SpacingTokens.minimumTouchTarget)
+        }
+    }
+}
+
+private struct ClientEditorDestination: View {
+    @Environment(\.modelContext) private var context
+
+    let clientID: PersistentIdentifier
+
+    var body: some View {
+        if let record = try? context.existingModel(Client.self, for: clientID) {
+            ClientEditorView(client: record)
+        } else {
+            ContentUnavailableView(
+                "Client Unavailable",
+                systemImage: "exclamationmark.circle"
+            )
         }
     }
 }

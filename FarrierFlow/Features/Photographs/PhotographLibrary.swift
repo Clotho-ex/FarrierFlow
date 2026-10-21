@@ -111,6 +111,45 @@ final class PhotographLibrary {
         }
     }
 
+    func deleteRecords(confirming impact: RecordDeletionImpact) async throws {
+        try await coordinator.withExclusiveOperation { @MainActor [self] in
+            let previewContext = ModelContext(container)
+            guard try RecordDeletionPlan(target: impact.target, in: previewContext).impact == impact else {
+                throw RecordDeletionError.dependenciesChanged
+            }
+            if !impact.photoIDs.isEmpty {
+                try fileStore.prepareDirectories()
+                guard protectedDataAvailable() else { throw PhotographLibraryError.protectedDataUnavailable }
+            }
+            var quarantines: [(source: URL, destination: URL)] = []
+            do {
+                for id in impact.photoIDs {
+                    guard try fileStore.canonicalFileIsAvailable(for: id) else { continue }
+                    let canonical = fileStore.canonicalURL(for: id)
+                    let quarantine = fileStore.quarantineURL(photoID: id, operationID: UUID())
+                    try fileStore.moveWithoutOverwriting(from: canonical, to: quarantine)
+                    quarantines.append((source: quarantine, destination: canonical))
+                    try fileStore.applyCompleteProtection(to: quarantine)
+                }
+                try await hooks.afterDiscardQuarantineMoves()
+                try Task.checkCancellation()
+                // Refresh after suspension so new relationships cannot silently
+                // expand what the user confirmed.
+                try RecordDeletionPlan.execute(
+                    impact.target, confirming: impact, in: ModelContext(container), saving: saving
+                )
+            } catch {
+                do { try restoreQuarantines(quarantines) }
+                catch { throw PhotographLibraryError.quarantineRestoreFailed }
+                throw error
+            }
+            // Metadata is committed. Reconciliation can clean up any leftover quarantine.
+            for quarantine in quarantines {
+                try? fileStore.removeManagedFile(at: quarantine.source)
+            }
+        }
+    }
+
     func canonicalURL(for id: UUID) -> URL {
         fileStore.canonicalURL(for: id)
     }

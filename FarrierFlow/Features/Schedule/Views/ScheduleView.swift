@@ -16,10 +16,10 @@ struct ScheduleView: View {
             Group {
                 if model.sections.isEmpty {
                     ContentUnavailableView {
-                        Label("No upcoming appointments", systemImage: "calendar")
+                        Label("No upcoming appointments", systemImage: "calendar.badge.plus")
                     } description: {
                         if subscription.allowsMutations {
-                            Text("Tap + to schedule an appointment.")
+                            Text("Use + to schedule work.")
                                 .frame(maxWidth: 320)
                         }
                     }
@@ -78,6 +78,11 @@ struct ScheduleView: View {
             }
             .onAppear(perform: reload)
             .onChange(of: backupSync?.runtime?.recordsVersion) { _, _ in reload() }
+            .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)) { notification in
+                guard let savedContext = notification.object as? ModelContext,
+                      savedContext.container === context.container else { return }
+                reload()
+            }
             .alert(item: $model.alert) {
                 Alert(title: Text($0.title), message: Text($0.message))
             }

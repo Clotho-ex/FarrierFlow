@@ -19,6 +19,8 @@ nonisolated enum ColorTokens {
     static let background = Color(uiColor: Palette.background)
     static let surface = Color(uiColor: Palette.surface)
     static let surfaceElevated = Color(uiColor: Palette.surfaceElevated)
+    static let recordSurface = Color(uiColor: Palette.recordSurface)
+    static let featuredSurface = Color(uiColor: Palette.featuredSurface)
     static let textPrimary = Color(uiColor: Palette.textPrimary)
     static let textSecondary = Color(uiColor: Palette.textSecondary)
     static let textMuted = Color(uiColor: Palette.textMuted)
@@ -49,6 +51,12 @@ nonisolated enum ColorTokens {
         static let background = dynamic(light: 0xF4F0EB, dark: 0x171513)
         static let surface = dynamic(light: 0xFAF8F5, dark: 0x211E1B)
         static let surfaceElevated = dynamic(light: 0xFFFFFF, dark: 0x2A2622)
+        static let recordSurface = UIColor { traits in
+            let source = traits.userInterfaceStyle == .dark ? surface : surfaceElevated
+            return source.resolvedColor(with: traits)
+        }
+        // Strengthen the featured field in daylight while preserving its existing dark tone.
+        static let featuredSurface = dynamic(light: 0xFBE6D5, dark: 0x3B2516)
 
         static let textPrimary = dynamic(light: 0x24211E, dark: 0xF5F1EC)
         static let textSecondary = dynamic(light: 0x5F5953, dark: 0xB8B0A8)

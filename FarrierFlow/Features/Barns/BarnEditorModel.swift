@@ -27,26 +27,26 @@ final class BarnEditorModel {
         guard let name = TextNormalization.required(draft.name) else { return nil }
 
         let isCreating = barnID == nil
-        let barn: Barn
-        if let barnID {
-            guard let existing = context.model(for: barnID) as? Barn else {
-                alert = FeatureAlert(
-                    title: "Service Location Unavailable",
-                    message: "This service location is no longer available."
-                )
-                return nil
-            }
-            barn = existing
-        } else {
-            barn = Barn(name: name)
-            context.insert(barn)
-        }
-
-        barn.name = name
-        barn.address = TextNormalization.optional(draft.address)
-        barn.contactNotes = TextNormalization.optional(draft.contactNotes)
-
         do {
+            let barn: Barn
+            if let barnID {
+                guard let existing = try context.existingModel(Barn.self, for: barnID) else {
+                    alert = FeatureAlert(
+                        title: "Service Location Unavailable",
+                        message: "This service location is no longer available."
+                    )
+                    return nil
+                }
+                barn = existing
+            } else {
+                barn = Barn(name: name)
+                context.insert(barn)
+            }
+
+            barn.name = name
+            barn.address = TextNormalization.optional(draft.address)
+            barn.contactNotes = TextNormalization.optional(draft.contactNotes)
+
             try DomainGraphValidator.save(context)
             if isCreating {
                 analyticsClient.track(.serviceLocationCreated)

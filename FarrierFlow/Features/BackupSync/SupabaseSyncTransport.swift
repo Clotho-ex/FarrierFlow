@@ -84,7 +84,7 @@ nonisolated struct SupabaseSyncTransport: SyncTransport {
         let receipt: SyncPushReceipt
         do {
             receipt = try await client
-                .rpc(protocolVersion == .legacy ? "ff_sync_push" : "ff_sync_push_v2",
+                .rpc(protocolVersion == .legacy ? "ff_sync_push" : (protocolVersion == .holds ? "ff_sync_push_v2" : "ff_sync_push_v3"),
                      params: PushParameters(p_batch: batch))
                 .execute().value
         } catch let error as PostgrestError where error.code == "40001" {
@@ -129,7 +129,7 @@ nonisolated struct SupabaseSyncTransport: SyncTransport {
     func pull(workspaceID: UUID, cursor: Int64, protocolVersion: SyncProtocolVersion) async throws -> SyncPullPage {
         guard cursor >= 0 else { throw SyncTransportError.invalidResponse }
         let page: SyncPullPage = try await client
-            .rpc(protocolVersion == .legacy ? "ff_sync_pull" : "ff_sync_pull_v2", params: PullParameters(
+            .rpc(protocolVersion == .legacy ? "ff_sync_pull" : (protocolVersion == .holds ? "ff_sync_pull_v2" : "ff_sync_pull_v3"), params: PullParameters(
                 p_workspace: workspaceID, p_cursor: cursor, p_limit: 50
             )).execute().value
         guard page.workspaceID == workspaceID, page.invoicingGeneration > 0,

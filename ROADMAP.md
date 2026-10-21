@@ -489,9 +489,11 @@ mode.
 
 - Add a resumable first-run owner setup flow containing only the required
   Business Profile name. Saving it opens Today directly.
-- Keep contact information, optional operating defaults, reusable Services,
-  and Service Locations in My Business or their contextual feature flows;
-  never present them as a first-run questionnaire or setup checklist.
+- Business setup offers optional reusable Services and prices, persisted with
+  the profile and its currency. My Business manages the same service catalog.
+  Appointment creation can create missing Service Locations, Clients, Horses and
+  Services without losing the draft. Contact information and operating defaults
+  remain contextual.
 - Add optional BusinessProfile defaults for new Appointment duration and new
   Invoice due days. Keep the existing default invoice note and Service catalog.
 - Apply defaults once when a new draft is created. Keep every prefilled value
@@ -558,7 +560,8 @@ final App Store candidate acceptance remain release activities.
   subscription entitlement and SwiftData business records.
 - Treat valid pre-onboarding workspaces as completed without rewriting data.
 - Preserve Pro-only operational mutations and Free/Unavailable read-only
-  access; allow only the required onboarding identity save before entitlement.
+  access; allow onboarding identity and optional initial Services to save before
+  entitlement. Operational mutations retain their entitlement checks.
 - Show small first-use guidance for empty Today, first invoice creation, and
   manual payment recording. Do not add a tutorial framework or payment
   processing semantics.

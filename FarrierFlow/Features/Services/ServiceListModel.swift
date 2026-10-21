@@ -19,14 +19,14 @@ final class ServiceListModel {
 
     @ObservationIgnored private let serviceFetcher: (ModelContext) throws -> [Service]
 
-    private(set) var services: [Service] = []
+    private(set) var services: [ServiceDetailSnapshot] = []
     private(set) var loadState: ServiceListLoadState = .loading
 
-    var activeServices: [Service] {
+    var activeServices: [ServiceDetailSnapshot] {
         services.filter { !$0.isArchived }
     }
 
-    var archivedServices: [Service] {
+    var archivedServices: [ServiceDetailSnapshot] {
         services.filter(\.isArchived)
     }
 
@@ -41,7 +41,7 @@ final class ServiceListModel {
     func load(in context: ModelContext, locale: Locale = .current) {
         loadState = .loading
         do {
-            services = ServiceRules.sorted(try serviceFetcher(context), locale: locale)
+            services = ServiceRules.sorted(try serviceFetcher(context), locale: locale).map(ServiceDetailSnapshot.init)
             loadState = .loaded
         } catch {
             Self.logger.error("Failed to load services: \(error, privacy: .public)")

@@ -97,37 +97,37 @@ final class RootNavigationUITests: XCTestCase {
         let app = launchShowcase(storeName: "RootInlineLargeTitles")
         defer { app.terminate() }
 
-        assertToolbarTitle("Today", actionLabel: "Schedule Appointment", in: app)
+        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.navigationBars["Today"].buttons["Schedule Appointment"].exists)
         assertToolbarTitle("Schedule", actionLabel: "Schedule Appointment", in: app)
         assertToolbarTitle("Clients", actionLabel: "Add Client", in: app)
     }
 
     @MainActor
-    func testRootTabsAndClientNavigationPersistIndependently() throws {
+    func testRootTabsAndBusinessNavigationPersistIndependently() throws {
         let app = XCUIApplication()
         app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] =
             "RootNavigation-\(UUID().uuidString)"
         app.launch()
+        defer { app.terminate() }
 
         XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.tabBars.buttons["Today"].exists)
-        XCTAssertTrue(app.tabBars.buttons["Schedule"].exists)
-        XCTAssertTrue(app.tabBars.buttons["Clients"].exists)
-
-        app.tabBars.buttons["Clients"].tap()
-        XCTAssertTrue(app.navigationBars["Clients"].waitForExistence(timeout: 2))
-        app.buttons["More"].tap()
-        XCTAssertTrue(app.buttons["Service Locations"].exists)
-        XCTAssertFalse(app.buttons["Settings"].exists)
+        XCTAssertEqual(app.tabBars.buttons.count, 4)
+        app.selectFarrierFlowTab("Clients")
+        XCTAssertTrue(app.navigationBars["Clients"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["More"].exists)
+        app.openBusinessRoot()
         app.buttons["Service Locations"].tap()
-        XCTAssertTrue(app.navigationBars["Service Locations"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.navigationBars["Service Locations"].waitForExistence(timeout: 3))
 
-        app.tabBars.buttons["Today"].tap()
-        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 2))
-        app.tabBars.buttons["Schedule"].tap()
-        XCTAssertTrue(app.navigationBars["Schedule"].waitForExistence(timeout: 2))
-        app.tabBars.buttons["Clients"].tap()
-        XCTAssertTrue(app.navigationBars["Service Locations"].waitForExistence(timeout: 2))
+        app.selectFarrierFlowTab("Today")
+        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 3))
+        app.selectFarrierFlowTab("Schedule")
+        XCTAssertTrue(app.navigationBars["Schedule"].waitForExistence(timeout: 3))
+        app.selectFarrierFlowTab("Clients")
+        XCTAssertTrue(app.navigationBars["Clients"].waitForExistence(timeout: 3))
+        app.selectFarrierFlowTab("Business")
+        XCTAssertTrue(app.navigationBars["Service Locations"].waitForExistence(timeout: 3))
     }
 
     @MainActor

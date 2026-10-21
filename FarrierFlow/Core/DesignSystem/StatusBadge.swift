@@ -87,3 +87,21 @@ struct StatusBadge: View {
         .accessibilityLabel(Text(title))
     }
 }
+
+struct RecordStatusPill: View {
+    let title: LocalizedStringResource
+    var tone: StatusTone = .neutral
+
+    var body: some View {
+        Text(title)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(ColorTokens.textPrimary)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(tone.background, in: Capsule())
+            .overlay {
+                Capsule().stroke(ColorTokens.border.opacity(0.65), lineWidth: 0.5)
+            }
+    }
+}

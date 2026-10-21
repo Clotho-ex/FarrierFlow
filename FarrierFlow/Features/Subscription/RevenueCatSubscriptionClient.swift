@@ -25,14 +25,44 @@ enum RevenueCatSubscriptionClientComposition {
         publicSDKKey: () throws -> String = {
             try RevenueCatConfiguration.publicSDKKey()
         },
-        clientFactory: (String) -> any SubscriptionClient = {
+        clientFactory: @escaping (String) -> any SubscriptionClient = {
             RevenueCatSubscriptionClient(publicSDKKey: $0)
         }
     ) -> any SubscriptionClient {
         guard let key = try? publicSDKKey() else {
             return UnavailableSubscriptionClient()
         }
-        return clientFactory(key)
+        return DeferredSubscriptionClient { clientFactory(key) }
+    }
+}
+
+@MainActor
+private final class DeferredSubscriptionClient: SubscriptionClient {
+    private let factory: () -> any SubscriptionClient
+    private lazy var client = factory()
+
+    init(factory: @escaping () -> any SubscriptionClient) {
+        self.factory = factory
+    }
+
+    func customerInfo() async throws -> SubscriptionCustomerSnapshot {
+        try await client.customerInfo()
+    }
+
+    func offerings() async throws -> [SubscriptionPlan] {
+        try await client.offerings()
+    }
+
+    func purchase(planID: String) async throws -> SubscriptionPurchaseResult {
+        try await client.purchase(planID: planID)
+    }
+
+    func restorePurchases() async throws -> SubscriptionCustomerSnapshot {
+        try await client.restorePurchases()
+    }
+
+    func customerInfoUpdates() async -> AsyncStream<SubscriptionCustomerSnapshot> {
+        await client.customerInfoUpdates()
     }
 }
 

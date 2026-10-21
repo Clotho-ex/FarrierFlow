@@ -189,7 +189,7 @@ nonisolated struct SyncJournal: Codable, Equatable, Sendable {
             throw SyncJournalError.batchTooLarge
         }
         pending = batch
-        pendingProtocolVersion = .holds
+        pendingProtocolVersion = .deletion
         return batch
     }
 

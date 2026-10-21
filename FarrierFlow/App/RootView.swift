@@ -30,6 +30,7 @@ struct RootView: View {
     @State private var setupModel = OwnerSetupReadinessModel()
     @State private var onboarding: OnboardingExperienceModel
     @State private var showsBackupInvitation = false
+    @State private var hasPresentedInitialContent = false
     private let onboardingDefaults: UserDefaults
 
     init(onboardingDefaults: UserDefaults = .standard) {
@@ -80,27 +81,17 @@ struct RootView: View {
         }
         .navigationLinkIndicatorVisibility(.hidden)
         .environment(onboarding)
+        .environment(\.appStartupReady, hasPresentedInitialContent)
         .task {
-            subscription.start()
             resolveInitialSetup()
-            await reconcilePhotographs()
         }
-        .task(id: scenePhase) {
-            if scenePhase == .active { await backupSync?.restore() }
-            else if scenePhase == .background { backupSync?.runtime?.stop() }
-        }
-        .task(id: backupSync?.authenticationObservationID) { await backupSync?.observeAuthentication() }
-        .task {
-            for await connected in SyncConnectivity.changes() {
-                guard !Task.isCancelled else { return }
-                if connected, scenePhase == .active { await backupSync?.connectionBecameAvailable() }
+        .background {
+            if setupModel.loadState == .loaded, !hasPresentedInitialContent {
+                InitialContentPresentation { hasPresentedInitialContent = true }
             }
         }
-        .task(id: cloudObservationScope) {
-            if scenePhase == .active { await backupSync?.observeWorkspace() }
-        }
-        .task(id: backupInvitationReady) {
-            if backupInvitationReady, backupSync?.consumeInvitation() == true { showsBackupInvitation = true }
+        .background {
+            if hasPresentedInitialContent { backgroundServices }
         }
         .sheet(isPresented: $showsBackupInvitation) {
             BackupSyncSheet().dynamicTypeSize(dynamicTypeSize)
@@ -125,11 +116,43 @@ struct RootView: View {
                 for: UIApplication.protectedDataDidBecomeAvailableNotification
             )
         ) { _ in
+            guard hasPresentedInitialContent else { return }
             Task {
                 await reconcilePhotographs()
                 await backupSync?.retry()
             }
         }
+    }
+
+    private var backgroundServices: some View {
+        Color.clear
+            .accessibilityHidden(true)
+            .task {
+                analyticsClient.start()
+                subscription.start()
+                await reconcilePhotographs()
+            }
+            .task(id: scenePhase) {
+                if scenePhase == .active { await backupSync?.restore() }
+                else if scenePhase == .background { backupSync?.runtime?.stop() }
+            }
+            .task(id: backupSync?.authenticationObservationID) {
+                await backupSync?.observeAuthentication()
+            }
+            .task {
+                for await connected in SyncConnectivity.changes() {
+                    guard !Task.isCancelled else { return }
+                    if connected, scenePhase == .active { await backupSync?.connectionBecameAvailable() }
+                }
+            }
+            .task(id: cloudObservationScope) {
+                if scenePhase == .active { await backupSync?.observeWorkspace() }
+            }
+            .task(id: backupInvitationReady) {
+                if backupInvitationReady, backupSync?.consumeInvitation() == true {
+                    showsBackupInvitation = true
+                }
+            }
     }
 
     private var cloudObservationScope: CloudObservationScope {
@@ -143,10 +166,18 @@ struct RootView: View {
             backupSync?.shouldOfferInvitation == true
     }
 
+    private var businessTabRole: TabRole? {
+        if #available(iOS 27, *) {
+            .prominent
+        } else {
+            nil
+        }
+    }
+
     private var appTabs: some View {
         TabView(selection: $selectedTab) {
             Tab("Today", systemImage: "sun.max", value: .today) {
-                TodayView()
+                TodayView(showSchedule: { selectedTab = .schedule })
             }
 
             Tab("Schedule", systemImage: "calendar", value: .schedule) {
@@ -156,7 +187,16 @@ struct RootView: View {
             Tab("Clients", systemImage: "person.2", value: .clients) {
                 ClientListView()
             }
+            Tab(
+                "Business",
+                systemImage: "briefcase",
+                value: .business,
+                role: businessTabRole
+            ) {
+                BusinessView()
+            }
         }
+        .sensoryFeedback(.selection, trigger: selectedTab)
     }
 
     private func resolveInitialSetup() {

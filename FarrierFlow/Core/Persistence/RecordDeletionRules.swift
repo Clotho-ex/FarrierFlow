@@ -2,111 +2,15 @@ import Foundation
 import SwiftData
 
 nonisolated enum RecordDeletionBlock: Error, Equatable {
-    case clientHasHorses
-    case clientHasInvoices
-    case barnHasHorses
-    case barnHasAppointments
-    case barnHasHorsesAndAppointments
-    case barnHasVisits
-    case horseHasAppointments
-    case horseHasVisits
-    case appointmentHasVisit
-    case completedVisitCannotBeDeleted
-    case visitHasInvoiceLineItems
-    case workItemHasInvoiceLineItem
     case businessProfileCannotBeDeleted
     case serviceHasHorseDefaults
-    case serviceHasPlannedAppointments
-    case serviceHasWorkItems
-    case serviceHasHorseDefaultsAndWorkItems
 
     var alert: FeatureAlert {
         switch self {
-        case .clientHasHorses:
-            FeatureAlert(
-                title: "Can’t Delete Client",
-                message: "Reassign or remove this client’s horses first."
-            )
-        case .clientHasInvoices:
-            FeatureAlert(
-                title: "Can’t Delete Client",
-                message: "This client is referenced by invoice history."
-            )
-        case .barnHasHorses:
-            FeatureAlert(
-                title: "Can’t Delete Service Location",
-                message: "Move or remove the horses at this service location first."
-            )
-        case .barnHasAppointments:
-            FeatureAlert(
-                title: "Can’t Delete Service Location",
-                message: "Delete its appointments first."
-            )
-        case .barnHasHorsesAndAppointments:
-            FeatureAlert(
-                title: "Can’t Delete Service Location",
-                message: "Move or remove its horses and delete its appointments first."
-            )
-        case .barnHasVisits:
-            FeatureAlert(
-                title: "Can’t Delete Service Location",
-                message: "This service location is referenced by visit history."
-            )
-        case .horseHasAppointments:
-            FeatureAlert(
-                title: "Can’t Delete Horse",
-                message: "Delete appointments that reference this horse first."
-            )
-        case .horseHasVisits:
-            FeatureAlert(
-                title: "Can’t Delete Horse",
-                message: "This horse is referenced by visit history."
-            )
-        case .appointmentHasVisit:
-            FeatureAlert(
-                title: "Can’t Delete Appointment",
-                message: "This appointment has a visit."
-            )
-        case .completedVisitCannotBeDeleted:
-            FeatureAlert(
-                title: "Can’t Delete Visit",
-                message: "Completed visits remain part of horse history."
-            )
-        case .visitHasInvoiceLineItems:
-            FeatureAlert(
-                title: "Can’t Delete Visit",
-                message: "This visit is referenced by an invoice."
-            )
-        case .workItemHasInvoiceLineItem:
-            FeatureAlert(
-                title: "Can’t Delete Recorded Work",
-                message: "This recorded work is referenced by an invoice."
-            )
         case .businessProfileCannotBeDeleted:
-            FeatureAlert(
-                title: "Can’t Delete Business Profile",
-                message: "Edit the existing business profile instead."
-            )
-        case .serviceHasPlannedAppointments:
-            FeatureAlert(
-                title: "Service Is Scheduled",
-                message: "This service is referenced by appointments. Archive it to keep their service choices."
-            )
+            FeatureAlert(title: "Can’t Delete Business Profile", message: "Edit the existing business profile instead.")
         case .serviceHasHorseDefaults:
-            FeatureAlert(
-                title: "Can’t Delete Service",
-                message: "Clear or replace every Horse default first."
-            )
-        case .serviceHasWorkItems:
-            FeatureAlert(
-                title: "Can’t Delete Service",
-                message: "This service is referenced by recorded work."
-            )
-        case .serviceHasHorseDefaultsAndWorkItems:
-            FeatureAlert(
-                title: "Can’t Delete Service",
-                message: "Clear Horse defaults and remove recorded work first."
-            )
+            FeatureAlert(title: "Can’t Archive Service", message: "Clear or replace every Horse default first.")
         }
     }
 }
@@ -114,68 +18,23 @@ nonisolated enum RecordDeletionBlock: Error, Equatable {
 @MainActor
 enum RecordDeletionRules {
     static func delete(_ client: Client, in context: ModelContext) throws {
-        guard client.invoices.isEmpty else { throw RecordDeletionBlock.clientHasInvoices }
-        guard client.horses.isEmpty else { throw RecordDeletionBlock.clientHasHorses }
-        try persistDeletion(in: context) {
-            context.delete(client)
-        }
+        try RecordDeletionPlan.execute(.client(client.persistentModelID), in: context)
     }
 
     static func delete(_ barn: Barn, in context: ModelContext) throws {
-        if !barn.visits.isEmpty {
-            throw RecordDeletionBlock.barnHasVisits
-        }
-        switch (barn.horses.isEmpty, barn.appointments.isEmpty) {
-        case (false, false):
-            throw RecordDeletionBlock.barnHasHorsesAndAppointments
-        case (false, true):
-            throw RecordDeletionBlock.barnHasHorses
-        case (true, false):
-            throw RecordDeletionBlock.barnHasAppointments
-        case (true, true):
-            try persistDeletion(in: context) {
-                context.delete(barn)
-            }
-        }
+        try RecordDeletionPlan.execute(.barn(barn.persistentModelID), in: context)
     }
 
     static func delete(_ horse: Horse, in context: ModelContext) throws {
-        if !horse.visitHorses.isEmpty {
-            throw RecordDeletionBlock.horseHasVisits
-        }
-        guard horse.appointmentHorses.isEmpty else {
-            throw RecordDeletionBlock.horseHasAppointments
-        }
-        try persistDeletion(in: context) {
-            context.delete(horse)
-        }
+        try RecordDeletionPlan.execute(.horse(horse.persistentModelID), in: context)
     }
 
     static func delete(_ appointment: Appointment, in context: ModelContext) throws {
-        guard appointment.visit == nil else {
-            throw RecordDeletionBlock.appointmentHasVisit
-        }
-        try persistDeletion(in: context) {
-            context.delete(appointment)
-        }
+        try RecordDeletionPlan.execute(.appointment(appointment.persistentModelID), in: context)
     }
 
     static func delete(_ visit: Visit, in context: ModelContext) throws {
-        guard visit.invoiceVisits.isEmpty else {
-            throw RecordDeletionBlock.visitHasInvoiceLineItems
-        }
-        guard visit.completedAt == nil else {
-            throw RecordDeletionBlock.completedVisitCannotBeDeleted
-        }
-        try persistDeletion(in: context) {
-            let appointment = visit.appointment
-            let barn = visit.barn
-            appointment?.visit = nil
-            visit.appointment = nil
-            barn?.visits.removeAll { $0 === visit }
-            visit.barn = nil
-            context.delete(visit)
-        }
+        try RecordDeletionPlan.execute(.visit(visit.persistentModelID), in: context)
     }
 
     static func delete(
@@ -201,32 +60,11 @@ enum RecordDeletionRules {
     }
 
     static func delete(_ service: Service, in context: ModelContext) throws {
-        guard service.plannedAppointments.isEmpty else {
-            throw RecordDeletionBlock.serviceHasPlannedAppointments
-        }
-        switch (service.horsesUsingAsDefault.isEmpty, service.workItems.isEmpty) {
-        case (false, false):
-            throw RecordDeletionBlock.serviceHasHorseDefaultsAndWorkItems
-        case (false, true):
-            throw RecordDeletionBlock.serviceHasHorseDefaults
-        case (true, false):
-            throw RecordDeletionBlock.serviceHasWorkItems
-        case (true, true):
-            try persistDeletion(in: context) {
-                context.delete(service)
-            }
-        }
+        try RecordDeletionPlan.execute(.service(service.persistentModelID), in: context)
     }
 
     static func delete(_ workItem: WorkItem, in context: ModelContext) throws {
-        guard workItem.invoiceLineItem == nil else {
-            throw RecordDeletionBlock.workItemHasInvoiceLineItem
-        }
-        try persistDeletion(in: context) {
-            workItem.service?.workItems.removeAll { $0 === workItem }
-            workItem.visitHorse?.workItems.removeAll { $0 === workItem }
-            context.delete(workItem)
-        }
+        try RecordDeletionPlan.execute(.workItem(workItem.persistentModelID), in: context)
     }
 
     static func delete(

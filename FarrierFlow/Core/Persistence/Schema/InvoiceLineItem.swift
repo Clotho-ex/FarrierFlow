@@ -17,6 +17,11 @@ extension FarrierFlowSchemaV5 {
         private(set) var invoiceVisit: InvoiceVisit?
         private(set) var sourceWorkItem: WorkItem?
 
+        func detachSourceWorkItem() {
+            sourceWorkItem?.invoiceLineItem = nil
+            sourceWorkItem = nil
+        }
+
         init(
             syncID: UUID = UUID(),
             horseNameSnapshot: String,
@@ -24,7 +29,7 @@ extension FarrierFlowSchemaV5 {
             amountMinorUnits: Int64,
             currencyCode: String = "USD",
             invoiceVisit: InvoiceVisit,
-            sourceWorkItem: WorkItem
+            sourceWorkItem: WorkItem?
         ) {
             self.syncID = syncID
             self.horseNameSnapshot = horseNameSnapshot

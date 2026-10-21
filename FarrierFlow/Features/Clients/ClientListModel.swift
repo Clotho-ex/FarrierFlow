@@ -5,7 +5,7 @@ import SwiftData
 @MainActor
 @Observable
 final class ClientListModel {
-    private(set) var clients: [Client] = []
+    private(set) var clients: [ClientDetailSnapshot] = []
     var alert: FeatureAlert?
 
     func load(in context: ModelContext) {
@@ -14,7 +14,7 @@ final class ClientListModel {
                 FetchDescriptor<Client>(
                     sortBy: [SortDescriptor(\.name, comparator: .localizedStandard)]
                 )
-            )
+            ).map(ClientDetailSnapshot.init)
         } catch {
             alert = FeatureAlert(
                 title: "Couldn’t Load Clients",

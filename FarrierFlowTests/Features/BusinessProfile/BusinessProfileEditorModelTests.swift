@@ -7,6 +7,58 @@ import Testing
 @MainActor
 struct BusinessProfileEditorModelTests {
     @Test
+    func setupSavesServicesWithBusinessCurrencyAndDoesNotDuplicateOnResave() throws {
+        let container = try ModelContainerFactory.inMemoryTest()
+        let context = container.mainContext
+        let model = BusinessProfileEditorModel()
+        model.load(in: context, locale: Locale(identifier: "de_DE"))
+        model.draft.name = "Field Farrier"
+        model.draft.currencyCode = "EUR"
+        model.addSetupService()
+        model.setupServices[0].service.name = "Trim"
+        model.setupServices[0].service.priceInput = "45,50"
+        model.addSetupService()
+        model.setupServices[1].service.name = "Full Set"
+        model.setupServices[1].service.priceInput = "90,25"
+        #expect(model.canSave)
+        #expect(model.save(in: context))
+        let check = ModelContext(container)
+        let services = try check.fetch(FetchDescriptor<Service>())
+        #expect(services.count == 2)
+        #expect(services.first { $0.name == "Trim" }?.defaultAmountMinorUnits == 4550)
+        #expect(services.first { $0.name == "Full Set" }?.defaultAmountMinorUnits == 9025)
+        #expect(services.allSatisfy { $0.currencyCode == "EUR" })
+        #expect(try check.fetch(FetchDescriptor<BusinessProfile>()).first?.currencyCode == "EUR")
+        #expect(model.isCurrencyLocked)
+        #expect(model.setupServices.isEmpty)
+        #expect(model.save(in: context))
+        #expect(try context.fetchCount(FetchDescriptor<Service>()) == 2)
+    }
+
+    @Test
+    func invalidSetupServiceLeavesEntireBusinessUnsavedAndCanBeRemoved() throws {
+        let container = try ModelContainerFactory.inMemoryTest()
+        let context = container.mainContext
+        let model = BusinessProfileEditorModel()
+        model.load(in: context)
+        model.draft.name = "Field Farrier"
+        model.addSetupService()
+        model.setupServices[0].service.name = "Trim"
+        model.setupServices[0].service.priceInput = "45"
+        model.addSetupService()
+        model.setupServices[1].service.name = "Full Set"
+        model.setupServices[1].service.priceInput = "not a price"
+        #expect(!model.canSave)
+        #expect(!model.save(in: context))
+        #expect(try context.fetchCount(FetchDescriptor<BusinessProfile>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<Service>()) == 0)
+        #expect(model.setupServices.count == 2)
+        model.setupServices = []
+        #expect(model.canSave)
+        #expect(model.save(in: context))
+    }
+
+    @Test
     func loadsAnEmptyDraftThenCreatesTheSoleProfileAtSequenceOne() throws {
         let container = try ModelContainerFactory.inMemoryTest()
         let context = container.mainContext

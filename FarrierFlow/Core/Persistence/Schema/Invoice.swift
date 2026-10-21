@@ -49,7 +49,7 @@ extension FarrierFlowSchemaV5 {
             businessEmailSnapshot: String? = nil,
             businessAddressSnapshot: String? = nil,
             currencyCode: String = "USD",
-            client: Client
+            client: Client?
         ) {
             self.syncID = syncID
             self.number = number
@@ -66,6 +66,11 @@ extension FarrierFlowSchemaV5 {
             self.businessAddressSnapshot = businessAddressSnapshot
             self.currencyCode = currencyCode
             self.client = client
+        }
+
+        func detachClient() {
+            client?.invoices.removeAll { $0 === self }
+            client = nil
         }
 
         func recordCompletedPayment(_ payment: Payment) throws {

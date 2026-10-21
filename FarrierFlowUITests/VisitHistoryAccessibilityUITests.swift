@@ -25,7 +25,7 @@ final class VisitHistoryAccessibilityUITests: XCTestCase {
         let overviewText = accessibilityText(of: overview)
         XCTAssertTrue(overviewText.contains("Completed"))
         XCTAssertTrue(overviewText.contains("invoiced work"))
-        XCTAssertTrue(overviewText.contains("can no longer be corrected"))
+        XCTAssertTrue(overviewText.contains("Corrections do not change saved invoices"))
 
         let serviceLocation = app.descendants(matching: .any)[
             "visit-detail-service-location-snapshot"
@@ -69,7 +69,7 @@ final class VisitHistoryAccessibilityUITests: XCTestCase {
         XCTAssertTrue(accessibilityText(of: status).contains("Completed"))
         XCTAssertTrue(
             app.staticTexts[
-                "This visit has invoiced work and can no longer be corrected."
+                "This visit has invoiced work. Corrections do not change saved invoices."
             ].waitForExistence(timeout: 3)
         )
         XCTAssertFalse(
@@ -136,7 +136,7 @@ final class VisitHistoryAccessibilityUITests: XCTestCase {
     private func openClients(in app: XCUIApplication) -> Bool {
         for _ in 0..<3 {
             app.tabBars.buttons["Clients"].tap()
-            if app.buttons["More"].waitForExistence(timeout: 2) {
+            if app.navigationBars["Clients"].waitForExistence(timeout: 2) {
                 return true
             }
         }

@@ -28,27 +28,27 @@ final class ClientEditorModel {
         guard let name = TextNormalization.required(draft.name) else { return nil }
 
         let isCreating = clientID == nil
-        let client: Client
-        if let clientID {
-            guard let existing = context.model(for: clientID) as? Client else {
-                alert = FeatureAlert(
-                    title: "Client Unavailable",
-                    message: "This client is no longer available."
-                )
-                return nil
-            }
-            client = existing
-        } else {
-            client = Client(name: name)
-            context.insert(client)
-        }
-
-        client.name = name
-        client.phone = TextNormalization.optional(draft.phone)
-        client.email = TextNormalization.optional(draft.email)
-        client.notes = TextNormalization.optional(draft.notes)
-
         do {
+            let client: Client
+            if let clientID {
+                guard let existing = try context.existingModel(Client.self, for: clientID) else {
+                    alert = FeatureAlert(
+                        title: "Client Unavailable",
+                        message: "This client is no longer available."
+                    )
+                    return nil
+                }
+                client = existing
+            } else {
+                client = Client(name: name)
+                context.insert(client)
+            }
+
+            client.name = name
+            client.phone = TextNormalization.optional(draft.phone)
+            client.email = TextNormalization.optional(draft.email)
+            client.notes = TextNormalization.optional(draft.notes)
+
             try DomainGraphValidator.save(context)
             if isCreating {
                 analyticsClient.track(.clientCreated)

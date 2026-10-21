@@ -23,13 +23,18 @@ extension FarrierFlowSchemaV5 {
         )
         var lineItems: [InvoiceLineItem] = []
 
+        func detachSourceVisit() {
+            sourceVisit?.invoiceVisits.removeAll { $0 === self }
+            sourceVisit = nil
+        }
+
         init(
             syncID: UUID = UUID(),
             visitDateSnapshot: Date,
             serviceLocationNameSnapshot: String,
             serviceLocationAddressSnapshot: String? = nil,
             invoice: Invoice,
-            sourceVisit: Visit
+            sourceVisit: Visit?
         ) {
             self.syncID = syncID
             self.visitDateSnapshot = visitDateSnapshot

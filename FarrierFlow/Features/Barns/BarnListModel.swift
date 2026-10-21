@@ -5,7 +5,7 @@ import SwiftData
 @MainActor
 @Observable
 final class BarnListModel {
-    private(set) var barns: [Barn] = []
+    private(set) var barns: [BarnDetailSnapshot] = []
     var alert: FeatureAlert?
 
     func load(in context: ModelContext) {
@@ -14,7 +14,7 @@ final class BarnListModel {
                 FetchDescriptor<Barn>(
                     sortBy: [SortDescriptor(\.name, comparator: .localizedStandard)]
                 )
-            )
+            ).map(BarnDetailSnapshot.init)
         } catch {
             alert = FeatureAlert(
                 title: "Couldn’t Load Service Locations",

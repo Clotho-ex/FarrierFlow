@@ -11,16 +11,69 @@ nonisolated enum TodayLoadState: Equatable {
 nonisolated struct TodayAppointmentSummary: Hashable, Identifiable {
     let id: PersistentIdentifier
     let startDate: Date
+    let serviceLocationID: PersistentIdentifier
     let serviceLocationName: String
     let serviceLocationAddress: String?
     let horseNames: [String]
+    let horseIDs: [PersistentIdentifier]
     let state: TodayAppointmentState
+
+    func heading(at now: Date) -> LocalizedStringResource {
+        now >= startDate ? "Due Now" : "Next Appointment"
+    }
+}
+
+nonisolated struct TodayStopSummary: Hashable, Identifiable {
+    struct ID: Hashable {
+        let serviceLocationID: PersistentIdentifier
+        let startDate: Date
+        let state: TodayAppointmentState
+    }
+
+    let id: ID
+    let appointments: [TodayAppointmentSummary]
+
+    var horseNames: [String] {
+        var seen = Set<PersistentIdentifier>()
+        return appointments.flatMap { appointment in
+            zip(appointment.horseIDs, appointment.horseNames).compactMap { id, name in
+                seen.insert(id).inserted ? name : nil
+            }
+        }.sorted(using: String.StandardComparator(.localizedStandard))
+    }
+
+    static func grouped(_ appointments: [TodayAppointmentSummary]) -> [Self] {
+        var order: [ID] = []
+        var groups: [ID: [TodayAppointmentSummary]] = [:]
+        for appointment in appointments {
+            // Only co-locate exact record identities and times; different work states stay explicit.
+            let key = ID(
+                serviceLocationID: appointment.serviceLocationID,
+                startDate: appointment.startDate,
+                state: appointment.state
+            )
+            if groups[key] == nil { order.append(key) }
+            groups[key, default: []].append(appointment)
+        }
+        return order.map { Self(id: $0, appointments: groups[$0, default: []]) }
+    }
 }
 
 nonisolated enum TodayAppointmentState: Hashable {
     case scheduled
     case inProgress
     case completed
+
+    var localizedTitle: LocalizedStringResource {
+        switch self {
+        case .scheduled:
+            "Scheduled"
+        case .inProgress:
+            "In Progress"
+        case .completed:
+            "Work Complete"
+        }
+    }
 }
 
 nonisolated struct TodayHorseSummary: Equatable {
@@ -62,9 +115,18 @@ nonisolated enum TodayPrimaryAction: Hashable {
     case resumeVisit(TodayVisitSummary)
     case openAppointment(TodayAppointmentSummary)
     case addClient
+    case addHorse(PersistentIdentifier?)
     case createInvoice(TodayInvoiceCandidate)
     case reviewInvoice(TodayUnpaidInvoiceSummary)
     case scheduleAppointment
+}
+
+nonisolated enum TodayEmptyState: Equatable {
+    case addClient
+    case addHorse
+    case noAppointments
+    case noStops(nextAppointment: Date?)
+    case allDone
 }
 
 @MainActor
@@ -74,6 +136,10 @@ final class TodayModel {
     private(set) var businessName = ""
     private(set) var primaryAction: TodayPrimaryAction = .scheduleAppointment
     private(set) var remainingAppointments: [TodayAppointmentSummary] = []
+    private(set) var featuredStop: TodayStopSummary?
+    private(set) var remainingStops: [TodayStopSummary] = []
+    private(set) var emptyState: TodayEmptyState?
+    private(set) var dayIsComplete = false
     var alert: FeatureAlert?
 
     func load(in context: ModelContext, now: Date, calendar: Calendar) {
@@ -86,6 +152,7 @@ final class TodayModel {
                 now: now,
                 calendar: calendar
             )
+            dayIsComplete = !appointments.isEmpty && appointments.allSatisfy { $0.state == .completed }
 
             if let visit = try activeVisitSummaries(in: context).first {
                 primaryAction = .resumeVisit(visit)
@@ -109,17 +176,80 @@ final class TodayModel {
             } else if let invoice = try unpaidInvoiceSummaries(in: context).first {
                 primaryAction = .reviewInvoice(invoice)
                 remainingAppointments = appointments
+            } else if try context.fetchCount(FetchDescriptor<Horse>()) == 0 {
+                var clients = FetchDescriptor<Client>()
+                clients.fetchLimit = 2
+                let choices = try context.fetch(clients)
+                primaryAction = .addHorse(choices.count == 1 ? choices.first?.persistentModelID : nil)
+                remainingAppointments = appointments
             } else {
                 primaryAction = .scheduleAppointment
                 remainingAppointments = appointments
             }
 
+            let stops = TodayStopSummary.grouped(appointments)
+            if case .openAppointment(let appointment) = primaryAction {
+                featuredStop = stops.first { $0.appointments.contains { $0.id == appointment.id } }
+            } else {
+                featuredStop = nil
+            }
+            let featuredIDs = Set(featuredStop?.appointments.map(\.id) ?? [])
+            remainingStops = TodayStopSummary.grouped(
+                remainingAppointments.filter { !featuredIDs.contains($0.id) }
+            )
+            switch primaryAction {
+            case .addClient:
+                emptyState = .addClient
+            case .addHorse:
+                emptyState = .addHorse
+            case .scheduleAppointment:
+                emptyState = try idleState(in: context, now: now, calendar: calendar)
+            default:
+                emptyState = nil
+            }
             loadState = .loaded
         } catch {
             businessName = ""
             primaryAction = .scheduleAppointment
             remainingAppointments = []
+            featuredStop = nil
+            remainingStops = []
+            emptyState = nil
+            dayIsComplete = false
             loadState = .failed
+        }
+    }
+
+    private func idleState(in context: ModelContext, now: Date, calendar: Calendar) throws -> TodayEmptyState {
+        if dayIsComplete { return .allDone }
+        let nextDay = CalendarRules.dayInterval(containing: now, calendar: calendar).end
+        var future = FetchDescriptor<Appointment>(
+            predicate: #Predicate { $0.startDate >= nextDay && $0.visit == nil },
+            sortBy: [SortDescriptor(\.startDate)]
+        )
+        future.fetchLimit = 1
+        if let next = try context.fetch(future).first {
+            return .noStops(nextAppointment: next.startDate)
+        }
+        return try context.fetchCount(FetchDescriptor<Appointment>()) == 0
+            ? .noAppointments : .noStops(nextAppointment: nil)
+    }
+
+    func remainingSectionTitle(at now: Date) -> LocalizedStringResource {
+        if remainingStops.contains(where: {
+            $0.id.state != .completed && $0.id.startDate <= now
+        }) {
+            return "Remaining Today"
+        }
+        switch primaryAction {
+        case .openAppointment(let appointment):
+            return remainingStops.contains {
+                $0.id.state != .completed && $0.id.startDate <= appointment.startDate
+            } ? "Other Stops" : "Later Today"
+        case .resumeVisit:
+            return "Other Stops"
+        default:
+            return "Today’s Stops"
         }
     }
 
@@ -152,33 +282,7 @@ final class TodayModel {
                 sortBy: [SortDescriptor(\.startDate)]
             )
         )
-        return try appointments.map { appointment in
-            guard
-                let barn = appointment.barn,
-                let barnName = TextNormalization.required(barn.name)
-            else {
-                throw TodayProjectionError.invalidAppointment
-            }
-            let horseNames = appointment.appointmentHorses
-                .compactMap { TextNormalization.required($0.horse?.name ?? "") }
-                .sorted(using: String.StandardComparator(.localizedStandard))
-            guard !horseNames.isEmpty else {
-                throw TodayProjectionError.invalidAppointment
-            }
-            return TodayAppointmentSummary(
-                id: appointment.persistentModelID,
-                startDate: appointment.startDate,
-                serviceLocationName: barnName,
-                serviceLocationAddress: TextNormalization.optional(barn.address ?? ""),
-                horseNames: horseNames,
-                state: appointmentState(for: appointment)
-            )
-        }.sorted(by: appointmentOrder)
-    }
-
-    private func appointmentState(for appointment: Appointment) -> TodayAppointmentState {
-        guard let visit = appointment.visit else { return .scheduled }
-        return visit.completedAt == nil ? .inProgress : .completed
+        return try appointments.map(TodayAppointmentSummary.project).sorted(by: appointmentOrder)
     }
 
     private func activeVisitSummaries(
@@ -293,4 +397,32 @@ private enum TodayProjectionError: Error {
     case invalidBusinessProfile
     case invalidAppointment
     case invalidVisit
+}
+
+extension TodayAppointmentSummary {
+    @MainActor
+    static func project(_ appointment: Appointment) throws -> Self {
+        guard
+            let barn = appointment.barn,
+            let barnName = TextNormalization.required(barn.name)
+        else {
+            throw TodayProjectionError.invalidAppointment
+        }
+        let horses = appointment.appointmentHorses.compactMap(\.horse)
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        let horseNames = horses.compactMap { TextNormalization.required($0.name) }
+        guard !horseNames.isEmpty, horseNames.count == appointment.appointmentHorses.count else {
+            throw TodayProjectionError.invalidAppointment
+        }
+        return TodayAppointmentSummary(
+            id: appointment.persistentModelID,
+            startDate: appointment.startDate,
+            serviceLocationID: barn.persistentModelID,
+            serviceLocationName: barnName,
+            serviceLocationAddress: TextNormalization.optional(barn.address ?? ""),
+            horseNames: horseNames,
+            horseIDs: horses.map(\.persistentModelID),
+            state: appointment.visit.map { $0.completedAt == nil ? .inProgress : .completed } ?? .scheduled
+        )
+    }
 }

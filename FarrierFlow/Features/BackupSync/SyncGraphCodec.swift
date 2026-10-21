@@ -240,7 +240,11 @@ enum SyncGraphCodec {
             }
             if old.kind == .workItem, let hold = old.fields["billingHoldID"], hold != .null,
                next.fields["billingHoldID"] != hold {
-                throw BillingHoldError.immutableHold
+                guard case .string(let value) = hold, let invoiceID = UUID(uuidString: value),
+                      next.fields["billingHoldID"] == .null, incoming[invoiceID] == nil,
+                      existingByID[invoiceID]?.kind == .invoice ||
+                        (journal?.revisions[invoiceID] != nil && journal?.baseline.contains { $0.id == invoiceID } == false)
+                else { throw BillingHoldError.immutableHold }
             }
             if [.invoice, .invoiceVisit, .invoiceLineItem, .payment, .photograph].contains(old.kind) {
                 var oldFields = old.fields
@@ -248,6 +252,27 @@ enum SyncGraphCodec {
                 if old.kind == .invoice {
                     oldFields.removeValue(forKey: "statusRawValue")
                     newFields.removeValue(forKey: "statusRawValue")
+                }
+                let detachable: String? = switch old.kind {
+                case .invoice: "client"
+                case .invoiceVisit: "sourceVisit"
+                case .invoiceLineItem: "sourceWorkItem"
+                default: nil
+                }
+                if let field = detachable, oldFields[field] != newFields[field],
+                   newFields[field] == .null, case .string(let value) = oldFields[field],
+                   let sourceID = UUID(uuidString: value) {
+                    var mayDetach = incoming[sourceID] == nil
+                    if old.kind == .invoiceLineItem,
+                       case .string(let groupValue) = old.fields["invoiceVisit"],
+                       let groupID = UUID(uuidString: groupValue),
+                       let invoice = incoming[groupID]?.fields["invoice"],
+                       incoming[sourceID]?.fields["billingHoldID"] == invoice {
+                        mayDetach = true
+                    }
+                    guard mayDetach else { throw SyncGraphError.immutableHistoryChanged }
+                    oldFields.removeValue(forKey: field)
+                    newFields.removeValue(forKey: field)
                 }
                 guard oldFields == newFields else {
                     throw SyncGraphError.immutableHistoryChanged
@@ -294,6 +319,19 @@ enum SyncGraphCodec {
         var invoiceVisits = try models(InvoiceVisit.self, in: context)
         var invoiceLineItems = try models(InvoiceLineItem.self, in: context)
         var payments = try models(Payment.self, in: context)
+        // Detach retained financial snapshots before deleting their live sources.
+        for (id, model) in invoices where incoming[id]?.fields["client"] == .null {
+            model.detachClient()
+        }
+        for (id, model) in invoiceVisits where incoming[id]?.fields["sourceVisit"] == .null {
+            model.detachSourceVisit()
+        }
+        for (id, model) in invoiceLineItems where incoming[id]?.fields["sourceWorkItem"] == .null || incoming[id] == nil {
+            model.detachSourceWorkItem()
+        }
+        for (id, model) in workItems where incoming[id]?.fields["billingHoldID"] == .null {
+            if let hold = model.billingHoldID { model.releaseBillingHold(for: hold) }
+        }
         for (id, model) in payments where incoming[id] == nil {
             if let invoice = model.invoice, invoice.statusRawValue == InvoiceStatus.paid.rawValue {
                 _ = try invoice.removeCompletedPayment()
@@ -314,6 +352,10 @@ enum SyncGraphCodec {
             invoices.removeValue(forKey: id)
         }
         for (id, model) in workItems where incoming[id] == nil {
+            model.service?.workItems.removeAll { $0 === model }
+            model.visitHorse?.workItems.removeAll { $0 === model }
+            model.service = nil
+            model.visitHorse = nil
             context.delete(model)
             workItems.removeValue(forKey: id)
         }
@@ -702,7 +744,7 @@ enum SyncGraphCodec {
                     businessEmailSnapshot: try reader.optionalString("businessEmailSnapshot"),
                     businessAddressSnapshot: try reader.optionalString("businessAddressSnapshot"),
                     currencyCode: try reader.string("currencyCode"),
-                    client: try reader.model("client", from: clients)
+                    client: try reader.optionalModel("client", from: clients)
                 )
                 context.insert(model)
                 invoices[record.id] = model
@@ -726,7 +768,7 @@ enum SyncGraphCodec {
                     serviceLocationNameSnapshot: try reader.string("serviceLocationNameSnapshot"),
                     serviceLocationAddressSnapshot: try reader.optionalString("serviceLocationAddressSnapshot"),
                     invoice: try reader.model("invoice", from: invoices),
-                    sourceVisit: try reader.model("sourceVisit", from: visits)
+                    sourceVisit: try reader.optionalModel("sourceVisit", from: visits)
                 )
                 context.insert(model)
                 invoiceVisits[record.id] = model
@@ -752,7 +794,7 @@ enum SyncGraphCodec {
                     amountMinorUnits: try reader.int64("amountMinorUnits"),
                     currencyCode: try reader.string("currencyCode"),
                     invoiceVisit: try reader.model("invoiceVisit", from: invoiceVisits),
-                    sourceWorkItem: try reader.model("sourceWorkItem", from: workItems)
+                    sourceWorkItem: try reader.optionalModel("sourceWorkItem", from: workItems)
                 )
                 context.insert(model)
                 invoiceLineItems[record.id] = model

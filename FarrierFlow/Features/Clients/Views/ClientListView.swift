@@ -30,11 +30,11 @@ struct ClientListView: View {
                         Section {
                             ForEach(
                                 model.clients,
-                                id: \.persistentModelID
+                                id: \.id
                             ) { client in
                                 RecordNavigationLink(
                                     value: ClientRoute.detail(
-                                        client.persistentModelID
+                                        client.id
                                     )
                                 ) {
                                     ClientRow(client: client)
@@ -56,122 +56,15 @@ struct ClientListView: View {
                 dynamicTypeSize.isAccessibilitySize ? .inline : .inlineLarge
             )
             .toolbar {
-                ToolbarItemGroup(placement: .topBarTrailing) {
+                ToolbarItem(placement: .topBarTrailing) {
                     if subscription.allowsMutations {
                         Button("Add Client", systemImage: "plus") {
                             showsEditor = true
                         }
                     }
-                    Menu {
-                        Section("Business Tools") {
-                            Button("Service Locations", systemImage: "mappin.and.ellipse") {
-                                path.append(BarnRoute.list)
-                            }
-                            Button("Services", systemImage: "wrench.and.screwdriver") {
-                                path.append(ServiceRoute.list)
-                            }
-                            Button("Invoices", systemImage: "doc.text") {
-                                path.append(InvoiceRoute.list)
-                            }
-                        }
-                        Section("Settings") {
-                            Button(
-                                "My Business",
-                                systemImage: "person.text.rectangle"
-                            ) {
-                                path.append(BusinessProfileRoute.editor)
-                            }
-                            Button("Subscription", systemImage: "creditcard") {
-                                path.append(SubscriptionRoute.store)
-                            }
-                            Button {
-                                path.append(BackupSyncRoute.account)
-                            } label: {
-                                Label {
-                                    Text(BackupSyncCopy.title)
-                                } icon: {
-                                    Image(systemName: "icloud")
-                                }
-                            }
-                            .accessibilityIdentifier("backup-sync-open")
-                        }
-                    } label: {
-                        Label("More", systemImage: "ellipsis.circle")
-                    }
-                    .tint(ColorTokens.textSecondary)
                 }
             }
-            .navigationDestination(for: ClientRoute.self) { route in
-                switch route {
-                case .detail(let id):
-                    ClientDetailView(clientID: id)
-                case .horse(let id):
-                    HorseDetailView(horseID: id)
-                case .visit(let id):
-                    VisitDetailView(visitID: id, container: context.container)
-                }
-            }
-            .navigationDestination(for: BarnRoute.self) { route in
-                switch route {
-                case .list:
-                    BarnListView()
-                case .detail(let id):
-                    BarnDetailView(barnID: id)
-                }
-            }
-            .navigationDestination(for: ServiceRoute.self) { route in
-                switch route {
-                case .list:
-                    ServiceListView()
-                case .detail(let id):
-                    ServiceDetailView(serviceID: id)
-                }
-            }
-            .navigationDestination(for: BusinessProfileRoute.self) { route in
-                switch route {
-                case .editor:
-                    BusinessProfileEditorView()
-                }
-            }
-            .navigationDestination(for: SubscriptionRoute.self) { route in
-                switch route {
-                case .store:
-                    SubscriptionView(
-                        presentation: .standard(
-                            showsManageSubscriptionButton: true
-                        )
-                    )
-                }
-            }
-            .navigationDestination(for: InvoiceRoute.self) { route in
-                switch route {
-                case .list:
-                    InvoiceListView()
-                case .history:
-                    InvoiceHistoryView(container: context.container)
-                case .detail(let id):
-                    InvoiceDetailView(invoiceID: id)
-                case .create(let clientID):
-                    InvoiceCreationView(clientID: clientID) { invoiceID in
-                        if path.count > 0 { path.removeLast() }
-                        path.append(InvoiceRoute.detail(invoiceID))
-                    }
-                }
-            }
-            .navigationDestination(for: BackupSyncRoute.self) { _ in
-                BackupSyncView()
-            }
-            .navigationDestination(for: InvoiceHistoryRoute.self) { route in
-                switch route {
-                case .list:
-                    InvoiceHistoryView(container: context.container)
-                case .detail(let identity):
-                    InvoiceHistoryDetailView(
-                        identity: identity,
-                        container: context.container
-                    )
-                }
-            }
+            .recordNavigationDestinations(path: $path)
             .sheet(isPresented: $showsEditor, onDismiss: reload) {
                 ClientEditorView()
             }
@@ -184,7 +77,7 @@ struct ClientListView: View {
     }
 
     private func reload() {
-        model.load(in: context)
+        model.load(in: ModelContext(context.container))
     }
 
     private var clientCountLabel: LocalizedStringKey {

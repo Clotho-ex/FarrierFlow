@@ -9,6 +9,11 @@ nonisolated enum InvoiceListLoadState: Equatable {
     case failed
 }
 
+nonisolated enum InvoiceListFilter {
+    case all
+    case unpaid
+}
+
 @MainActor
 @Observable
 final class InvoiceListModel {
@@ -21,12 +26,14 @@ final class InvoiceListModel {
     private(set) var loadState: InvoiceListLoadState = .loading
     var alert: FeatureAlert?
 
-    func load(in context: ModelContext, locale: Locale = .current) {
+    func load(in context: ModelContext, locale: Locale = .current, filter: InvoiceListFilter = .all) {
         loadState = .loading
         do {
             let invoices = try context.fetch(FetchDescriptor<Invoice>())
             summaries = try invoices.sorted { $0.number > $1.number }.map { invoice in
                 try InvoiceProjection.summary(from: invoice, locale: locale)
+            }.filter {
+                filter == .all || $0.status == .unpaid
             }
             alert = nil
             loadState = .loaded

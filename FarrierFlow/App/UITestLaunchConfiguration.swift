@@ -23,6 +23,7 @@ struct UITestLaunchConfiguration {
 
     let storeURL: URL?
     let forcesCameraUnavailable: Bool
+    let forcesDeletionSaveFailure: Bool
     let scenario: UITestScenario?
     let dynamicTypeSize: DynamicTypeSize?
     let colorScheme: ColorScheme?
@@ -57,6 +58,7 @@ struct UITestLaunchConfiguration {
     init(environment: [String: String], applicationSupportURL: URL) {
         forcesCameraUnavailable =
             environment[Self.cameraUnavailableEnvironmentKey] == "1"
+        forcesDeletionSaveFailure = environment["FARRIERFLOW_UI_TEST_DELETE_FAILURE"] == "1"
         scenario = environment[Self.scenarioEnvironmentKey]
             .flatMap(UITestScenario.init(rawValue:))
         dynamicTypeSize = switch environment[
@@ -173,8 +175,16 @@ enum ScreenshotFixtureStage: String {
 
 enum UITestScenario: String {
     case appStoreShowcase = "app-store-showcase"
+    case todayStops = "today-stops"
+    case todayStopsBoundary = "today-stops-boundary"
+    case todayFeaturedBoundary = "today-featured-boundary"
+    case todayEmpty = "today-empty"
+    case todayReady = "today-ready"
+    case todayFuture = "today-future"
+    case todayComplete = "today-complete"
     case invoiceReady = "invoice-ready"
     case paymentPending = "payment-pending"
+    case deletionReferences = "deletion-references"
     case nextAppointment = "next-appointment"
     case ownerSetup = "owner-setup"
 }
@@ -188,6 +198,7 @@ nonisolated enum SubscriptionUITestAccess: String, Sendable {
     case noTrial = "no-trial"
     case outage
     case updatePro = "update-pro"
+    case verificationPending = "verification-pending"
 }
 
 nonisolated private enum SubscriptionUITestError: Error { case expected }
@@ -197,6 +208,9 @@ struct UITestSubscriptionClient: SubscriptionClient {
     let configuration: UITestLaunchConfiguration
 
     func customerInfo() async throws -> SubscriptionCustomerSnapshot {
+        if configuration.subscriptionAccess == .verificationPending {
+            try await Task.sleep(for: .seconds(300))
+        }
         if configuration.subscriptionAccess == .outage {
             throw SubscriptionUITestError.expected
         }

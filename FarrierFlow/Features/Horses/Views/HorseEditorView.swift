@@ -163,14 +163,7 @@ struct HorseEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        guard subscription.allowsMutations else { return }
-                        if let id = model.save(
-                            in: context,
-                            analyticsClient: analyticsClient
-                        ) {
-                            createdHorseID?.wrappedValue = id
-                            dismiss()
-                        }
+                        save()
                     }
                     .fontWeight(.semibold)
                     .tint(ColorTokens.brandActionText)
@@ -214,7 +207,15 @@ struct HorseEditorView: View {
                 }
             }
             .alert(item: $model.alert) {
-                Alert(title: Text($0.title), message: Text($0.message))
+                if let relocation = model.pendingRelocation {
+                    Alert(
+                        title: Text($0.title), message: Text($0.message),
+                        primaryButton: .default(Text("Move Horse")) { save(confirming: relocation) },
+                        secondaryButton: .cancel()
+                    )
+                } else {
+                    Alert(title: Text($0.title), message: Text($0.message))
+                }
             }
         }
         .presentationDetents(
@@ -222,6 +223,16 @@ struct HorseEditorView: View {
             selection: $selectedDetent
         )
         .presentationDragIndicator(.visible)
+    }
+
+    private func save(confirming relocation: HorseRelocationConfirmation? = nil) {
+        guard subscription.allowsMutations else { return }
+        // Creation must share the parent's cached inverse relationships; moves need a fresh read.
+        let savingContext = model.horseID == nil ? context : ModelContext(context.container)
+        if let id = model.save(in: savingContext, analyticsClient: analyticsClient, confirming: relocation) {
+            createdHorseID?.wrappedValue = id
+            dismiss()
+        }
     }
 
     private func reloadCreatedRecord() {
@@ -240,7 +251,7 @@ struct HorseEditorView: View {
         guard let id = model.draft.clientID else {
             return String(localized: "Select Client", locale: locale)
         }
-        return model.clients.first { $0.persistentModelID == id }?.name
+        return model.clients.first { $0.id == id }?.name
             ?? String(localized: "Select Client", locale: locale)
     }
 
@@ -248,7 +259,7 @@ struct HorseEditorView: View {
         guard let id = model.draft.barnID else {
             return String(localized: "Select Service Location", locale: locale)
         }
-        return model.barns.first { $0.persistentModelID == id }?.name
+        return model.barns.first { $0.id == id }?.name
             ?? String(localized: "Select Service Location", locale: locale)
     }
 
@@ -277,7 +288,7 @@ struct HorseEditorView: View {
                 title: "Select Client",
                 choices: model.clients.map {
                     HorseRelationshipChoice(
-                        id: $0.persistentModelID,
+                        id: $0.id,
                         name: $0.name
                     )
                 },
@@ -298,7 +309,7 @@ struct HorseEditorView: View {
                 title: "Select Service Location",
                 choices: model.barns.map {
                     HorseRelationshipChoice(
-                        id: $0.persistentModelID,
+                        id: $0.id,
                         name: $0.name
                     )
                 },

@@ -105,15 +105,15 @@ struct ServiceListView: View {
     }
 
     @ViewBuilder
-    private func serviceRows(_ services: [Service]) -> some View {
-        ForEach(services, id: \.persistentModelID) { service in
-            RecordNavigationLink(value: ServiceRoute.detail(service.persistentModelID)) {
+    private func serviceRows(_ services: [ServiceDetailSnapshot]) -> some View {
+        ForEach(services, id: \.id) { service in
+            RecordNavigationLink(value: ServiceRoute.detail(service.id)) {
                 ServiceRow(service: service)
             }
         }
     }
 
     private func reload() {
-        model.load(in: context, locale: locale)
+        model.load(in: ModelContext(context.container), locale: locale)
     }
 }

@@ -17,7 +17,7 @@ final class SubscriptionFlowUITests: XCTestCase {
     }
 
     @MainActor
-    func testReadOnlyProfileShowsTodayNoticeAndSubscriptionFromClientsMore() {
+    func testReadOnlyProfileShowsTodayNoticeAndSubscriptionFromBusiness() {
         let app = launch(storeName: "SubscriptionReadOnly-\(UUID().uuidString)")
         defer { app.terminate() }
 
@@ -27,7 +27,7 @@ final class SubscriptionFlowUITests: XCTestCase {
         XCTAssertEqual(app.buttons.matching(identifier: "subscription-read-only-notice").count, 1)
 
         openClients(in: app)
-        let subscription = openMore(in: app)
+        let subscription = openBusinessSubscription(in: app)
         subscription.tap()
 
         XCTAssertTrue(app.navigationBars["Subscription"].waitForExistence(timeout: 3))
@@ -258,23 +258,10 @@ final class SubscriptionFlowUITests: XCTestCase {
     }
 
     @MainActor
-    private func openMore(in app: XCUIApplication) -> XCUIElement {
-        let more = app.buttons["More"].firstMatch
+    private func openBusinessSubscription(in app: XCUIApplication) -> XCUIElement {
+        app.openBusinessRoot()
         let subscription = app.buttons["Subscription"]
-        XCTAssertTrue(more.waitForExistence(timeout: 3))
-        let waiterResult = XCTWaiter().wait(
-            for: [
-                XCTNSPredicateExpectation(
-                    predicate: NSPredicate(format: "isHittable == true"),
-                    object: more
-                )
-            ],
-            timeout: 3
-        )
-        XCTAssertEqual(waiterResult, .completed)
-        guard waiterResult == .completed else { return subscription }
-
-        more.tap()
+        for _ in 0..<5 where !subscription.isHittable { app.swipeUp() }
         XCTAssertTrue(subscription.waitForExistence(timeout: 3))
         return subscription
     }

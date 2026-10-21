@@ -5,30 +5,56 @@ import SwiftData
 @MainActor
 @Observable
 final class BarnDetailModel {
-    private(set) var barn: Barn?
+    private(set) var barn: BarnDetailSnapshot?
     var alert: FeatureAlert?
 
     func load(id: PersistentIdentifier, in context: ModelContext) {
-        barn = context.model(for: id) as? Barn
+        do {
+            barn = try context.existingModel(Barn.self, for: id).map(BarnDetailSnapshot.init)
+        } catch {
+            barn = nil
+            alert = FeatureAlert(
+                title: "Service Location Unavailable",
+                message: "The service location couldn’t be loaded. Try again."
+            )
+        }
     }
 
-    func delete(in context: ModelContext) -> Bool {
-        guard let barn else { return false }
-        self.barn = nil
+    func delete(
+        in context: ModelContext,
+        deleting: (Barn, ModelContext) throws -> Void = { record, context in
+            try RecordDeletionRules.delete(record, in: context)
+        }
+    ) -> Bool {
+        guard let displayed = barn else {
+            alert = unavailableAlert
+            return false
+        }
         do {
-            try RecordDeletionRules.delete(barn, in: context)
+            guard let record = try context.existingModel(Barn.self, for: displayed.id) else {
+                alert = unavailableAlert
+                return false
+            }
+            try deleting(record, context)
+            barn = nil
+            alert = nil
             return true
         } catch let block as RecordDeletionBlock {
-            self.barn = barn
             alert = block.alert
             return false
         } catch {
-            self.barn = barn
             alert = FeatureAlert(
                 title: "Couldn’t Delete Service Location",
                 message: "The service location wasn’t deleted. Try again."
             )
             return false
         }
+    }
+
+    private var unavailableAlert: FeatureAlert {
+        FeatureAlert(
+            title: "Service Location Unavailable",
+            message: "This service location is no longer available."
+        )
     }
 }

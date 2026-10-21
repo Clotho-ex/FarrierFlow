@@ -1,3 +1,4 @@
+import Foundation
 import SwiftData
 
 nonisolated enum AppointmentVisitState: Equatable, Sendable {
@@ -11,6 +12,33 @@ nonisolated struct HorseRelocationProjection: Equatable {
     let appointmentStates: [AppointmentVisitState]
     let hasInProgressVisitHorse: Bool
     let isSameBarn: Bool
+}
+
+struct HorseRelocationConfirmation: Equatable {
+    let horseID: PersistentIdentifier
+    let sourceID: PersistentIdentifier
+    let destinationID: PersistentIdentifier
+    let horseName: String
+    let sourceName: String
+    let destinationName: String
+
+    @MainActor
+    init?(horse: Horse, destination: Barn) {
+        guard let source = horse.currentBarn, source !== destination else { return nil }
+        horseID = horse.persistentModelID
+        sourceID = source.persistentModelID
+        destinationID = destination.persistentModelID
+        horseName = horse.name
+        sourceName = source.name
+        destinationName = destination.name
+    }
+
+    var alert: FeatureAlert {
+        FeatureAlert(
+            title: "Move to Another Location?",
+            message: "Move \(horseName) from \(sourceName) to \(destinationName)? Completed visit history will keep its original location."
+        )
+    }
 }
 
 nonisolated enum HorseRelocationRules {
@@ -120,7 +148,6 @@ nonisolated enum HorseRelocationRules {
 
         var visitHorseIDs = Set<PersistentIdentifier>()
         var hasPendingOutcome = false
-        var hasServicedOutcome = false
         for membership in visit.visitHorses {
             guard
                 membership.visit === visit,
@@ -135,7 +162,6 @@ nonisolated enum HorseRelocationRules {
                 return false
             }
             hasPendingOutcome = hasPendingOutcome || outcome == .pending
-            hasServicedOutcome = hasServicedOutcome || outcome == .serviced
         }
 
         guard visitHorseIDs == appointmentHorseIDs else {
@@ -145,7 +171,6 @@ nonisolated enum HorseRelocationRules {
         if let completedAt = visit.completedAt {
             return completedAt >= visit.startedAt
                 && !hasPendingOutcome
-                && hasServicedOutcome
         }
 
         return appointment.appointmentHorses.allSatisfy {

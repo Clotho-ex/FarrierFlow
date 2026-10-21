@@ -21,7 +21,11 @@ final class HorseDetailModel {
     @ObservationIgnored
     private var historyContext: ModelContext?
 
-    private(set) var horse: Horse?
+    private(set) var horse: HorseDetailSnapshot?
+    private(set) var usage = RecordUsageSnapshot()
+    var inProgressVisits: [RecordUsageSnapshot.VisitReference] {
+        usage.visits.filter { !$0.isCompleted }
+    }
     private(set) var history: [HorseHistoryEntry] = []
     private(set) var historyLoadState = HorseHistoryLoadState.loading
     private(set) var defaultService: HorseDefaultServiceDetail?
@@ -42,9 +46,29 @@ final class HorseDetailModel {
         in context: ModelContext,
         locale: Locale = .current
     ) {
-        horse = context.model(for: id) as? Horse
-        defaultService = horse.flatMap { horse in
-            Self.defaultServiceDetail(for: horse, locale: locale)
+        do {
+            guard let record = try context.existingModel(Horse.self, for: id) else {
+                horse = nil
+                usage = RecordUsageSnapshot()
+                defaultService = nil
+                history = []
+                historyHorseID = nil
+                return
+            }
+            usage = try RecordUsageSnapshot(horse: record)
+            horse = HorseDetailSnapshot(horse: record)
+            defaultService = Self.defaultServiceDetail(for: record, locale: locale)
+        } catch {
+            horse = nil
+            usage = RecordUsageSnapshot()
+            defaultService = nil
+            history = []
+            historyHorseID = nil
+            alert = FeatureAlert(
+                title: "Horse Unavailable",
+                message: "The horse couldn’t be loaded. Try again."
+            )
+            return
         }
         historyHorseID = id
         historyContext = context
@@ -79,18 +103,29 @@ final class HorseDetailModel {
         loadHistory()
     }
 
-    func delete(in context: ModelContext) -> Bool {
-        guard let horse else { return false }
-        self.horse = nil
+    func delete(
+        in context: ModelContext,
+        deleting: (Horse, ModelContext) throws -> Void = { record, context in
+            try RecordDeletionRules.delete(record, in: context)
+        }
+    ) -> Bool {
+        guard let displayed = horse else {
+            alert = unavailableAlert
+            return false
+        }
         do {
-            try RecordDeletionRules.delete(horse, in: context)
+            guard let record = try context.existingModel(Horse.self, for: displayed.id) else {
+                alert = unavailableAlert
+                return false
+            }
+            try deleting(record, context)
+            horse = nil
+            alert = nil
             return true
         } catch let block as RecordDeletionBlock {
-            self.horse = horse
             alert = block.alert
             return false
         } catch {
-            self.horse = horse
             alert = FeatureAlert(
                 title: "Couldn’t Delete Horse",
                 message: "The horse wasn’t deleted. Try again."
@@ -99,12 +134,19 @@ final class HorseDetailModel {
         }
     }
 
+    private var unavailableAlert: FeatureAlert {
+        FeatureAlert(
+            title: "Horse Unavailable",
+            message: "This horse is no longer available."
+        )
+    }
+
     static func loadHistory(
         horseID: PersistentIdentifier,
         in context: ModelContext,
         locale: Locale = .current
     ) throws -> [HorseHistoryEntry] {
-        guard context.model(for: horseID) as? Horse != nil else {
+        guard try context.existingModel(Horse.self, for: horseID) != nil else {
             throw HorseHistoryLoadError.horseUnavailable
         }
 

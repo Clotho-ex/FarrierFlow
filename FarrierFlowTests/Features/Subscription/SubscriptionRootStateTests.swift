@@ -17,6 +17,8 @@ struct SubscriptionRootStateTests {
 
     @Test(arguments: [
         (SubscriptionAccess.loading, false, false, SubscriptionRootState.loading),
+        (.loading, true, false, .app(readOnly: true)),
+        (.loading, false, true, .app(readOnly: true)),
         (.free, false, false, .subscriptionWelcome),
         (.pro, false, false, .ownerSetup),
         (.unavailable, false, false, .subscriptionUnavailable),

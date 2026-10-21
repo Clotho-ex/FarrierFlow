@@ -1,5 +1,5 @@
--- Reviewed source for the first FarrierFlow Dev sync contract.
--- Execute through Safari only after action-time access confirmation.
+-- Declarative source for the FarrierFlow sync contract.
+-- Existing installations use the reviewed incremental update under supabase/updates/.
 -- No data is dropped. App tables remain outside the exposed Data API schemas.
 begin;
 create schema ff_private;
@@ -13,7 +13,7 @@ create table ff_private.workspaces (
   invoicing_device_id uuid,
   invoicing_generation bigint not null default 1 check (invoicing_generation > 0),
   deleting boolean not null default false,
-  minimum_sync_protocol integer not null default 1 check (minimum_sync_protocol in (1,2))
+  minimum_sync_protocol integer not null default 1 check (minimum_sync_protocol in (1,2,3))
 );
 create table ff_private.memberships (
   workspace_id uuid not null references ff_private.workspaces(id),
@@ -44,7 +44,7 @@ create table ff_private.commits (
   revision bigint not null check (revision > 0),
   operation_id uuid not null,
   request_hash text not null,
-  protocol_version integer not null default 1 check (protocol_version in (1,2)),
+  protocol_version integer not null default 1 check (protocol_version in (1,2,3)),
   mutations jsonb not null check (jsonb_typeof(mutations) = 'array'),
   primary key (workspace_id, revision),
   unique (workspace_id, operation_id)
@@ -135,7 +135,7 @@ end $$;
 
 create function ff_private.kind_schema(p_kind text) returns jsonb
 language sql immutable set search_path = '' as $$
-  select '{"businessProfile":{"name":"string","phone":"string?","email":"string?","address":"string?","defaultInvoiceNote":"string?","defaultAppointmentDurationMinutes":"integer?","defaultInvoiceDueDays":"integer?","nextInvoiceNumber":"integer","currencyCode":"string"},"client":{"name":"string","phone":"string?","email":"string?","notes":"string?"},"barn":{"name":"string","address":"string?","contactNotes":"string?"},"service":{"name":"string","defaultAmountMinorUnits":"integer","currencyCode":"string","isArchived":"boolean"},"horse":{"name":"string","safetyNotes":"string?","appointmentIntervalWeeks":"integer","client":"uuid:client","currentBarn":"uuid:barn","defaultService":"uuid:service?"},"appointment":{"startDate":"date","notes":"string?","expectedDurationMinutes":"integer?","barn":"uuid:barn"},"appointmentHorse":{"appointment":"uuid:appointment","horse":"uuid:horse","plannedService":"uuid:service?"},"visit":{"startedAt":"date","completedAt":"date?","serviceLocationNameSnapshot":"string","serviceLocationAddressSnapshot":"string?","appointment":"uuid:appointment","barn":"uuid:barn"},"visitHorse":{"outcomeRawValue":"string","workNotes":"string?","visit":"uuid:visit","horse":"uuid:horse"},"photograph":{"createdAt":"date","pixelWidth":"integer","pixelHeight":"integer","byteCount":"integer","visitHorse":"uuid:visitHorse"},"workItem":{"billingHoldID":"uuid?","serviceNameSnapshot":"string","amountMinorUnits":"integer","currencyCode":"string","service":"uuid:service","visitHorse":"uuid:visitHorse"},"invoice":{"number":"integer","invoiceDate":"date","dueDate":"date?","note":"string?","statusRawValue":"string","clientNameSnapshot":"string","clientPhoneSnapshot":"string?","clientEmailSnapshot":"string?","businessNameSnapshot":"string","businessPhoneSnapshot":"string?","businessEmailSnapshot":"string?","businessAddressSnapshot":"string?","currencyCode":"string","client":"uuid:client"},"invoiceVisit":{"visitDateSnapshot":"date","serviceLocationNameSnapshot":"string","serviceLocationAddressSnapshot":"string?","invoice":"uuid:invoice","sourceVisit":"uuid:visit"},"invoiceLineItem":{"horseNameSnapshot":"string","serviceNameSnapshot":"string","amountMinorUnits":"integer","currencyCode":"string","invoiceVisit":"uuid:invoiceVisit","sourceWorkItem":"uuid:workItem"},"payment":{"amountMinorUnits":"integer","currencyCode":"string","receivedAt":"date","methodRawValue":"string","sourceRawValue":"string","otherDescription":"string?","reference":"string?","note":"string?","invoice":"uuid:invoice"}}'::jsonb -> p_kind
+  select '{"businessProfile":{"name":"string","phone":"string?","email":"string?","address":"string?","defaultInvoiceNote":"string?","defaultAppointmentDurationMinutes":"integer?","defaultInvoiceDueDays":"integer?","nextInvoiceNumber":"integer","currencyCode":"string"},"client":{"name":"string","phone":"string?","email":"string?","notes":"string?"},"barn":{"name":"string","address":"string?","contactNotes":"string?"},"service":{"name":"string","defaultAmountMinorUnits":"integer","currencyCode":"string","isArchived":"boolean"},"horse":{"name":"string","safetyNotes":"string?","appointmentIntervalWeeks":"integer","client":"uuid:client","currentBarn":"uuid:barn","defaultService":"uuid:service?"},"appointment":{"startDate":"date","notes":"string?","expectedDurationMinutes":"integer?","barn":"uuid:barn"},"appointmentHorse":{"appointment":"uuid:appointment","horse":"uuid:horse","plannedService":"uuid:service?"},"visit":{"startedAt":"date","completedAt":"date?","serviceLocationNameSnapshot":"string","serviceLocationAddressSnapshot":"string?","appointment":"uuid:appointment","barn":"uuid:barn"},"visitHorse":{"outcomeRawValue":"string","workNotes":"string?","visit":"uuid:visit","horse":"uuid:horse"},"photograph":{"createdAt":"date","pixelWidth":"integer","pixelHeight":"integer","byteCount":"integer","visitHorse":"uuid:visitHorse"},"workItem":{"billingHoldID":"uuid?","serviceNameSnapshot":"string","amountMinorUnits":"integer","currencyCode":"string","service":"uuid:service","visitHorse":"uuid:visitHorse"},"invoice":{"number":"integer","invoiceDate":"date","dueDate":"date?","note":"string?","statusRawValue":"string","clientNameSnapshot":"string","clientPhoneSnapshot":"string?","clientEmailSnapshot":"string?","businessNameSnapshot":"string","businessPhoneSnapshot":"string?","businessEmailSnapshot":"string?","businessAddressSnapshot":"string?","currencyCode":"string","client":"uuid:client?"},"invoiceVisit":{"visitDateSnapshot":"date","serviceLocationNameSnapshot":"string","serviceLocationAddressSnapshot":"string?","invoice":"uuid:invoice","sourceVisit":"uuid:visit?"},"invoiceLineItem":{"horseNameSnapshot":"string","serviceNameSnapshot":"string","amountMinorUnits":"integer","currencyCode":"string","invoiceVisit":"uuid:invoiceVisit","sourceWorkItem":"uuid:workItem?"},"payment":{"amountMinorUnits":"integer","currencyCode":"string","receivedAt":"date","methodRawValue":"string","sourceRawValue":"string","otherDescription":"string?","reference":"string?","note":"string?","invoice":"uuid:invoice"}}'::jsonb -> p_kind
 $$;
 create function ff_private.validate_fields(p_kind text, p_fields jsonb) returns void
 language plpgsql set search_path = '' as $$
@@ -312,10 +312,7 @@ begin
       (r.fields->>'completedAt')::numeric < (r.fields->>'startedAt')::numeric or
       exists(select 1 from ff_private.records c where c.workspace_id = p_workspace
         and c.kind = 'visitHorse' and c.fields->>'visit' = r.id::text
-        and c.fields->>'outcomeRawValue' = 'pending') or
-      not exists(select 1 from ff_private.records c where c.workspace_id = p_workspace
-        and c.kind = 'visitHorse' and c.fields->>'visit' = r.id::text
-        and c.fields->>'outcomeRawValue' = 'serviced')
+        and c.fields->>'outcomeRawValue' = 'pending')
     ) then raise exception 'Invalid completed visit' using errcode = '23514'; end if;
   end loop;
   for r in select * from ff_private.records where workspace_id = p_workspace
@@ -355,11 +352,19 @@ begin
       join ff_private.records h on h.workspace_id = l.workspace_id and h.id = (w.fields->>'visitHorse')::uuid
       join ff_private.records horse on horse.workspace_id = l.workspace_id and horse.id = (h.fields->>'horse')::uuid
     where l.workspace_id = p_workspace and l.kind = 'invoiceLineItem' and l.fields is not null
-      and (h.fields->>'visit' <> g.fields->>'sourceVisit'
-        or horse.fields->>'client' <> i.fields->>'client'
+      and (h.fields->>'visit' is distinct from g.fields->>'sourceVisit'
+        or horse.fields->>'client' is distinct from i.fields->>'client'
         or l.fields->>'currencyCode' <> w.fields->>'currencyCode'
         or l.fields->>'currencyCode' <> i.fields->>'currencyCode')
   ) then raise exception 'Invoice source mismatch' using errcode = '23514'; end if;
+  if exists(
+    select 1 from ff_private.records l
+      join ff_private.records g on g.workspace_id = l.workspace_id and g.id = (l.fields->>'invoiceVisit')::uuid
+      join ff_private.records i on i.workspace_id = l.workspace_id and i.id = (g.fields->>'invoice')::uuid
+    where l.workspace_id = p_workspace and l.kind = 'invoiceLineItem' and l.fields is not null
+      and l.fields->>'currencyCode' is distinct from i.fields->>'currencyCode'
+  ) then raise exception 'Invoice snapshot currency mismatch' using errcode = '23514'; end if;
+
 end $$;
 
 create function ff_private.bootstrap(p_device uuid) returns jsonb
@@ -412,8 +417,8 @@ begin
         where g.workspace_id = p_workspace and g.id = (item.fields->>'invoiceVisit')::uuid
           and g.kind = 'invoiceVisit';
     end if;
-    if invoice.fields is null or invoice.fields->>'statusRawValue' is distinct from 'unpaid' then
-      raise exception 'Paid history cannot be deleted' using errcode = '23514';
+    if invoice.fields is null then
+      raise exception 'Invoice history unavailable' using errcode = '23514';
     end if;
     if item.kind <> 'invoice' and not exists (
       select 1 from jsonb_array_elements(p_mutations) m
@@ -421,6 +426,72 @@ begin
         and (m.value->'record' is null or m.value->'record' = 'null'::jsonb)
     ) then
       raise exception 'Invoice snapshots require complete invoice deletion' using errcode = '23514';
+    end if;
+  end loop;
+end $$;
+
+create function ff_private.validate_history_changes(p_workspace uuid, p_mutations jsonb, p_protocol integer)
+returns void language plpgsql set search_path = '' as $$
+declare mutation jsonb; old ff_private.records%rowtype; next jsonb;
+        old_fields jsonb; new_fields jsonb; field text; source_id uuid; invoice_id uuid;
+begin
+  -- Validate against the original graph so mutation order cannot change authorization.
+  for mutation in select value from jsonb_array_elements(p_mutations) loop
+    select * into old from ff_private.records where workspace_id = p_workspace
+      and id = (mutation->>'id')::uuid;
+    next := mutation->'record'->'fields';
+    if next = 'null'::jsonb then next := null; end if;
+    if p_protocol < 3 and mutation->>'kind' in ('invoice','invoiceVisit','invoiceLineItem')
+       and next is not null and (
+         (mutation->>'kind' = 'invoice' and next->>'client' is null) or
+         (mutation->>'kind' = 'invoiceVisit' and next->>'sourceVisit' is null) or
+         (mutation->>'kind' = 'invoiceLineItem' and next->>'sourceWorkItem' is null)) then
+      raise exception 'FF_PROTOCOL_UPGRADE_REQUIRED' using errcode = 'P0001';
+    end if;
+    if old.fields is null then continue; end if;
+    if p_protocol < 3 and old.kind = 'invoice' and old.fields->>'statusRawValue' = 'paid'
+       and next is null then
+      raise exception 'Paid history cannot be deleted' using errcode = '23514';
+    end if;
+    if old.kind = 'workItem' and next is not null and old.fields->>'billingHoldID' is not null
+       and old.fields->>'billingHoldID' is distinct from next->>'billingHoldID' then
+      if p_protocol < 3 or next->>'billingHoldID' is not null or not exists(
+        select 1 from ff_private.records i join jsonb_array_elements(p_mutations) m
+          on i.id = (m.value->>'id')::uuid
+        where i.workspace_id = p_workspace and i.kind = 'invoice' and i.fields is not null
+          and i.id = (old.fields->>'billingHoldID')::uuid and m.value->>'kind' = 'invoice'
+          and (m.value->'record' is null or m.value->'record' = 'null'::jsonb)
+      ) then raise exception 'Immutable billing hold' using errcode = '23514'; end if;
+    end if;
+    if old.kind not in ('invoice','invoiceVisit','invoiceLineItem','payment','photograph')
+       or next is null then continue; end if;
+    old_fields := old.fields; new_fields := next;
+    if old.kind = 'invoice' then
+      old_fields := old_fields - 'statusRawValue'; new_fields := new_fields - 'statusRawValue';
+    end if;
+    field := case old.kind when 'invoice' then 'client' when 'invoiceVisit' then 'sourceVisit'
+      when 'invoiceLineItem' then 'sourceWorkItem' else null end;
+    if p_protocol >= 3 and field is not null and old_fields->field is distinct from new_fields->field
+       and new_fields->field = 'null'::jsonb and old_fields->>field is not null then
+      source_id := (old_fields->>field)::uuid;
+      if not exists(select 1 from jsonb_array_elements(p_mutations) m
+        where (m.value->>'id')::uuid = source_id
+          and (m.value->'record' is null or m.value->'record' = 'null'::jsonb)) then
+        invoice_id := null;
+        if old.kind = 'invoiceLineItem' then
+          select (g.fields->>'invoice')::uuid into invoice_id from ff_private.records g
+            where g.workspace_id = p_workspace and g.id = (old.fields->>'invoiceVisit')::uuid;
+        end if;
+        if invoice_id is null or not exists(select 1 from jsonb_array_elements(p_mutations) m
+          where (m.value->>'id')::uuid = source_id and m.value->>'kind' = 'workItem'
+            and m.value->'record'->'fields'->>'billingHoldID' = invoice_id::text) then
+          raise exception 'Snapshot source can only detach with source deletion or a billing hold' using errcode = '23514';
+        end if;
+      end if;
+      old_fields := old_fields - field; new_fields := new_fields - field;
+    end if;
+    if old_fields is distinct from new_fields then
+      raise exception 'Immutable history changed' using errcode = '23514';
     end if;
   end loop;
 end $$;
@@ -434,7 +505,7 @@ declare actor uuid; workspace uuid; device uuid; operation uuid; fingerprint tex
         next_revision bigint; normalized jsonb := '[]'::jsonb;
         new_line_ids uuid[] := '{}'; constraint_name text; has_holds boolean;
 begin
-  if p_protocol is null or p_protocol not in (1,2) then
+  if p_protocol is null or p_protocol not in (1,2,3) then
     raise exception 'FF_PROTOCOL_UPGRADE_REQUIRED' using errcode = 'P0001';
   end if;
   if jsonb_typeof(p_batch) is distinct from 'object' or octet_length(p_batch::text) > 10485760
@@ -474,6 +545,7 @@ begin
   end if;
   next_revision := w.revision + 1;
   perform ff_private.validate_history_deletions(workspace, p_batch->'mutations');
+  perform ff_private.validate_history_changes(workspace, p_batch->'mutations', p_protocol);
   for mutation in select value from jsonb_array_elements(p_batch->'mutations') loop
     record_id := (mutation->>'id')::uuid;
     record_kind := mutation->>'kind';
@@ -506,24 +578,15 @@ begin
       end if;
     end if;
     if record_kind = 'workItem' and fields_value is not null then
-      if fields_value->>'billingHoldID' is not null and p_protocol <> 2 then
+      if fields_value->>'billingHoldID' is not null and p_protocol < 2 then
         raise exception 'FF_PROTOCOL_UPGRADE_REQUIRED' using errcode = 'P0001';
       end if;
-      if old.fields->>'billingHoldID' is not null and
-         old.fields->>'billingHoldID' is distinct from fields_value->>'billingHoldID' then
-        raise exception 'Immutable billing hold' using errcode = '23514';
-      end if;
+
     end if;
     if record_kind = 'invoiceLineItem' and old.id is null and fields_value is not null then
       new_line_ids := array_append(new_line_ids, record_id);
     end if;
-    if old.fields is not null and record_kind in ('invoice','invoiceVisit','invoiceLineItem','payment','photograph')
-       and fields_value is not null and
-       (case when record_kind = 'invoice' then old.fields - 'statusRawValue' else old.fields end)
-       is distinct from
-       (case when record_kind = 'invoice' then fields_value - 'statusRawValue' else fields_value end) then
-      raise exception 'Immutable history changed' using errcode = '23514';
-    end if;
+
     if old.fields is not null and fields_value is null
        and record_kind = 'businessProfile' then
       raise exception 'Historical record cannot be deleted' using errcode = '23514';
@@ -553,7 +616,7 @@ begin
   select exists(select 1 from ff_private.records where workspace_id = workspace
     and kind = 'workItem' and fields->>'billingHoldID' is not null) into has_holds;
   update ff_private.workspaces set revision = next_revision,
-    minimum_sync_protocol = greatest(minimum_sync_protocol, case when has_holds then 2 else 1 end)
+    minimum_sync_protocol = greatest(minimum_sync_protocol, case when p_protocol = 3 then 3 when has_holds then 2 else 1 end)
     where id = workspace;
   insert into ff_private.commits(workspace_id, revision, operation_id, request_hash, mutations, protocol_version)
     values(workspace, next_revision, operation, fingerprint, normalized, p_protocol);
@@ -578,6 +641,10 @@ create function ff_private.sync_push_v2(p_batch jsonb) returns jsonb
 language sql security definer set search_path = '' as $$
   select ff_private.sync_push_versioned(p_batch, 2)
 $$;
+create function ff_private.sync_push_v3(p_batch jsonb) returns jsonb
+language sql security definer set search_path = '' as $$
+  select ff_private.sync_push_versioned(p_batch, 3)
+$$;
 
 create function ff_private.legacy_mutations(p_mutations jsonb) returns jsonb
 language sql immutable security invoker set search_path = '' as $$
@@ -595,7 +662,7 @@ begin
   perform ff_private.require_access(p_workspace);
   select * into w from ff_private.workspaces where id = p_workspace for share;
   perform ff_private.require_access(p_workspace);
-  if p_protocol is null or p_protocol not in (1,2) or p_protocol < w.minimum_sync_protocol then
+  if p_protocol is null or p_protocol not in (1,2,3) or p_protocol < w.minimum_sync_protocol then
     raise exception 'FF_PROTOCOL_UPGRADE_REQUIRED' using errcode = 'P0001';
   end if;
   if p_cursor is null or p_cursor < 0 or p_cursor > w.revision
@@ -622,6 +689,10 @@ $$;
 create function ff_private.sync_pull_v2(p_workspace uuid, p_cursor bigint, p_limit integer) returns jsonb
 language sql security definer set search_path = '' as $$
   select ff_private.sync_pull_versioned(p_workspace, p_cursor, p_limit, 2)
+$$;
+create function ff_private.sync_pull_v3(p_workspace uuid, p_cursor bigint, p_limit integer) returns jsonb
+language sql security definer set search_path = '' as $$
+  select ff_private.sync_pull_versioned(p_workspace, p_cursor, p_limit, 3)
 $$;
 
 create function public.ff_sync_bootstrap(p_device uuid) returns jsonb
@@ -782,9 +853,17 @@ create function public.ff_sync_push_v2(p_batch jsonb) returns jsonb
 language sql security invoker set search_path = '' as $$
   select ff_private.sync_push_v2(p_batch)
 $$;
+create function public.ff_sync_push_v3(p_batch jsonb) returns jsonb
+language sql security invoker set search_path = '' as $$
+  select ff_private.sync_push_v3(p_batch)
+$$;
 create function public.ff_sync_pull_v2(p_workspace uuid, p_cursor bigint, p_limit integer) returns jsonb
 language sql security invoker set search_path = '' as $$
   select ff_private.sync_pull_v2(p_workspace, p_cursor, p_limit)
+$$;
+create function public.ff_sync_pull_v3(p_workspace uuid, p_cursor bigint, p_limit integer) returns jsonb
+language sql security invoker set search_path = '' as $$
+  select ff_private.sync_pull_v3(p_workspace, p_cursor, p_limit)
 $$;
 
 insert into storage.buckets(id, name, public, file_size_limit, allowed_mime_types)
@@ -836,4 +915,7 @@ revoke all on function public.ff_sync_bootstrap_v2(uuid), public.ff_sync_push_v2
   public.ff_sync_pull_v2(uuid,bigint,integer) from public, anon, authenticated;
 grant execute on function public.ff_sync_bootstrap_v2(uuid), public.ff_sync_push_v2(jsonb),
   public.ff_sync_pull_v2(uuid,bigint,integer) to authenticated;
+grant execute on function ff_private.sync_push_v3(jsonb), ff_private.sync_pull_v3(uuid,bigint,integer) to authenticated;
+revoke all on function public.ff_sync_push_v3(jsonb), public.ff_sync_pull_v3(uuid,bigint,integer) from public, anon, authenticated;
+grant execute on function public.ff_sync_push_v3(jsonb), public.ff_sync_pull_v3(uuid,bigint,integer) to authenticated;
 commit;

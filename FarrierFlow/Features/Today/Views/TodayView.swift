@@ -2,6 +2,8 @@ import SwiftData
 import SwiftUI
 
 struct TodayView: View {
+    let showSchedule: () -> Void
+
     @Environment(OnboardingExperienceModel.self) private var onboarding
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
@@ -11,6 +13,7 @@ struct TodayView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var path = NavigationPath()
     @State private var model = TodayModel()
+    @State private var scheduleNow: Date?
     @State private var presentedSheet: TodaySheet?
     @State private var pendingCompletedVisitID: PersistentIdentifier?
 
@@ -23,22 +26,17 @@ struct TodayView: View {
                 case .failed:
                     unavailableContent
                 case .loaded:
-                    runSheet
+                    if let emptyState = model.emptyState, model.remainingStops.isEmpty {
+                        emptyRunSheet(emptyState)
+                    } else {
+                        runSheet
+                    }
                 }
             }
             .navigationTitle("Today")
             .toolbarTitleDisplayMode(
                 dynamicTypeSize.isAccessibilitySize ? .inline : .inlineLarge
             )
-            .toolbar {
-                if subscription.allowsMutations {
-                    ToolbarItemGroup(placement: .topBarTrailing) {
-                        Button("Schedule Appointment", systemImage: "plus") {
-                            presentedSheet = .appointment
-                        }
-                    }
-                }
-            }
             .navigationDestination(for: TodayRoute.self) { route in
                 destination(for: route)
             }
@@ -54,10 +52,15 @@ struct TodayView: View {
             }
             .sheet(item: $presentedSheet, onDismiss: handleSheetDismissal) { sheet in
                 switch sheet {
+                case .stop(let stop):
+                    StopDetailsSheet(stop: stop)
+                        .dynamicTypeSize(dynamicTypeSize)
                 case .appointment:
                     AppointmentEditorView()
                 case .client:
                     ClientEditorView()
+                case .horse(let clientID):
+                    HorseEditorView(preselectedClientID: clientID)
                 case .visit(let id):
                     VisitEditorView(
                         visitID: id,
@@ -70,7 +73,15 @@ struct TodayView: View {
                 }
             }
             .onAppear(perform: reload)
+            .task(id: scheduledStartDates) {
+                await updateScheduleClock(at: scheduledStartDates)
+            }
             .onChange(of: backupSync?.runtime?.recordsVersion) { _, _ in reload() }
+            .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)) { notification in
+                guard let savedContext = notification.object as? ModelContext,
+                      savedContext.container === context.container else { return }
+                reload()
+            }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { reload() }
             }
@@ -92,48 +103,231 @@ struct TodayView: View {
             }
 
             identityContent
-            primaryActionContent
-
-            if !model.remainingAppointments.isEmpty {
-                Section("Today’s Stops") {
-                    ForEach(model.remainingAppointments.indices, id: \.self) { index in
-                        let appointment = model.remainingAppointments[index]
-                        RecordNavigationLink(
-                            value: TodayRoute.appointment(appointment.id)
-                        ) {
-                            TodayAppointmentRow(
-                                summary: appointment,
-                                isFirst: index == 0,
-                                isLast: index == model.remainingAppointments.count - 1
-                            )
-                        }
-                        .badge(
-                            dynamicTypeSize.isAccessibilitySize ? nil : Text(appointment.state.localizedTitle)
-                                .foregroundStyle(appointment.state.emphasisColor)
-                        )
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(ColorTokens.surface)
+            if model.dayIsComplete, model.emptyState == nil {
+                Section {
+                    VStack(alignment: .leading, spacing: SpacingTokens.compact) {
+                        Label("All done for today", systemImage: "checkmark.circle")
+                            .font(.headline)
+                        Text("All of today’s scheduled stops are complete.")
+                            .font(.subheadline)
+                            .foregroundStyle(ColorTokens.textSecondary)
                     }
                 }
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
             }
+            primaryActionContent
+
+            stopSection(
+                model.remainingStops.filter { $0.id.state != .completed },
+                title: nil
+            )
+            stopSection(
+                model.remainingStops.filter { $0.id.state == .completed },
+                title: "Completed Today"
+            )
         }
-        .listSectionSpacing(.custom(SpacingTokens.related))
-        .padding(.top, SpacingTokens.compact)
+        .listSectionSpacing(.custom(20))
+        .environment(\.defaultMinListRowHeight, 0)
+        .contentMargins(.top, 0, for: .scrollContent)
         .farrierFlowScrollBackground()
         .refreshable { reload() }
     }
 
     private var identityContent: some View {
         Section {
-            Text(
-                appClock.now(),
-                format: .dateTime.weekday(.wide).month(.wide).day()
-            )
-            .font(.subheadline)
-            .foregroundStyle(ColorTokens.textSecondary)
+            dateText
         }
+        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
         .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)
+    }
+
+    private var dateText: some View {
+        Text(appClock.now(), format: .dateTime.weekday(.wide).month(.wide).day())
+            .font(.subheadline)
+            .foregroundStyle(ColorTokens.textSecondary)
+    }
+
+    private func emptyRunSheet(_ state: TodayEmptyState) -> some View {
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    dateText
+                    if !subscription.allowsMutations, subscription.access != .loading {
+                        SubscriptionReadOnlyNotice(access: subscription.access) {
+                            path.append(SubscriptionRoute.store)
+                        }
+                        .padding(.top, SpacingTokens.section)
+                    }
+                    Spacer(minLength: SpacingTokens.section)
+                    emptyStateContent(state)
+                        .frame(maxWidth: .infinity)
+                    Spacer(minLength: SpacingTokens.section)
+                }
+                .padding(.horizontal, SpacingTokens.standard)
+                .padding(.bottom, SpacingTokens.section)
+                .frame(minHeight: geometry.size.height)
+            }
+            .refreshable { reload() }
+        }
+        .farrierFlowScreenBackground()
+    }
+
+    private func emptyStateContent(_ state: TodayEmptyState) -> some View {
+        ContentUnavailableView {
+            switch state {
+            case .addClient where subscription.allowsMutations:
+                Label("Add your first client", systemImage: "person.badge.plus")
+            case .addHorse where subscription.allowsMutations:
+                Label("Add your first horse", systemImage: "plus")
+            case .addClient, .addHorse, .noAppointments:
+                Label("No appointments scheduled", systemImage: "calendar.badge.plus")
+            case .noStops:
+                Label("No stops today", systemImage: "calendar")
+            case .allDone:
+                Label("All done for today", systemImage: "checkmark.circle")
+            }
+        } description: {
+            emptyStateDescription(state)
+                .frame(maxWidth: 320)
+        } actions: {
+            switch state {
+            case .addClient where subscription.allowsMutations:
+                Button("Add Client") { presentedSheet = .client }
+                    .farrierFlowPrimaryAction()
+                    .controlSize(.large)
+                    .accessibilityIdentifier("today-add-first-client")
+            case .addHorse where subscription.allowsMutations:
+                Button("Add Horse") {
+                    if case .addHorse(let clientID) = model.primaryAction {
+                        presentedSheet = .horse(clientID)
+                    }
+                }
+                .farrierFlowPrimaryAction()
+                .controlSize(.large)
+                .accessibilityIdentifier("today-add-first-horse")
+            case .noAppointments where subscription.allowsMutations:
+                Button {
+                    presentedSheet = .appointment
+                } label: {
+                    ViewThatFits(in: .horizontal) {
+                        Text("Schedule Appointment").fixedSize()
+                        Text("Schedule")
+                    }
+                }
+                .accessibilityLabel("Schedule Appointment")
+                .farrierFlowPrimaryAction()
+                .controlSize(.large)
+            case .noStops, .allDone:
+                Button("View Schedule", action: showSchedule)
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+            default:
+                EmptyView()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func emptyStateDescription(_ state: TodayEmptyState) -> some View {
+        switch state {
+        case .addClient where subscription.allowsMutations:
+            Text("Start with a client, then add their horses and schedule work.")
+        case .addHorse where subscription.allowsMutations:
+            Text("Add a client’s horse and service location, then schedule work.")
+        case .addClient, .addHorse, .noAppointments:
+            if subscription.allowsMutations {
+                Text("Schedule your first appointment to start planning your work.")
+            } else {
+                Text("There are no appointments in your schedule.")
+            }
+        case .noStops(let nextAppointment):
+            if let nextAppointment {
+                Text("Your day is clear. Your next appointment is \(nextAppointment, format: .dateTime.weekday(.wide).month(.wide).day().hour().minute()).")
+            } else {
+                Text("Your day is clear.")
+            }
+        case .allDone:
+            Text("All of today’s scheduled stops are complete.")
+        }
+    }
+
+    @ViewBuilder
+    private func stopSection(_ stops: [TodayStopSummary], title: LocalizedStringResource?) -> some View {
+        if !stops.isEmpty {
+            Section {
+                ForEach(stops) { stop in
+                    Button {
+                        presentedSheet = .stop(stop)
+                    } label: {
+                        TodayStopRow(stop: stop)
+                            .foregroundStyle(ColorTokens.textPrimary)
+                    }
+                    .buttonStyle(.automatic)
+                    .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16))
+                    .listRowBackground(ColorTokens.recordSurface)
+                    .accessibilityIdentifier("today-stop-row")
+                }
+            } header: {
+                if let title {
+                    stopSectionHeader(title: title, count: stops.count)
+                } else {
+                    stopSectionHeader(
+                        title: model.remainingSectionTitle(at: scheduleNow ?? appClock.now()),
+                        count: stops.count
+                    )
+                }
+            }
+        }
+    }
+
+    private var scheduledStartDates: [Date] {
+        var dates = model.remainingStops
+            .filter { $0.id.state != .completed }
+            .map(\.id.startDate)
+        if case .openAppointment(let appointment) = model.primaryAction {
+            dates.append(appointment.startDate)
+        }
+        dates.append(CalendarRules.dayInterval(containing: appClock.now(), calendar: .autoupdatingCurrent).end)
+        return Set(dates).sorted()
+    }
+
+    private func updateScheduleClock(at dates: [Date]) async {
+        guard model.loadState == .loaded else { return }
+        let dayEnd = CalendarRules.dayInterval(containing: appClock.now(), calendar: .autoupdatingCurrent).end
+        scheduleNow = appClock.now()
+        for date in Set(dates).sorted() {
+            let delay = date.timeIntervalSince(appClock.now())
+            guard delay > 0 else { continue }
+            do {
+                try await Task.sleep(for: .seconds(delay))
+            } catch {
+                return // The run sheet disappeared or its scheduled starts changed.
+            }
+            guard !Task.isCancelled else { return }
+            if appClock.now() >= dayEnd {
+                reload()
+                return
+            }
+            scheduleNow = appClock.now()
+        }
+    }
+
+    private func stopSectionHeader(title: LocalizedStringResource, count: Int) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title).font(.headline)
+                Spacer()
+                Text("\(count) stops").font(.subheadline)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title).font(.headline)
+                Text("\(count) stops").font(.subheadline)
+            }
+        }
+        .foregroundStyle(ColorTokens.textSecondary)
+        .textCase(nil)
     }
 
     @ViewBuilder
@@ -148,41 +342,36 @@ struct TodayView: View {
                         path.append(TodayRoute.visit(visit.id))
                     }
                 } label: {
-                    TodayRunSheetBand(state: .active(visit))
+                    TodayRunSheetBand(state: .active(visit), now: scheduleNow ?? appClock.now())
                 }
                 .buttonStyle(.plain)
                 .listRowInsets(EdgeInsets())
-                .listRowBackground(ColorTokens.brandTint)
+                .listRowBackground(ColorTokens.featuredSurface)
                 .listRowSeparator(.hidden)
                 .accessibilityIdentifier("today-run-sheet-active")
             }
         case .openAppointment(let appointment):
             Section {
                 Button {
-                    path.append(TodayRoute.appointment(appointment.id))
+                    if let stop = model.featuredStop {
+                        presentedSheet = .stop(stop)
+                    }
                 } label: {
-                    TodayRunSheetBand(state: .scheduled(appointment))
+                    TodayRunSheetBand(state: .scheduled(appointment, model.featuredStop), now: scheduleNow ?? appClock.now())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.automatic)
                 .listRowInsets(EdgeInsets())
-                .listRowBackground(ColorTokens.brandTint)
+                .listRowBackground(ColorTokens.featuredSurface)
                 .listRowSeparator(.hidden)
                 .accessibilityIdentifier("today-run-sheet-scheduled")
             }
-        case .addClient where subscription.allowsMutations:
-            Section("First Customer") {
-                Button {
-                    presentedSheet = .client
-                } label: {
-                    TodayPrimaryActionLabel(
-                        title: "Add First Client",
-                        detail: "Create the client record, then attach their horses while scheduling.",
-                        systemImage: "person.badge.plus",
-                        detailAccessibilityIdentifier: "today-add-first-client-context"
-                    )
+        case .addClient, .addHorse, .scheduleAppointment:
+            if let emptyState = model.emptyState {
+                Section {
+                    emptyStateContent(emptyState)
                 }
-                .accessibilityIdentifier("today-add-first-client")
-                .listRowBackground(ColorTokens.surface)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
             }
         case .createInvoice(let candidate) where subscription.allowsMutations:
             Section("Ready to Invoice") {
@@ -220,22 +409,6 @@ struct TodayView: View {
                 .accessibilityIdentifier("today-review-invoice-action")
                 .listRowBackground(ColorTokens.surface)
             }
-        case .scheduleAppointment where subscription.allowsMutations:
-            Section {
-                ContentUnavailableView {
-                    Label("Nothing Scheduled Yet", systemImage: "calendar.badge.plus")
-                } description: {
-                    Text("Your appointments will appear here.")
-                } actions: {
-                    Button("Schedule Appointment") {
-                        presentedSheet = .appointment
-                    }
-                    .farrierFlowPrimaryAction()
-                    .controlSize(.large)
-                }
-            }
-            .listRowBackground(Color.clear)
-            .listRowSeparator(.hidden)
         default:
             EmptyView()
         }
@@ -254,10 +427,6 @@ struct TodayView: View {
     @ViewBuilder
     private func destination(for route: TodayRoute) -> some View {
         switch route {
-        case .appointment(let id):
-            AppointmentDetailView(appointmentID: id) {
-                path = NavigationPath()
-            }
         case .createInvoice(let clientID, let visitID):
             InvoiceCreationView(
                 clientID: clientID,
@@ -274,7 +443,9 @@ struct TodayView: View {
     }
 
     private func reload() {
-        model.load(in: context, now: appClock.now(), calendar: .autoupdatingCurrent)
+        let now = appClock.now()
+        scheduleNow = now
+        model.load(in: context, now: now, calendar: .autoupdatingCurrent)
     }
 
     private func handleSheetDismissal() {
@@ -366,7 +537,6 @@ private struct TodayPrimaryActionMarker: View {
 }
 
 private enum TodayRoute: Hashable {
-    case appointment(PersistentIdentifier)
     case createInvoice(
         clientID: PersistentIdentifier,
         visitID: PersistentIdentifier
@@ -375,153 +545,71 @@ private enum TodayRoute: Hashable {
     case visit(PersistentIdentifier)
 }
 
-private struct TodayAppointmentRow: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+private struct TodayStopRow: View {
+    let stop: TodayStopSummary
 
-    let summary: TodayAppointmentSummary
-    let isFirst: Bool
-    let isLast: Bool
-
-    @ViewBuilder
     var body: some View {
-        if dynamicTypeSize.isAccessibilitySize {
-            accessibilityContent
-        } else {
-            standardContent
-        }
-    }
-
-    private var standardContent: some View {
-        HStack(alignment: .top, spacing: 12) {
-            worklineMarker
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(summary.startDate, format: .dateTime.hour().minute())
-                    .font(.headline)
-                    .monospacedDigit()
-                locationText
-                Text(summary.horseNames.formatted(.list(type: .and)))
-                    .font(.subheadline)
-                    .foregroundStyle(ColorTokens.textSecondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityLabel)
-        .accessibilityValue(accessibilityValue)
-    }
-
-    private var accessibilityContent: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 10) {
-                worklineMarker
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(summary.startDate, format: .dateTime.hour().minute())
-                        .font(.headline)
-                        .monospacedDigit()
-                    Text(summary.state.localizedTitle)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(summary.state.emphasisColor)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline) {
+                    timeText
+                    Spacer(minLength: 8)
+                    metadataGroup.fixedSize()
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    timeText
+                    Text(metadataText)
+                        .font(.subheadline)
+                        .foregroundStyle(ColorTokens.textSecondary)
+                        .multilineTextAlignment(.trailing)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
-
-            locationText
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
-            Text(todayHorseSummaryText(summary.horseNames))
+            if let appointment = stop.appointments.first {
+                Text(appointment.serviceLocationName)
+                    .font(.headline)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Text(todayHorseSummaryText(stop.horseNames))
                 .font(.subheadline)
                 .foregroundStyle(ColorTokens.textSecondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityLabel)
-        .accessibilityValue(accessibilityValue)
+        .accessibilityLabel("\(stop.id.startDate.formatted(date: .omitted, time: .shortened)), \(stop.appointments.first?.serviceLocationName ?? "")")
+        .accessibilityValue("\(metadataText), \(stop.horseNames.formatted(.list(type: .and)))")
+        .accessibilityHint("Opens stop details.")
     }
 
-    private var worklineMarker: some View {
-        TodayWorklineMarker(
-            state: summary.state,
-            isFirst: isFirst,
-            isLast: isLast
+    private var timeText: some View {
+        Text(stop.id.startDate, format: .dateTime.hour().minute())
+            .font(.headline)
+            .monospacedDigit()
+    }
+
+    private var horseCountText: String {
+        String(localized: "\(stop.horseNames.count) horses")
+    }
+
+    private var metadataText: String {
+        let status = String(localized: stop.id.state.localizedTitle)
+        return String(
+            localized: "\(horseCountText) · \(status)",
+            comment: "Horse count followed by appointment status in a Today stop’s metadata."
         )
     }
 
-    private var locationText: some View {
-        Text(summary.serviceLocationName)
-    }
-
-    private var accessibilityLabel: String {
-        "\(summary.startDate.formatted(date: .omitted, time: .shortened)), \(summary.serviceLocationName)"
-    }
-
-    private var accessibilityValue: String {
-        let horseNames = summary.horseNames.formatted(.list(type: .and))
-        return dynamicTypeSize.isAccessibilitySize
-            ? "\(String(localized: summary.state.localizedTitle)), \(horseNames)"
-            : horseNames
-    }
-}
-
-private struct TodayWorklineMarker: View {
-    @ScaledMetric(relativeTo: .body) private var markerSize = 20.0
-
-    let state: TodayAppointmentState
-    let isFirst: Bool
-    let isLast: Bool
-
-    var body: some View {
-        ZStack(alignment: .top) {
-            Rectangle()
-                .frame(width: 1)
-                .padding(.top, isFirst ? markerSize / 2 : 0)
-                .padding(.bottom, isLast ? markerSize / 2 : 0)
-
-            Image(systemName: state.systemImage)
-                .font(.caption.weight(.semibold))
-                .frame(width: markerSize, height: markerSize)
-                .background(ColorTokens.surface, in: Circle())
+    private var metadataGroup: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(horseCountText)
+            Text(verbatim: "·").accessibilityHidden(true)
+            Text(stop.id.state.localizedTitle)
         }
+        .font(.subheadline)
         .foregroundStyle(ColorTokens.textSecondary)
-        .frame(width: markerSize)
-        .frame(maxHeight: .infinity)
-        .accessibilityHidden(true)
-    }
-}
-
-private extension TodayAppointmentState {
-    var localizedTitle: LocalizedStringResource {
-        switch self {
-        case .scheduled:
-            "Scheduled"
-        case .inProgress:
-            "In Progress"
-        case .completed:
-            "Work Complete"
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .scheduled:
-            "circle"
-        case .inProgress:
-            "circle.lefthalf.filled"
-        case .completed:
-            "checkmark.circle.fill"
-        }
-    }
-
-    var emphasisColor: Color {
-        switch self {
-        case .scheduled:
-            ColorTokens.textSecondary
-        case .inProgress:
-            ColorTokens.brandActionText
-        case .completed:
-            ColorTokens.success
-        }
     }
 }
 
@@ -529,58 +617,60 @@ private struct TodayRunSheetBand: View {
     @Environment(SubscriptionAccessModel.self) private var subscription
 
     enum State {
-        case scheduled(TodayAppointmentSummary)
+        case scheduled(TodayAppointmentSummary, TodayStopSummary?)
         case active(TodayVisitSummary)
     }
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let state: State
+    let now: Date
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             switch state {
-            case .scheduled(let appointment):
-                scheduledContent(appointment)
+            case .scheduled(let appointment, let stop):
+                scheduledContent(appointment, stop: stop)
             case .active(let visit):
                 activeContent(visit)
             }
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, dynamicTypeSize.isAccessibilitySize ? 16 : 22)
+        .padding(.vertical, 16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(ColorTokens.brandTint)
+        .contentShape(Rectangle())
+        .background(ColorTokens.featuredSurface)
         .foregroundStyle(ColorTokens.textPrimary)
     }
 
-    private func scheduledContent(_ appointment: TodayAppointmentSummary) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            statusHeader(title: "Next Appointment", status: "Scheduled")
+    private func scheduledContent(_ appointment: TodayAppointmentSummary, stop: TodayStopSummary?) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            statusHeader(title: appointment.heading(at: now), status: "Scheduled")
             Text(appointment.startDate, format: .dateTime.hour().minute())
                 .font(
                     dynamicTypeSize.isAccessibilitySize
                         ? .title2.weight(.bold)
-                        : .largeTitle.weight(.bold)
+                        : .title.weight(.bold)
                 )
                 .monospacedDigit()
             recordDetails(
                 location: appointment.serviceLocationName,
                 address: appointment.serviceLocationAddress,
-                horseNames: appointment.horseNames
+                horseNames: stop?.horseNames ?? appointment.horseNames
             )
-            Label("Open Appointment", systemImage: "arrow.right")
+            Label("Open Stop", systemImage: "arrow.right")
                 .font(.headline)
                 .foregroundStyle(ColorTokens.brandActionText)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Next appointment, \(appointment.serviceLocationName)")
-        .accessibilityValue(scheduledAccessibilityValue(appointment))
-        .accessibilityHint("Opens appointment details.")
+        .accessibilityLabel("\(String(localized: appointment.heading(at: now))), \(appointment.serviceLocationName)")
+        .accessibilityValue(scheduledAccessibilityValue(appointment, horseNames: stop?.horseNames ?? appointment.horseNames))
+        .accessibilityHint("Opens stop details.")
     }
 
     private func activeContent(_ visit: TodayVisitSummary) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            statusHeader(title: "Next Action", status: "Visit In Progress")
+            statusHeader(title: "Continue Visit", status: "In Progress", tone: .active)
             recordDetails(
                 location: visit.serviceLocationName,
                 address: visit.serviceLocationAddress,
@@ -611,24 +701,21 @@ private struct TodayRunSheetBand: View {
     @ViewBuilder
     private func statusHeader(
         title: LocalizedStringResource,
-        status: LocalizedStringResource
+        status: LocalizedStringResource,
+        tone: StatusTone = .neutral
     ) -> some View {
         if dynamicTypeSize.isAccessibilitySize {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.headline)
-                Text(status)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ColorTokens.brandActionText)
+                RecordStatusPill(title: status, tone: tone)
             }
         } else {
             HStack(alignment: .firstTextBaseline) {
                 Text(title)
                     .font(.headline)
                 Spacer()
-                Text(status)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ColorTokens.brandActionText)
+                RecordStatusPill(title: status, tone: tone)
             }
         }
     }
@@ -657,7 +744,8 @@ private struct TodayRunSheetBand: View {
     }
 
     private func scheduledAccessibilityValue(
-        _ appointment: TodayAppointmentSummary
+        _ appointment: TodayAppointmentSummary,
+        horseNames: [String]
     ) -> String {
         let time = appointment.startDate.formatted(date: .omitted, time: .shortened)
         let schedule = String(
@@ -667,7 +755,7 @@ private struct TodayRunSheetBand: View {
         return [
             schedule,
             appointment.serviceLocationAddress,
-            todayHorseSummaryText(appointment.horseNames),
+            todayHorseSummaryText(horseNames),
         ]
         .compactMap { $0 }
         .joined(separator: ", ")
@@ -700,17 +788,23 @@ private func todayHorseSummaryText(_ horseNames: [String]) -> String {
 }
 
 private enum TodaySheet: Identifiable {
+    case stop(TodayStopSummary)
     case appointment
     case client
+    case horse(PersistentIdentifier?)
     case visit(PersistentIdentifier)
     case nextAppointment(PersistentIdentifier)
 
     var id: String {
         switch self {
+        case .stop(let stop):
+            "stop-\(String(describing: stop.id))"
         case .appointment:
             "appointment"
         case .client:
             "client"
+        case .horse:
+            "horse"
         case .visit(let id):
             "visit-\(String(describing: id))"
         case .nextAppointment(let id):
@@ -721,7 +815,7 @@ private enum TodaySheet: Identifiable {
 
 #Preview("Today — Empty") {
     if let container = try? ModelContainerFactory.inMemoryTest() {
-        TodayView()
+        TodayView(showSchedule: {})
             .modelContainer(container)
             .environment(
                 SubscriptionAccessModel(

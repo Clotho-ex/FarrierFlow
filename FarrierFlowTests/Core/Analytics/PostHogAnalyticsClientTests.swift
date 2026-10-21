@@ -7,6 +7,26 @@ import Testing
 @MainActor
 struct PostHogAnalyticsClientTests {
     @Test
+    func sdkPreparationWaitsForStartupAndFlushesEarlyEventsOnceInOrder() {
+        var preparations = 0
+        var names: [String] = []
+        let client = PostHogAnalyticsClient(
+            capture: { name, _ in names.append(name) },
+            prepare: { preparations += 1 }
+        )
+        client.track(.appFirstOpened)
+        client.track(.onboardingStarted)
+        #expect(preparations == 0)
+        #expect(names.isEmpty)
+
+        client.start()
+        client.start()
+        client.track(.visitCompleted)
+        #expect(preparations == 1)
+        #expect(names == ["app_first_opened", "onboarding_started", "visit_completed"])
+    }
+
+    @Test
     func missingConfigurationFallsBackToNoOpWithoutConstructingProvider() {
         var constructedProvider = false
 

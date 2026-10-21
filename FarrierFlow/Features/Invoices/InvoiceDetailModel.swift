@@ -28,7 +28,7 @@ final class InvoiceDetailModel {
     }
 
     var canDelete: Bool {
-        detail?.status == .unpaid
+        detail != nil
     }
 
     init(invoiceID: PersistentIdentifier) {
@@ -73,7 +73,7 @@ final class InvoiceDetailModel {
 
     func delete(in context: ModelContext) {
         do {
-            try InvoiceDeletionUseCase.deleteUnpaid(invoiceID: invoiceID, in: context)
+            try InvoiceDeletionUseCase.delete(invoiceID: invoiceID, in: context)
             didDelete = true
             detail = nil
         } catch {

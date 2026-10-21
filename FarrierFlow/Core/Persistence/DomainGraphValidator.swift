@@ -160,10 +160,8 @@ enum DomainGraphValidator {
             guard let invoiceVisit = lineItem.invoiceVisit else {
                 throw DomainGraphViolation.invoiceLineItemMissingInvoiceVisit
             }
-            guard
-                let sourceWorkItem = lineItem.sourceWorkItem,
-                billedWorkItemIDs.insert(sourceWorkItem.persistentModelID).inserted
-            else {
+            if let sourceWorkItem = lineItem.sourceWorkItem,
+               !billedWorkItemIDs.insert(sourceWorkItem.persistentModelID).inserted {
                 throw DomainGraphViolation.duplicateInvoiceLineItemSource
             }
             lineItemsByInvoiceVisit[invoiceVisit.persistentModelID, default: []].append(lineItem)
@@ -380,10 +378,7 @@ enum DomainGraphValidator {
         payments: [Payment],
         businessCurrencyCode: String?
     ) throws {
-        guard let client = invoice.client else {
-            throw DomainGraphViolation.invoiceMissingClient
-        }
-        guard client.invoices.contains(where: { $0 === invoice }) else {
+        if let client = invoice.client, !client.invoices.contains(where: { $0 === invoice }) {
             throw DomainGraphViolation.invoiceClientInverseMismatch
         }
         guard
@@ -417,10 +412,8 @@ enum DomainGraphValidator {
         var sourceVisitIDs = Set<PersistentIdentifier>()
         var amounts = [Int64]()
         for invoiceVisit in visits {
-            guard let sourceVisit = invoiceVisit.sourceVisit else {
-                throw DomainGraphViolation.invoiceVisitMissingSourceVisit
-            }
-            guard sourceVisitIDs.insert(sourceVisit.persistentModelID).inserted else {
+            if let sourceVisit = invoiceVisit.sourceVisit,
+               !sourceVisitIDs.insert(sourceVisit.persistentModelID).inserted {
                 throw DomainGraphViolation.duplicateInvoiceVisitSource
             }
             amounts.append(contentsOf: invoiceVisit.lineItems.map(\.amountMinorUnits))
@@ -487,13 +480,11 @@ enum DomainGraphValidator {
         guard let invoice = invoiceVisit.invoice else {
             throw DomainGraphViolation.invoiceVisitMissingInvoice
         }
-        guard let sourceVisit = invoiceVisit.sourceVisit else {
-            throw DomainGraphViolation.invoiceVisitMissingSourceVisit
-        }
         guard invoice.invoiceVisits.contains(where: { $0 === invoiceVisit }) else {
             throw DomainGraphViolation.invoiceVisitInvoiceInverseMismatch
         }
-        guard sourceVisit.invoiceVisits.contains(where: { $0 === invoiceVisit }) else {
+        if let sourceVisit = invoiceVisit.sourceVisit,
+           !sourceVisit.invoiceVisits.contains(where: { $0 === invoiceVisit }) {
             throw DomainGraphViolation.invoiceVisitSourceInverseMismatch
         }
         guard
@@ -519,21 +510,8 @@ enum DomainGraphValidator {
         guard let invoiceVisit = lineItem.invoiceVisit else {
             throw DomainGraphViolation.invoiceLineItemMissingInvoiceVisit
         }
-        guard let sourceWorkItem = lineItem.sourceWorkItem else {
-            throw DomainGraphViolation.invoiceLineItemMissingSourceWorkItem
-        }
         guard invoiceVisit.lineItems.contains(where: { $0 === lineItem }) else {
             throw DomainGraphViolation.invoiceLineItemVisitInverseMismatch
-        }
-        guard sourceWorkItem.invoiceLineItem === lineItem else {
-            throw DomainGraphViolation.invoiceLineItemWorkItemInverseMismatch
-        }
-        guard
-            let sourceVisitHorse = sourceWorkItem.visitHorse,
-            let sourceVisit = sourceVisitHorse.visit,
-            invoiceVisit.sourceVisit === sourceVisit
-        else {
-            throw DomainGraphViolation.invoiceLineItemSourceVisitMismatch
         }
         guard
             TextNormalization.required(lineItem.horseNameSnapshot) == lineItem.horseNameSnapshot,
@@ -545,16 +523,24 @@ enum DomainGraphValidator {
             throw DomainGraphViolation.invoiceLineItemAmountNegative
         }
         guard BusinessCurrency.isSupported(lineItem.currencyCode),
-              lineItem.currencyCode == sourceWorkItem.currencyCode,
               lineItem.currencyCode == invoiceVisit.invoice?.currencyCode
         else {
             throw DomainGraphViolation.invoiceLineItemCurrencyInvalid
         }
-        guard
-            let invoiceClient = invoiceVisit.invoice?.client,
-            sourceVisitHorse.horse?.client === invoiceClient
-        else {
-            throw DomainGraphViolation.invoiceLineItemClientMismatch
+        if let sourceWorkItem = lineItem.sourceWorkItem {
+            guard sourceWorkItem.invoiceLineItem === lineItem else {
+                throw DomainGraphViolation.invoiceLineItemWorkItemInverseMismatch
+            }
+            guard let member = sourceWorkItem.visitHorse, let sourceVisit = member.visit,
+                  invoiceVisit.sourceVisit === sourceVisit else {
+                throw DomainGraphViolation.invoiceLineItemSourceVisitMismatch
+            }
+            guard sourceWorkItem.currencyCode == lineItem.currencyCode else {
+                throw DomainGraphViolation.invoiceLineItemCurrencyInvalid
+            }
+            guard let client = invoiceVisit.invoice?.client, member.horse?.client === client else {
+                throw DomainGraphViolation.invoiceLineItemClientMismatch
+            }
         }
     }
 
@@ -650,7 +636,6 @@ enum DomainGraphValidator {
 
         var visitHorseIDs = Set<PersistentIdentifier>()
         var hasPendingHorse = false
-        var hasServicedHorse = false
         var subtotals = [MoneyAvailability]()
         for membership in memberships {
             guard let horse = membership.horse else {
@@ -691,7 +676,6 @@ enum DomainGraphValidator {
                 throw DomainGraphViolation.workItemTotalOverflow
             }
             hasPendingHorse = hasPendingHorse || outcome == .pending
-            hasServicedHorse = hasServicedHorse || outcome == .serviced
 
             if visit.completedAt != nil,
                outcome == .serviced,
@@ -710,9 +694,6 @@ enum DomainGraphValidator {
             }
             guard !hasPendingHorse else {
                 throw DomainGraphViolation.completedVisitHasPendingHorse
-            }
-            guard hasServicedHorse else {
-                throw DomainGraphViolation.completedVisitHasNoServicedHorse
             }
         }
 

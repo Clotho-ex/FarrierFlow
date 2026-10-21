@@ -22,10 +22,11 @@ final class ExistingHorsePickerModel {
     @ObservationIgnored
     private let saving: (ModelContext) throws -> Void
 
-    private(set) var horses: [Horse] = []
+    private(set) var horses: [HorseDetailSnapshot] = []
     private(set) var loadState = ExistingHorsePickerLoadState.loading
     var selectedHorseID: PersistentIdentifier?
     var alert: FeatureAlert?
+    private(set) var pendingRelocation: HorseRelocationConfirmation?
 
     init(
         horseFetcher: @escaping (ModelContext) throws -> [Horse] = {
@@ -60,7 +61,7 @@ final class ExistingHorsePickerModel {
                     hasInProgressVisitHorse: projection.hasInProgressVisitHorse,
                     isSameBarn: projection.isSameBarn
                 )
-            }
+            }.map(HorseDetailSnapshot.init)
             loadState = .loaded
         } catch {
             loadState = .failed
@@ -70,43 +71,65 @@ final class ExistingHorsePickerModel {
         }
     }
 
-    func move(to destinationBarnID: PersistentIdentifier, in context: ModelContext) -> Bool {
-        guard
-            let selectedHorseID,
-            let horse = context.model(for: selectedHorseID) as? Horse,
-            let destination = context.model(for: destinationBarnID) as? Barn,
-            let originalBarn = horse.currentBarn,
-            let projection = HorseRelocationRules.projection(
-                for: horse,
-                destinationBarnID: destinationBarnID
-            ),
-            HorseRelocationRules.canRelocate(
-                appointmentStates: projection.appointmentStates,
-                hasInProgressVisitHorse: projection.hasInProgressVisitHorse,
-                isSameBarn: projection.isSameBarn
-            )
-        else {
-            alert = FeatureAlert(
-                title: "Can’t Move Horse",
-                message: "Complete or remove unresolved appointments before moving this horse."
-            )
-            return false
-        }
-
-        horse.currentBarn = destination
-        if !destination.horses.contains(where: { $0 === horse }) {
-            destination.horses.append(horse)
-        }
-
+    func move(
+        to destinationBarnID: PersistentIdentifier,
+        in context: ModelContext,
+        confirming relocation: HorseRelocationConfirmation? = nil
+    ) -> Bool {
+        pendingRelocation = nil
         do {
-            try saving(context)
-            return true
-        } catch {
-            horse.currentBarn = originalBarn
-            destination.horses.removeAll { $0 === horse }
-            if !originalBarn.horses.contains(where: { $0 === horse }) {
-                originalBarn.horses.append(horse)
+            guard let selectedHorseID,
+                  let horse = try context.existingModel(Horse.self, for: selectedHorseID),
+                  let destination = try context.existingModel(Barn.self, for: destinationBarnID) else {
+                alert = FeatureAlert(
+                    title: "Can’t Move Horse",
+                    message: "The horse or service location is no longer available. Choose another before moving."
+                )
+                return false
             }
+            guard let originalBarn = horse.currentBarn,
+                  let projection = HorseRelocationRules.projection(
+                    for: horse,
+                    destinationBarnID: destinationBarnID
+                  ),
+                  HorseRelocationRules.canRelocate(
+                    appointmentStates: projection.appointmentStates,
+                    hasInProgressVisitHorse: projection.hasInProgressVisitHorse,
+                    isSameBarn: projection.isSameBarn
+                  ) else {
+                alert = FeatureAlert(
+                    title: "Can’t Move Horse",
+                    message: "Complete or remove unresolved appointments before moving this horse."
+                )
+                return false
+            }
+            if let move = HorseRelocationConfirmation(horse: horse, destination: destination),
+               relocation != move {
+                pendingRelocation = move
+                alert = move.alert
+                return false
+            }
+            horse.currentBarn = destination
+            if !destination.horses.contains(where: { $0 === horse }) {
+                destination.horses.append(horse)
+            }
+
+            do {
+                try saving(context)
+                return true
+            } catch {
+                horse.currentBarn = originalBarn
+                destination.horses.removeAll { $0 === horse }
+                if !originalBarn.horses.contains(where: { $0 === horse }) {
+                    originalBarn.horses.append(horse)
+                }
+                alert = FeatureAlert(
+                    title: "Couldn’t Move Horse",
+                    message: "The horse remains at its previous service location."
+                )
+                return false
+            }
+        } catch {
             alert = FeatureAlert(
                 title: "Couldn’t Move Horse",
                 message: "The horse remains at its previous service location."

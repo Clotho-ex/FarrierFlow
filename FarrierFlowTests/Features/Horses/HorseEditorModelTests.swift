@@ -7,6 +7,63 @@ import Testing
 @MainActor
 struct HorseEditorModelTests {
     @Test
+    func changingLocationRequiresConfirmationBeforeAnyPersistence() throws {
+        let graph = try makeHorseGraph()
+        let destination = Barn(name: "South Field")
+        graph.context.insert(destination)
+        try DomainGraphValidator.save(graph.context)
+        let editor = HorseEditorModel(horse: graph.horse)
+        editor.loadChoices(in: graph.context)
+        editor.draft.barnID = destination.persistentModelID
+        editor.draft.name = "Unsaved rename"
+
+        #expect(editor.save(in: graph.context) == nil)
+        #expect(graph.horse.currentBarn === graph.barn)
+        #expect(graph.horse.name == "Milo")
+        #expect(editor.alert != nil)
+    }
+
+    @Test
+    func addingExistingHorseRequiresConfirmationBeforeMoving() throws {
+        let graph = try makeHorseGraph()
+        let destination = Barn(name: "South Field")
+        graph.context.insert(destination)
+        try DomainGraphValidator.save(graph.context)
+        let picker = ExistingHorsePickerModel()
+        picker.load(destinationBarnID: destination.persistentModelID, in: graph.context)
+        picker.selectedHorseID = graph.horse.persistentModelID
+
+        #expect(!picker.move(to: destination.persistentModelID, in: graph.context))
+        #expect(graph.horse.currentBarn === graph.barn)
+        #expect(picker.alert != nil)
+    }
+
+    @Test
+    func confirmedMoveRechecksDestinationAndPersistsOnlyAfterConfirmation() throws {
+        let graph = try makeHorseGraph()
+        let destination = Barn(name: "South Field")
+        let another = Barn(name: "West Field")
+        graph.context.insert(destination)
+        graph.context.insert(another)
+        try DomainGraphValidator.save(graph.context)
+        let editor = HorseEditorModel(horse: graph.horse)
+        editor.loadChoices(in: graph.context)
+        editor.draft.barnID = destination.persistentModelID
+        #expect(editor.save(in: graph.context) == nil)
+        let first = try #require(editor.pendingRelocation)
+        #expect(first.sourceName == "North Field")
+        #expect(first.destinationName == "South Field")
+        editor.draft.barnID = another.persistentModelID
+        #expect(editor.save(in: graph.context, confirming: first) == nil)
+        #expect(graph.horse.currentBarn === graph.barn)
+        let updated = try #require(editor.pendingRelocation)
+        #expect(updated.destinationName == "West Field")
+        #expect(editor.save(in: graph.context, confirming: updated) == graph.horse.persistentModelID)
+        #expect(graph.horse.currentBarn === another)
+        #expect(!graph.barn.horses.contains { $0 === graph.horse })
+    }
+
+    @Test
     func creationEmitsAfterSaveWhileEditAndInvalidSaveDoNot() throws {
         let graph = try makeHorseGraph()
         let analytics = AnalyticsSpy()

@@ -5,8 +5,8 @@ import Testing
 
 @Suite("Official SDK sync transport", .serialized)
 struct SupabaseSyncTransportTests {
-    @Test
-    func versionedPushUsesExactOriginalPayloadAndSelectedContract() async throws {
+    @Test(arguments: [SyncProtocolVersion.holds, .deletion])
+    func versionedPushUsesExactOriginalPayloadAndSelectedContract(_ version: SyncProtocolVersion) async throws {
         let record = SyncRecord(id: UUID(), kind: .workItem,
             fields: ["billingHoldID": .string(UUID().uuidString.lowercased()),
                      "amountMinorUnits": .integer(9_007_199_254_740_993)])
@@ -14,13 +14,13 @@ struct SupabaseSyncTransportTests {
             invoicingGeneration: 3, mutations: [.init(id: record.id, kind: .workItem,
                 expectedRevision: 4, record: record)])
         SyncHTTPStub.configure { request in
-            #expect(request.url?.path == "/rest/v1/rpc/ff_sync_push_v2")
+            #expect(request.url?.path == "/rest/v1/rpc/ff_sync_push_v\(version.rawValue)")
             let body = try JSONDecoder().decode(PushBody.self, from: SyncHTTPStub.body(of: request))
             #expect(body.p_batch == batch)
             return (200, Data("{\"operationID\":\"\(batch.operationID)\",\"revision\":5}".utf8))
         }
         defer { SyncHTTPStub.configure(nil) }
-        let result = try await makeTransport().push(batch, protocolVersion: .holds)
+        let result = try await makeTransport().push(batch, protocolVersion: version)
         #expect(result.operationID == batch.operationID && result.revision == 5)
     }
 

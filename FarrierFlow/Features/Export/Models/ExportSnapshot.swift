@@ -120,7 +120,7 @@ nonisolated struct InvoiceExportRecord: Sendable, Equatable {
     let businessEmailSnapshot: String?
     let businessAddressSnapshot: String?
     let currencyCode: String
-    let clientID: ExportRecordID
+    let clientID: ExportRecordID?
 }
 
 nonisolated struct PaymentExportRecord: Sendable, Equatable {
@@ -142,7 +142,7 @@ nonisolated struct InvoiceVisitExportRecord: Sendable, Equatable {
     let serviceLocationNameSnapshot: String
     let serviceLocationAddressSnapshot: String?
     let invoiceID: ExportRecordID
-    let sourceVisitID: ExportRecordID
+    let sourceVisitID: ExportRecordID?
 }
 
 nonisolated struct InvoiceLineItemExportRecord: Sendable, Equatable {
@@ -152,7 +152,7 @@ nonisolated struct InvoiceLineItemExportRecord: Sendable, Equatable {
     let amountMinorUnits: Int64
     let currencyCode: String
     let invoiceVisitID: ExportRecordID
-    let sourceWorkItemID: ExportRecordID
+    let sourceWorkItemID: ExportRecordID?
 }
 
 nonisolated struct ExportInvoiceDocument: Sendable, Equatable {

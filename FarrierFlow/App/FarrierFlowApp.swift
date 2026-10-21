@@ -53,7 +53,13 @@ struct FarrierFlowApp: App {
                                     path: PhotographConstants.rootDirectoryName,
                                     directoryHint: .isDirectory
                             )
-                        )
+                        ),
+                        saving: { context in
+                            if uiTestConfiguration.forcesDeletionSaveFailure {
+                                throw PhotographLibraryError.persistenceFailed
+                            }
+                            try DomainGraphValidator.save(context)
+                        }
                     ),
                     subscriptionAccessModel: SubscriptionAccessModel(
                         client: UITestSubscriptionClient(configuration: uiTestConfiguration)

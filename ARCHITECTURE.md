@@ -34,8 +34,11 @@ operation retries, full-transaction cursors and conservative merges. Private
 original JPEG protection is acknowledged separately from metadata.
 
 Reviewed recovery archives original invoices locally, outside cloud batches,
-and applies permanent exact-WorkItem billing holds. Protocol 2 refuses new
-billing against committed holds. Explicit profile review and one atomic local
+and applies exact-WorkItem billing holds. Protocol 2 refuses new
+billing against committed holds. Protocol 3 supports explicit record deletion,
+detached invoice sources and completed Visit corrections. It releases a hold
+only when its existing invoice is explicitly deleted in the same transaction;
+local-only archived holds remain protected. Explicit profile review and one atomic local
 save preserve original numbers, currency and payment snapshots. Unacknowledged
 holds and local-only history never imply whole-business cloud protection.
 Independent archive details/PDFs need no session or SDK, including after cloud
@@ -104,6 +107,7 @@ FarrierFlow/
 │   ├── Visits/
 │   ├── Photographs/
 │   ├── Services/
+│   ├── Business/
 │   ├── BusinessProfile/
 │   ├── Subscription/
 │   ├── Export/
@@ -211,9 +215,22 @@ can still move for the keyboard or Dynamic Type.
 1. Today
 2. Schedule
 3. Clients
+4. Business
 
 Each tab owns a separate `NavigationStack` and path. Switching tabs therefore
-does not discard navigation state or combine unrelated routes.
+does not discard navigation state or combine unrelated routes. On iOS 27,
+Business uses the native `.prominent` tab role at the trailing edge, separate
+from Today, Schedule, and Clients. Earlier systems use four ordinary native
+tabs. No search role, custom tab bar, or custom transitions are used.
+
+Today opens physical stops in a native Stop Details sheet with medium/large
+detents and its own `NavigationStack`. Its individual appointment links reuse
+Schedule's `AppointmentDetailView` and `AppointmentEditorView`; Schedule still
+opens those records directly. Stops are read-only groups of saved location,
+exact start time and work state, never merged appointment records. Saved changes
+refresh both tabs from the shared SwiftData container. The stop sheet retains its
+physical group while it has appointments, and follows a moved member only when
+that group becomes empty. Native tab histories remain independent.
 
 Owner setup applies an onboarding-only name preflight before reusing the single
 BusinessProfile validation and save boundary. The preflight permits letters,
@@ -226,16 +243,30 @@ route, because that route may have been reached by native back navigation. A
 workspace with valid identity and no legacy completion marker is intentionally
 treated as completed compatibility state. Stale or mismatched interrupted
 markers restart safely at Business.
-Service, Service Location, customer-record, contact, and owner-default setup
-remain owned by their contextual features and never block identity completion.
+Business setup also offers optional reusable service names and prices, using
+Services' shared fields and validation. BusinessProfile saves those draft Services
+atomically with identity and the selected business currency. Services remain the
+single catalog, accessible from My Business and contextual appointment creation.
+Missing locations, horses, clients and services can be created without discarding
+an appointment draft. Service Location, customer-record, contact, and owner-default
+setup remain contextual.
 
 `RootView` resolves subscription access, onboarding, and owner-setup readiness
 independently. Onboarding reads `SubscriptionAccessModel` only when choosing
 whether to skip or present the existing paywall. Pro completes that handoff;
 Free and Unavailable can continue into the existing safe read-only app, and
-Retry remains available. Onboarding identity saving is the sole narrow setup
-exception to ordinary Pro mutation gates; operational business mutations remain
-Pro-only.
+Retry remains available. Saving onboarding identity and its optional initial
+Services is the narrow setup exception to ordinary Pro mutation gates; contextual
+service creation and operational business mutations remain Pro-only.
+
+Local onboarding/readiness resolution precedes service startup. After local
+content has had a display frame, RootView starts analytics, subscription
+verification, photograph reconciliation, and the existing cloud observers.
+RevenueCat construction is deferred until first use; analytics buffers early
+typed events until startup. Existing business records stay readable while
+verification is pending, with mutations still denied. Startup verifies access
+without requesting offerings; the shared Subscription screen loads products
+and introductory eligibility when opened. No persisted entitlement bypass is used.
 
 The RevenueCat adapter also projects each StoreKit product's numeric price and
 currency code alongside its localized display price. The localized string stays
@@ -282,9 +313,20 @@ the existing subscription boundary.
   service-location context.
 - Barns owns the Service Locations list, service-location detail, and
   service-location editor.
-- The Clients toolbar menu exposes Service Locations, Services, Invoices, My
-  Business, and the concrete Subscription destination. Each destination remains
-  inside the Clients navigation stack.
+- Business owns the global Operations (Service Locations, Services, Invoices)
+  and Settings (Business Profile, Subscription, Backup & Sync) directory.
+  Its read-only Overview sums validated unpaid Invoice snapshots using checked
+  integer arithmetic in the saved business currency. It counts distinct Visits
+  by completion date in the local calendar month, with a half-open month range.
+  Metrics open the shared Invoice list's unpaid filter or a monthly completed
+  Visit list linking to the existing Visit Detail. Fresh read contexts and
+  save/sync/foreground/month-boundary refresh keep the projection current;
+  no new persisted totals, financial records, conversions, or editing flows exist.
+  Its Support group opens native Help & Support and About screens, with published
+  support/contact/legal links and a footer from the installed bundle version.
+  Clients keeps its Add Client action and contextual record links. The two
+  stacks reuse `RecordNavigationDestinations` and the existing feature views;
+  navigation does not duplicate editors, persistence, or subscription rules.
 - No generalized Settings route, screen, folder, toolbar item, or empty
   destination exists through Slice 7. Business Profile remains the
   concrete owner-configuration destination. Settings may be introduced later
@@ -299,12 +341,13 @@ Appointment Detail and Horse History and exposes the recoverable Schedule-owned
 next-appointment assistant. The Unit 5 handoff passes only a
 successfully completed Visit identifier and waits for the Visit editor to
 dismiss before Today or Appointment Detail presents that assistant. Horse
-Detail owns its completed-history projection and routes to Visit Detail. No
-Visit tab or global history destination is added.
+Detail owns its completed-history projection and routes to Visit Detail.
+Business Overview also opens the current month's completed Visits, reusing
+that same detail. No Visit tab or general history browser is added.
 
 Client Detail owns Create Invoice. Successful generation replaces the creation
 route with Invoice Detail. Invoice list and Business Profile are also reachable
-from Clients > More; no Invoice tab or custom document browser is added.
+from Business; no Invoice tab or custom document browser is added.
 
 The presenting feature owns sheet presentation state and any transient context,
 such as a preselected client. The presented editor owns its draft, validation,
@@ -408,9 +451,14 @@ repository is justified only when a real persistence boundary cannot be
 expressed clearly with `ModelContext`. There is no protocol around every
 concrete type and no dependency-injection framework.
 
-Deletion use cases perform relationship preflight checks, return a typed
-blocked reason, and delete only when the approved rules allow it. SwiftData
-relationship delete rules provide a second line of data protection.
+Deletion uses one fresh RecordDeletionPlan for the warning and commit. It
+cascades operational dependencies, preserves other horses in shared visits,
+and removes empty appointments/visits. Saved invoices remain independent
+financial snapshots; their source/client links detach without changing values
+or payment evidence. Paid and unpaid invoices can be deleted separately.
+The shared native sheet does not mutate on cancellation. Changed dependencies
+require another confirmation; save failure rolls back the graph and quarantined
+photos. SwiftData relationship rules remain a second line of protection.
 
 ### Persistence Storage Optionality and Domain Requiredness
 
@@ -484,9 +532,13 @@ mutates the Invoice.
 
 Record Payment creates one full-total manual Payment and changes status to Paid
 in one validated save. Mark as Unpaid deletes that evidence and restores the
-outstanding status in one validated save. Unpaid deletion removes only invoice
-snapshots and their WorkItem billing links. Visit correction is available again
-only when no remaining InvoiceLineItem references any WorkItem from that Visit.
+outstanding status in one validated save. Explicit paid or unpaid deletion
+removes invoice snapshots/payment evidence and releases its WorkItem links/holds,
+preserving operational work and photos. Completed Visit correction is allowed
+with invoiced work: source lines detach and matching WorkItems receive billing
+holds, preserving saved financial values and preventing accidental repeat billing.
+Corrections may leave every horse Not Serviced; initial completion still requires
+one serviced horse.
 
 Reads never force-unwrap stored relationships. If corrupted or externally
 invalid persisted data is encountered, views render an unavailable value or
@@ -587,7 +639,7 @@ ZAR. BusinessProfile owns one code; Service, WorkItem, InvoiceLineItem, Invoice,
 and Payment carry same-currency snapshots. Currency changes lock once any of
 those monetary records exists, and PDF/export boundaries reject unsupported
 codes. No layer performs exchange-rate conversion.
-Status change and unpaid deletion use focused atomic use cases. Every failure
+Status change and record deletion use focused atomic use cases. Every failure
 surfaces human error copy without success-shaped navigation or partial state.
 
 Dirty Visit drafts are not persisted per keystroke. Backgrounding makes a
@@ -693,7 +745,7 @@ appropriate appearance on each OS.
   plans, and non-Apple billing.
 - Completion of the remaining Slice 8 Export units before revenue launch.
 - Background tasks, external draft files, or per-change autosave.
-- Completed Visit deletion or historical-date correction.
+- Historical-date correction.
 - A generalized Settings destination beyond the concrete Business Profile and
   approved owner defaults.
 - Custom navigation, custom tabs, or custom iOS 26 visual effects.

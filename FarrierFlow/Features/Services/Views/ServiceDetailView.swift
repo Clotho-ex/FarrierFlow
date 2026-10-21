@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ServiceDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
@@ -29,12 +30,32 @@ struct ServiceDetailView: View {
                                 service.horsesUsingAsDefault.sorted {
                                     $0.name.localizedStandardCompare($1.name) == .orderedAscending
                                 },
-                                id: \.persistentModelID
+                                id: \.id
                             ) { horse in
-                                RecordNavigationLink(value: ClientRoute.horse(horse.persistentModelID)) {
+                                RecordNavigationLink(value: ClientRoute.horse(horse.id)) {
                                     HorseRow(horse: horse)
                                 }
                             }
+                        }
+                        .listRowBackground(ColorTokens.surface)
+                    }
+                    if !model.usage.appointments.isEmpty {
+                        Section("Appointments") {
+                            ForEach(model.usage.appointments) { appointment in
+                                LinkedAppointmentRow(appointment: appointment)
+                            }
+                        }
+                        .listRowBackground(ColorTokens.surface)
+                    }
+                    if !model.usage.visits.isEmpty {
+                        Section {
+                            ForEach(model.usage.visits) { visit in
+                                LinkedVisitRow(visit: visit)
+                            }
+                        } header: {
+                            Text("Recorded Work")
+                        } footer: {
+                            Text("Open a visit to review its work and invoices. Deleting this service removes its recorded work; saved invoices are kept.")
                         }
                         .listRowBackground(ColorTokens.surface)
                     }
@@ -50,12 +71,12 @@ struct ServiceDetailView: View {
                             if service.isArchived {
                                 Button("Reactivate", systemImage: "arrow.counterclockwise") {
                                     guard subscription.allowsMutations else { return }
-                                    _ = model.reactivate(in: context)
+                                    _ = model.reactivate(in: ModelContext(context.container))
                                 }
                             } else {
                                 Button("Archive", systemImage: "archivebox") {
                                     guard subscription.allowsMutations else { return }
-                                    _ = model.archive(in: context)
+                                    _ = model.archive(in: ModelContext(context.container))
                                 }
                             }
                             Divider()
@@ -70,23 +91,13 @@ struct ServiceDetailView: View {
                     }
                 }
                 .sheet(isPresented: $showsEditor, onDismiss: reload) {
-                    ServiceEditorView(service: service)
+                    ServiceEditorDestination(serviceID: service.id)
                 }
-                .confirmationDialog(
-                    "Delete Service?",
-                    isPresented: $showsDeleteConfirmation,
-                    titleVisibility: .visible
-                ) {
-                    Button("Delete Service", role: .destructive) {
-                        guard subscription.allowsMutations else { return }
-                        if model.delete(in: context) {
-                            dismiss()
-                        }
-                    }
-                    .accessibilityIdentifier("service-delete-confirmation")
-                } message: {
-                    Text("This permanently deletes the service when it is not used by an appointment, a Horse default, or recorded work.")
-                }
+                .recordDeletionSheet(
+                    .service(serviceID), isPresented: $showsDeleteConfirmation,
+                    title: "Delete Service?", confirmationTitle: "Delete Service",
+                    accessibilityPrefix: "service-delete", alert: $model.alert
+                ) { dismiss() }
             } else {
                 ContentUnavailableView("Service Unavailable", systemImage: "exclamationmark.circle")
             }
@@ -99,14 +110,33 @@ struct ServiceDetailView: View {
     }
 
     private func reload() {
-        model.load(id: serviceID, in: context)
+        model.load(id: serviceID, in: ModelContext(context.container))
     }
 
-    private func formattedAmount(for service: Service) -> String {
+
+
+    private func formattedAmount(for service: ServiceDetailSnapshot) -> String {
         MoneyFormatter.currency(
             minorUnits: service.defaultAmountMinorUnits,
             currencyCode: service.currencyCode,
             locale: locale
         ) ?? String(localized: "Unavailable", locale: locale)
+    }
+}
+
+private struct ServiceEditorDestination: View {
+    @Environment(\.modelContext) private var context
+
+    let serviceID: PersistentIdentifier
+
+    var body: some View {
+        if let record = try? context.existingModel(Service.self, for: serviceID) {
+            ServiceEditorView(service: record)
+        } else {
+            ContentUnavailableView(
+                "Service Unavailable",
+                systemImage: "exclamationmark.circle"
+            )
+        }
     }
 }

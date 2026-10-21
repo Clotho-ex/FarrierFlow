@@ -85,7 +85,7 @@ struct AppointmentDetailModelTests {
     }
 
     @Test
-    func visitBlockedDeletionKeepsDetailLoadedAndShowsTheTypedAlert() throws {
+    func deletionIncludesAssociatedVisit() throws {
         let container = try ModelContainerFactory.inMemoryTest()
         let context = container.mainContext
         let client = Client(name: "Alex")
@@ -103,13 +103,10 @@ struct AppointmentDetailModelTests {
         let model = AppointmentDetailModel()
         model.load(id: appointment.persistentModelID, in: context)
 
-        #expect(!model.delete(in: context))
-        #expect(model.detail?.id == appointment.persistentModelID)
-        let alert = try #require(model.alert)
-        let expectedAlert = RecordDeletionBlock.appointmentHasVisit.alert
-        #expect(alert.title == expectedAlert.title)
-        #expect(alert.message == expectedAlert.message)
-        #expect(try context.fetchCount(FetchDescriptor<Appointment>()) == 1)
+        #expect(model.delete(in: context))
+        #expect(model.alert == nil)
+        #expect(try context.fetchCount(FetchDescriptor<Appointment>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<Visit>()) == 0)
     }
 
     @Test
@@ -142,15 +139,11 @@ struct AppointmentDetailModelTests {
         )
 
         let deletionContext = ModelContext(container)
-        #expect(!model.delete(in: deletionContext))
-        let alert = try #require(model.alert)
-        let expectedAlert = RecordDeletionBlock.appointmentHasVisit.alert
-        #expect(alert.title == expectedAlert.title)
-        #expect(alert.message == expectedAlert.message)
-
+        #expect(model.delete(in: deletionContext))
+        #expect(model.alert == nil)
         let verificationContext = ModelContext(container)
-        #expect(try verificationContext.fetchCount(FetchDescriptor<Appointment>()) == 1)
-        #expect(try verificationContext.fetchCount(FetchDescriptor<Visit>()) == 1)
+        #expect(try verificationContext.fetchCount(FetchDescriptor<Appointment>()) == 0)
+        #expect(try verificationContext.fetchCount(FetchDescriptor<Visit>()) == 0)
         try DomainGraphValidator.validateAll(in: verificationContext)
     }
 }

@@ -85,12 +85,51 @@ struct BusinessProfileEditorView: View {
             Alert(title: Text($0.title), message: Text($0.message))
         }
         .task {
-            model.load(in: context, locale: locale)
+            if model.loadState != .loaded { model.load(in: context, locale: locale) }
+            else { model.refreshCurrencyLock(in: context) }
             if mode == .identity {
                 await Task.yield()
                 focusedField = .name
             }
         }
+    }
+
+    private var setupServices: some View {
+        VStack(alignment: .leading, spacing: SpacingTokens.standard) {
+            Text("What services do you offer?")
+                .font(.headline)
+                .accessibilityAddTraits(.isHeader)
+            Text("Add your services and prices now, or later in My Business.")
+                .font(.footnote)
+                .foregroundStyle(ColorTokens.textSecondary)
+            ForEach($model.setupServices) { $entry in
+                VStack(alignment: .leading, spacing: SpacingTokens.related) {
+                    ServiceFormFields(draft: $entry.service)
+                        .textFieldStyle(.roundedBorder)
+                    Button(role: .destructive) {
+                        model.setupServices.removeAll { $0.id == entry.id }
+                    } label: {
+                        Text("Remove Service")
+                            .frame(minHeight: 44, alignment: .leading)
+                    }
+                }
+                Divider()
+            }
+            Button {
+                focusedField = nil
+                model.addSetupService()
+            } label: {
+                Label("Add Service", systemImage: "plus")
+                    .frame(minHeight: 44, alignment: .leading)
+            }
+            .accessibilityIdentifier("business-setup-add-service")
+            if !model.setupServicesAreValid {
+                Text("Enter a name and valid price for each service, or remove it to continue.")
+                    .font(.footnote)
+                    .foregroundStyle(ColorTokens.textSecondary)
+            }
+        }
+        .onChange(of: model.draft.currencyCode) { model.synchronizeServiceCurrency() }
     }
 
     @ViewBuilder
@@ -108,10 +147,10 @@ struct BusinessProfileEditorView: View {
             VStack(spacing: SpacingTokens.hero) {
                 OnboardingHeroTitle(title: "Your Business")
                 identityGroup
+                setupServices
             }
             .frame(maxWidth: 560, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .center)
-            .containerRelativeFrame(.vertical, alignment: .center)
             .padding(.horizontal, 24)
             .padding(.top, 18)
             .padding(.bottom, 12)
@@ -357,6 +396,23 @@ struct BusinessProfileEditorView: View {
             .listRowBackground(ColorTokens.surface)
 
             Section {
+                NavigationLink(value: ServiceRoute.list) {
+                    Text("Services")
+                }
+                .disabled(!model.canOpenServiceCatalog)
+                .accessibilityIdentifier("business-profile-services")
+            } header: {
+                Text("Your Services")
+            } footer: {
+                if model.canOpenServiceCatalog {
+                    Text("Manage the services and prices you offer.")
+                } else {
+                    Text("Save your business currency before adding services.")
+                }
+            }
+            .listRowBackground(ColorTokens.surface)
+
+            Section {
                 Picker(
                     "Appointment Duration",
                     selection: $model.draft.defaultAppointmentDurationMinutes
@@ -588,7 +644,7 @@ struct BusinessProfileEditorView: View {
         case .full:
             model.canSave
         case .identity:
-            model.loadState == .loaded && identityNameValidationError == nil
+            model.loadState == .loaded && identityNameValidationError == nil && model.setupServicesAreValid
         }
     }
 

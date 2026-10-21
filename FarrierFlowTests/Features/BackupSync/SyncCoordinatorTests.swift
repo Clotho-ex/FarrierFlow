@@ -15,10 +15,10 @@ struct SyncCoordinatorTests {
         let store = SyncJournalStore(container: container)
         try store.bind(accountID: account, workspaceID: transport.workspaceID, deviceID: device)
         let pending = try #require(try store.stage())
-        await transport.setMinimumProtocol(3)
+        await transport.setMinimumProtocol(4)
         let coordinator = SyncCoordinator(container: container, transport: transport, deviceID: device)
         coordinator.activate(accountID: account)
-        await #expect(throws: SyncTransportError.updateRequired(3)) { try await coordinator.sync() }
+        await #expect(throws: SyncTransportError.updateRequired(4)) { try await coordinator.sync() }
         #expect(await transport.sentBatches() == [pending])
         #expect(await transport.pullCount == 0)
         #expect(try store.journal()?.pending == nil && store.journal()?.lastSuccessfulSync == nil)

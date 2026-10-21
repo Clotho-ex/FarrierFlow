@@ -804,7 +804,7 @@ struct VisitEditorModelTests {
     }
 
     @Test
-    func invoicedWorkLocksCompletedVisitCorrectionBeforeLoadingItsDraft() throws {
+    func invoicedWorkAllowsCorrectionWithoutChangingInvoice() throws {
         let graph = try makeVisitGraph()
         try completeVisit(
             graph: graph,
@@ -839,18 +839,8 @@ struct VisitEditorModelTests {
         )
         try DomainGraphValidator.save(context)
 
-        #expect(throws: VisitSaveError.invoicedVisitCannotBeCorrected) {
-            _ = try VisitSaveUseCase.editorMode(
-                visitID: graph.visitID,
-                in: ModelContext(graph.container)
-            )
-        }
-        #expect(throws: VisitSaveError.invoicedVisitCannotBeCorrected) {
-            _ = try VisitSaveUseCase.loadDraft(
-                visitID: graph.visitID,
-                in: ModelContext(graph.container)
-            )
-        }
+        #expect(try VisitSaveUseCase.editorMode(visitID: graph.visitID, in: ModelContext(graph.container)) == .correction)
+        #expect(try VisitSaveUseCase.loadDraft(visitID: graph.visitID, in: ModelContext(graph.container)).horses.count == 2)
 
         let model = VisitEditorModel(
             visitID: graph.visitID,
@@ -859,8 +849,8 @@ struct VisitEditorModelTests {
         )
         model.load()
 
-        #expect(model.loadState == .failed)
-        #expect(model.draft == nil)
+        #expect(model.loadState == .loaded)
+        #expect(model.draft != nil)
     }
 
     @Test
@@ -898,8 +888,8 @@ struct VisitEditorModelTests {
         #expect(try verificationContext.fetch(FetchDescriptor<Visit>()).isEmpty)
         #expect(try verificationContext.fetch(FetchDescriptor<VisitHorse>()).isEmpty)
         #expect(try verificationContext.fetch(FetchDescriptor<WorkItem>()).isEmpty)
-        #expect(try verificationContext.fetch(FetchDescriptor<Appointment>()).count == 1)
-        #expect(try verificationContext.fetch(FetchDescriptor<AppointmentHorse>()).count == 2)
+        #expect(try verificationContext.fetch(FetchDescriptor<Appointment>()).isEmpty)
+        #expect(try verificationContext.fetch(FetchDescriptor<AppointmentHorse>()).isEmpty)
         #expect(try verificationContext.fetch(FetchDescriptor<Barn>()).count == 1)
         #expect(try verificationContext.fetch(FetchDescriptor<Horse>()).count == 2)
         #expect(try verificationContext.fetch(FetchDescriptor<Client>()).count == 1)
@@ -907,7 +897,7 @@ struct VisitEditorModelTests {
     }
 
     @Test
-    func completedVisitCannotBeDiscarded() throws {
+    func completedVisitCanBeDeleted() throws {
         let graph = try makeVisitGraph()
         try completeVisit(
             graph: graph,
@@ -915,9 +905,9 @@ struct VisitEditorModelTests {
         )
 
         let context = ModelContext(graph.container)
-        #expect(throws: RecordDeletionBlock.completedVisitCannotBeDeleted) {
-            try VisitDiscardUseCase.discard(visitID: graph.visitID, in: context)
-        }
+        try VisitDiscardUseCase.discard(visitID: graph.visitID, in: context)
+        #expect(try context.fetchCount(FetchDescriptor<Visit>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<Appointment>()) == 0)
     }
 
     @Test

@@ -193,6 +193,16 @@ enum UITestFixtures {
                 calendar: calendar,
                 stage: screenshotStage ?? .active
             )
+        case .todayStops:
+            try seedTodayStops(in: container, now: now, calendar: calendar)
+        case .todayStopsBoundary:
+            try seedTodayStops(in: container, now: now, calendar: calendar, startsSoon: true)
+        case .todayFeaturedBoundary:
+            try seedTodayStops(in: container, now: now, calendar: calendar, featuredStartsSoon: true)
+        case .todayEmpty:
+            try seedOwnerIdentity(in: container)
+        case .todayReady, .todayFuture, .todayComplete:
+            try seedTodayEmptyState(scenario, in: container, now: now, calendar: calendar)
         case .invoiceReady:
             try seedInvoiceReady(
                 in: container,
@@ -205,6 +215,8 @@ enum UITestFixtures {
                 currencyCode: currencyCode,
                 photographRootURL: photographRootURL
             )
+        case .deletionReferences:
+            try seedDeletionReferences(in: container, currencyCode: currencyCode, photographRootURL: photographRootURL)
         case .nextAppointment:
             try seedNextAppointment(in: container)
         case .ownerSetup:
@@ -218,6 +230,79 @@ enum UITestFixtures {
             return
         }
         context.insert(BusinessProfile(name: "UI Test Farrier"))
+        try DomainGraphValidator.save(context)
+    }
+
+    private static func seedTodayEmptyState(
+        _ scenario: UITestScenario, in container: ModelContainer, now: Date, calendar: Calendar
+    ) throws {
+        let context = container.mainContext
+        try seedOwnerIdentity(in: container)
+        guard try context.fetchCount(FetchDescriptor<Client>()) == 0 else { return }
+        let client = Client(name: "Empty State Client")
+        let barn = Barn(name: "North Field")
+        context.insert(client)
+        context.insert(barn)
+        let horse = Horse(name: "Milo", client: client, currentBarn: barn)
+        context.insert(horse)
+        client.horses.append(horse)
+        barn.horses.append(horse)
+        if scenario == .todayFuture || scenario == .todayComplete {
+            let start = scenario == .todayFuture
+                ? CalendarRules.dayInterval(containing: now, calendar: calendar).end.addingTimeInterval(9 * 3_600)
+                : calendar.startOfDay(for: now)
+            let appointment = makeAppointment(startDate: start, barn: barn, horses: [horse], in: context)
+            if scenario == .todayComplete {
+                let visit = Visit(
+                    startedAt: start, completedAt: start.addingTimeInterval(60),
+                    serviceLocationNameSnapshot: barn.name, appointment: appointment, barn: barn
+                )
+                context.insert(visit)
+                appointment.visit = visit
+                barn.visits.append(visit)
+                let outcome = VisitHorse(outcomeRawValue: VisitOutcome.notServiced.rawValue, visit: visit, horse: horse)
+                context.insert(outcome)
+                visit.visitHorses.append(outcome)
+                horse.visitHorses.append(outcome)
+            }
+        }
+        try DomainGraphValidator.save(context)
+    }
+
+    private static func seedTodayStops(
+        in container: ModelContainer, now: Date, calendar: Calendar,
+        startsSoon: Bool = false, featuredStartsSoon: Bool = false
+    ) throws {
+        let context = container.mainContext
+        guard try context.fetchCount(FetchDescriptor<Appointment>()) == 0 else { return }
+        try seedOwnerIdentity(in: container)
+        let client = Client(name: "Today Client")
+        let firstBarn = Barn(name: "Chestnut Barn", address: "397 Hickory Lane, Washington, DC")
+        let secondBarn = Barn(name: "The Old Barn", address: "120 Meadow Road")
+        context.insert(client)
+        context.insert(firstBarn)
+        context.insert(secondBarn)
+        let day = calendar.startOfDay(for: now)
+        for (name, barn, offset) in [
+            ("Monnahey Boy", firstBarn, 15.5),
+            ("Thunder", secondBarn, 16.0),
+            ("Peanut", secondBarn, 16.0),
+        ] {
+            if featuredStartsSoon, barn !== firstBarn { continue }
+            let horse = Horse(name: name, client: client, currentBarn: barn)
+            context.insert(horse)
+            client.horses.append(horse)
+            barn.horses.append(horse)
+            let start: Date
+            if featuredStartsSoon {
+                start = now.addingTimeInterval(20)
+            } else if startsSoon {
+                start = now.addingTimeInterval(barn === firstBarn ? -600 : 20)
+            } else {
+                start = day.addingTimeInterval(offset * 3_600)
+            }
+            _ = makeAppointment(startDate: start, barn: barn, horses: [horse], in: context)
+        }
         try DomainGraphValidator.save(context)
     }
 
@@ -309,6 +394,27 @@ enum UITestFixtures {
             rootURL: photographRootURL,
             in: container
         )
+    }
+
+    private static func seedDeletionReferences(
+        in container: ModelContainer,
+        currencyCode: String,
+        photographRootURL: URL
+    ) throws {
+        try seedPaymentPending(in: container, currencyCode: currencyCode, photographRootURL: photographRootURL)
+        let context = ModelContext(container)
+        let existing = try context.fetch(FetchDescriptor<Appointment>())
+        guard !existing.contains(where: { $0.notes == "Review linked appointments" }) else { return }
+        let horses = try context.fetch(FetchDescriptor<Horse>())
+        guard let horse = horses.first(where: { $0.name == "Milo" }), let barn = horse.currentBarn else {
+            throw SeedError.visitHorseUnavailable
+        }
+        let scheduled = makeAppointment(startDate: .now.addingTimeInterval(-86_400), barn: barn, horses: [horse], in: context)
+        scheduled.notes = "Review linked appointments"
+        scheduled.appointmentHorses.first?.plannedService = horse.defaultService
+        let active = makeAppointment(startDate: .now, barn: barn, horses: [horse], in: context)
+        try DomainGraphValidator.save(context)
+        _ = try VisitStartUseCase.start(appointmentID: active.persistentModelID, now: .now, in: container)
     }
 
     private static func seedPaymentPending(

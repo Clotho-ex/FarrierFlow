@@ -9,7 +9,7 @@ set local role authenticated;
 do $$
 declare batch jsonb; protocol integer; rejected boolean;
 begin
-  for protocol in 1..2 loop
+  for protocol in 1..3 loop
     for batch in
       select value from (values
         (null::jsonb), ('null'::jsonb), ('[]'::jsonb), ('{}'::jsonb),
@@ -22,7 +22,8 @@ begin
       rejected := false;
       begin
         if protocol = 1 then perform public.ff_sync_push(batch);
-        else perform public.ff_sync_push_v2(batch); end if;
+        elsif protocol = 2 then perform public.ff_sync_push_v2(batch);
+        else perform public.ff_sync_push_v3(batch); end if;
       exception when invalid_parameter_value then
         if sqlerrm <> 'Invalid batch size' then raise; end if;
         rejected := true;
@@ -33,7 +34,8 @@ begin
     begin
       batch := jsonb_build_object('mutations',jsonb_build_array('{}'::jsonb));
       if protocol = 1 then perform public.ff_sync_push(batch);
-      else perform public.ff_sync_push_v2(batch); end if;
+      elsif protocol = 2 then perform public.ff_sync_push_v2(batch);
+        else perform public.ff_sync_push_v3(batch); end if;
     exception when invalid_parameter_value then
       if sqlerrm <> 'Missing batch identity' then raise; end if;
       rejected := true;
@@ -53,5 +55,5 @@ begin
     raise exception 'FAIL: rejected input changed business state';
   end if;
 end $$;
-select 'PASS: both sync protocols reject malformed/oversized batches and missing identities without business writes' as result;
+select 'PASS: all three sync protocols reject malformed/oversized batches and missing identities without business writes' as result;
 rollback;

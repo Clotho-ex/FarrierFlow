@@ -261,7 +261,7 @@ struct DomainGraphValidatorTests {
     }
 
     @Test
-    func saveRejectsCompletedVisitWithoutServicedHorse() throws {
+    func completedVisitCanRemainAfterAllRecordedWorkIsRemoved() throws {
         let graph = try makeGraph()
         let visit = ModelFixtures.makeVisit(
             startedAt: Date(timeIntervalSinceReferenceDate: 100),
@@ -273,9 +273,7 @@ struct DomainGraphValidatorTests {
             visitHorse.outcomeRawValue = VisitOutcome.notServiced.rawValue
         }
 
-        #expect(throws: DomainGraphViolation.completedVisitHasNoServicedHorse) {
-            try DomainGraphValidator.save(graph.context)
-        }
+        try DomainGraphValidator.save(graph.context)
     }
 
     @Test

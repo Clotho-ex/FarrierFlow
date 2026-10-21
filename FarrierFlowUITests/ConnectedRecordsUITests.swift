@@ -20,12 +20,8 @@ final class ConnectedRecordsUITests: XCTestCase {
         app.buttons["Save"].tap()
         XCTAssertTrue(app.buttons["client-row-\(clientName)"].waitForExistence(timeout: 3))
 
-        let more = app.buttons["More"].firstMatch
+        app.openBusinessRoot()
         let serviceLocations = app.buttons["Service Locations"].firstMatch
-        guard tapUntilDestinationAppears(
-            more,
-            destination: serviceLocations
-        ) else { return }
         guard tapUntilDestinationAppears(
             serviceLocations,
             destination: app.navigationBars["Service Locations"]
@@ -40,7 +36,7 @@ final class ConnectedRecordsUITests: XCTestCase {
         app.buttons["Save"].tap()
         XCTAssertTrue(app.buttons["barn-row-\(barnName)"].waitForExistence(timeout: 3))
         guard tapUntilDestinationAppears(
-            app.navigationBars["Service Locations"].buttons["Clients"],
+            app.tabBars.buttons["Clients"],
             destination: app.buttons["client-row-\(clientName)"]
         ) else { return }
 

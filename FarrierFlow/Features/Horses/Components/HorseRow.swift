@@ -7,13 +7,17 @@ enum HorseRowContext {
 }
 
 struct HorseRow: View {
-    let horse: Horse
+    let horse: HorseDetailSnapshot
     let context: HorseRowContext
 
     init(
         horse: Horse,
         context: HorseRowContext = .collection
     ) {
+        self.init(horse: HorseDetailSnapshot(horse: horse), context: context)
+    }
+
+    init(horse: HorseDetailSnapshot, context: HorseRowContext = .collection) {
         self.horse = horse
         self.context = context
     }

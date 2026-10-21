@@ -14,7 +14,9 @@ nonisolated enum SubscriptionRootRules {
     ) -> SubscriptionRootState {
         switch access {
         case .loading:
-            .loading
+            hasIdentity || hasExistingBusinessData
+                ? .app(readOnly: true)
+                : .loading
         case .free:
             hasIdentity || hasExistingBusinessData
                 ? .app(readOnly: true)

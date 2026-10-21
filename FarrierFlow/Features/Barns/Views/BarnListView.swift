@@ -28,11 +28,11 @@ struct BarnListView: View {
                     Section {
                         ForEach(
                             model.barns,
-                            id: \.persistentModelID
+                            id: \.id
                         ) { barn in
                             RecordNavigationLink(
                                 value: BarnRoute.detail(
-                                    barn.persistentModelID
+                                    barn.id
                                 )
                             ) {
                                 BarnRow(barn: barn)
@@ -73,7 +73,7 @@ struct BarnListView: View {
     }
 
     private func reload() {
-        model.load(in: context)
+        model.load(in: ModelContext(context.container))
     }
 
     private var serviceLocationCountLabel: LocalizedStringKey {

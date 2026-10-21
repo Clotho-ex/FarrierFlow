@@ -8,7 +8,7 @@ nonisolated enum SyncBatchPlanner {
         .visit: ["appointment", "barn"],
         .visitHorse: ["visit", "horse"],
         .photograph: ["visitHorse"],
-        .workItem: ["service", "visitHorse"],
+        .workItem: ["service", "visitHorse", "billingHoldID"],
         .invoice: ["client"],
         .invoiceVisit: ["invoice", "sourceVisit"],
         .invoiceLineItem: ["invoiceVisit", "sourceWorkItem"],

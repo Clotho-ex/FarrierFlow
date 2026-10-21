@@ -5,17 +5,38 @@ import SwiftData
 @MainActor
 @Observable
 final class ServiceDetailModel {
-    private(set) var service: Service?
+    private(set) var service: ServiceDetailSnapshot?
+    private(set) var usage = RecordUsageSnapshot()
     var alert: FeatureAlert?
 
     func load(id: PersistentIdentifier, in context: ModelContext) {
-        service = context.model(for: id) as? Service
+        do {
+            if let record = try context.existingModel(Service.self, for: id) {
+                usage = try RecordUsageSnapshot(service: record)
+                service = ServiceDetailSnapshot(service: record)
+            } else {
+                service = nil
+                usage = RecordUsageSnapshot()
+            }
+        } catch {
+            service = nil
+            usage = RecordUsageSnapshot()
+            alert = FeatureAlert(
+                title: "Service Unavailable",
+                message: "The service couldn’t be loaded. Try again."
+            )
+        }
     }
 
     func archive(in context: ModelContext) -> Bool {
-        guard let service else { return false }
         do {
-            try RecordDeletionRules.archive(service, in: context)
+            guard let id = service?.id,
+                  let record = try context.existingModel(Service.self, for: id) else {
+                alert = unavailableAlert
+                return false
+            }
+            try RecordDeletionRules.archive(record, in: context)
+            service = ServiceDetailSnapshot(service: record)
             return true
         } catch RecordDeletionBlock.serviceHasHorseDefaults {
             alert = FeatureAlert(
@@ -33,11 +54,17 @@ final class ServiceDetailModel {
     }
 
     func reactivate(in context: ModelContext) -> Bool {
-        guard let service else { return false }
-        guard service.isArchived else { return true }
-        service.isArchived = false
         do {
-            try DomainGraphValidator.save(context)
+            guard let id = service?.id,
+                  let record = try context.existingModel(Service.self, for: id) else {
+                alert = unavailableAlert
+                return false
+            }
+            if record.isArchived {
+                record.isArchived = false
+                try DomainGraphValidator.save(context)
+            }
+            service = ServiceDetailSnapshot(service: record)
             return true
         } catch {
             context.rollback()
@@ -49,23 +76,41 @@ final class ServiceDetailModel {
         }
     }
 
-    func delete(in context: ModelContext) -> Bool {
-        guard let service else { return false }
-        self.service = nil
+    func delete(
+        in context: ModelContext,
+        deleting: (Service, ModelContext) throws -> Void = { record, context in
+            try RecordDeletionRules.delete(record, in: context)
+        }
+    ) -> Bool {
+        guard let displayed = service else {
+            alert = unavailableAlert
+            return false
+        }
         do {
-            try RecordDeletionRules.delete(service, in: context)
+            guard let record = try context.existingModel(Service.self, for: displayed.id) else {
+                alert = unavailableAlert
+                return false
+            }
+            try deleting(record, context)
+            service = nil
+            alert = nil
             return true
         } catch let block as RecordDeletionBlock {
-            self.service = service
             alert = block.alert
             return false
         } catch {
-            self.service = service
             alert = FeatureAlert(
                 title: "Couldn’t Delete Service",
                 message: "The service wasn’t deleted. Try again."
             )
             return false
         }
+    }
+
+    private var unavailableAlert: FeatureAlert {
+        FeatureAlert(
+            title: "Service Unavailable",
+            message: "This service is no longer available."
+        )
     }
 }

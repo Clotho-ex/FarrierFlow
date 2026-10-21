@@ -57,7 +57,7 @@ final class BadgeAlignmentUITests: XCTestCase {
         let app = launch(accessibilitySize: true)
         defer { app.terminate() }
         openTab("Clients", in: app)
-        app.buttons["More"].tap()
+        app.openBusinessRoot()
         app.buttons["Invoices"].tap()
         let invoice = app.buttons["invoice-row-0001"]
         XCTAssertTrue(invoice.waitForExistence(timeout: 5))

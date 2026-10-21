@@ -121,7 +121,12 @@ final class VisitCompletionUITests: XCTestCase {
         )
         app.buttons["visit-save-progress"].tap()
         app.buttons["Cancel"].tap()
-        app.navigationBars.buttons["Today"].tap()
+        if app.navigationBars.buttons["Stop Details"].exists {
+            app.navigationBars.buttons["Stop Details"].tap()
+            app.buttons["stop-details-close"].tap()
+        } else {
+            app.navigationBars.buttons["Today"].tap()
+        }
 
         let activeVisit = app.buttons["today-run-sheet-active"]
         XCTAssertTrue(activeVisit.waitForExistence(timeout: 3))
@@ -547,7 +552,12 @@ final class VisitCompletionUITests: XCTestCase {
         app.buttons["Discard Visit"].tap()
 
         XCTAssertTrue(app.buttons["visit-start-action"].waitForExistence(timeout: 3))
-        app.navigationBars.buttons["Today"].tap()
+        if app.navigationBars.buttons["Stop Details"].exists {
+            app.navigationBars.buttons["Stop Details"].tap()
+            app.buttons["stop-details-close"].tap()
+        } else {
+            app.navigationBars.buttons["Today"].tap()
+        }
         XCTAssertTrue(
             app.buttons["appointment-row-\(graph.primaryBarnName)"].exists
                 || app.buttons["today-run-sheet-scheduled"].waitForExistence(timeout: 3)
@@ -769,16 +779,8 @@ final class VisitCompletionUITests: XCTestCase {
     @MainActor
     private func createBarn(_ name: String, in app: XCUIApplication) {
         if !app.navigationBars["Service Locations"].exists {
+            app.openBusinessRoot()
             let serviceLocations = app.buttons["Service Locations"].firstMatch
-            for _ in 0..<2 {
-                let more = app.buttons["More"].firstMatch
-                XCTAssertTrue(more.waitForExistence(timeout: 3))
-                guard more.exists else { return }
-                more.tap()
-                if serviceLocations.waitForExistence(timeout: 2) {
-                    break
-                }
-            }
             XCTAssertTrue(serviceLocations.waitForExistence(timeout: 3))
             guard serviceLocations.exists else { return }
             guard tapUntilDestinationAppears(
@@ -803,7 +805,7 @@ final class VisitCompletionUITests: XCTestCase {
     private func openClient(_ name: String, in app: XCUIApplication) {
         let clientRow = app.buttons["client-row-\(name)"]
         if app.navigationBars["Service Locations"].exists {
-            let clientsBackButton = app.navigationBars["Service Locations"].buttons["Clients"]
+            let clientsBackButton = app.tabBars.buttons["Clients"]
             XCTAssertTrue(clientsBackButton.waitForExistence(timeout: 3))
             clientsBackButton.tap()
             XCTAssertTrue(clientRow.waitForExistence(timeout: 5))
@@ -861,20 +863,8 @@ final class VisitCompletionUITests: XCTestCase {
 
     @MainActor
     private func createService(_ name: String, price: String, in app: XCUIApplication) {
-        let more = app.buttons["More"]
-        for _ in 0..<2 {
-            app.tabBars.buttons["Clients"].tap()
-            if more.waitForExistence(timeout: 2) {
-                break
-            }
-        }
-        XCTAssertTrue(more.waitForExistence(timeout: 3))
-        guard more.exists else { return }
+        app.openBusinessRoot()
         let services = app.buttons["Services"].firstMatch
-        for _ in 0..<2 where !services.exists {
-            more.tap()
-            _ = services.waitForExistence(timeout: 5)
-        }
         XCTAssertTrue(services.exists)
         guard services.exists else { return }
         let addService = app.buttons["service-add-action"]
@@ -895,7 +885,7 @@ final class VisitCompletionUITests: XCTestCase {
         focusAndType(price, in: app.textFields["service-price-field"])
         app.buttons["Save"].tap()
         XCTAssertTrue(app.buttons["service-row-\(name)"].waitForExistence(timeout: 3))
-        app.navigationBars.buttons["Clients"].tap()
+        app.selectFarrierFlowTab("Clients")
     }
 
     @MainActor
@@ -1010,6 +1000,8 @@ final class VisitCompletionUITests: XCTestCase {
             appointment.coordinate(
                 withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
             ).tap()
+            let stopAppointment = app.buttons["today-stop-appointment"].firstMatch
+            if stopAppointment.waitForExistence(timeout: 1) { stopAppointment.tap() }
             if app.buttons["visit-start-action"].waitForExistence(timeout: 2)
                 || app.buttons["visit-resume-action"].waitForExistence(timeout: 2)
                 || app.buttons["visit-view-action"].waitForExistence(timeout: 2)

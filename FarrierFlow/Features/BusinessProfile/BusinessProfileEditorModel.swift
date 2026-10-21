@@ -8,10 +8,17 @@ nonisolated enum BusinessProfileEditorLoadState: Equatable {
     case failed
 }
 
+struct BusinessSetupServiceDraft: Identifiable {
+    let id = UUID()
+    var service: ServiceDraft
+}
+
 @MainActor
 @Observable
 final class BusinessProfileEditorModel {
     var draft = BusinessProfileDraft()
+    var setupServices: [BusinessSetupServiceDraft] = []
+    @ObservationIgnored private var locale = Locale.current
     private(set) var loadState: BusinessProfileEditorLoadState = .loading
     private(set) var isCurrencyLocked = false
     var alert: FeatureAlert?
@@ -22,9 +29,11 @@ final class BusinessProfileEditorModel {
         loadState == .loaded
             && (!isCurrencyLocked || draft.currencyCode == originalCurrencyCode)
             && (try? BusinessProfileRules.validated(draft)) != nil
+            && setupServicesAreValid
     }
 
     func load(in context: ModelContext, locale: Locale = .current) {
+        self.locale = locale
         loadState = .loading
         do {
             let profiles = try fetchProfiles(in: context)
@@ -59,6 +68,36 @@ final class BusinessProfileEditorModel {
         }
     }
 
+    var setupServicesAreValid: Bool {
+        setupServices.allSatisfy { (try? ServiceRules.validated(serviceDraft($0), locale: locale)) != nil }
+    }
+
+    var canOpenServiceCatalog: Bool {
+        draft.currencyCode == originalCurrencyCode
+    }
+
+    func addSetupService() {
+        setupServices.append(BusinessSetupServiceDraft(service: ServiceDraft(currencyCode: draft.currencyCode)))
+    }
+
+    func synchronizeServiceCurrency() {
+        for index in setupServices.indices { setupServices[index].service.currencyCode = draft.currencyCode }
+    }
+
+    func refreshCurrencyLock(in context: ModelContext) {
+        do {
+            isCurrencyLocked = try hasCurrencyBearingRecords(in: context)
+        } catch {
+            alert = FeatureAlert(title: "Business Currency Unavailable", message: "Try reopening My Business before changing its currency.")
+        }
+    }
+
+    private func serviceDraft(_ entry: BusinessSetupServiceDraft) -> ServiceDraft {
+        var service = entry.service
+        service.currencyCode = draft.currencyCode
+        return service
+    }
+
     func save(in context: ModelContext) -> Bool {
         guard
             loadState == .loaded,
@@ -72,6 +111,7 @@ final class BusinessProfileEditorModel {
             guard profiles.count <= 1 else {
                 throw BusinessProfileEditorError.multipleProfiles
             }
+            let newServices = try setupServices.map { try ServiceRules.validated(serviceDraft($0), locale: locale) }
             let currencyIsLocked = try hasCurrencyBearingRecords(in: context)
             let persistedCurrencyCode = profiles.first?.currencyCode
                 ?? BusinessCurrency.unitedStatesDollar.rawValue
@@ -100,9 +140,16 @@ final class BusinessProfileEditorModel {
             profile.defaultInvoiceDueDays = values.defaultInvoiceDueDays
             profile.currencyCode = values.currencyCode
 
+            for service in newServices {
+                context.insert(Service(
+                    name: service.name, defaultAmountMinorUnits: service.defaultAmountMinorUnits,
+                    currencyCode: service.currencyCode
+                ))
+            }
             try DomainGraphValidator.save(context)
+            setupServices = []
             originalCurrencyCode = values.currencyCode
-            isCurrencyLocked = currencyIsLocked
+            isCurrencyLocked = currencyIsLocked || !newServices.isEmpty
             alert = nil
             return true
         } catch BusinessProfileEditorError.currencyLocked {

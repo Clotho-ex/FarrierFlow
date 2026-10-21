@@ -8,7 +8,7 @@ struct SyncJournalTests {
     func legacyPendingContractSurvivesUpgradeWithoutChangingBatch() throws {
         var journal = makeJournal()
         let batch = try #require(try journal.stage([record("Before")]))
-        #expect(journal.pendingProtocol == .holds)
+        #expect(journal.pendingProtocol == .deletion)
         var json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(journal)) as? [String: Any])
         json.removeValue(forKey: "pendingProtocolVersion")
         var legacy = try JSONDecoder().decode(SyncJournal.self, from: JSONSerialization.data(withJSONObject: json))
@@ -17,7 +17,7 @@ struct SyncJournalTests {
         #expect(legacy.pendingProtocol == .legacy)
         try legacy.acknowledge(operationID: batch.operationID, revision: 1)
         _ = try legacy.stage([record("After")])
-        #expect(legacy.pendingProtocol == .holds)
+        #expect(legacy.pendingProtocol == .deletion)
     }
     private let recordID = UUID()
     private let accountID = UUID()

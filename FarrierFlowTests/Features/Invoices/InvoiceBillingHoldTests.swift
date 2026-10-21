@@ -7,19 +7,16 @@ import Testing
 @MainActor
 struct InvoiceBillingHoldTests {
     @Test
-    func removingAnActiveInvoiceKeepsItsHeldWorkUnbillable() throws {
+    func explicitInvoiceDeletionReleasesItsHold() throws {
         let graph = try InvoiceActionGraph.make(currencyCode: "GBP")
         let work = try #require(graph.context.model(for: graph.workItemID) as? WorkItem)
         let invoice = try #require(graph.context.model(for: graph.invoiceID) as? Invoice)
         try work.applyBillingHold(try #require(invoice.syncID))
         try DomainGraphValidator.save(graph.context)
-        let beforeDeletion = try SyncGraphCodec.capture(in: graph.context)
-        try InvoiceDeletionUseCase.deleteUnpaid(invoiceID: graph.invoiceID, in: graph.context)
+        try InvoiceDeletionUseCase.delete(invoiceID: graph.invoiceID, in: graph.context)
+        #expect(work.billingHoldID == nil)
         #expect(try InvoiceEligibilityRules.choices(for: try #require(work.visitHorse?.horse?.client?.persistentModelID),
-            in: graph.context).isEmpty)
-        #expect(throws: (any Error).self) {
-            try SyncGraphCodec.apply(beforeDeletion, in: graph.context)
-        }
+            in: graph.context).count == 1)
         #expect(try ModelContext(graph.container).fetchCount(FetchDescriptor<Invoice>()) == 0)
     }
 

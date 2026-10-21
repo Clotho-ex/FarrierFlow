@@ -6,17 +6,21 @@ final class PostHogAnalyticsClient: AnalyticsClient {
     typealias Capture = (String, [String: Any]?) -> Void
 
     private let capture: Capture
+    private var prepare: (() -> Void)?
+    private var pendingEvents: [AnalyticsEvent] = []
 
-    init(configuration: PostHogAnalyticsConfiguration) {
-        let sdkConfiguration = Self.sdkConfiguration(for: configuration)
-        PostHogSDK.shared.setup(sdkConfiguration)
-        capture = { event, properties in
-            PostHogSDK.shared.capture(event, properties: properties)
-        }
+    convenience init(configuration: PostHogAnalyticsConfiguration) {
+        self.init(
+            capture: { event, properties in
+                PostHogSDK.shared.capture(event, properties: properties)
+            },
+            prepare: { PostHogSDK.shared.setup(Self.sdkConfiguration(for: configuration)) }
+        )
     }
 
-    init(capture: @escaping Capture) {
+    init(capture: @escaping Capture, prepare: (() -> Void)? = nil) {
         self.capture = capture
+        self.prepare = prepare
     }
 
     convenience init(_ capture: @escaping Capture) {
@@ -24,8 +28,21 @@ final class PostHogAnalyticsClient: AnalyticsClient {
     }
 
     func track(_ event: AnalyticsEvent) {
+        guard prepare == nil else {
+            pendingEvents.append(event)
+            return
+        }
         let providerEvent = ProviderEvent(event)
         capture(providerEvent.name, providerEvent.properties)
+    }
+
+    func start() {
+        guard let prepare else { return }
+        self.prepare = nil
+        prepare()
+        let events = pendingEvents
+        pendingEvents.removeAll()
+        for event in events { track(event) }
     }
 
     static func sdkConfiguration(

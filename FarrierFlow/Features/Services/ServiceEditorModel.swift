@@ -85,30 +85,30 @@ final class ServiceEditorModel {
             )
             return nil
         }
-        let service: Service
-        if let serviceID {
-            guard let existing = context.model(for: serviceID) as? Service else {
-                alert = FeatureAlert(
-                    title: "Service Unavailable",
-                    message: "This service is no longer available."
-                )
-                return nil
-            }
-            service = existing
-        } else {
-            service = Service(
-                name: values.name,
-                defaultAmountMinorUnits: values.defaultAmountMinorUnits,
-                currencyCode: values.currencyCode
-            )
-            context.insert(service)
-        }
-
-        service.name = values.name
-        service.defaultAmountMinorUnits = values.defaultAmountMinorUnits
-        service.currencyCode = values.currencyCode
-
         do {
+            let service: Service
+            if let serviceID {
+                guard let existing = try context.existingModel(Service.self, for: serviceID) else {
+                    alert = FeatureAlert(
+                        title: "Service Unavailable",
+                        message: "This service is no longer available."
+                    )
+                    return nil
+                }
+                service = existing
+            } else {
+                service = Service(
+                    name: values.name,
+                    defaultAmountMinorUnits: values.defaultAmountMinorUnits,
+                    currencyCode: values.currencyCode
+                )
+                context.insert(service)
+            }
+
+            service.name = values.name
+            service.defaultAmountMinorUnits = values.defaultAmountMinorUnits
+            service.currencyCode = values.currencyCode
+
             try DomainGraphValidator.save(context)
             if isCreating {
                 analyticsClient.track(.serviceCreated)

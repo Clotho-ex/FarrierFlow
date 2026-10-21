@@ -17,14 +17,14 @@ final class FormatterDisplayUITests: XCTestCase {
         app.textFields["client-name-field"].typeText(clientName)
         app.buttons["Save"].tap()
 
-        app.buttons["More"].tap()
+        app.openBusinessRoot()
         XCTAssertTrue(app.buttons["Service Locations"].waitForExistence(timeout: 3))
         app.buttons["Service Locations"].tap()
         app.buttons["Add Service Location"].firstMatch.tap()
         app.textFields["barn-name-field"].tap()
         app.textFields["barn-name-field"].typeText(barnName)
         app.buttons["Save"].tap()
-        app.navigationBars.buttons["Clients"].tap()
+        app.selectFarrierFlowTab("Clients")
 
         app.buttons["client-row-\(clientName)"].tap()
         app.buttons["Add Horse"].firstMatch.tap()

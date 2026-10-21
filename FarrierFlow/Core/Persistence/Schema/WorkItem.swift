@@ -31,6 +31,10 @@ extension FarrierFlowSchemaV5 {
             billingHoldID = invoiceID
         }
 
+        func releaseBillingHold(for invoiceID: UUID) {
+            if billingHoldID == invoiceID { billingHoldID = nil }
+        }
+
         init(
             syncID: UUID = UUID(),
             serviceNameSnapshot: String,

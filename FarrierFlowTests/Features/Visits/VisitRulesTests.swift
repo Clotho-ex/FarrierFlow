@@ -126,10 +126,10 @@ struct VisitRulesTests {
     }
 
     @Test
-    func correctionRetainsAtLeastOneServicedHorse() throws {
+    func correctionAllowsAllHorsesToBeNotServiced() throws {
         let draft = try makeDraft(outcomes: [(.notServiced, "")])
 
-        #expect(VisitRules.correctionViolation(in: draft) == .completionRequiresServicedHorse)
+        #expect(VisitRules.correctionViolation(in: draft) == nil)
     }
 
     @Test

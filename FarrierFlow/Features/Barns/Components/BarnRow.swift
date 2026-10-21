@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct BarnRow: View {
-    let barn: Barn
+    let barn: BarnDetailSnapshot
 
     var body: some View {
         VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {

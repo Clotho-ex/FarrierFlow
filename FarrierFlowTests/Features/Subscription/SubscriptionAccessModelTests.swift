@@ -187,6 +187,32 @@ struct SubscriptionAccessModelTests {
         await client.emit(.init(hasActiveProEntitlement: true))
         await eventually { model.access == .pro }
         #expect(await client.customerRequestCount == 1)
+        #expect(client.offeringsRequestCount == 0)
+        #expect(model.planLoadState == .loading)
+    }
+
+    @Test func startupAndPaywallSharePendingVerificationWithoutGrantingEarlyAccess() async {
+        let client = TestSubscriptionClient(customer: .init(hasActiveProEntitlement: true))
+        client.setPlans([Self.monthly, Self.annual])
+        client.suspendCustomerInfo()
+        let model = SubscriptionAccessModel(client: client)
+        model.start()
+        await eventually { client.customerRequestCount == 1 }
+        #expect(model.access == .loading)
+        #expect(!model.allowsMutations)
+
+        let paywallRefresh = Task { await model.refresh() }
+        await Task.yield()
+        await Task.yield()
+        #expect(client.customerRequestCount == 1)
+        #expect(client.offeringsRequestCount == 0)
+
+        client.resumeCustomerInfo()
+        await paywallRefresh.value
+        #expect(model.access == .pro)
+        #expect(model.allowsMutations)
+        #expect(client.offeringsRequestCount == 1)
+        #expect(model.paywallIsAvailable)
     }
 
     @Test func updateStreamAppliesExpiration() async {
@@ -223,6 +249,8 @@ private final class TestSubscriptionClient: SubscriptionClient, @unchecked Senda
     private var restoreCustomer = SubscriptionCustomerSnapshot(hasActiveProEntitlement: false)
     private var restoreError: Error?
     private var continuation: AsyncStream<SubscriptionCustomerSnapshot>.Continuation?
+    private var suspendsCustomerInfo = false
+    private var customerContinuations: [CheckedContinuation<SubscriptionCustomerSnapshot, Error>] = []
     private var suspendsOfferings = false
     private var offeringsContinuations: [CheckedContinuation<[SubscriptionPlan], Error>] = []
     private(set) var customerRequestCount = 0
@@ -237,6 +265,9 @@ private final class TestSubscriptionClient: SubscriptionClient, @unchecked Senda
 
     func customerInfo() async throws -> SubscriptionCustomerSnapshot {
         customerRequestCount += 1
+        if suspendsCustomerInfo {
+            return try await withCheckedThrowingContinuation { customerContinuations.append($0) }
+        }
         if let customerError { throw customerError }
         return customer
     }
@@ -263,6 +294,13 @@ private final class TestSubscriptionClient: SubscriptionClient, @unchecked Senda
         return stream
     }
     func setCustomerError(_ error: Error?) { customerError = error }
+    func suspendCustomerInfo() { suspendsCustomerInfo = true }
+    func resumeCustomerInfo() {
+        suspendsCustomerInfo = false
+        let continuations = customerContinuations
+        customerContinuations.removeAll()
+        for continuation in continuations { continuation.resume(returning: customer) }
+    }
     func setPlans(_ plans: [SubscriptionPlan]) { offeredPlans = plans }
     func suspendOfferings() { suspendsOfferings = true }
     func resumeOfferings() {

@@ -90,7 +90,7 @@ final class SyncCoordinator {
         if let pending = try store.journal()?.pending {
             try await push(pending, epoch: epoch)
         }
-        if (info.minimumProtocolVersion ?? 1) > SyncProtocolVersion.holds.rawValue {
+        if (info.minimumProtocolVersion ?? 1) > SyncProtocolVersion.deletion.rawValue {
             throw SyncTransportError.updateRequired(info.minimumProtocolVersion ?? 1)
         }
         while true {
@@ -130,7 +130,7 @@ final class SyncCoordinator {
             guard let journal = try store.journal() else { throw SyncJournalStoreError.unbound }
             guard journal.deferredRemote == nil else { throw SyncJournalError.unresolvedConflicts }
             let page = try await transport.pull(workspaceID: workspaceID, cursor: journal.cursor,
-                protocolVersion: .holds)
+                protocolVersion: .deletion)
             try check(epoch)
             for transaction in page.transactions {
                 try check(epoch)

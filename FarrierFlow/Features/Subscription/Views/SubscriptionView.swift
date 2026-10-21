@@ -18,6 +18,7 @@ struct SubscriptionView: View {
 
     @Environment(SubscriptionAccessModel.self) private var subscription
     @Environment(\.analyticsClient) private var analyticsClient
+    @Environment(\.appStartupReady) private var appStartupReady
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var presentsManageSubscriptions = false
@@ -52,8 +53,8 @@ struct SubscriptionView: View {
             }
         }
         .manageSubscriptionsSheet(isPresented: $presentsManageSubscriptions)
-        .task {
-            if subscription.planLoadState == .loading {
+        .task(id: appStartupReady) {
+            if appStartupReady, subscription.planLoadState == .loading {
                 await subscription.refresh()
             }
         }

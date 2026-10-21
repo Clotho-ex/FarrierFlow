@@ -2,6 +2,70 @@ import XCTest
 
 final class BlockedMutationUITests: XCTestCase {
     @MainActor
+    func testHorseClientAndLocationEditThenDeleteWithoutInvalidatedRows() {
+        let store = "DeletionSnapshots-\(UUID().uuidString)"
+        var app = XCUIApplication()
+        app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] = store
+        app.launch()
+        createClient("Safe Client", in: app)
+        createBarn("Safe Barn", in: app)
+        app.navigationBars.buttons["Clients"].tap()
+        app.buttons["client-row-Safe Client"].tap()
+        createHorse("Safe Horse", barnName: "Safe Barn", in: app)
+        app.buttons["horse-row-Safe Horse"].tap()
+        app.buttons["Edit"].tap()
+        let horseName = app.textFields["horse-name-field"]
+        XCTAssertTrue(horseName.waitForExistence(timeout: 3))
+        guard focusAndType(" Edited", in: horseName) else { return }
+        app.buttons["Save"].tap()
+        XCTAssertTrue(app.navigationBars["Safe Horse Edited"].waitForExistence(timeout: 3))
+        app.buttons["Delete"].tap()
+        app.buttons["Delete Horse"].tap()
+        XCTAssertTrue(app.navigationBars["Client"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["No horses yet"].waitForExistence(timeout: 3))
+
+        app.buttons["Actions"].tap()
+        app.buttons["Edit"].tap()
+        let clientName = app.textFields["client-name-field"]
+        XCTAssertTrue(clientName.waitForExistence(timeout: 3))
+        guard focusAndType(" Edited", in: clientName) else { return }
+        app.buttons["Save"].tap()
+        XCTAssertTrue(app.staticTexts["Safe Client Edited"].waitForExistence(timeout: 3))
+        app.buttons["Actions"].tap()
+        app.buttons["Delete"].tap()
+        let deleteClient = app.buttons["client-delete-confirmation"]
+        XCTAssertTrue(deleteClient.waitForExistence(timeout: 3))
+        deleteClient.tap()
+        XCTAssertTrue(app.navigationBars["Clients"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["No clients"].waitForExistence(timeout: 3))
+
+        app.openBusinessRoot()
+        app.buttons["Service Locations"].tap()
+        app.buttons["barn-row-Safe Barn"].tap()
+        app.buttons["Actions"].tap()
+        app.buttons["Edit"].tap()
+        let barnName = app.textFields["barn-name-field"]
+        XCTAssertTrue(barnName.waitForExistence(timeout: 3))
+        guard focusAndType(" Edited", in: barnName) else { return }
+        app.buttons["Save"].tap()
+        XCTAssertTrue(app.staticTexts["Safe Barn Edited"].waitForExistence(timeout: 3))
+        app.buttons["Actions"].tap()
+        app.buttons["Delete"].tap()
+        app.buttons["Delete Service Location"].tap()
+        XCTAssertTrue(app.staticTexts["No Service Locations"].waitForExistence(timeout: 3))
+        app.terminate()
+        app = XCUIApplication()
+        app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] = store
+        app.launch()
+        defer { app.terminate() }
+        app.tabBars.buttons["Clients"].tap()
+        XCTAssertTrue(app.staticTexts["No clients"].waitForExistence(timeout: 5))
+        app.openBusinessRoot()
+        app.buttons["Service Locations"].tap()
+        XCTAssertTrue(app.staticTexts["No Service Locations"].waitForExistence(timeout: 3))
+    }
+
+    @MainActor
     func testReferencedRecordsAreBlockedUntilAppointmentIsDeleted() throws {
         let clientName = "Blocked Client"
         let firstBarn = "Blocked Barn"
@@ -59,14 +123,7 @@ final class BlockedMutationUITests: XCTestCase {
         XCTAssertTrue(app.alerts["Can’t Delete Client"].waitForExistence(timeout: 3))
         app.alerts.buttons["OK"].tap()
 
-        guard tapUntilDestinationAppears(
-            app.navigationBars.buttons["Clients"],
-            destination: app.buttons["More"]
-        ) else { return }
-        guard tapUntilDestinationAppears(
-            app.buttons["More"],
-            destination: app.buttons["Service Locations"]
-        ) else { return }
+        app.openBusinessRoot()
         guard tapUntilDestinationAppears(
             app.buttons["Service Locations"],
             destination: app.buttons["barn-row-\(firstBarn)"]
@@ -151,13 +208,8 @@ final class BlockedMutationUITests: XCTestCase {
     @MainActor
     private func createBarn(_ name: String, in app: XCUIApplication) {
         if !app.navigationBars["Service Locations"].exists {
-            let more = app.buttons["More"].firstMatch
-            XCTAssertTrue(more.waitForExistence(timeout: 10))
+            app.openBusinessRoot()
             let serviceLocations = app.buttons["Service Locations"].firstMatch
-            for _ in 0..<2 where !serviceLocations.exists {
-                more.tap()
-                _ = serviceLocations.waitForExistence(timeout: 5)
-            }
             XCTAssertTrue(serviceLocations.exists)
             for _ in 0..<2 where !app.navigationBars["Service Locations"].exists {
                 serviceLocations.tap()
@@ -207,7 +259,7 @@ final class BlockedMutationUITests: XCTestCase {
                 element.tap()
             } else {
                 element.coordinate(
-                    withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
+                    withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85)
                 ).tap()
             }
             if waitForKeyboardFocus(in: element) {

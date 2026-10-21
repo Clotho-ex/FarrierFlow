@@ -41,7 +41,7 @@ final class SyncInvoiceRecoveryModel {
         let initial = try await transport.bootstrap(deviceID: journal.deviceID)
         try check(accountID, generation: generation)
         guard initial.workspaceID == journal.workspaceID else { throw SyncJournalError.accountMismatch }
-        guard (initial.minimumProtocolVersion ?? 1) <= SyncProtocolVersion.holds.rawValue else {
+        guard (initial.minimumProtocolVersion ?? 1) <= SyncProtocolVersion.deletion.rawValue else {
             throw SyncTransportError.updateRequired(initial.minimumProtocolVersion ?? 1)
         }
         var records = try SyncJournal.index(journal.baseline)
@@ -49,7 +49,7 @@ final class SyncInvoiceRecoveryModel {
         var cursor = journal.cursor
         var page: SyncPullPage
         repeat {
-            page = try await transport.pull(workspaceID: journal.workspaceID, cursor: cursor, protocolVersion: .holds)
+            page = try await transport.pull(workspaceID: journal.workspaceID, cursor: cursor, protocolVersion: .deletion)
             try check(accountID, generation: generation)
             guard page.workspaceID == journal.workspaceID else { throw SyncJournalError.accountMismatch }
             for transaction in page.transactions {
