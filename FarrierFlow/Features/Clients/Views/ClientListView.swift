@@ -43,6 +43,8 @@ struct ClientListView: View {
                             }
                         } header: {
                             Text(clientCountLabel)
+                                .font(Typography.recordMetadata)
+                                .foregroundStyle(ColorTokens.textSecondary)
                                 .textCase(nil)
                         }
                     }
@@ -69,6 +71,9 @@ struct ClientListView: View {
                 ClientEditorView()
             }
             .onAppear(perform: reload)
+            .onReceive(ModelSaveChanges.publisher(in: context.container, entities: ["Client", "Horse"])) {
+                reload()
+            }
             .onChange(of: backupSync?.runtime?.recordsVersion) { _, _ in reload() }
             .alert(item: $model.alert) {
                 Alert(title: Text($0.title), message: Text($0.message))

@@ -90,6 +90,70 @@ struct ClientDraftAndModelTests {
     }
 
     @Test
+    func listHorseCountsFollowSavedRelationships() throws {
+        let container = try ModelContainerFactory.inMemoryTest()
+        let context = container.mainContext
+        let first = Client(name: "Arthur")
+        let second = Client(name: "John")
+        let barn = Barn(name: "North Field")
+        context.insert(first)
+        context.insert(second)
+        context.insert(barn)
+        let atlas = Horse(name: "Atlas", client: first, currentBarn: barn)
+        let beacon = Horse(name: "Beacon", client: first, currentBarn: barn)
+        context.insert(atlas)
+        context.insert(beacon)
+        first.horses.append(contentsOf: [atlas, beacon])
+        barn.horses.append(contentsOf: [atlas, beacon])
+        try DomainGraphValidator.save(context)
+        let model = ClientListModel()
+        model.load(in: ModelContext(container))
+        #expect(model.clients.map(\.horseCount) == [2, 0])
+
+        atlas.client = second
+        try DomainGraphValidator.save(context)
+        model.load(in: ModelContext(container))
+        #expect(model.clients.map(\.horseCount) == [1, 1])
+
+        try RecordDeletionRules.delete(beacon, in: context)
+        model.load(in: ModelContext(container))
+        #expect(model.clients.map(\.horseCount) == [0, 1])
+    }
+
+    @Test
+    func listReadsSavedCountsAndContactAfterStoreReopens() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ClientListReopen-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("workspace.store")
+        try autoreleasepool {
+            let container = try ModelContainerFactory.persistentStoreTest(at: url)
+            let context = container.mainContext
+            let client = Client(name: "Arthur", phone: "+13625849")
+            let barn = Barn(name: "North Field")
+            context.insert(client)
+            context.insert(Client(name: "John"))
+            context.insert(barn)
+            let horses = ["Atlas", "Beacon"].map { name in
+                Horse(name: name, client: client, currentBarn: barn)
+            }
+            for horse in horses { context.insert(horse) }
+            client.horses = horses
+            barn.horses = horses
+            try DomainGraphValidator.save(context)
+        }
+
+        let reopened = try ModelContainerFactory.persistentStoreTest(at: url)
+        let model = ClientListModel()
+        model.load(in: ModelContext(reopened))
+        #expect(model.alert == nil)
+        #expect(model.clients.map(\.name) == ["Arthur", "John"])
+        #expect(model.clients.map(\.phone) == ["+13625849", nil])
+        #expect(model.clients.map(\.horseCount) == [2, 0])
+    }
+
+    @Test
     func detailOnlyOffersAnInvoiceForCompletedUninvoicedWork() throws {
         let container = try ModelContainerFactory.inMemoryTest()
         let context = container.mainContext

@@ -70,6 +70,7 @@ struct DeletionSnapshotTests {
         model.load(id: graph.client.persistentModelID, in: ModelContext(graph.container))
         let list = ClientListModel()
         list.load(in: ModelContext(graph.container))
+        let retainedRow = try #require(list.clients.first)
         let retained = try #require(model.client)
         let action = ModelContext(graph.container)
 
@@ -84,7 +85,11 @@ struct DeletionSnapshotTests {
         }
         #expect(deleted)
         #expect(retained.name == "Alex")
+        #expect(retainedRow.name == "Alex")
+        #expect(retainedRow.horseCount == 0)
         #expect(model.client == nil)
+        list.load(in: ModelContext(graph.container))
+        #expect(list.clients.isEmpty)
     }
 
     @Test
