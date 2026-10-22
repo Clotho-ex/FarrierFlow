@@ -34,14 +34,6 @@ struct ScheduleView: View {
                                     ) {
                                         AppointmentRow(appointment: appointment)
                                     }
-                                    .badge(dynamicTypeSize.isAccessibilitySize ? nil : appointment.visit.map { visit in
-                                        Text(visit.completedAt == nil ? "In Progress" : "Completed")
-                                            .foregroundStyle(
-                                                visit.completedAt == nil
-                                                    ? ColorTokens.brandActionText
-                                                    : ColorTokens.success
-                                            )
-                                    })
                                 }
                             }
                             .listRowBackground(ColorTokens.surface)
@@ -78,7 +70,7 @@ struct ScheduleView: View {
             .onAppear(perform: reload)
             .onReceive(
                 ModelSaveChanges.publisher(in: context.container, entities: [
-                    "Appointment", "AppointmentHorse", "Barn", "Horse", "Visit"
+                    "Appointment", "AppointmentHorse", "Barn", "Horse", "Client", "Service", "Visit"
                 ])
             ) {
                 reload()

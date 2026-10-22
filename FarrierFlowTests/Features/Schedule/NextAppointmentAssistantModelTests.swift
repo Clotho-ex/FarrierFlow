@@ -228,7 +228,7 @@ struct NextAppointmentAssistantModelTests {
 
         let projection = try #require(model.projection)
         let option = try #require(projection.options.first)
-        let ordinaryDraftStart = AppointmentStartDateRules.nextHalfHour(
+        let ordinaryDraftStart = AppointmentStartDateRules.suggestedStart(
             after: graph.now,
             calendar: graph.calendar
         )

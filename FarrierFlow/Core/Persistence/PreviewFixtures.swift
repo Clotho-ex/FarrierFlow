@@ -219,6 +219,8 @@ enum UITestFixtures {
             try seedDeletionReferences(in: container, currencyCode: currencyCode, photographRootURL: photographRootURL)
         case .nextAppointment:
             try seedNextAppointment(in: container)
+        case .scheduleRows:
+            try seedScheduleRows(in: container, now: now, calendar: calendar)
         case .ownerSetup:
             break
         }
@@ -469,6 +471,65 @@ enum UITestFixtures {
                 in: context
             )
         }
+    }
+
+    private static func seedScheduleRows(
+        in container: ModelContainer, now: Date, calendar: Calendar
+    ) throws {
+        let context = container.mainContext
+        guard try context.fetchCount(FetchDescriptor<Appointment>()) == 0 else { return }
+        try seedOwnerIdentity(in: container)
+        let owner = Client(name: "John Doe")
+        let otherOwner = Client(name: "Casey Morgan")
+        let trim = Service(name: "Trim", defaultAmountMinorUnits: 5_000)
+        let fullSet = Service(name: "Full Set", defaultAmountMinorUnits: 15_000)
+        context.insert(owner)
+        context.insert(otherOwner)
+        context.insert(trim)
+        context.insert(fullSet)
+        let barns = ["The Old Barn", "North Field", "River Barn", "East Barn", "Oak Barn",
+                     "South Barn", "Meadow Barn", "The Long Meadow Equestrian Service Location",
+                     "Hill Barn", "West Barn"]
+        let day = calendar.startOfDay(for: now)
+        var appointments: [Appointment] = []
+        for (index, name) in barns.enumerated() {
+            let barn = Barn(name: name)
+            context.insert(barn)
+            var horses: [Horse] = []
+            for horseIndex in 0..<(index == 2 ? 3 : 1) {
+                let client = horseIndex == 2 ? otherOwner : owner
+                let horseName = index == 0 ? "Peanut"
+                    : index == 1 ? "Thunder"
+                    : index == 8 ? "A Horse With a Particularly Long Registered Name"
+                    : "Horse \(index + 1)-\(horseIndex + 1)"
+                let horse = Horse(name: horseName, client: client, currentBarn: barn)
+                horse.defaultService = fullSet
+                context.insert(horse)
+                client.horses.append(horse)
+                barn.horses.append(horse)
+                horses.append(horse)
+            }
+            let start = calendar.date(byAdding: .hour, value: 8 + index, to: day) ?? day
+            let appointment = makeAppointment(startDate: start, barn: barn, horses: horses, in: context)
+            if index == 0 || index == 2 || index == 3 {
+                appointment.appointmentHorses.first?.plannedService = trim
+            }
+            if index == 2 {
+                appointment.appointmentHorses.first { $0.horse === horses[1] }?.plannedService = fullSet
+            }
+            appointments.append(appointment)
+        }
+        try DomainGraphValidator.save(context)
+        _ = try VisitStartUseCase.start(
+            appointmentID: appointments[3].persistentModelID,
+            now: appointments[3].startDate,
+            in: container
+        )
+        _ = try completeVisit(
+            for: appointments[4].persistentModelID,
+            startedAt: appointments[4].startDate,
+            in: container
+        )
     }
 
     private static func seedNextAppointment(

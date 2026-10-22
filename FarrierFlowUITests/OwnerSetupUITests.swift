@@ -741,7 +741,8 @@ final class OwnerSetupUITests: XCTestCase {
         XCTAssertTrue(schedule.waitForExistence(timeout: 3))
         schedule.tap()
         XCTAssertTrue(app.navigationBars["New Appointment"].waitForExistence(timeout: 3))
-        let addLocation = app.buttons["appointment-add-service-location"]
+        app.buttons["appointment-barn-picker"].tap()
+        let addLocation = app.buttons["appointment-create-location"]
         XCTAssertTrue(addLocation.waitForExistence(timeout: 3))
         tapAfterBringingIntoView(addLocation, in: app)
         XCTAssertTrue(
@@ -764,7 +765,7 @@ final class OwnerSetupUITests: XCTestCase {
                 .contains(locationName)
         )
 
-        let addHorse = app.buttons["appointment-add-horse"]
+        let addHorse = app.buttons["appointment-create-horse"]
         tapAfterBringingIntoView(addHorse, in: app)
         let horseNameField = app.textFields["horse-name-field"]
         XCTAssertTrue(horseNameField.waitForExistence(timeout: 3))

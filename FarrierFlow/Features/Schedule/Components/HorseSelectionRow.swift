@@ -8,7 +8,7 @@ struct HorseSelectionRow: View {
     var body: some View {
         Button(action: action) {
             HStack {
-                HorseRow(horse: horse)
+                HorseRow(horse: horse, context: .serviceLocationDetail)
                 Spacer()
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
@@ -22,6 +22,7 @@ struct HorseSelectionRow: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
+        .accessibilityHint("Includes or removes this horse from the appointment")
         .accessibilityValue(isSelected ? "Selected" : "Not selected")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }

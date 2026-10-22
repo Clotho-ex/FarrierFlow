@@ -119,8 +119,15 @@ At accessibility text sizes, use plain status text below the record instead so a
 trailing badge cannot squeeze its label into a narrow column. Paid/completed text
 may use semantic green; ordinary
 unpaid/pending labels use readable secondary text without an extra warning
-treatment. Actual warning callouts retain amber. Hide navigation-link disclosure
-indicators app-wide with `RecordNavigationLink`, using the native visibility
+treatment. Actual warning callouts retain amber.
+
+Schedule rows place plain status text beside the time instead: Scheduled stays
+secondary, In Progress uses the existing brand action color, and Completed uses
+semantic green. Stack status below time at accessibility sizes. Keep horse/owner
+metadata bounded and show a separated planned-service row only for explicit
+appointment assignments; horse defaults alone do not create that row.
+
+Hide navigation-link disclosure indicators app-wide with `RecordNavigationLink`, using the native visibility
 modifier on iOS 26 and a shared compatibility treatment on iOS 18. Retain native
 NavigationLink interaction, accessibility, and back navigation. Keep supporting record text
 leading-aligned. Invoice detail amounts and captions share a trailing edge in

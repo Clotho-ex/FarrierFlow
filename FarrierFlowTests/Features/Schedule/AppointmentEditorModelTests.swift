@@ -11,6 +11,74 @@ struct AppointmentEditorModelTests {
     }
 
     @Test
+    func afterHoursStartUsesRecentDaytimePatternOnlyOnce() throws {
+        let fixture = try makeTwoHorseFixture()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(secondsFromGMT: 0))
+        let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 10, day: 21, hour: 23, minute: 38)))
+        let previous = try #require(calendar.date(bySettingHour: 13, minute: 30, second: 0, of: now))
+        _ = ModelFixtures.makeAppointment(startDate: previous, barn: fixture.barn, horses: fixture.horses, in: fixture.context)
+        try DomainGraphValidator.save(fixture.context)
+        let editor = AppointmentEditorModel(now: now, calendar: calendar)
+        #expect(calendar.component(.hour, from: editor.draft.startDate) == 9)
+        editor.load(in: fixture.context)
+        #expect(calendar.component(.hour, from: editor.draft.startDate) == 13)
+        #expect(calendar.component(.minute, from: editor.draft.startDate) == 30)
+        #expect(calendar.component(.day, from: editor.draft.startDate) == 22)
+        editor.draft.startDate = now
+        editor.load(in: fixture.context)
+        #expect(editor.draft.startDate == now)
+    }
+
+    @Test
+    func explicitOvernightStartAndPreloadEditsArePreserved() throws {
+        let fixture = try makeTwoHorseFixture()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(secondsFromGMT: 0))
+        let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 10, day: 21, hour: 23, minute: 38)))
+        let overnight = try #require(calendar.date(byAdding: .hour, value: 2, to: now))
+        let seed = NextAppointmentSeed(barnID: fixture.barn.persistentModelID, horseIDs: Set(fixture.horses.map(\.persistentModelID)), startDate: overnight, hasFollowUpSuggestion: false)
+        let seeded = AppointmentEditorModel(seed: seed, now: now, calendar: calendar)
+        seeded.load(in: fixture.context)
+        #expect(seeded.draft.startDate == overnight)
+        let fresh = AppointmentEditorModel(now: now, calendar: calendar)
+        fresh.draft.startDate = overnight
+        fresh.load(in: fixture.context)
+        #expect(fresh.draft.startDate == overnight)
+    }
+
+    @Test(arguments: [(7, 15, 9, 0), (10, 10, 10, 30), (17, 45, 9, 0), (23, 38, 9, 0)])
+    func startSuggestionStaysInLocalDaytime(hour: Int, minute: Int, expectedHour: Int, expectedMinute: Int) throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: "America/New_York"))
+        let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 10, day: 21, hour: hour, minute: minute)))
+        let start = AppointmentStartDateRules.suggestedStart(after: now, calendar: calendar)
+        #expect(start > now)
+        #expect(calendar.component(.hour, from: start) == expectedHour)
+        #expect(calendar.component(.minute, from: start) == expectedMinute)
+        #expect(calendar.component(.day, from: start) == (hour >= 17 ? 22 : 21))
+    }
+
+    @Test
+    func multipleHorsePlansStayIndependentAndUnplannedHorseCanBeScheduled() throws {
+        let fixture = try makeTwoHorseFixture()
+        let service = ModelFixtures.makeService(name: "Trim", in: fixture.context)
+        try DomainGraphValidator.save(fixture.context)
+        let editor = AppointmentEditorModel()
+        editor.load(in: fixture.context)
+        editor.selectBarn(fixture.barn.persistentModelID, in: fixture.context)
+        fixture.horses.forEach { editor.toggleHorse($0.persistentModelID) }
+        editor.draft.serviceIDsByHorse[fixture.horses[0].persistentModelID] = service.persistentModelID
+        let id = try #require(editor.save(in: fixture.context))
+        let reopened = ModelContext(fixture.container)
+        let saved = try #require(try reopened.existingModel(Appointment.self, for: id))
+        #expect(saved.appointmentHorses.count == 2)
+        #expect(saved.appointmentHorses.first { $0.horse?.persistentModelID == fixture.horses[0].persistentModelID }?.plannedService?.name == "Trim")
+        #expect(saved.appointmentHorses.first { $0.horse?.persistentModelID == fixture.horses[1].persistentModelID }?.plannedService == nil)
+        #expect(saved.appointmentHorses.allSatisfy { $0.horse?.defaultService == nil })
+    }
+
+    @Test
     func appointmentServiceOverridesDefaultWithoutChangingHorseAndCarriesIntoVisit() throws {
         let fixture = try makeTwoHorseFixture()
         let horse = fixture.horses[0]
@@ -45,15 +113,25 @@ struct AppointmentEditorModelTests {
         editor.selectBarn(fixture.barn.persistentModelID, in: fixture.context)
         let horseID = fixture.horses[0].persistentModelID
         let service = ModelFixtures.makeService(in: fixture.context)
+        let usual = ModelFixtures.makeService(name: "Saved Default", in: fixture.context)
+        fixture.horses[0].defaultService = usual
         try DomainGraphValidator.save(fixture.context)
+        let otherHorseID = fixture.horses[1].persistentModelID
+        editor.toggleHorse(otherHorseID)
+        editor.draft.serviceIDsByHorse[otherHorseID] = service.persistentModelID
         editor.toggleHorse(horseID)
         editor.draft.serviceIDsByHorse[horseID] = service.persistentModelID
         editor.toggleHorse(horseID)
-        #expect(editor.draft.serviceIDsByHorse.isEmpty)
+        #expect(editor.draft.serviceIDsByHorse[horseID] == nil)
+        #expect(editor.draft.serviceIDsByHorse[otherHorseID] == service.persistentModelID)
+        #expect(fixture.horses[0].defaultService === usual)
         editor.toggleHorse(horseID)
         editor.draft.serviceIDsByHorse[horseID] = service.persistentModelID
         editor.selectBarn(nil, in: fixture.context)
         #expect(editor.draft.serviceIDsByHorse.isEmpty)
+        let reopened = ModelContext(fixture.container)
+        let savedHorse = try #require(try reopened.existingModel(Horse.self, for: horseID))
+        #expect(savedHorse.defaultService?.name == "Saved Default")
     }
 
     @Test
@@ -528,6 +606,14 @@ struct AppointmentEditorModelTests {
         editor.load(in: fixture.context)
         editor.selectBarn(fixture.barn.persistentModelID, in: fixture.context)
         editor.draft.notes = "Keep this appointment note"
+        editor.draft.expectedDurationText = "45"
+        let startDate = editor.draft.startDate.addingTimeInterval(3_600)
+        editor.draft.startDate = startDate
+        let service = ModelFixtures.makeService(in: fixture.context)
+        try DomainGraphValidator.save(fixture.context)
+        let existingHorseID = fixture.horses[0].persistentModelID
+        editor.toggleHorse(existingHorseID)
+        editor.draft.serviceIDsByHorse[existingHorseID] = service.persistentModelID
         let client = Client(name: "Casey")
         fixture.context.insert(client)
         let horse = Horse(
@@ -543,7 +629,11 @@ struct AppointmentEditorModelTests {
         editor.selectCreatedHorse(horse.persistentModelID, in: fixture.context)
 
         #expect(editor.loadState == .loaded)
-        #expect(editor.draft.selectedHorseIDs == [horse.persistentModelID])
+        #expect(editor.draft.selectedHorseIDs == [existingHorseID, horse.persistentModelID])
+        #expect(editor.draft.serviceIDsByHorse[existingHorseID] == service.persistentModelID)
+        #expect(editor.draft.startDate == startDate)
+        #expect(editor.draft.expectedDurationText == "45")
+        #expect(editor.draft.barnID == fixture.barn.persistentModelID)
         #expect(editor.draft.notes == "Keep this appointment note")
         #expect(editor.saveRequirement == nil)
     }

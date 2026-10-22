@@ -15,6 +15,32 @@ nonisolated enum AppointmentEditorLoadError: Error, Equatable {
 }
 
 nonisolated enum AppointmentStartDateRules {
+    static func suggestedStart(
+        after now: Date,
+        calendar: Calendar,
+        recentStarts: [Date] = []
+    ) -> Date {
+        let rounded = nextHalfHour(after: now, calendar: calendar)
+        let hour = calendar.component(.hour, from: rounded)
+        guard hour < 8 || hour >= 18 else { return rounded }
+
+        // Infer a daytime suggestion only; explicit dates and overnight work remain unrestricted.
+        let daytimeMinutes = recentStarts.compactMap { date -> Int? in
+            let hour = calendar.component(.hour, from: date)
+            guard (8..<18).contains(hour) else { return nil }
+            return hour * 60 + (calendar.component(.minute, from: date) / 30) * 30
+        }
+        let frequencies = Dictionary(grouping: daytimeMinutes, by: { $0 }).mapValues(\.count)
+        // Preserve recency to break ties in the bounded, newest-first history.
+        let mostFrequent = frequencies.values.max()
+        let preferred = daytimeMinutes.first { frequencies[$0] == mostFrequent } ?? 9 * 60
+        return calendar.nextDate(
+            after: now,
+            matching: DateComponents(hour: preferred / 60, minute: preferred % 60, second: 0),
+            matchingPolicy: .nextTime
+        ) ?? rounded
+    }
+
     static func nextHalfHour(after now: Date, calendar: Calendar) -> Date {
         let components = calendar.dateComponents(
             [.era, .year, .month, .day, .hour, .minute],
@@ -57,6 +83,10 @@ final class AppointmentEditorModel {
     private(set) var lockedHorseNames: [String] = []
     private var lockedBarnID: PersistentIdentifier?
     private var lockedHorseIDs = Set<PersistentIdentifier>()
+    @ObservationIgnored private let initialNow: Date
+    @ObservationIgnored private let calendar: Calendar
+    @ObservationIgnored private let initialSuggestedStart: Date?
+    private var hasAppliedStartSuggestion = false
     private var hasAppliedOwnerDefault = false
     private(set) var appliedOwnerDurationDefault = false
     let appointmentID: PersistentIdentifier?
@@ -98,6 +128,11 @@ final class AppointmentEditorModel {
     ) {
         self.barnFetcher = barnFetcher
         self.horseFetcher = horseFetcher
+        initialNow = now
+        self.calendar = calendar
+        initialSuggestedStart = appointment == nil && seed == nil
+            ? AppointmentStartDateRules.suggestedStart(after: now, calendar: calendar)
+            : nil
         let seed = appointment == nil ? seed : nil
         appointmentID = appointment?.persistentModelID
         hasFollowUpSuggestion = seed?.hasFollowUpSuggestion ?? false
@@ -106,7 +141,7 @@ final class AppointmentEditorModel {
             barnID: appointment?.barn?.persistentModelID ?? seed?.barnID,
             startDate: appointment?.startDate
                 ?? seed?.startDate
-                ?? AppointmentStartDateRules.nextHalfHour(
+                ?? AppointmentStartDateRules.suggestedStart(
                     after: now,
                     calendar: calendar
                 ),
@@ -146,6 +181,7 @@ final class AppointmentEditorModel {
                 }
                 updateVisitLock(from: appointment)
             } else {
+                try applyStartSuggestionIfNeeded(in: context)
                 try applyOwnerDefaultIfNeeded(in: context)
             }
             services = try context.fetch(FetchDescriptor<Service>(
@@ -418,6 +454,30 @@ final class AppointmentEditorModel {
                 "Failed to load eligible appointment horses: \(error, privacy: .public)"
             )
         }
+    }
+
+    private func applyStartSuggestionIfNeeded(in context: ModelContext) throws {
+        guard !hasAppliedStartSuggestion else { return }
+        guard let initialSuggestedStart, draft.startDate == initialSuggestedStart else {
+            hasAppliedStartSuggestion = true
+            return
+        }
+        let rounded = AppointmentStartDateRules.nextHalfHour(after: initialNow, calendar: calendar)
+        let hour = calendar.component(.hour, from: rounded)
+        if hour < 8 || hour >= 18 {
+            let now = initialNow
+            var history = FetchDescriptor<Appointment>(
+                predicate: #Predicate { $0.startDate < now },
+                sortBy: [SortDescriptor(\.startDate, order: .reverse)]
+            )
+            history.fetchLimit = 20
+            draft.startDate = AppointmentStartDateRules.suggestedStart(
+                after: initialNow,
+                calendar: calendar,
+                recentStarts: try context.fetch(history).map(\.startDate)
+            )
+        }
+        hasAppliedStartSuggestion = true
     }
 
     private func applyOwnerDefaultIfNeeded(in context: ModelContext) throws {

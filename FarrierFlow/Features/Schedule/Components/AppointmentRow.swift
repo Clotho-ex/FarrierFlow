@@ -4,45 +4,67 @@ struct AppointmentRow: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let appointment: Appointment
 
-    private var horseNames: String {
-        let names = appointment.appointmentHorses
-            .compactMap(\.horse?.name)
-            .sorted(using: String.StandardComparator(.localizedStandard))
-        return names.isEmpty
-            ? String(localized: "Horse unavailable")
-            : names.formatted(.list(type: .and))
-    }
-
-    private var barnName: String {
-        appointment.barn?.name ?? String(localized: "Service location unavailable")
-    }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
-            appointmentTime
-            serviceLocation
-            Text(horseNames)
-                .font(Typography.recordMetadata)
-            if dynamicTypeSize.isAccessibilitySize, let visit = appointment.visit {
-                Text(visit.completedAt == nil ? "In Progress" : "Completed")
+        let summary = AppointmentRowSummary(appointment: appointment)
+        VStack(alignment: .leading, spacing: SpacingTokens.related) {
+            headerLayout {
+                Text(appointment.startDate, format: .dateTime.hour().minute())
+                    .font(.title2.weight(.semibold))
+                if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: SpacingTokens.compact) }
+                Text(summary.state.title)
                     .font(Typography.recordMetadata)
-                    .foregroundStyle(visit.completedAt == nil ? ColorTokens.brandActionText : ColorTokens.success)
+                    .foregroundStyle(statusColor(summary.state))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
+                Text(verbatim: summary.barnName)
+                    .font(Typography.recordTitle)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(verbatim: summary.horseDetail)
+                    .font(Typography.recordMetadata)
+                    .foregroundStyle(ColorTokens.textSecondary)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let services = summary.plannedServices {
+                Divider()
+                headerLayout {
+                    Text("Planned Services")
+                        .foregroundStyle(ColorTokens.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: SpacingTokens.compact) }
+                    Text(verbatim: services)
+                        .foregroundStyle(ColorTokens.textPrimary)
+                        .multilineTextAlignment(dynamicTypeSize.isAccessibilitySize ? .leading : .trailing)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .font(Typography.recordMetadata)
             }
         }
+        .padding(.vertical, SpacingTokens.tight)
         .frame(maxWidth: .infinity, alignment: .leading)
         .multilineTextAlignment(.leading)
+        .lineLimit(nil)
+        .contentShape(.rect)
         .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("appointment-row-\(barnName)")
+        .accessibilityIdentifier("appointment-row-\(summary.barnName)")
     }
 
-    private var appointmentTime: some View {
-        Text(appointment.startDate, format: .dateTime.hour().minute())
-            .font(Typography.recordTitle)
+    private var headerLayout: AnyLayout {
+        if dynamicTypeSize.isAccessibilitySize {
+            AnyLayout(VStackLayout(alignment: .leading, spacing: SpacingTokens.rowContent))
+        } else {
+            AnyLayout(HStackLayout(alignment: .firstTextBaseline))
+        }
     }
 
-    private var serviceLocation: some View {
-        Text(barnName)
-            .font(Typography.recordMetadata)
-            .foregroundStyle(ColorTokens.textSecondary)
+    private func statusColor(_ state: AppointmentRowSummary.State) -> Color {
+        switch state {
+        case .scheduled: ColorTokens.textSecondary
+        case .inProgress: ColorTokens.brandActionText
+        case .completed: ColorTokens.success
+        }
     }
 }

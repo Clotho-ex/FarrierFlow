@@ -86,7 +86,7 @@ nonisolated enum NextAppointmentSuggestionRules {
         calendar: Calendar
     ) -> Date {
         guard let groupSuggestion, groupSuggestion >= now else {
-            return AppointmentStartDateRules.nextHalfHour(after: now, calendar: calendar)
+            return AppointmentStartDateRules.suggestedStart(after: now, calendar: calendar)
         }
 
         return groupSuggestion

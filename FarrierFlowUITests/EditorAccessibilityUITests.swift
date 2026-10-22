@@ -12,9 +12,8 @@ final class EditorAccessibilityUITests: XCTestCase {
         openClients(in: app)
         let addClient = app.navigationBars["Clients"].buttons["Add Client"]
         XCTAssertTrue(addClient.waitForExistence(timeout: 10))
-        addClient.tap()
         let clientMoreDetails = app.buttons["client-more-details"]
-        XCTAssertTrue(clientMoreDetails.waitForExistence(timeout: 3))
+        guard tapUntilDestinationAppears(addClient, destination: clientMoreDetails) else { return }
         guard tapUntilDestinationAppears(
             clientMoreDetails,
             destination: app.descendants(matching: .any)["client-notes-field"]
@@ -37,8 +36,8 @@ final class EditorAccessibilityUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["New Client"].exists)
         app.buttons["Save"].tap()
 
-        guard let todayNavigationBar = openToday(in: app) else { return }
-        let addAppointment = todayNavigationBar.buttons["Schedule Appointment"]
+        guard openSchedule(in: app) else { return }
+        let addAppointment = app.navigationBars["Schedule"].buttons["Schedule Appointment"]
         XCTAssertTrue(addAppointment.waitForExistence(timeout: 10))
         guard tapUntilDestinationAppears(
             addAppointment,
@@ -46,13 +45,15 @@ final class EditorAccessibilityUITests: XCTestCase {
         ) else { return }
         let appointmentNotes = app.textViews["Appointment Notes"]
         guard tapUntilDestinationAppears(
-            app.buttons["appointment-more-details"],
+            app.buttons["appointment-additional-details"],
             destination: appointmentNotes
         ) else { return }
         appointmentNotes.tap()
         appointmentNotes.typeText("Keep this draft")
         dismissAppointmentKeyboard(in: app)
-        let addServiceLocation = app.buttons["appointment-add-service-location"]
+        guard revealElement(app.buttons["appointment-barn-picker"], in: app, towardTop: true) else { return }
+        app.buttons["appointment-barn-picker"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let addServiceLocation = app.buttons["appointment-create-location"]
         XCTAssertTrue(addServiceLocation.waitForExistence(timeout: 3))
         guard tapUntilDestinationAppears(
             addServiceLocation,
@@ -78,8 +79,8 @@ final class EditorAccessibilityUITests: XCTestCase {
             ].waitForExistence(timeout: 3)
         )
         let horseName = app.textFields["horse-name-field"]
-        let addHorse = app.buttons["appointment-add-horse"]
-        revealAddHorse(addHorse, in: app)
+        guard revealElement(app.buttons["appointment-create-horse"], in: app, towardTop: true) else { return }
+        let addHorse = app.buttons["appointment-create-horse"]
         guard tapUntilDestinationAppears(
             addHorse,
             destination: horseName
@@ -100,13 +101,13 @@ final class EditorAccessibilityUITests: XCTestCase {
         guard revealElement(appointmentNotes, in: app) else { return }
         XCTAssertEqual(appointmentNotes.value as? String, "Keep this draft")
 
-        let addAnotherHorse = app.buttons["appointment-add-horse"]
+        guard revealElement(app.buttons["appointment-create-horse"], in: app, towardTop: true) else { return }
+        let addAnotherHorse = app.buttons["appointment-create-horse"]
         guard addAnotherHorse.waitForExistence(timeout: 3) else {
             XCTFail("Add Horse should remain available after creating the first horse")
             return
         }
         let secondHorseName = app.textFields["horse-name-field"]
-        revealAddHorse(addAnotherHorse, in: app)
         guard tapUntilDestinationAppears(
             addAnotherHorse,
             destination: secondHorseName
@@ -127,8 +128,10 @@ final class EditorAccessibilityUITests: XCTestCase {
         XCTAssertEqual(secondSelectedHorse.value as? String, "Selected")
         guard revealElement(appointmentNotes, in: app) else { return }
         XCTAssertEqual(appointmentNotes.value as? String, "Keep this draft")
-        let addService = app.buttons["appointment-add-service-Appointment Horse"]
-        revealAddHorse(addService, in: app)
+        let serviceMenu = app.buttons["appointment-service-Appointment Horse"]
+        guard revealElement(serviceMenu, in: app) else { return }
+        serviceMenu.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let addService = app.buttons["appointment-create-service"]
         guard tapUntilDestinationAppears(
             addService,
             destination: app.navigationBars["New Service"]
@@ -148,14 +151,14 @@ final class EditorAccessibilityUITests: XCTestCase {
         app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] =
             "AppointmentKeyboard-\(UUID().uuidString)"
         app.launch()
-        guard let today = openToday(in: app) else { return }
+        guard openSchedule(in: app) else { return }
         guard tapUntilDestinationAppears(
-            today.buttons["Schedule Appointment"],
+            app.navigationBars["Schedule"].buttons["Schedule Appointment"],
             destination: app.navigationBars["New Appointment"]
         ) else { return }
         let duration = app.textFields["Expected Duration (minutes)"]
         guard tapUntilDestinationAppears(
-            app.buttons["appointment-more-details"],
+            app.buttons["appointment-additional-details"],
             destination: duration
         ) else { return }
         guard focusAndType("45", in: duration) else { return }
@@ -187,6 +190,7 @@ final class EditorAccessibilityUITests: XCTestCase {
     private func verifyAppointmentServiceFlow(largeText: Bool) throws {
         let app = XCUIApplication()
         if largeText {
+            app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
             app.launchEnvironment["FARRIERFLOW_UI_TEST_DYNAMIC_TYPE_SIZE"] = "accessibility5"
             app.launchEnvironment["FARRIERFLOW_UI_TEST_COLOR_SCHEME"] = "dark"
         }
@@ -199,14 +203,15 @@ final class EditorAccessibilityUITests: XCTestCase {
             app.navigationBars["Schedule"].buttons["Schedule Appointment"],
             destination: app.navigationBars["New Appointment"]
         ) else { return }
-        app.buttons["appointment-barn-picker"].tap()
+        app.buttons["appointment-barn-picker"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         app.buttons["Next Appointment Service Location"].tap()
         let horse = app.buttons["appointment-horse-Atlas"]
         guard revealElement(horse, in: app) else { return }
         horse.tap()
+        XCTAssertFalse(app.textFields["appointment-duration"].exists)
         let service = app.buttons["appointment-service-Atlas"]
         guard revealElement(service, in: app) else { return }
-        service.tap()
+        service.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         app.buttons["Next Appointment Trim"].tap()
         XCTAssertEqual(service.value as? String, "Next Appointment Trim")
         let selectionScreenshot = XCTAttachment(screenshot: app.screenshot())
@@ -251,25 +256,21 @@ final class EditorAccessibilityUITests: XCTestCase {
     }
 
     @MainActor
-    private func revealAddHorse(_ button: XCUIElement, in app: XCUIApplication) {
-        guard !button.isHittable else { return }
-        let notes = app.textViews["Appointment Notes"]
-        let scrollDown = notes.exists && notes.isHittable
-        for _ in 0..<5 {
-            if button.exists && button.isHittable { return }
-            if scrollDown {
-                app.swipeDown()
-            } else {
-                app.swipeUp()
-            }
-        }
-    }
-
-    @MainActor
-    private func revealElement(_ element: XCUIElement, in app: XCUIApplication) -> Bool {
+    private func revealElement(_ element: XCUIElement, in app: XCUIApplication, towardTop: Bool = false) -> Bool {
         for _ in 0..<8 {
-            if element.exists && element.isHittable { return true }
-            app.swipeUp()
+            let top = app.navigationBars.allElementsBoundByIndex
+                .filter(\.isHittable).map { $0.frame.maxY }.max() ?? app.frame.minY + 100
+            let frame = element.exists ? element.frame : .zero
+            if element.exists, frame.width > 0,
+               frame.midY > top + 8, frame.midY < app.frame.maxY - 20 {
+                return true
+            }
+            let surface = app.collectionViews.allElementsBoundByIndex.last(where: \.isHittable) ?? app
+            let down = towardTop || (element.exists && frame.midY <= top + 8)
+            // Use the form gutter so an embedded notes editor cannot consume the drag.
+            let start = surface.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: down ? 0.2 : 0.8))
+            let end = surface.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: down ? 0.8 : 0.2))
+            start.press(forDuration: 0.01, thenDragTo: end)
         }
         XCTFail("Expected to reveal \(element.identifier)")
         return false
@@ -346,12 +347,13 @@ final class EditorAccessibilityUITests: XCTestCase {
     private func focusAndType(_ text: String, in element: XCUIElement) -> Bool {
         XCTAssertTrue(element.waitForExistence(timeout: 3))
         guard element.exists else { return false }
+        guard revealElement(element, in: XCUIApplication(), towardTop: element.identifier.hasSuffix("-name-field")) else { return false }
         for attempt in 0..<4 {
             if attempt == 0 {
                 element.tap()
             } else {
                 element.coordinate(
-                    withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
+                    withNormalizedOffset: CGVector(dx: 0.5, dy: [0.5, 0.75, 0.85, 0.65][attempt])
                 ).tap()
             }
             if waitForKeyboardFocus(in: element) {

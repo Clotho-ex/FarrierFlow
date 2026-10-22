@@ -19,25 +19,28 @@ struct ClientDetailView: View {
             if let client = model.client {
                 List {
                     Section {
-                        VStack(
-                            alignment: .leading,
-                            spacing: SpacingTokens.tight
-                        ) {
-                            Text(client.name)
-                                .font(.title2.weight(.semibold))
-                                .foregroundStyle(ColorTokens.textPrimary)
-                                .accessibilityAddTraits(.isHeader)
-                            Text("Client profile")
-                                .font(Typography.recordMetadata)
-                                .foregroundStyle(ColorTokens.textSecondary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        Text(client.name)
+                            .font(.title2.weight(.semibold))
+                            .foregroundStyle(ColorTokens.textPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityAddTraits(.isHeader)
+                            .frame(maxWidth: .infinity, alignment: .leading)
 
                         if let phone = client.phone {
-                            LabeledContent("Phone", value: phone)
+                            contactRow(
+                                "Phone", value: phone,
+                                url: ClientContactURL.phone(phone),
+                                accessibilityLabel: Text("Call \(phone)")
+                            )
+                            .accessibilityIdentifier("client-phone-action")
                         }
                         if let email = client.email {
-                            LabeledContent("Email", value: email)
+                            contactRow(
+                                "Email", value: email,
+                                url: ClientContactURL.email(email),
+                                accessibilityLabel: Text("Email \(email)")
+                            )
+                            .accessibilityIdentifier("client-email-action")
                         }
                         if let notes = client.notes {
                             LabeledContent("Notes", value: notes)
@@ -52,7 +55,16 @@ struct ClientDetailView: View {
                                 showsEditor = true
                             }
                         }
+                    } header: {
+                        Text("Profile")
+                            .textCase(nil)
                     }
+                    .listRowInsets(EdgeInsets(
+                        top: SpacingTokens.standard,
+                        leading: SpacingTokens.standard,
+                        bottom: SpacingTokens.standard,
+                        trailing: SpacingTokens.standard
+                    ))
                     .listRowBackground(ColorTokens.surface)
 
                     Section {
@@ -115,9 +127,8 @@ struct ClientDetailView: View {
                         .listRowBackground(ColorTokens.surface)
                     }
                 }
-                .listSectionSpacing(
-                    .custom(SpacingTokens.recordSection)
-                )
+                // Native section headers already provide the separation here.
+                .listSectionSpacing(.custom(0))
                 .farrierFlowScrollBackground()
                 .navigationTitle("Client")
                 .toolbarTitleDisplayMode(.inline)
@@ -172,7 +183,56 @@ struct ClientDetailView: View {
         model.load(id: clientID, in: ModelContext(context.container))
     }
 
+    @ViewBuilder
+    private func contactRow(
+        _ title: LocalizedStringKey,
+        value: String,
+        url: URL?,
+        accessibilityLabel: Text
+    ) -> some View {
+        if let url {
+            Link(destination: url) {
+                contactLabel(title, value: value)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(accessibilityLabel)
+        } else {
+            contactLabel(title, value: value)
+        }
+    }
 
+    private func contactLabel(_ title: LocalizedStringKey, value: String) -> some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                stackedContactLabel(title, value: value)
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .firstTextBaseline, spacing: 0) {
+                        Text(title)
+                            .foregroundStyle(ColorTokens.textPrimary)
+                            .fixedSize()
+                        Spacer(minLength: SpacingTokens.standard)
+                        Text(verbatim: value)
+                            .foregroundStyle(ColorTokens.textSecondary)
+                            .fixedSize()
+                    }
+                    stackedContactLabel(title, value: value)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+
+    private func stackedContactLabel(_ title: LocalizedStringKey, value: String) -> some View {
+        VStack(alignment: .leading, spacing: SpacingTokens.tight) {
+            Text(title)
+                .foregroundStyle(ColorTokens.textPrimary)
+            Text(verbatim: value)
+                .foregroundStyle(ColorTokens.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
 
     private func hasContactDetails(_ client: ClientDetailSnapshot) -> Bool {
         client.phone != nil || client.email != nil || client.notes != nil

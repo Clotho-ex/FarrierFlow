@@ -116,6 +116,19 @@ struct NextAppointmentSuggestionRulesTests {
     }
 
     @Test
+    func missingOrPastGroupSuggestionsUseDaytimeAfterHoursFallback() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: "America/New_York"))
+        let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 10, day: 21, hour: 23, minute: 38)))
+        for suggestion in [nil, now.addingTimeInterval(-3_600)] {
+            let start = NextAppointmentSuggestionRules.editorStart(groupSuggestion: suggestion, now: now, calendar: calendar)
+            #expect(calendar.component(.day, from: start) == 22)
+            #expect(calendar.component(.hour, from: start) == 9)
+            #expect(calendar.component(.minute, from: start) == 0)
+        }
+    }
+
+    @Test
     func usesTheNextHalfHourWhenTheGroupSuggestionIsPast() throws {
         let calendar = makeCalendar()
         let now = try date(2026, 2, 2, 9, 7, calendar: calendar)

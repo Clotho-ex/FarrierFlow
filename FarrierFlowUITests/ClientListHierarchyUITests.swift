@@ -54,6 +54,90 @@ final class ClientListHierarchyUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Client"].waitForExistence(timeout: 3))
     }
 
+    @MainActor
+    func testClientProfileHasNeutralNativeContactActions() {
+        let app = launch()
+        defer {
+            XCUIDevice.shared.orientation = .portrait
+            app.terminate()
+        }
+        editSeededClient(name: "John Doe", email: "example@gmail.com", in: app)
+        app.buttons["client-row-John Doe"].tap()
+        XCTAssertTrue(app.navigationBars["Client"].waitForExistence(timeout: 3))
+        capture(app, name: "Client profile — Light")
+        XCTAssertTrue(app.staticTexts["Profile"].exists)
+        XCTAssertFalse(app.staticTexts["Client profile"].exists)
+        assertContactActions(in: app, email: "example@gmail.com")
+        XCTAssertTrue(app.buttons["Add Horse"].isHittable)
+        app.buttons["Add Horse"].tap()
+        XCTAssertTrue(app.navigationBars["New Horse"].waitForExistence(timeout: 3))
+        app.buttons["Cancel"].tap()
+
+        app.terminate()
+        app.launchEnvironment["FARRIERFLOW_UI_TEST_COLOR_SCHEME"] = "dark"
+        app.launch()
+        app.selectFarrierFlowTab("Clients")
+        app.buttons["client-row-John Doe"].tap()
+        assertContactActions(in: app, email: "example@gmail.com")
+        capture(app, name: "Client profile — Dark")
+        XCUIDevice.shared.orientation = .landscapeLeft
+        app.collectionViews.firstMatch.swipeDown(velocity: .slow)
+        XCTAssertGreaterThan(app.windows.firstMatch.frame.width, app.windows.firstMatch.frame.height)
+        capture(app, name: "Client profile — Landscape", fullScreen: true)
+    }
+
+    @MainActor
+    func testClientProfileLongEmailRemainsReadableAtAccessibilitySize() {
+        let address = "alexandria.montgomery.wellington+appointments@northfield.example.com"
+        let app = launch()
+        defer { app.terminate() }
+        editSeededClient(name: longName, email: address, in: app)
+        app.buttons["client-row-\(longName)"].tap()
+        assertContactActions(in: app, email: address)
+        capture(app, name: "Client profile — Long email, standard text")
+        app.terminate()
+        app.launchEnvironment["FARRIERFLOW_UI_TEST_COLOR_SCHEME"] = "dark"
+        app.launchEnvironment["FARRIERFLOW_UI_TEST_DYNAMIC_TYPE_SIZE"] = "accessibility5"
+        app.launch()
+        app.selectFarrierFlowTab("Clients")
+        app.buttons["client-row-\(longName)"].tap()
+        XCTAssertTrue(app.staticTexts["Profile"].waitForExistence(timeout: 3))
+        capture(app, name: "Client profile — Largest accessibility text, top")
+        assertContactActions(in: app, email: address)
+        let email = contactAction("client-email-action", in: app)
+        app.collectionViews.firstMatch.swipeUp(velocity: .slow)
+        XCTAssertTrue(email.exists)
+        capture(app, name: "Client profile — Largest accessibility text, email")
+        let addHorse = app.buttons["Add Horse"]
+        for _ in 0..<8 where !addHorse.isHittable {
+            app.collectionViews.firstMatch.swipeUp(velocity: .slow)
+        }
+        XCTAssertTrue(addHorse.isHittable)
+        capture(app, name: "Client profile — Largest accessibility text, horses")
+        addHorse.tap()
+        XCTAssertTrue(app.navigationBars["New Horse"].waitForExistence(timeout: 3))
+    }
+
+    @MainActor
+    private func assertContactActions(in app: XCUIApplication, email address: String) {
+        let phone = contactAction("client-phone-action", in: app)
+        let email = contactAction("client-email-action", in: app)
+        XCTAssertTrue(phone.waitForExistence(timeout: 3))
+        XCTAssertTrue(phone.label.contains("+13625849"))
+        XCTAssertTrue(phone.elementType == .link || phone.elementType == .button)
+        for _ in 0..<8 where !email.exists {
+            app.collectionViews.firstMatch.swipeUp(velocity: .slow)
+        }
+        XCTAssertTrue(email.exists)
+        XCTAssertTrue(email.label.contains(address))
+        XCTAssertTrue(email.elementType == .link || email.elementType == .button)
+    }
+
+    @MainActor
+    private func contactAction(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+    }
+
     private var longName: String {
         "Alexandria Montgomery-Wellington and Family"
     }
@@ -73,7 +157,7 @@ final class ClientListHierarchyUITests: XCTestCase {
     }
 
     @MainActor
-    private func editSeededClient(name: String, in app: XCUIApplication) {
+    private func editSeededClient(name: String, email: String? = nil, in app: XCUIApplication) {
         let row = app.buttons["client-row-Next Appointment Client"]
         XCTAssertTrue(row.waitForExistence(timeout: 3))
         row.tap()
@@ -81,6 +165,10 @@ final class ClientListHierarchyUITests: XCTestCase {
         app.buttons["Edit"].tap()
         fillName(name, in: app)
         fillPhone(in: app)
+        if let email {
+            replaceText(email, in: app.textFields["client-email-field"], app: app)
+            dismissKeyboard(in: app)
+        }
         app.navigationBars["Edit Client"].buttons["Save"].tap()
         XCTAssertTrue(app.navigationBars["Edit Client"].waitForNonExistence(timeout: 3))
         app.navigationBars.buttons["Clients"].tap()
@@ -124,8 +212,8 @@ final class ClientListHierarchyUITests: XCTestCase {
     }
 
     @MainActor
-    private func capture(_ app: XCUIApplication, name: String) {
-        let attachment = XCTAttachment(screenshot: app.screenshot())
+    private func capture(_ app: XCUIApplication, name: String, fullScreen: Bool = false) {
+        let attachment = XCTAttachment(screenshot: fullScreen ? XCUIScreen.main.screenshot() : app.screenshot())
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
