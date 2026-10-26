@@ -5,6 +5,7 @@ enum RecordDeletionTarget: Hashable {
     case client(PersistentIdentifier), horse(PersistentIdentifier), barn(PersistentIdentifier)
     case service(PersistentIdentifier), appointment(PersistentIdentifier), visit(PersistentIdentifier)
     case invoice(PersistentIdentifier), workItem(PersistentIdentifier)
+    case scheduledVisit(PersistentIdentifier)
 }
 
 enum RecordDeletionError: Error {
@@ -30,11 +31,13 @@ struct RecordDeletionImpact: Equatable {
         case .barn:
             "Deletes this service location, its horses and related appointments, visits, recorded work and photos. Saved invoices are kept. This cannot be undone."
         case .service:
-            "Deletes this service and its recorded work. Clears horse defaults and scheduled service choices. Saved invoices and photos are kept. This cannot be undone."
+            "Deletes this service. Clears horse defaults and scheduled service choices. Recorded work, saved invoices and photos are kept. This cannot be undone."
         case .appointment:
-            "Deletes this appointment and any linked visit, recorded work and photos. Horses, clients and saved invoices are kept. This cannot be undone."
+            "Deletes this appointment and its horse assignments. Horses, clients and recorded work are kept. This cannot be undone."
+        case .scheduledVisit:
+            "Removes this visit from Today and Schedule. Recorded work, photos and saved invoices are kept in Recorded Work. This cannot be undone."
         case .visit:
-            "Deletes this visit, its appointment, recorded work and photos. Horses, clients and saved invoices are kept. This cannot be undone."
+            "Deletes this recorded work and its photos. Its scheduled appointment and saved invoices are kept. This cannot be undone."
         case .invoice:
             "Deletes this invoice and any recorded payment. Recorded work and photos are kept. This cannot be undone."
         case .workItem:
@@ -78,9 +81,14 @@ struct RecordDeletionPlan {
         case .service(let id):
             let record: Service = try Self.resolve(id, in: context)
             services[id] = record
-            for item in record.workItems { add(item) }
-        case .appointment(let id): add(try Self.resolve(id, in: context) as Appointment)
-        case .visit(let id): add(try Self.resolve(id, in: context) as Visit)
+        case .appointment(let id):
+            let record: Appointment = try Self.resolve(id, in: context)
+            add(record, includingVisit: false)
+        case .scheduledVisit(let id):
+            let visit: Visit = try Self.resolve(id, in: context)
+            guard let appointment = visit.appointment else { throw RecordDeletionError.unavailable }
+            add(appointment, includingVisit: false)
+        case .visit(let id): add(try Self.resolve(id, in: context) as Visit, includingAppointment: false)
         case .workItem(let id): add(try Self.resolve(id, in: context) as WorkItem)
         case .invoice(let id):
             let invoice: Invoice = try Self.resolve(id, in: context)
@@ -111,9 +119,11 @@ struct RecordDeletionPlan {
         ids.formUnion(invoices.values.flatMap(\.payments).map(\.persistentModelID))
         var references = Set(services.values.flatMap(\.horsesUsingAsDefault).map(\.persistentModelID))
         references.formUnion(services.values.flatMap(\.plannedAppointments).map(\.persistentModelID))
+        references.formUnion(services.values.flatMap(\.workItems).map(\.persistentModelID))
         references.formUnion(clients.values.flatMap(\.invoices).map(\.persistentModelID))
         references.formUnion(work.values.compactMap(\.invoiceLineItem).map(\.persistentModelID))
         references.formUnion(visits.values.flatMap(\.invoiceVisits).map(\.persistentModelID))
+        references.formUnion(appointments.values.compactMap(\.visit).map(\.persistentModelID))
         references.formUnion(heldWork.keys)
         return RecordDeletionImpact(
             target: target, recordIDs: ids, referenceIDs: references,
@@ -145,10 +155,10 @@ struct RecordDeletionPlan {
         for member in horse.visitHorses { add(member) }
     }
 
-    private mutating func add(_ appointment: Appointment) {
+    private mutating func add(_ appointment: Appointment, includingVisit: Bool = true) {
         guard appointments.updateValue(appointment, forKey: appointment.persistentModelID) == nil else { return }
         for member in appointment.appointmentHorses { add(member) }
-        if let visit = appointment.visit { add(visit) }
+        if includingVisit, let visit = appointment.visit { add(visit) }
     }
 
     private mutating func add(_ membership: AppointmentHorse) {
@@ -156,17 +166,17 @@ struct RecordDeletionPlan {
         if let appointment = membership.appointment { affectedAppointments[appointment.persistentModelID] = appointment }
     }
 
-    private mutating func add(_ visit: Visit) {
+    private mutating func add(_ visit: Visit, includingAppointment: Bool = true) {
         guard visits.updateValue(visit, forKey: visit.persistentModelID) == nil else { return }
-        for member in visit.visitHorses { add(member) }
-        if let appointment = visit.appointment { add(appointment) }
+        for member in visit.visitHorses { add(member, includingAppointmentMemberships: includingAppointment) }
+        if includingAppointment, let appointment = visit.appointment { add(appointment) }
     }
 
-    private mutating func add(_ member: VisitHorse) {
+    private mutating func add(_ member: VisitHorse, includingAppointmentMemberships: Bool = true) {
         guard visitHorses.updateValue(member, forKey: member.persistentModelID) == nil else { return }
         if let visit = member.visit {
             affectedVisits[visit.persistentModelID] = visit
-            for appointmentHorse in visit.appointment?.appointmentHorses ?? [] where appointmentHorse.horse === member.horse {
+            for appointmentHorse in visit.appointment?.appointmentHorses ?? [] where includingAppointmentMemberships && appointmentHorse.horse === member.horse {
                 add(appointmentHorse)
             }
         }
@@ -205,6 +215,8 @@ struct RecordDeletionPlan {
         for service in services.values {
             for horse in service.horsesUsingAsDefault { horse.defaultService = nil }
             for member in service.plannedAppointments { member.plannedService = nil }
+            // Work owns its historical name and price independently of the catalog.
+            for item in service.workItems { item.service = nil }
         }
         for item in work.values {
             let member = item.visitHorse
@@ -246,6 +258,8 @@ struct RecordDeletionPlan {
             context.delete(visit)
         }
         for appointment in appointments.values {
+            appointment.visit?.appointment = nil
+            appointment.visit = nil
             appointment.barn?.appointments.removeAll { $0 === appointment }
             appointment.barn = nil
             context.delete(appointment)

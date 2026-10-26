@@ -30,10 +30,14 @@ struct RecordUsageSnapshotTests {
         #expect(visit.invoiceNumbers == ["0042"])
         #expect(visit.isCompleted)
         #expect(model.delete(in: graph.context))
+        #expect(try graph.context.fetchCount(FetchDescriptor<Service>()) == 0)
         #expect(try graph.context.fetchCount(FetchDescriptor<Invoice>()) == 1)
-        #expect(try graph.context.fetchCount(FetchDescriptor<WorkItem>()) == 0)
+        #expect(try graph.context.fetchCount(FetchDescriptor<WorkItem>()) == 2)
+        #expect(try graph.context.fetch(FetchDescriptor<WorkItem>()).allSatisfy {
+            $0.service == nil && $0.serviceNameSnapshot == "Trim"
+        })
         #expect(invoice.invoiceVisits.first?.lineItems.count == 2)
-        #expect(invoice.invoiceVisits.first?.lineItems.allSatisfy { $0.sourceWorkItem == nil } == true)
+        #expect(invoice.invoiceVisits.first?.lineItems.allSatisfy { $0.sourceWorkItem != nil } == true)
         try DomainGraphValidator.validateAll(in: graph.context)
     }
 
@@ -92,6 +96,27 @@ struct RecordUsageSnapshotTests {
         let usage = try RecordUsageSnapshot(service: graph.service)
         #expect(usage.appointments.map(\.id) == [appointment.persistentModelID])
         #expect(usage.visits.isEmpty)
+    }
+
+    @Test
+    func completedPlannedAppointmentsMoveOutOfServiceAppointmentsOnFreshReload() throws {
+        let graph = try makeGraph(completed: false)
+        let appointment = try #require(graph.visit.appointment)
+        appointment.appointmentHorses.first?.plannedService = graph.service
+        let barn = try #require(appointment.barn)
+        let horse = try #require(appointment.appointmentHorses.first?.horse)
+        let scheduled = ModelFixtures.makeAppointment(barn: barn, horses: [horse], in: graph.context)
+        scheduled.appointmentHorses.first?.plannedService = graph.service
+        try DomainGraphValidator.save(graph.context)
+        let model = ServiceDetailModel()
+        model.load(id: graph.service.persistentModelID, in: ModelContext(graph.container))
+        #expect(Set(model.usage.appointments.map(\.id)) == [appointment.persistentModelID, scheduled.persistentModelID])
+        graph.visit.completedAt = Date(timeIntervalSinceReferenceDate: 200)
+        try DomainGraphValidator.save(graph.context)
+        model.load(id: graph.service.persistentModelID, in: ModelContext(graph.container))
+        #expect(model.usage.appointments.map(\.id) == [scheduled.persistentModelID])
+        #expect(model.usage.visits.map(\.id) == [graph.visit.persistentModelID])
+        #expect(model.usage.visits.first?.isCompleted == true)
     }
 
     @Test

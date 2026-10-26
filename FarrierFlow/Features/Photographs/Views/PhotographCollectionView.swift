@@ -40,7 +40,7 @@ struct PhotographCollectionView: View {
                         .background(.regularMaterial, in: .rect(cornerRadius: 12))
                 }
             }
-            .navigationTitle("Hoof Photos")
+            .navigationTitle("Photos")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if subscription.allowsMutations {
@@ -148,7 +148,7 @@ struct PhotographCollectionView: View {
             ContentUnavailableView(
                 "No Photos",
                 systemImage: "photo.on.rectangle",
-                description: Text("Add a hoof photo with the camera or photo library.")
+                description: Text("Add a photo with the camera or photo library.")
             )
         } else {
             VStack(spacing: 0) {

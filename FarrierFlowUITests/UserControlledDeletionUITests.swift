@@ -2,7 +2,7 @@ import XCTest
 
 final class UserControlledDeletionUITests: XCTestCase {
     @MainActor
-    func testInvoicedVisitCanBeCorrectedAndDeletedWhileInvoiceRemains() {
+    func testScheduleRemovalKeepsRecordedWorkAndInvoiceUntilExplicitWorkDeletion() {
         let app = launch()
         defer { app.terminate() }
         openClient(in: app)
@@ -10,44 +10,68 @@ final class UserControlledDeletionUITests: XCTestCase {
         let history = app.buttons["horse-history-visit-Milo"].firstMatch
         reveal(history, in: app)
         history.tap()
-        let edit = app.buttons["visit-edit-action"]
-        XCTAssertTrue(edit.waitForExistence(timeout: 3))
-        edit.tap()
-        let outcome = app.buttons["visit-outcome-Milo"]
-        XCTAssertTrue(outcome.waitForExistence(timeout: 3))
-        outcome.tap()
-        app.buttons["Not Serviced"].tap()
-        let clear = app.buttons["Clear Recorded Work"]
-        if clear.waitForExistence(timeout: 2) { clear.tap() }
-        let save = app.buttons["visit-save-correction"]
-        XCTAssertTrue(save.isEnabled, "An all-Not-Serviced correction must be savable")
-        save.tap()
         XCTAssertTrue(app.navigationBars["Visit"].waitForExistence(timeout: 3))
-        let invoice = app.buttons["visit-invoice-0001"]
-        reveal(invoice, in: app)
-        invoice.tap()
-        XCTAssertTrue(app.navigationBars["Invoice 0001"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts["Trim"].exists, "The saved invoice keeps its original work snapshot")
-        app.navigationBars.buttons["Visit"].tap()
+        app.buttons["visit-detail-actions"].tap()
         app.buttons["visit-delete-action"].tap()
         let confirm = app.buttons["visit-delete-confirmation"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 3))
         app.buttons["Cancel"].tap()
-        XCTAssertTrue(app.buttons["visit-edit-action"].exists)
+        XCTAssertTrue(app.buttons["visit-detail-actions"].exists)
+        app.buttons["visit-detail-actions"].tap()
         app.buttons["visit-delete-action"].tap()
         XCTAssertTrue(confirm.waitForExistence(timeout: 3))
         confirm.tap()
         XCTAssertTrue(app.navigationBars["Milo"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.buttons.matching(identifier: "horse-history-visit-Milo").count, 1, "The other completed visit remains")
+        XCTAssertEqual(app.buttons.matching(identifier: "horse-history-visit-Milo").count, 2)
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "FARRIERFLOW_UI_TEST_SCENARIO")
         app.launch()
         openClient(in: app)
-        let kept = app.buttons["client-invoice-0001"]
-        reveal(kept, in: app)
-        kept.tap()
+        app.buttons["horse-row-Milo"].tap()
+        reveal(history, in: app)
+        history.tap()
+        XCTAssertTrue(app.navigationBars["Visit"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Trim"].firstMatch.exists)
+        app.buttons["visit-detail-actions"].tap()
+        XCTAssertTrue(app.buttons["visit-edit-action"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["visit-delete-action"].exists)
+        app.tap()
+        app.openBusinessRoot()
+        let recordedWork = app.buttons["business-recorded-work"]
+        reveal(recordedWork, in: app)
+        recordedWork.tap()
+        XCTAssertTrue(app.navigationBars["Recorded Work"].waitForExistence(timeout: 3))
+        let workRows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "business-completed-visit-"))
+        let before = workRows.count
+        XCTAssertEqual(before, 2)
+        workRows.firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Visit"].waitForExistence(timeout: 3))
+        app.buttons["visit-detail-actions"].tap()
+        let deletion = app.buttons["Delete Recorded Work"]
+        XCTAssertTrue(deletion.waitForExistence(timeout: 3))
+        deletion.tap()
+        XCTAssertTrue(confirm.waitForExistence(timeout: 3))
+        capture(app, "Explicit Recorded Work deletion")
+        confirm.tap()
+        XCTAssertTrue(app.navigationBars["Recorded Work"].waitForExistence(timeout: 5))
+        XCTAssertEqual(workRows.count, before - 1)
+        app.terminate()
+        app.launch()
+        openClient(in: app)
+        let invoice = app.buttons["client-invoice-0001"]
+        reveal(invoice, in: app)
+        invoice.tap()
         XCTAssertTrue(app.navigationBars["Invoice 0001"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["Trim"].exists)
+        capture(app, "Invoice intact after schedule and Recorded Work deletion")
+    }
+
+    @MainActor
+    private func capture(_ app: XCUIApplication, _ name: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     @MainActor
@@ -136,10 +160,11 @@ final class UserControlledDeletionUITests: XCTestCase {
 
     @MainActor
     private func openClient(in app: XCUIApplication) {
-        app.tabBars.buttons["Clients"].tap()
+        app.selectFarrierFlowTab("Clients")
         let row = app.buttons["client-row-Invoice Client"]
         XCTAssertTrue(row.waitForExistence(timeout: 5))
         row.tap()
+        XCTAssertTrue(app.navigationBars["Client"].waitForExistence(timeout: 5))
     }
 
     @MainActor

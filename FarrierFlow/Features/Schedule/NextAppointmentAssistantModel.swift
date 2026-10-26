@@ -15,6 +15,7 @@ final class NextAppointmentAssistantModel {
 
     private(set) var loadState: NextAppointmentAssistantLoadState = .loading
     private(set) var projection: NextAppointmentAssistantProjection?
+    var alert: FeatureAlert?
 
     init(visitID: PersistentIdentifier) {
         self.visitID = visitID
@@ -136,6 +137,37 @@ final class NextAppointmentAssistantModel {
         )
     }
 
+    func schedule(
+        in context: ModelContext,
+        now: Date,
+        calendar: Calendar,
+        locale: Locale,
+        analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()
+    ) -> PersistentIdentifier? {
+        guard let seed = makeSeed() else { return nil }
+        let savingContext = ModelContext(context.container)
+        let current = NextAppointmentAssistantModel(visitID: visitID)
+        current.load(in: savingContext, now: now, calendar: calendar, locale: locale)
+        let availableIDs = Set(current.projection?.options.filter {
+            $0.unavailabilityReason == nil
+        }.map(\.horseID) ?? [])
+        guard seed.horseIDs.isSubset(of: availableIDs) else {
+            alert = FeatureAlert(title: "Review Selected Horses",
+                message: "The selected horses are no longer available for a next appointment. Review the visit and schedule before trying again.")
+            return nil
+        }
+        let editor = AppointmentEditorModel(seed: seed, now: now, calendar: calendar)
+        editor.load(in: savingContext)
+        guard editor.canSave else {
+            alert = editor.alert ?? FeatureAlert(title: "Couldn’t Save Appointment",
+                message: "Review the service location and selected horses before saving.")
+            return nil
+        }
+        let id = editor.save(in: savingContext, analyticsClient: analyticsClient)
+        alert = editor.alert
+        return id
+    }
+
     private func updateProposedStart(_ projection: inout NextAppointmentAssistantProjection) {
         guard let projectionCalendar else {
             return
@@ -200,7 +232,7 @@ final class NextAppointmentAssistantModel {
             suggestedStart = NextAppointmentSuggestionRules.suggestedStart(
                 visitStartedAt: source.visit.startedAt,
                 intervalWeeks: horse.appointmentIntervalWeeks,
-                sourceAppointmentStart: source.appointment.startDate,
+                sourceAppointmentStart: source.appointment?.startDate ?? source.visit.startedAt,
                 calendar: calendar
             )
         } else {
@@ -261,7 +293,7 @@ final class NextAppointmentAssistantModel {
 
     private func futureAppointment(
         for horse: Horse,
-        excluding sourceAppointment: Appointment,
+        excluding sourceAppointment: Appointment?,
         in context: ModelContext,
         now: Date
     ) throws -> Appointment? {
@@ -317,8 +349,8 @@ final class NextAppointmentAssistantModel {
                   candidate.visitHorses.contains(where: {
                       $0.persistentModelID == membership.persistentModelID
                   }),
-                  candidate.appointment?.visit === candidate,
-                  candidate.barn === candidate.appointment?.barn,
+                  candidate.barn != nil,
+                  candidate.appointment.map({ $0.visit === candidate && candidate.barn === $0.barn }) ?? true,
                   membership.horse === horse
             else {
                 throw NextAppointmentAssistantLoadError.projectionUnavailable
@@ -350,7 +382,7 @@ final class NextAppointmentAssistantModel {
 @MainActor
 private struct SourceGraph {
     let visit: Visit
-    let appointment: Appointment
+    let appointment: Appointment?
     let barn: Barn
     let completedAt: Date
     let visitHorses: [VisitHorse]
@@ -362,29 +394,30 @@ private struct SourceGraph {
         guard let visit = try context.existingModel(Visit.self, for: visitID),
               let completedAt = visit.completedAt,
               completedAt >= visit.startedAt,
-              let appointment = visit.appointment,
-              appointment.visit === visit,
-              let appointmentBarn = appointment.barn,
               let visitBarn = visit.barn,
-              visitBarn === appointmentBarn,
-              TextNormalization.required(appointmentBarn.name) == appointmentBarn.name
+              TextNormalization.required(visitBarn.name) == visitBarn.name
         else {
             throw NextAppointmentAssistantLoadError.sourceAppointmentUnavailable
         }
 
+        let appointment = visit.appointment
+        if let appointment {
+            guard appointment.visit === visit, appointment.barn === visitBarn else {
+                throw NextAppointmentAssistantLoadError.sourceAppointmentUnavailable
+            }
+        }
         let persistedAppointmentHorses = try context.fetch(FetchDescriptor<AppointmentHorse>())
-            .filter { $0.appointment === appointment }
+            .filter { appointment != nil && $0.appointment === appointment }
         let persistedVisitHorses = try context.fetch(FetchDescriptor<VisitHorse>())
             .filter { $0.visit === visit }
-        let appointmentHorseIDs = try validHorseIDs(
-            persistedAppointmentHorses,
-            belongingTo: appointment
-        )
+        let appointmentHorseIDs = try appointment.map { appointment in
+            try validHorseIDs(persistedAppointmentHorses, belongingTo: appointment)
+        }
         let visitHorseIDs = try validHorseIDs(persistedVisitHorses, belongingTo: visit)
-        guard appointmentHorseIDs == visitHorseIDs,
-              Set(appointment.appointmentHorses.map(\.persistentModelID))
-                  == Set(persistedAppointmentHorses.map(\.persistentModelID)),
-              appointment.appointmentHorses.count == persistedAppointmentHorses.count,
+        guard appointmentHorseIDs.map({ $0 == visitHorseIDs }) ?? true,
+              appointment.map({ Set($0.appointmentHorses.map(\.persistentModelID))
+                  == Set(persistedAppointmentHorses.map(\.persistentModelID))
+                  && $0.appointmentHorses.count == persistedAppointmentHorses.count }) ?? true,
               Set(visit.visitHorses.map(\.persistentModelID))
                   == Set(persistedVisitHorses.map(\.persistentModelID)),
               visit.visitHorses.count == persistedVisitHorses.count
@@ -395,7 +428,7 @@ private struct SourceGraph {
         return SourceGraph(
             visit: visit,
             appointment: appointment,
-            barn: appointmentBarn,
+            barn: visitBarn,
             completedAt: completedAt,
             visitHorses: persistedVisitHorses
         )

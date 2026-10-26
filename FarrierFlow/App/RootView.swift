@@ -166,18 +166,10 @@ struct RootView: View {
             backupSync?.shouldOfferInvitation == true
     }
 
-    private var businessTabRole: TabRole? {
-        if #available(iOS 27, *) {
-            .prominent
-        } else {
-            nil
-        }
-    }
-
     private var appTabs: some View {
         TabView(selection: $selectedTab) {
             Tab("Today", systemImage: "sun.max", value: .today) {
-                TodayView(showSchedule: { selectedTab = .schedule })
+                TodayView()
             }
 
             Tab("Schedule", systemImage: "calendar", value: .schedule) {
@@ -190,8 +182,7 @@ struct RootView: View {
             Tab(
                 "Business",
                 systemImage: "briefcase",
-                value: .business,
-                role: businessTabRole
+                value: .business
             ) {
                 BusinessView()
             }

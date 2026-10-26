@@ -22,6 +22,7 @@ struct ClientEditorView: View {
     @State private var model: ClientEditorModel
     @State private var showsMoreDetails: Bool
     @State private var selectedDetent: PresentationDetent
+    @State private var dismissalBaseline: ClientDraft?
     @FocusState private var focusedField: ClientField?
     private let createdClientID: Binding<PersistentIdentifier?>?
 
@@ -180,6 +181,7 @@ struct ClientEditorView: View {
                     expandSheet()
                 }
             }
+            .onAppear { if dismissalBaseline == nil { dismissalBaseline = model.draft } }
             .onChange(of: showsMoreDetails) { _, isExpanded in
                 if isExpanded {
                     expandSheet()
@@ -196,6 +198,7 @@ struct ClientEditorView: View {
             selection: $selectedDetent
         )
         .presentationDragIndicator(.visible)
+        .interactiveDismissDisabled(dismissalBaseline.map { $0 != model.draft } ?? false)
     }
 
     private func expandSheet() {

@@ -20,7 +20,7 @@ struct PhotographCountLabel: View {
             case .loading:
                 ProgressView()
             case .loaded(let count):
-                Text("\(count)")
+                Text(count, format: .number)
             case .unavailable:
                 Text("Unavailable")
             }

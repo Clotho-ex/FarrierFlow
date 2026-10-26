@@ -11,7 +11,17 @@ struct BarnListView: View {
 
     var body: some View {
         Group {
-            if model.barns.isEmpty {
+            if model.barns.isEmpty, model.loadState == .loading {
+                ProgressView("Loading service locations…")
+            } else if model.barns.isEmpty, model.loadState == .failed {
+                ContentUnavailableView {
+                    Label("Couldn’t Load Service Locations", systemImage: "exclamationmark.circle")
+                } description: {
+                    Text("FarrierFlow couldn’t load your service locations.")
+                } actions: {
+                    Button("Retry", action: reload)
+                }
+            } else if model.barns.isEmpty {
                 ContentUnavailableView {
                     Label("No Service Locations", systemImage: "mappin.and.ellipse")
                 } description: {
@@ -40,7 +50,7 @@ struct BarnListView: View {
                             .listRowBackground(ColorTokens.surface)
                         }
                     } header: {
-                        Text(serviceLocationCountLabel)
+                        Text(serviceLocationCountLabel).recordSectionHeading()
                             .textCase(nil)
                     }
                 }
@@ -50,15 +60,14 @@ struct BarnListView: View {
         }
         .farrierFlowScreenBackground()
         .navigationTitle("Service Locations")
-        .toolbarTitleDisplayMode(
-            dynamicTypeSize.isAccessibilitySize ? .inline : .inlineLarge
-        )
+        .toolbarTitleDisplayMode(.inline)
         .toolbar {
             if subscription.allowsMutations {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Add Service Location", systemImage: "plus") {
                         showsEditor = true
                     }
+                    .disabled(model.loadState != .loaded && model.barns.isEmpty)
                 }
             }
         }
@@ -68,7 +77,8 @@ struct BarnListView: View {
         .onAppear(perform: reload)
         .onChange(of: backupSync?.runtime?.recordsVersion) { _, _ in reload() }
         .alert(item: $model.alert) {
-            Alert(title: Text($0.title), message: Text($0.message))
+            Alert(title: Text($0.title), message: Text($0.message),
+                primaryButton: .default(Text("Retry"), action: reload), secondaryButton: .cancel())
         }
     }
 

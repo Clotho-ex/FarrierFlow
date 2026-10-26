@@ -4,7 +4,7 @@ import SwiftData
 nonisolated struct WorkItemDraft: Equatable, Identifiable {
     let id: UUID
     let persistentID: PersistentIdentifier?
-    var serviceID: PersistentIdentifier
+    var serviceID: PersistentIdentifier?
     var serviceNameSnapshot: String
     var amountMinorUnits: Int64
     let currencyCode: String
@@ -13,7 +13,7 @@ nonisolated struct WorkItemDraft: Equatable, Identifiable {
     init(
         id: UUID = UUID(),
         persistentID: PersistentIdentifier? = nil,
-        serviceID: PersistentIdentifier,
+        serviceID: PersistentIdentifier?,
         serviceNameSnapshot: String,
         amountMinorUnits: Int64,
         currencyCode: String = "USD",

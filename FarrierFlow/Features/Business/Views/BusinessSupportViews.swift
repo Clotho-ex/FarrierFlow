@@ -3,20 +3,22 @@ import SwiftUI
 struct HelpAndSupportView: View {
     var body: some View {
         List {
-            Section("Get Help") {
+            RecordSection(Text("Get Help")) {
                 if let url = URL(string: "https://farrierflow.vercel.app/support/") {
                     Link(destination: url) {
-                        Label("Help Center", systemImage: "questionmark.circle")
+                        ExternalLinkLabel { Text("Help Center") }
                     }
                 }
                 if let url = URL(string: "mailto:farrierflow.support@gmail.com") {
                     Link(destination: url) {
-                        VStack(alignment: .leading, spacing: SpacingTokens.compact) {
-                            Text("Contact Support")
-                            Text(verbatim: "farrierflow.support@gmail.com")
-                                .font(.footnote)
-                                .foregroundStyle(ColorTokens.textSecondary)
-                                .textSelection(.enabled)
+                        ExternalLinkLabel {
+                            VStack(alignment: .leading, spacing: SpacingTokens.compact) {
+                                Text("Contact Support")
+                                Text(verbatim: "farrierflow.support@gmail.com")
+                                    .font(.footnote)
+                                    .foregroundStyle(ColorTokens.textSecondary)
+                                    .textSelection(.enabled)
+                            }
                         }
                     }
                 }
@@ -59,12 +61,12 @@ struct AboutFarrierFlowView: View {
 
 private struct BusinessLegalLinks: View {
     var body: some View {
-        Section("Legal") {
+        RecordSection(Text("Legal")) {
             if let url = URL(string: "https://farrierflow.vercel.app/privacy/") {
-                Link("Privacy Policy", destination: url)
+                Link(destination: url) { ExternalLinkLabel { Text("Privacy Policy") } }
             }
             if let url = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/") {
-                Link("Terms of Use", destination: url)
+                Link(destination: url) { ExternalLinkLabel { Text("Terms of Use") } }
             }
         }
         .listRowBackground(ColorTokens.surface)

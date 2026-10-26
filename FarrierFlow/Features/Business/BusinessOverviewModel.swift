@@ -6,6 +6,7 @@ import SwiftData
 enum BusinessOverviewRoute: Hashable {
     case outstandingInvoices
     case completedVisits(DateInterval)
+    case recordedWork
 }
 
 nonisolated struct BusinessOverviewSummary: Equatable {

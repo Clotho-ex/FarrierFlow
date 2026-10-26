@@ -19,6 +19,24 @@ struct HorseDraftAndRelocationTests {
     }
 
     @Test
+    func requiredFieldsIdentifyOnlyTheMissingInputs() throws {
+        var draft = HorseDraft(name: "  ")
+        #expect(draft.missingRequiredFields == [.name, .client, .serviceLocation])
+        let container = try ModelContainerFactory.inMemoryTest()
+        let client = Client(name: "Alex")
+        let barn = Barn(name: "North Field")
+        container.mainContext.insert(client)
+        container.mainContext.insert(barn)
+        draft.clientID = client.persistentModelID
+        #expect(draft.missingRequiredFields == [.name, .serviceLocation])
+        draft.name = "Milo"
+        #expect(draft.missingRequiredFields == [.serviceLocation])
+        draft.barnID = barn.persistentModelID
+        #expect(draft.missingRequiredFields.isEmpty)
+        #expect(draft.isValid)
+    }
+
+    @Test
     func relocationRuleUsesTheFullVisitStateMatrix() {
         #expect(HorseRelocationRules.canRelocate(
             appointmentStates: [.noVisit],

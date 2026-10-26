@@ -18,7 +18,6 @@ struct InvoiceDetailView: View {
     @State private var shareModel = InvoicePDFShareModel()
     @State private var pdfPreparationTask: Task<Void, Never>?
     @State private var paymentModel: PaymentRecordingModel?
-    @State private var showsPaymentSheet = false
     @State private var showsDeleteConfirmation = false
 
     let invoiceID: PersistentIdentifier
@@ -84,8 +83,7 @@ struct InvoiceDetailView: View {
                         if model.detail?.status == .paid {
                             Button(
                                 "Mark as Unpaid",
-                                systemImage: "arrow.uturn.backward",
-                                role: .destructive
+                                systemImage: "arrow.uturn.backward"
                             ) {
                                 actionConfirmation = .markUnpaid
                             }
@@ -115,7 +113,7 @@ struct InvoiceDetailView: View {
         ) { confirmation in
             switch confirmation {
             case .markUnpaid:
-                Button("Mark as Unpaid", role: .destructive) {
+                Button("Mark as Unpaid") {
                     guard subscription.allowsMutations else { return }
                     model.markUnpaid(in: context)
                 }
@@ -154,11 +152,9 @@ struct InvoiceDetailView: View {
                 }
             }
         }
-        .sheet(isPresented: $showsPaymentSheet, onDismiss: reload) {
-            if let paymentModel {
-                PaymentRecordingView(model: paymentModel) {
-                    showsPaymentSheet = false
-                }
+        .sheet(item: $paymentModel, onDismiss: reload) { payment in
+            PaymentRecordingView(model: payment) {
+                paymentModel = nil
             }
         }
         .task(id: invoiceID, reload)
@@ -301,7 +297,6 @@ struct InvoiceDetailView: View {
             amountMinorUnits: amount,
             currencyCode: detail.currencyCode
         )
-        showsPaymentSheet = true
     }
 
     private func preparePDF(isRetry: Bool = false) {
@@ -433,7 +428,7 @@ private struct InvoicePaymentSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Payment")
-                .font(.headline)
+                .recordSectionHeading()
             LabeledContent("Paid Amount", value: formattedAmount)
             LabeledContent("Payment Date") {
                 Text(payment.receivedAt, format: .dateTime.month(.abbreviated).day().year().locale(locale))
@@ -466,18 +461,20 @@ private struct InvoicePaymentSection: View {
 }
 
 private struct PaymentRecordingView: View {
+    private enum Field: Hashable { case methodDescription, reference, note }
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
     @Environment(\.analyticsClient) private var analyticsClient
     @Environment(SubscriptionAccessModel.self) private var subscription
     @Bindable var model: PaymentRecordingModel
+    @FocusState private var focusedField: Field?
     let onRecorded: () -> Void
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Payment") {
+                RecordSection(Text("Payment")) {
                     Picker("Payment Method", selection: $model.draft.method) {
                         Text("Choose Method").tag(PaymentMethod?.none)
                         ForEach(PaymentMethod.allCases, id: \.self) { method in
@@ -491,29 +488,50 @@ private struct PaymentRecordingView: View {
                         .accessibilityIdentifier("payment-date")
                     if model.draft.method == .other {
                         TextField("Describe Payment Method", text: $model.draft.otherDescription)
+                            .focused($focusedField, equals: .methodDescription)
                             .accessibilityIdentifier("payment-other-description")
                     }
                 }
                 .listRowBackground(ColorTokens.surface)
-                Section("Details") {
-                    TextField("Reference (Optional)", text: $model.draft.reference)
-                        .accessibilityIdentifier("payment-reference")
-                    TextField("Internal Note (Optional)", text: $model.draft.note, axis: .vertical)
-                        .lineLimit(2...5)
-                        .accessibilityIdentifier("payment-note")
+                RecordSection(Text("Details")) {
+                    VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
+                        Text("Reference")
+                            .font(.caption)
+                            .foregroundStyle(ColorTokens.textSecondary)
+                            .accessibilityHidden(true)
+                        TextField("Reference (Optional)", text: $model.draft.reference)
+                            .focused($focusedField, equals: .reference)
+                            .accessibilityIdentifier("payment-reference")
+                    }
+                    VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
+                        Text("Internal Note")
+                            .font(.caption)
+                            .foregroundStyle(ColorTokens.textSecondary)
+                            .accessibilityHidden(true)
+                        TextField("Internal Note (Optional)", text: $model.draft.note, axis: .vertical)
+                            .lineLimit(2...5)
+                            .focused($focusedField, equals: .note)
+                            .accessibilityIdentifier("payment-note")
+                    }
                 }
                 .listRowBackground(ColorTokens.surface)
             }
             .farrierFlowScrollBackground()
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Record Payment")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { focusedField = nil }
+                        .accessibilityIdentifier("payment-keyboard-done")
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                         .tint(ColorTokens.textSecondary)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Confirm Payment") {
+                    Button("Record") {
                         guard subscription.allowsMutations else { return }
                         model.confirm(
                             in: context,
@@ -522,6 +540,7 @@ private struct PaymentRecordingView: View {
                         if model.didRecord { onRecorded() }
                     }
                     .disabled(!subscription.allowsMutations || !model.canConfirm)
+                    .accessibilityLabel("Record Payment")
                     .accessibilityIdentifier("payment-confirm")
                 }
             }
@@ -551,7 +570,7 @@ private struct InvoiceContactSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
-                .font(.headline)
+                .recordSectionHeading()
             Text(name)
                 .font(.title3.weight(.semibold))
             if let phone {
@@ -593,8 +612,7 @@ private struct InvoiceVisitSection: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 Text("Services Provided")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ColorTokens.textSecondary)
+                    .recordSectionHeading()
                     .padding(.bottom, 12)
                 Divider()
                 ForEach(visit.lineItems) { lineItem in
@@ -640,7 +658,7 @@ private struct InvoiceTextSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
             Text(title)
-                .font(.headline)
+                .recordSectionHeading()
             Text(text)
                 .font(.body)
         }

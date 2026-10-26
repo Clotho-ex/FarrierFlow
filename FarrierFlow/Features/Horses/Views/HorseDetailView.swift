@@ -18,7 +18,7 @@ struct HorseDetailView: View {
         Group {
             if let horse = model.horse {
                 List {
-                    Section("Horse") {
+                    RecordSection(Text("Horse")) {
                         LabeledContent("Name", value: horse.name)
                         LabeledContent(
                             "Client",
@@ -53,7 +53,7 @@ struct HorseDetailView: View {
                     }
                     .listRowBackground(ColorTokens.surface)
                     if let safetyNotes = horse.safetyNotes {
-                        Section("Safety Notes") {
+                        RecordSection(Text("Safety Notes")) {
                             Label {
                                 Text(safetyNotes)
                                     .foregroundStyle(ColorTokens.textPrimary)
@@ -71,7 +71,7 @@ struct HorseDetailView: View {
                                 LinkedAppointmentRow(appointment: appointment)
                             }
                         } header: {
-                            Text("Appointments")
+                            Text("Appointments").recordSectionHeading()
                         } footer: {
                             Text("Open an appointment to review this horse’s scheduled work.")
                         }
@@ -83,7 +83,7 @@ struct HorseDetailView: View {
                                 LinkedVisitRow(visit: visit)
                             }
                         } header: {
-                            Text("In Progress Visits")
+                            Text("In Progress Visits").recordSectionHeading()
                         } footer: {
                             Text("These visits also reference this horse, even though they are not yet in completed history.")
                         }
@@ -132,7 +132,7 @@ struct HorseDetailView: View {
 
     @ViewBuilder
     private var historySection: some View {
-        Section("History") {
+        RecordSection(Text("History")) {
             switch model.historyLoadState {
             case .loading:
                 HStack {

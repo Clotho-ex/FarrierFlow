@@ -59,23 +59,25 @@ struct StopDetailsSheet: View {
         List {
             Section {
                 VStack(alignment: .leading, spacing: SpacingTokens.compact) {
-                    Text(stop.appointments.first?.serviceLocationName ?? "")
-                        .font(.title2.weight(.bold))
-                        .foregroundStyle(ColorTokens.textPrimary)
-                    let date = stop.id.startDate.formatted(.dateTime.weekday(.wide).month(.wide).day())
-                    let time = stop.id.startDate.formatted(.dateTime.hour().minute())
-                    Text("\(date) · \(time)")
-                        .font(.subheadline)
-                        .foregroundStyle(ColorTokens.textSecondary)
+                    VStack(alignment: .leading, spacing: SpacingTokens.compact) {
+                        Text(stop.appointments.first?.serviceLocationName ?? "")
+                            .font(.title2.weight(.bold))
+                            .foregroundStyle(ColorTokens.textPrimary)
+                        let date = stop.id.startDate.formatted(.dateTime.weekday(.wide).month(.wide).day())
+                        let time = stop.id.startDate.formatted(.dateTime.hour().minute())
+                        Text("\(date) · \(time)")
+                            .font(.subheadline)
+                            .foregroundStyle(ColorTokens.textSecondary)
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("today-stop-identity")
                     if let address = stop.appointments.first?.serviceLocationAddress {
-                        Text(address)
+                        ServiceLocationAddress(address: address)
                             .font(.subheadline)
                             .foregroundStyle(ColorTokens.textSecondary)
                     }
                 }
                 .fixedSize(horizontal: false, vertical: true)
-                .accessibilityElement(children: .combine)
-                .accessibilityIdentifier("today-stop-identity")
             }
             .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
             .listRowBackground(Color.clear)
@@ -114,7 +116,7 @@ struct StopDetailsSheet: View {
     }
 
     private var appointmentsHeading: some View {
-        Text("Appointments").font(.headline).foregroundStyle(ColorTokens.textPrimary)
+        Text("Appointments").recordSectionHeading()
     }
 
     private func horseCount(_ stop: TodayStopSummary) -> some View {

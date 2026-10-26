@@ -64,6 +64,7 @@ final class VisitDetailModel {
     private(set) var detail: VisitDetail?
     private(set) var editorMode: VisitEditorMode = .inProgress
     private(set) var isCorrectionLocked = false
+    private(set) var hasScheduledAppointment = false
     var alert: FeatureAlert?
 
     let visitID: PersistentIdentifier
@@ -84,6 +85,7 @@ final class VisitDetailModel {
         loadState = .loading
         do {
             let loadedDetail = try loading(visitID, context, locale)
+            hasScheduledAppointment = try context.existingModel(Visit.self, for: visitID)?.appointment != nil
             detail = loadedDetail
             editorMode = loadedDetail.completedAt == nil ? .inProgress : .correction
             isCorrectionLocked = loadedDetail.isCorrectionLocked
@@ -252,27 +254,28 @@ final class VisitDetailModel {
         }
     }
 
-    // A missing persisted Visit.barn is the sole tolerated invalid relationship:
-    // immutable snapshots still make the historical record readable. All other
-    // Visit invariants remain required before detail UI can present data.
+    // Historical snapshots remain readable after removal from the schedule,
+    // including when the current service-location reference is unavailable.
     private static func validateForDetail(_ visit: Visit) throws {
         guard
-            let appointment = visit.appointment,
-            appointment.visit === visit,
-            let appointmentBarn = appointment.barn,
             TextNormalization.required(visit.serviceLocationNameSnapshot) != nil,
-            !appointment.appointmentHorses.isEmpty,
             !visit.visitHorses.isEmpty
         else {
             throw VisitDetailLoadError.invalidVisit
         }
 
-        if let visitBarn = visit.barn, visitBarn !== appointmentBarn {
+        let appointment = visit.appointment
+        let appointmentBarn = appointment?.barn ?? visit.barn
+        if let appointment {
+            guard appointment.visit === visit, appointment.barn != nil,
+                  !appointment.appointmentHorses.isEmpty else { throw VisitDetailLoadError.invalidVisit }
+        }
+        if let visitBarn = visit.barn, let appointmentBarn, visitBarn !== appointmentBarn {
             throw VisitDetailLoadError.invalidVisit
         }
 
         var appointmentHorseIDs = Set<PersistentIdentifier>()
-        for appointmentHorse in appointment.appointmentHorses {
+        for appointmentHorse in appointment?.appointmentHorses ?? [] {
             guard
                 appointmentHorse.appointment === appointment,
                 let horse = appointmentHorse.horse,
@@ -317,7 +320,7 @@ final class VisitDetailModel {
             containsServicedOutcome = containsServicedOutcome || outcome == .serviced
         }
 
-        guard visitHorseIDs == appointmentHorseIDs else {
+        if appointment != nil, visitHorseIDs != appointmentHorseIDs {
             throw VisitDetailLoadError.invalidVisit
         }
 
@@ -332,7 +335,8 @@ final class VisitDetailModel {
         } else {
             // A completed Visit permits later relocation. An in-progress Visit
             // retains the original Appointment location invariant.
-            guard visit.visitHorses.allSatisfy({ $0.horse?.currentBarn === appointmentBarn }) else {
+            guard let appointmentBarn,
+                  visit.visitHorses.allSatisfy({ $0.horse?.currentBarn === appointmentBarn }) else {
                 throw VisitDetailLoadError.invalidVisit
             }
         }

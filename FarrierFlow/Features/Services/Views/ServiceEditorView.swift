@@ -8,6 +8,7 @@ struct ServiceEditorView: View {
     @Environment(\.analyticsClient) private var analyticsClient
     @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model: ServiceEditorModel
+    @State private var dismissalBaseline: ServiceDraft?
     private let createdServiceID: Binding<PersistentIdentifier?>?
 
     init(
@@ -21,12 +22,13 @@ struct ServiceEditorView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Service") {
+                RecordSection(Text("Service")) {
                     ServiceFormFields(draft: $model.draft)
                 }
                 .listRowBackground(ColorTokens.surface)
             }
             .farrierFlowScrollBackground()
+            .scrollDismissesKeyboard(.interactively)
             .disabled(!subscription.allowsMutations)
             .navigationTitle(model.serviceID == nil ? "New Service" : "Edit Service")
             .navigationBarTitleDisplayMode(.inline)
@@ -54,8 +56,10 @@ struct ServiceEditorView: View {
             }
             .task {
                 model.loadBusinessCurrency(in: context)
+                if dismissalBaseline == nil { dismissalBaseline = model.draft }
             }
         }
+        .interactiveDismissDisabled(dismissalBaseline.map { $0 != model.draft } ?? false)
     }
 
 }

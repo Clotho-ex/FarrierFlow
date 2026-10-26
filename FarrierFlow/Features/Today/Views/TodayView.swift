@@ -2,8 +2,6 @@ import SwiftData
 import SwiftUI
 
 struct TodayView: View {
-    let showSchedule: () -> Void
-
     @Environment(OnboardingExperienceModel.self) private var onboarding
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
@@ -149,6 +147,7 @@ struct TodayView: View {
         Text(appClock.now(), format: .dateTime.weekday(.wide).month(.wide).day())
             .font(.subheadline)
             .foregroundStyle(ColorTokens.textSecondary)
+            .accessibilityIdentifier("today-date")
     }
 
     private func emptyRunSheet(_ state: TodayEmptyState) -> some View {
@@ -213,18 +212,15 @@ struct TodayView: View {
                 Button {
                     presentedSheet = .appointment
                 } label: {
-                    ViewThatFits(in: .horizontal) {
-                        Text("Schedule Appointment").fixedSize()
+                    if dynamicTypeSize.isAccessibilitySize {
                         Text("Schedule")
+                    } else {
+                        Text("Schedule Appointment")
                     }
                 }
                 .accessibilityLabel("Schedule Appointment")
                 .farrierFlowPrimaryAction()
                 .controlSize(.large)
-            case .noStops, .allDone:
-                Button("View Schedule", action: showSchedule)
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
             default:
                 EmptyView()
             }
@@ -319,12 +315,12 @@ struct TodayView: View {
     private func stopSectionHeader(title: LocalizedStringResource, count: Int) -> some View {
         ViewThatFits(in: .horizontal) {
             HStack(alignment: .firstTextBaseline) {
-                Text(title).font(.headline)
+                Text(title).recordSectionHeading()
                 Spacer()
                 Text("\(count) stops").font(.subheadline)
             }
             VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(.headline)
+                Text(title).recordSectionHeading()
                 Text("\(count) stops").font(.subheadline)
             }
         }
@@ -376,7 +372,7 @@ struct TodayView: View {
                 .listRowSeparator(.hidden)
             }
         case .createInvoice(let candidate) where subscription.allowsMutations:
-            Section("Ready to Invoice") {
+            RecordSection(Text("Ready to Invoice")) {
                 Button {
                     onboarding.markInvoiceCreationHintSeen()
                     path.append(
@@ -399,7 +395,7 @@ struct TodayView: View {
                 .listRowBackground(ColorTokens.surface)
             }
         case .reviewInvoice(let invoice):
-            Section("Payment Status") {
+            RecordSection(Text("Payment Status")) {
                 RecordNavigationLink(value: TodayRoute.invoice(invoice.id)) {
                     TodayPrimaryActionLabel(
                         title: "Review Invoice \(invoice.number)",
@@ -817,7 +813,7 @@ private enum TodaySheet: Identifiable {
 
 #Preview("Today — Empty") {
     if let container = try? ModelContainerFactory.inMemoryTest() {
-        TodayView(showSchedule: {})
+        TodayView()
             .modelContainer(container)
             .environment(
                 SubscriptionAccessModel(

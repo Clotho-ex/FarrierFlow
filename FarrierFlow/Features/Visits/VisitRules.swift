@@ -19,6 +19,7 @@ nonisolated enum VisitBatchWorkViolation: Error, Equatable {
     case sourceMustBeServiced
     case sourceRequiresRecordedWork
     case invalidSourceWork(WorkItemDraftViolation)
+    case sourceContainsDeletedService
     case sourceContainsArchivedService
     case targetHorseUnavailable
     case targetMustBePending
@@ -114,6 +115,9 @@ nonisolated enum VisitRules {
         }
         if let violation = WorkItemRules.violation(in: horse.workItems) {
             return .invalidSourceWork(violation)
+        }
+        guard horse.workItems.allSatisfy({ $0.serviceID != nil }) else {
+            return .sourceContainsDeletedService
         }
         guard horse.workItems.allSatisfy({ !$0.serviceIsArchived }) else {
             return .sourceContainsArchivedService

@@ -16,6 +16,7 @@ final class SubscriptionReadOnlyUITests: XCTestCase {
         XCTAssertFalse(app.buttons["Schedule Appointment"].exists)
 
         app.tabBars.buttons["Schedule"].tap()
+        app.segmentedControls["schedule-status-tabs"].buttons["Completed"].tap()
         XCTAssertTrue(
             app.buttons["appointment-row-Invoice Service Location"].waitForExistence(timeout: 3)
         )
@@ -40,7 +41,7 @@ final class SubscriptionReadOnlyUITests: XCTestCase {
         XCTAssertTrue(history.waitForExistence(timeout: 3))
         history.tap()
         let hoofPhotos = app.buttons.matching(
-            NSPredicate(format: "label CONTAINS %@", "Hoof Photos")
+            NSPredicate(format: "label CONTAINS %@", "Photos")
         ).firstMatch
         XCTAssertTrue(bringIntoView(hoofPhotos, in: app))
         hoofPhotos.tap()
@@ -72,6 +73,7 @@ final class SubscriptionReadOnlyUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Status, Unpaid"].exists)
         app.navigationBars.buttons["Invoices"].tap()
         app.tabBars.buttons["Schedule"].tap()
+        app.segmentedControls["schedule-status-tabs"].buttons["Completed"].tap()
         XCTAssertEqual(
             app.buttons.matching(identifier: "appointment-row-Invoice Service Location").count,
             2

@@ -39,17 +39,14 @@ enum VisitSaveUseCase {
             guard let outcome = VisitOutcome(rawValue: visitHorse.outcomeRawValue) else {
                 throw VisitDraftViolation.unknownOutcome
             }
-            let workItems = try visitHorse.workItems.map { workItem in
-                guard let service = workItem.service else {
-                    throw DomainGraphViolation.workItemMissingService
-                }
-                return WorkItemDraft(
+            let workItems = visitHorse.workItems.map { workItem in
+                WorkItemDraft(
                     persistentID: workItem.persistentModelID,
-                    serviceID: service.persistentModelID,
+                    serviceID: workItem.service?.persistentModelID,
                     serviceNameSnapshot: workItem.serviceNameSnapshot,
                     amountMinorUnits: workItem.amountMinorUnits,
                     currencyCode: workItem.currencyCode,
-                    serviceIsArchived: service.isArchived
+                    serviceIsArchived: workItem.service?.isArchived ?? false
                 )
             }
             return VisitHorseDraft(
@@ -271,7 +268,17 @@ enum VisitSaveUseCase {
         }
 
         for draft in drafts {
-            guard let service = try context.existingModel(Service.self, for: draft.serviceID) else {
+            guard let serviceID = draft.serviceID else {
+                guard let id = draft.persistentID, let item = existingByID[id],
+                      item.service == nil,
+                      item.serviceNameSnapshot == draft.serviceNameSnapshot,
+                      item.currencyCode == draft.currencyCode else {
+                    throw DomainGraphViolation.workItemMissingService
+                }
+                item.amountMinorUnits = draft.amountMinorUnits
+                continue
+            }
+            guard let service = try context.existingModel(Service.self, for: serviceID) else {
                 throw DomainGraphViolation.workItemMissingService
             }
 

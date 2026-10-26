@@ -2,13 +2,13 @@ import SwiftUI
 
 struct AppointmentRow: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    let appointment: Appointment
+    let startDate: Date
+    let summary: AppointmentRowSummary
 
     var body: some View {
-        let summary = AppointmentRowSummary(appointment: appointment)
         VStack(alignment: .leading, spacing: SpacingTokens.related) {
             headerLayout {
-                Text(appointment.startDate, format: .dateTime.hour().minute())
+                Text(startDate, format: .dateTime.hour().minute())
                     .font(.title2.weight(.semibold))
                 if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: SpacingTokens.compact) }
                 Text(summary.state.title)

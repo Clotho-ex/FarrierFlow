@@ -138,7 +138,7 @@ struct SubscriptionView: View {
                         )
                     }
                 } header: {
-                    Text("Choose a Plan")
+                    Text("Choose a Plan").recordSectionHeading()
                 } footer: {
                     Text("Any trial shown comes from the App Store. Each plan renews automatically unless canceled.")
                 }
@@ -578,7 +578,7 @@ struct SubscriptionView: View {
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
         } header: {
-            Text("Legal")
+            Text("Legal").recordSectionHeading()
         }
     }
 

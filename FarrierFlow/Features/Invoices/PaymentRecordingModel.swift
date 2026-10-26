@@ -4,8 +4,9 @@ import SwiftData
 
 @MainActor
 @Observable
-final class PaymentRecordingModel {
+final class PaymentRecordingModel: Identifiable {
     let invoiceID: PersistentIdentifier
+    var id: PersistentIdentifier { invoiceID }
     var draft: PaymentRecordingDraft
     private(set) var didRecord = false
     var alert: FeatureAlert?

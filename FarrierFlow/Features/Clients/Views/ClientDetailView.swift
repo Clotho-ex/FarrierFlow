@@ -25,47 +25,67 @@ struct ClientDetailView: View {
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityAddTraits(.isHeader)
                             .frame(maxWidth: .infinity, alignment: .leading)
-
-                        if let phone = client.phone {
-                            contactRow(
-                                "Phone", value: phone,
-                                url: ClientContactURL.phone(phone),
-                                accessibilityLabel: Text("Call \(phone)")
-                            )
-                            .accessibilityIdentifier("client-phone-action")
-                        }
-                        if let email = client.email {
-                            contactRow(
-                                "Email", value: email,
-                                url: ClientContactURL.email(email),
-                                accessibilityLabel: Text("Email \(email)")
-                            )
-                            .accessibilityIdentifier("client-email-action")
-                        }
-                        if let notes = client.notes {
-                            LabeledContent("Notes", value: notes)
-                        }
-
-                        if !hasContactDetails(client),
-                           subscription.allowsMutations {
-                            Button(
-                                "Add Contact Details",
-                                systemImage: "person.crop.circle.badge.plus"
-                            ) {
-                                showsEditor = true
-                            }
-                        }
-                    } header: {
-                        Text("Profile")
-                            .textCase(nil)
+                            .accessibilityIdentifier("client-identity-name")
                     }
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
                     .listRowInsets(EdgeInsets(
-                        top: SpacingTokens.standard,
-                        leading: SpacingTokens.standard,
-                        bottom: SpacingTokens.standard,
-                        trailing: SpacingTokens.standard
+                        top: SpacingTokens.compact, leading: SpacingTokens.standard,
+                        bottom: SpacingTokens.related, trailing: SpacingTokens.standard
                     ))
-                    .listRowBackground(ColorTokens.surface)
+
+                    if hasContactDetails(client) || subscription.allowsMutations {
+                        Section {
+                            if let phone = client.phone {
+                                contactRow(
+                                    "Phone", value: phone,
+                                    url: ClientContactURL.phone(phone),
+                                    accessibilityLabel: Text("Call \(phone)")
+                                )
+                                .accessibilityIdentifier("client-phone-action")
+                            }
+                            if let email = client.email {
+                                contactRow(
+                                    "Email", value: email,
+                                    url: ClientContactURL.email(email),
+                                    accessibilityLabel: Text("Email \(email)")
+                                )
+                                .accessibilityIdentifier("client-email-action")
+                            }
+                            if let notes = client.notes {
+                                RecordDetailField("Notes") {
+                                    Text(verbatim: notes)
+                                        .lineSpacing(3)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(SpacingTokens.related)
+                                        .background(ColorTokens.noteSurface, in: .rect(cornerRadius: SpacingTokens.related))
+                                        .textSelection(.enabled)
+                                }
+                                .accessibilityElement(children: .combine)
+                                .accessibilityIdentifier("client-notes")
+                            }
+
+                            if !hasContactDetails(client),
+                               subscription.allowsMutations {
+                                Button(
+                                    "Add Contact Details",
+                                    systemImage: "person.crop.circle.badge.plus"
+                                ) {
+                                    showsEditor = true
+                                }
+                            }
+                        } header: {
+                            Text("Contact").recordSectionHeading()
+                                .textCase(nil)
+                        }
+                        .listRowInsets(EdgeInsets(
+                            top: SpacingTokens.standard,
+                            leading: SpacingTokens.standard,
+                            bottom: SpacingTokens.standard,
+                            trailing: SpacingTokens.standard
+                        ))
+                        .listRowBackground(ColorTokens.surface)
+                    }
 
                     Section {
                         if client.horses.isEmpty {
@@ -111,14 +131,14 @@ struct ClientDetailView: View {
                                 .accessibilityIdentifier("client-invoice-\(invoice.number)")
                             }
                         } header: {
-                            Text("Invoices")
+                            Text("Invoices").recordSectionHeading()
                                 .textCase(nil)
                         }
                         .listRowBackground(ColorTokens.surface)
                     }
 
                     if model.hasInvoiceableWork, subscription.allowsMutations {
-                        Section("Ready to Invoice") {
+                        RecordSection(Text("Ready to Invoice")) {
                             RecordNavigationLink(value: InvoiceRoute.create(clientID)) {
                                 Label("Create Invoice", systemImage: "doc.badge.plus")
                             }
@@ -201,7 +221,10 @@ struct ClientDetailView: View {
         }
     }
 
-    private func contactLabel(_ title: LocalizedStringKey, value: String) -> some View {
+    private func contactLabel(
+        _ title: LocalizedStringKey,
+        value: String
+    ) -> some View {
         Group {
             if dynamicTypeSize.isAccessibilitySize {
                 stackedContactLabel(title, value: value)
@@ -220,7 +243,7 @@ struct ClientDetailView: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: SpacingTokens.minimumTouchTarget, alignment: .leading)
         .contentShape(Rectangle())
     }
 
@@ -230,6 +253,7 @@ struct ClientDetailView: View {
                 .foregroundStyle(ColorTokens.textPrimary)
             Text(verbatim: value)
                 .foregroundStyle(ColorTokens.textSecondary)
+                .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -242,12 +266,12 @@ struct ClientDetailView: View {
     private var horsesSectionHeader: some View {
         if dynamicTypeSize.isAccessibilitySize {
             VStack(alignment: .leading, spacing: SpacingTokens.tight) {
-                Text("Horses")
+                Text("Horses").recordSectionHeading()
                 addHorseButton
             }
         } else {
             HStack(spacing: SpacingTokens.compact) {
-                Text("Horses")
+                Text("Horses").recordSectionHeading()
                 Spacer(minLength: SpacingTokens.compact)
                 addHorseButton
             }

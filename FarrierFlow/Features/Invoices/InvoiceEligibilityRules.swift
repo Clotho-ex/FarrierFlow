@@ -63,17 +63,21 @@ enum InvoiceEligibilityRules {
                 throw InvoiceEligibilityError.invalidSourceRelationship
             }
             for item in member.workItems {
-                guard item.visitHorse === member, let service = item.service else {
+                guard item.visitHorse === member else {
                     throw InvoiceEligibilityError.invalidWorkItem
                 }
-                let serviceID = ObjectIdentifier(service)
-                if serviceMemberships[serviceID] == nil {
-                    serviceMemberships[serviceID] = Set(service.workItems.map(ObjectIdentifier.init))
+                if let service = item.service {
+                    let serviceID = ObjectIdentifier(service)
+                    if serviceMemberships[serviceID] == nil {
+                        serviceMemberships[serviceID] = Set(service.workItems.map(ObjectIdentifier.init))
+                    }
+                    guard serviceMemberships[serviceID]?.contains(ObjectIdentifier(item)) == true,
+                          item.currencyCode == service.currencyCode else {
+                        throw InvoiceEligibilityError.invalidWorkItem
+                    }
                 }
-                guard serviceMemberships[serviceID]?.contains(ObjectIdentifier(item)) == true,
-                      TextNormalization.required(item.serviceNameSnapshot) == item.serviceNameSnapshot,
-                      item.amountMinorUnits >= 0, BusinessCurrency.isSupported(item.currencyCode),
-                      item.currencyCode == service.currencyCode else {
+                guard TextNormalization.required(item.serviceNameSnapshot) == item.serviceNameSnapshot,
+                      item.amountMinorUnits >= 0, BusinessCurrency.isSupported(item.currencyCode) else {
                     throw InvoiceEligibilityError.invalidWorkItem
                 }
                 guard item.invoiceLineItem == nil, item.billingHoldID == nil else { continue }

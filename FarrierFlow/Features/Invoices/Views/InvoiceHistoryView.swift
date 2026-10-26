@@ -148,7 +148,7 @@ struct InvoiceHistoryDetailView: View {
                     }
                 }
                 if let payment = content.payment {
-                    Section("Payment") {
+                    RecordSection(Text("Payment")) {
                         Text(amount(payment.amountMinorUnits, currency: content.currencyCode))
                         Text(payment.receivedAt, style: .date)
                         Text(payment.method.displayName)
@@ -156,7 +156,7 @@ struct InvoiceHistoryDetailView: View {
                         if let value = payment.reference { Text(value) }
                     }
                 }
-                if let note = content.note { Section("Note") { Text(note) } }
+                if let note = content.note { RecordSection(Text("Note")) { Text(note) } }
                 Section {
                     Button("Share Invoice", systemImage: "square.and.arrow.up") {
                         exportTask = Task { await model.preparePDF(archiveID: identity.archiveID, invoiceID: identity.invoiceID) }

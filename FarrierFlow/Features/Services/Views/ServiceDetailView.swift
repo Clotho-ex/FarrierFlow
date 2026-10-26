@@ -2,14 +2,18 @@ import SwiftData
 import SwiftUI
 
 struct ServiceDetailView: View {
+    private enum History: Hashable { case appointments, recordedWork }
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
     @Environment(\.backupSync) private var backupSync
+    @Environment(PhotographLibrary.self) private var photographLibrary
+    @State private var deletion = RecordDeletionController()
     @State private var model = ServiceDetailModel()
     @State private var showsEditor = false
+    @State private var history = History.appointments
     @State private var showsDeleteConfirmation = false
 
     let serviceID: PersistentIdentifier
@@ -18,14 +22,13 @@ struct ServiceDetailView: View {
         Group {
             if let service = model.service {
                 List {
-                    Section("Service") {
+                    RecordSection(Text("Service")) {
                         LabeledContent("Name", value: service.name)
                         LabeledContent("Default Price", value: formattedAmount(for: service))
-                        LabeledContent("Status", value: service.isArchived ? "Archived" : "Active")
                     }
                     .listRowBackground(ColorTokens.surface)
                     if !service.horsesUsingAsDefault.isEmpty {
-                        Section("Horse Defaults") {
+                        RecordSection(Text("Horse Defaults")) {
                             ForEach(
                                 service.horsesUsingAsDefault.sorted {
                                     $0.name.localizedStandardCompare($1.name) == .orderedAscending
@@ -39,65 +42,101 @@ struct ServiceDetailView: View {
                         }
                         .listRowBackground(ColorTokens.surface)
                     }
-                    if !model.usage.appointments.isEmpty {
-                        Section("Appointments") {
+                    Section {
+                        Picker("Service History", selection: $history) {
+                            Text("Appointments").tag(History.appointments)
+                            Text("Recorded Work").tag(History.recordedWork)
+                        }
+                        .pickerStyle(.segmented)
+                        .accessibilityIdentifier("service-history-tabs")
+                    }
+                    .listRowBackground(ColorTokens.background)
+                    .listRowInsets(.init())
+
+                    if history == .appointments {
+                        RecordSection(Text("Appointments")) {
+                            if model.usage.appointments.isEmpty {
+                                Text("No appointments use this service.")
+                                    .foregroundStyle(ColorTokens.textSecondary)
+                            }
                             ForEach(model.usage.appointments) { appointment in
                                 LinkedAppointmentRow(appointment: appointment)
                             }
                         }
                         .listRowBackground(ColorTokens.surface)
-                    }
-                    if !model.usage.visits.isEmpty {
-                        Section {
+                    } else {
+                        RecordSection(Text("Recorded Work")) {
+                            if model.usage.visits.isEmpty {
+                                Text("No recorded work uses this service.")
+                                    .foregroundStyle(ColorTokens.textSecondary)
+                            }
                             ForEach(model.usage.visits) { visit in
                                 LinkedVisitRow(visit: visit)
                             }
-                        } header: {
-                            Text("Recorded Work")
-                        } footer: {
-                            Text("Open a visit to review its work and invoices. Deleting this service removes its recorded work; saved invoices are kept.")
+                        }
+                        .listRowBackground(ColorTokens.surface)
+                    }
+                    if subscription.allowsMutations {
+                        Section {
+                            Button(role: .destructive) {
+                                deletion.prepare(.service(serviceID), in: context.container)
+                                if deletion.impact != nil { showsDeleteConfirmation = true }
+                                else { model.alert = deletion.alert }
+                            } label: {
+                                Text("Delete Service")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .foregroundStyle(ColorTokens.destructive)
+                            .accessibilityIdentifier("service-delete-action")
                         }
                         .listRowBackground(ColorTokens.surface)
                     }
                 }
                 .farrierFlowScrollBackground()
                 .navigationTitle(service.name)
+                .toolbarTitleDisplayMode(.inline)
                 .toolbar {
                     if subscription.allowsMutations {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Menu {
-                            Button("Edit", systemImage: "pencil") { showsEditor = true }
+                        ToolbarItemGroup(placement: .topBarTrailing) {
+                            Button("Edit Service", systemImage: "pencil") { showsEditor = true }
                                 .tint(ColorTokens.textSecondary)
+                                .accessibilityIdentifier("service-edit-action")
                             if service.isArchived {
-                                Button("Reactivate", systemImage: "arrow.counterclockwise") {
+                                Button("Reactivate Service", systemImage: "arrow.counterclockwise") {
                                     guard subscription.allowsMutations else { return }
                                     _ = model.reactivate(in: ModelContext(context.container))
                                 }
+                                .accessibilityIdentifier("service-reactivate-action")
+                                .tint(ColorTokens.textSecondary)
                             } else {
-                                Button("Archive", systemImage: "archivebox") {
+                                Button("Archive Service", systemImage: "archivebox") {
                                     guard subscription.allowsMutations else { return }
-                                    _ = model.archive(in: ModelContext(context.container))
+                                    if model.archive(in: ModelContext(context.container)) { dismiss() }
                                 }
+                                .accessibilityIdentifier("service-archive-action")
+                                .tint(ColorTokens.textSecondary)
                             }
-                            Divider()
-                            Button("Delete", systemImage: "trash", role: .destructive) {
-                                showsDeleteConfirmation = true
-                            }
-                        } label: {
-                            Label("Actions", systemImage: "ellipsis.circle")
                         }
-                        .tint(ColorTokens.textSecondary)
-                    }
                     }
                 }
                 .sheet(isPresented: $showsEditor, onDismiss: reload) {
                     ServiceEditorDestination(serviceID: service.id)
                 }
-                .recordDeletionSheet(
-                    .service(serviceID), isPresented: $showsDeleteConfirmation,
-                    title: "Delete Service?", confirmationTitle: "Delete Service",
-                    accessibilityPrefix: "service-delete", alert: $model.alert
-                ) { dismiss() }
+                .disabled(deletion.isDeleting)
+                .alert("Delete Service?", isPresented: $showsDeleteConfirmation,
+                       presenting: deletion.impact) { impact in
+                    Button("Delete Service", role: .destructive) {
+                        guard subscription.allowsMutations else { return }
+                        Task {
+                            if await deletion.delete(impact, using: photographLibrary) { dismiss() }
+                            else { model.alert = deletion.alert }
+                        }
+                    }
+                    .accessibilityIdentifier("service-delete-confirmation")
+                    Button("Cancel", role: .cancel) {}
+                } message: { impact in
+                    Text(impact.warning)
+                }
             } else {
                 ContentUnavailableView("Service Unavailable", systemImage: "exclamationmark.circle")
             }

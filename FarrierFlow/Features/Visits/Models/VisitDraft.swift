@@ -7,6 +7,17 @@ nonisolated struct VisitHorseDraft: Equatable, Identifiable {
     var outcome: VisitOutcome
     var workNotes: String
     var workItems: [WorkItemDraft] = []
+
+    var hasRecordedOutcome: Bool {
+        switch outcome {
+        case .pending:
+            false
+        case .notServiced:
+            workItems.isEmpty && TextNormalization.optional(workNotes) == nil
+        case .serviced:
+            !workItems.isEmpty && WorkItemRules.violation(in: workItems) == nil
+        }
+    }
 }
 
 nonisolated struct VisitDraft: Equatable {
@@ -19,5 +30,26 @@ nonisolated struct VisitDraft: Equatable {
     ) {
         self.visitID = visitID
         self.horses = horses
+    }
+}
+
+nonisolated enum VisitRecordedTotal: Equatable {
+    case none
+    case available(minorUnits: Int64, currencyCode: String)
+    case unavailable
+}
+
+extension VisitDraft {
+    var recordedTotal: VisitRecordedTotal {
+        let recordedHorses = horses.filter { $0.outcome == .serviced && !$0.workItems.isEmpty }
+        guard !recordedHorses.isEmpty else { return .none }
+        guard recordedHorses.allSatisfy(\.hasRecordedOutcome) else { return .unavailable }
+        let items = recordedHorses.flatMap(\.workItems)
+        guard let currency = items.first?.currencyCode,
+              items.allSatisfy({ $0.currencyCode == currency }),
+              let amount = try? CheckedMoneyTotal.sum(items.map(\.amountMinorUnits)) else {
+            return .unavailable
+        }
+        return .available(minorUnits: amount, currencyCode: currency)
     }
 }

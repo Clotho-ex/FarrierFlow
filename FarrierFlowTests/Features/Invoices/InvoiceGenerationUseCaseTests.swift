@@ -7,6 +7,24 @@ import Testing
 @MainActor
 struct InvoiceGenerationUseCaseTests {
     @Test
+    func deletedCatalogServicesRemainInvoiceableFromRecordedSnapshots() throws {
+        let graph = try makeGenerationGraph()
+        let context = ModelContext(graph.container)
+        for service in try context.fetch(FetchDescriptor<Service>()) {
+            try RecordDeletionRules.delete(service, in: context)
+        }
+        let invoiceID = try InvoiceGenerationUseCase.generate(
+            draft(for: graph.alexID, visitID: graph.mixedVisitID), in: context
+        )
+        let invoice = try #require(try context.existingModel(Invoice.self, for: invoiceID))
+        let lines = invoice.invoiceVisits.flatMap(\.lineItems)
+        #expect(!lines.isEmpty)
+        #expect(lines.allSatisfy { !$0.serviceNameSnapshot.isEmpty && $0.sourceWorkItem?.service == nil })
+        #expect(try context.fetchCount(FetchDescriptor<Service>()) == 0)
+        try DomainGraphValidator.validateAll(in: context)
+    }
+
+    @Test
     func secondarySyncPhoneCannotIssueOrAdvanceInvoiceSequence() throws {
         let graph = try makeGenerationGraph()
         let device = UUID()

@@ -13,6 +13,7 @@ struct HorseEditorView: View {
     }
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
     @Environment(\.analyticsClient) private var analyticsClient
@@ -24,6 +25,8 @@ struct HorseEditorView: View {
     @State private var createdBarnID: PersistentIdentifier?
     @State private var showsMoreDetails: Bool
     @State private var selectedDetent: PresentationDetent
+    @State private var dismissalBaseline: HorseDraft?
+    @State private var showsValidation = false
     @FocusState private var focusedField: Field?
     private let createdHorseID: Binding<PersistentIdentifier?>?
 
@@ -53,11 +56,13 @@ struct HorseEditorView: View {
                         TextField(
                             "Horse Name",
                             text: $model.draft.name,
-                            prompt: Text("Enter horse name")
-                                .foregroundStyle(ColorTokens.textSecondary)
+                            prompt: Text(namePrompt)
+                                .foregroundStyle(isMissing(.name) ? ColorTokens.destructive : ColorTokens.textSecondary),
+                            axis: dynamicTypeSize.isAccessibilitySize ? .vertical : .horizontal
                         )
                         .foregroundStyle(ColorTokens.textPrimary)
                         .textInputAutocapitalization(.words)
+                        .autocorrectionDisabled()
                         .submitLabel(.done)
                         .focused($focusedField, equals: .name)
                         .onSubmit {
@@ -65,12 +70,15 @@ struct HorseEditorView: View {
                         }
                         .accessibilityLabel("Horse Name")
                         .accessibilityIdentifier("horse-name-field")
+                        .accessibilityHint(Text(requiredMessage(for: .name)), isEnabled: isMissing(.name))
+                        .frame(minHeight: SpacingTokens.minimumTouchTarget)
                     }
 
                     if model.choicesLoadState == .loaded {
                         relationshipLink(
                             title: "Client",
                             value: selectedClientName,
+                            field: .client,
                             route: .client
                         )
                         .accessibilityIdentifier("horse-client-picker")
@@ -78,6 +86,7 @@ struct HorseEditorView: View {
                         relationshipLink(
                             title: "Service Location",
                             value: selectedBarnName,
+                            field: .serviceLocation,
                             route: .serviceLocation
                         )
                         .accessibilityIdentifier("horse-barn-picker")
@@ -87,10 +96,7 @@ struct HorseEditorView: View {
                             isExpanded: $showsMoreDetails
                         ) {
                             Text("Care Defaults")
-                                .font(.caption)
-                                .foregroundStyle(ColorTokens.textSecondary)
-                                .textCase(.uppercase)
-                                .accessibilityAddTraits(.isHeader)
+                                .recordSectionHeading()
 
                             Stepper(
                                 value: $model.draft.appointmentIntervalWeeks,
@@ -167,7 +173,8 @@ struct HorseEditorView: View {
                     }
                     .fontWeight(.semibold)
                     .tint(ColorTokens.brandActionText)
-                    .disabled(!subscription.allowsMutations || !model.canSave)
+                    .disabled(!subscription.allowsMutations || model.choicesLoadState != .loaded)
+                    .accessibilityIdentifier("horse-save-action")
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
@@ -185,6 +192,7 @@ struct HorseEditorView: View {
             }
             .onAppear {
                 model.loadChoices(in: context)
+                if dismissalBaseline == nil { dismissalBaseline = model.draft }
             }
             .onChange(of: focusedField) { _, field in
                 if field != nil {
@@ -223,15 +231,57 @@ struct HorseEditorView: View {
             selection: $selectedDetent
         )
         .presentationDragIndicator(.visible)
+        .interactiveDismissDisabled(dismissalBaseline.map { $0 != model.draft } ?? false)
     }
 
     private func save(confirming relocation: HorseRelocationConfirmation? = nil) {
         guard subscription.allowsMutations else { return }
+        guard model.canSave else {
+            focusedField = nil
+            if model.draft.missingRequiredFields.isEmpty {
+                showsMoreDetails = true
+                model.alert = FeatureAlert(title: "Default Service Unavailable",
+                    message: "Choose an active service or None before saving this horse.")
+            } else {
+                showsValidation = true
+                // Native prompts need an empty value, including a whitespace-only missing name.
+                if model.draft.missingRequiredFields.contains(.name) { model.draft.name = "" }
+                let message = [HorseRequiredField.name, .client, .serviceLocation]
+                    .filter { model.draft.missingRequiredFields.contains($0) }
+                    .map { requiredMessage(for: $0) }
+                    .joined(separator: " ")
+                AccessibilityNotification.Announcement(message).post()
+            }
+            return
+        }
         // Creation must share the parent's cached inverse relationships; moves need a fresh read.
         let savingContext = model.horseID == nil ? context : ModelContext(context.container)
         if let id = model.save(in: savingContext, analyticsClient: analyticsClient, confirming: relocation) {
             createdHorseID?.wrappedValue = id
             dismiss()
+        }
+    }
+
+    private func isMissing(_ field: HorseRequiredField) -> Bool {
+        showsValidation && model.draft.missingRequiredFields.contains(field)
+    }
+
+    private var namePrompt: String {
+        if dynamicTypeSize.isAccessibilitySize {
+            return isMissing(.name)
+                ? String(localized: "Required", locale: locale)
+                : String(localized: "Enter name", locale: locale)
+        }
+        return isMissing(.name)
+            ? String(localized: "Horse name required", locale: locale)
+            : String(localized: "Enter horse name", locale: locale)
+    }
+
+    private func requiredMessage(for field: HorseRequiredField) -> String {
+        switch field {
+        case .name: String(localized: "Enter a horse name.", locale: locale)
+        case .client: String(localized: "Select a client.", locale: locale)
+        case .serviceLocation: String(localized: "Select a service location.", locale: locale)
         }
     }
 
@@ -257,27 +307,44 @@ struct HorseEditorView: View {
 
     private var selectedBarnName: String {
         guard let id = model.draft.barnID else {
-            return String(localized: "Select Service Location", locale: locale)
+            return String(localized: "Select", locale: locale)
         }
         return model.barns.first { $0.id == id }?.name
-            ?? String(localized: "Select Service Location", locale: locale)
+            ?? String(localized: "Select", locale: locale)
     }
 
     private func relationshipLink(
         title: LocalizedStringKey,
         value: String,
+        field: HorseRequiredField,
         route: HorseEditorRoute
     ) -> some View {
-        NavigationLink(value: route) {
-            LabeledContent {
-                Text(value)
-                    .foregroundStyle(ColorTokens.textSecondary)
-                    .multilineTextAlignment(.trailing)
-            } label: {
-                Text(title)
-                    .foregroundStyle(ColorTokens.textPrimary)
+        let hasError = isMissing(field)
+        let displayedValue = hasError ? String(localized: "Required", locale: locale) : value
+        return NavigationLink(value: route) {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: SpacingTokens.compact) {
+                    Text(title)
+                        .foregroundStyle(ColorTokens.textPrimary)
+                    Text(displayedValue)
+                        .foregroundStyle(hasError ? ColorTokens.destructive : ColorTokens.textSecondary)
+                }
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+            } else {
+                LabeledContent {
+                    Text(displayedValue)
+                        .foregroundStyle(hasError ? ColorTokens.destructive : ColorTokens.textSecondary)
+                        .multilineTextAlignment(.trailing)
+                } label: {
+                    Text(title)
+                        .foregroundStyle(ColorTokens.textPrimary)
+                }
             }
         }
+        .accessibilityLabel(title)
+        .accessibilityValue(displayedValue)
+        .accessibilityHint(Text(requiredMessage(for: field)), isEnabled: hasError)
     }
 
     @ViewBuilder
@@ -340,11 +407,12 @@ struct HorseEditorView: View {
         }
     }
 
+    @ViewBuilder
     private func labeledField<Content: View>(
         _ title: LocalizedStringKey,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: Layout.labelGap) {
+        let field = VStack(alignment: .leading, spacing: Layout.labelGap) {
             Text(title)
                 .font(.caption)
                 .foregroundStyle(ColorTokens.textSecondary)
@@ -352,6 +420,11 @@ struct HorseEditorView: View {
             content()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        if #available(iOS 26.0, *) {
+            field.listRowInsets(.vertical, SpacingTokens.related)
+        } else {
+            field
+        }
     }
 
     private func formattedPrice(for service: ServiceChoice) -> String {

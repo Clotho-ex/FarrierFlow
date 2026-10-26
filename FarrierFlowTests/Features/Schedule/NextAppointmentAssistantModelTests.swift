@@ -34,14 +34,41 @@ struct NextAppointmentAssistantModelTests {
         #expect(seed.hasFollowUpSuggestion)
     }
 
+    @Test
+    func confirmationSavesImmediatelyAndRechecksNewBookings() throws {
+        let graph = try makeSourceGraph()
+        let model = NextAppointmentAssistantModel(visitID: graph.visitID)
+        model.load(in: graph.context, now: graph.now, calendar: graph.calendar, locale: Locale(identifier: "en_US"))
+        let seed = try #require(model.makeSeed())
+        let id = try #require(model.schedule(in: graph.context, now: graph.now,
+            calendar: graph.calendar, locale: Locale(identifier: "en_US")))
+        let fresh = ModelContext(graph.container)
+        let appointment = try #require(try fresh.existingModel(Appointment.self, for: id))
+        #expect(appointment.startDate == seed.startDate)
+        #expect(Set(appointment.appointmentHorses.compactMap(\.horse?.persistentModelID)) == seed.horseIDs)
+        #expect(appointment.visit == nil)
+        #expect(model.schedule(in: graph.context, now: graph.now,
+            calendar: graph.calendar, locale: Locale(identifier: "en_US")) == nil)
+        #expect(model.alert?.title == "Review Selected Horses")
+        #expect(try fresh.fetchCount(FetchDescriptor<Appointment>()) == 2)
+        try DomainGraphValidator.validateAll(in: fresh)
+    }
+
+    @Test
+    func removedScheduleStillAllowsNextAppointmentFromRecordedWork() throws {
+        let graph = try makeSourceGraph()
+        try RecordDeletionRules.delete(graph.appointment, in: graph.context)
+        let model = NextAppointmentAssistantModel(visitID: graph.visitID)
+        model.load(in: graph.context, now: graph.now, calendar: graph.calendar, locale: Locale(identifier: "en_US"))
+        #expect(model.loadState == .loaded)
+        #expect(model.makeSeed() != nil)
+        try DomainGraphValidator.validateAll(in: graph.context)
+    }
+
     @Test(arguments: SourceInvalidation.allCases)
     fileprivate func invalidSourceGraphFailsTheEntireProjection(_ invalidation: SourceInvalidation) throws {
         let graph = try makeSourceGraph()
         switch invalidation {
-        case .missingAppointment:
-            graph.visit.appointment = nil
-        case .brokenInverse:
-            graph.appointment.visit = nil
         case .locationMismatch:
             let otherBarn = Barn(name: "South Field")
             graph.context.insert(otherBarn)
@@ -244,8 +271,6 @@ struct NextAppointmentAssistantModelTests {
 }
 
 fileprivate enum SourceInvalidation: CaseIterable {
-    case missingAppointment
-    case brokenInverse
     case locationMismatch
     case completionBeforeStart
     case duplicateMembership

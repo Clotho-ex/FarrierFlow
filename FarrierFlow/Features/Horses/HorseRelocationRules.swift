@@ -107,7 +107,6 @@ nonisolated enum HorseRelocationRules {
             let visit = membership.visit,
             membership.horse != nil,
             visit.visitHorses.contains(where: { $0 === membership }),
-            visit.appointment != nil,
             isValidVisit(visit)
         else {
             return .invalid
@@ -120,21 +119,21 @@ nonisolated enum HorseRelocationRules {
         for expectedAppointment: Appointment? = nil
     ) -> Bool {
         guard
-            let appointment = visit.appointment,
-            appointment.visit === visit,
-            expectedAppointment.map({ appointment === $0 }) ?? true,
-            let appointmentBarn = appointment.barn,
             let visitBarn = visit.barn,
-            visitBarn === appointmentBarn,
             TextNormalization.required(visit.serviceLocationNameSnapshot) != nil,
-            !appointment.appointmentHorses.isEmpty,
             !visit.visitHorses.isEmpty
         else {
             return false
         }
 
+        let appointment = visit.appointment
+        if let expectedAppointment, appointment !== expectedAppointment { return false }
+        if let appointment {
+            guard appointment.visit === visit, appointment.barn === visitBarn,
+                  !appointment.appointmentHorses.isEmpty else { return false }
+        }
         var appointmentHorseIDs = Set<PersistentIdentifier>()
-        for membership in appointment.appointmentHorses {
+        for membership in appointment?.appointmentHorses ?? [] {
             guard
                 membership.appointment === appointment,
                 let horse = membership.horse,
@@ -164,7 +163,7 @@ nonisolated enum HorseRelocationRules {
             hasPendingOutcome = hasPendingOutcome || outcome == .pending
         }
 
-        guard visitHorseIDs == appointmentHorseIDs else {
+        if appointment != nil, visitHorseIDs != appointmentHorseIDs {
             return false
         }
 
@@ -173,8 +172,6 @@ nonisolated enum HorseRelocationRules {
                 && !hasPendingOutcome
         }
 
-        return appointment.appointmentHorses.allSatisfy {
-            $0.horse?.currentBarn === appointmentBarn
-        }
+        return visit.visitHorses.allSatisfy { $0.horse?.currentBarn === visitBarn }
     }
 }

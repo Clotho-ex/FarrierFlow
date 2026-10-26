@@ -1,8 +1,13 @@
 import XCTest
 
 final class ServiceDeletionUITests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        continueAfterFailure = false
+    }
+
     @MainActor
-    func testContentSizedSheetCancelsAndDeletesOnlyAfterConfirmation() {
+    func testNativeAlertCancelsAndDeletesOnlyAfterConfirmation() {
         let store = "ServiceDelete-\(UUID().uuidString)"
         var app = launch(store)
         openServices(in: app)
@@ -18,35 +23,26 @@ final class ServiceDeletionUITests: XCTestCase {
         let row = app.buttons["service-row-Delete Me"]
         XCTAssertTrue(row.waitForExistence(timeout: 3))
         row.tap()
-        app.buttons["Actions"].tap()
-        app.buttons["Edit"].tap()
+        app.buttons["service-edit-action"].tap()
         XCTAssertTrue(app.textFields["service-name-field"].waitForExistence(timeout: 3))
         XCTAssertEqual(app.textFields["service-name-field"].value as? String, "Delete Me")
         app.buttons["Save"].tap()
         XCTAssertTrue(app.navigationBars["Delete Me"].waitForExistence(timeout: 3))
-        app.buttons["Actions"].tap()
-        app.buttons["Archive"].tap()
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "Status", "Archived")).firstMatch.waitForExistence(timeout: 3))
-        app.buttons["Actions"].tap()
-        app.buttons["Reactivate"].tap()
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "Status", "Active")).firstMatch.waitForExistence(timeout: 3))
+        app.buttons["service-archive-action"].tap()
+        XCTAssertTrue(app.navigationBars["Services"].waitForExistence(timeout: 3))
+        row.tap()
+        XCTAssertTrue(app.buttons["service-reactivate-action"].waitForExistence(timeout: 3))
+        app.buttons["service-reactivate-action"].tap()
+        XCTAssertTrue(app.buttons["service-archive-action"].waitForExistence(timeout: 3))
         openConfirmation(in: app)
-        let sheet = app.scrollViews["service-delete-sheet"]
-        let cancel = app.buttons["Cancel"]
-        XCTAssertTrue(cancel.isHittable)
-        XCTAssertLessThan(sheet.frame.height, app.frame.height * 0.48)
-        XCTAssertLessThan(sheet.frame.maxY - cancel.frame.maxY, 65)
-        capture(app, "Service deletion fits standard text light")
-        cancel.tap()
+        let alert = app.alerts["Delete Service?"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 3))
+        capture(app, "Native service deletion light")
+        alert.buttons["Cancel"].tap()
         XCTAssertTrue(app.navigationBars["Delete Me"].waitForExistence(timeout: 3))
 
         openConfirmation(in: app)
-        app.buttons["Sheet Grabber"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            .press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.98)))
-        XCTAssertTrue(app.navigationBars["Delete Me"].waitForExistence(timeout: 3))
-        XCTAssertFalse(sheet.exists)
-        openConfirmation(in: app)
-        app.buttons["service-delete-confirmation"].tap()
+        app.buttons["service-delete-confirmation"].firstMatch.tap()
         XCTAssertTrue(app.navigationBars["Services"].waitForExistence(timeout: 3))
         XCTAssertFalse(row.exists)
         app.terminate()
@@ -58,34 +54,50 @@ final class ServiceDeletionUITests: XCTestCase {
     }
 
     @MainActor
-    func testLargestTextSheetDeletesServiceAndRecordedWork() {
-        let app = launch("ServiceDeleteBlocked-\(UUID().uuidString)", largestText: true)
+    func testLargestTextDeletionKeepsRecordedWorkAfterRelaunch() {
+        let app = launch("ServiceHistory-\(UUID().uuidString)", largestText: true)
         defer { app.terminate() }
         openServices(in: app)
         let row = app.buttons["service-row-Trim"]
         XCTAssertTrue(row.waitForExistence(timeout: 3))
         row.tap()
-        openConfirmation(in: app)
-        let sheet = app.scrollViews["service-delete-sheet"]
-        XCTAssertGreaterThan(sheet.frame.height, app.frame.height * 0.5)
-        let cancel = app.buttons["Cancel"]
-        for _ in 0..<6 {
-            if cancel.isHittable && cancel.frame.maxY < app.frame.maxY - 30 { break }
-            sheet.swipeUp()
-        }
-        XCTAssertTrue(cancel.isHittable)
-        capture(app, "Service deletion accommodates largest text dark")
-        let confirm = app.buttons["service-delete-confirmation"]
-        XCTAssertTrue(confirm.isHittable)
-        confirm.tap()
+        let tabs = app.segmentedControls["service-history-tabs"]
+        reveal(tabs, in: app)
+        tabs.buttons["Recorded Work"].tap()
+        let deletion = app.buttons["service-delete-action"]
+        reveal(deletion, in: app)
+        XCTAssertTrue(deletion.isEnabled)
+        XCTAssertEqual(deletion.images.count, 0)
+        capture(app, "Centered text-only service deletion AX dark")
+        deletion.tap()
+        let alert = app.alerts["Delete Service?"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 3))
+        XCTAssertTrue(alert.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "Recorded work, saved invoices and photos are kept.")
+        ).firstMatch.exists)
+        app.buttons["service-delete-confirmation"].firstMatch.tap()
         XCTAssertTrue(app.navigationBars["Services"].waitForExistence(timeout: 5))
         XCTAssertFalse(row.exists)
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "FARRIERFLOW_UI_TEST_SCENARIO")
         app.launch()
         openServices(in: app)
-        XCTAssertFalse(app.buttons["service-row-Trim"].exists)
-
+        XCTAssertFalse(row.exists)
+        app.openBusinessRoot()
+        let history = app.buttons["business-recorded-work"]
+        reveal(history, in: app)
+        history.tap()
+        XCTAssertTrue(app.navigationBars["Recorded Work"].waitForExistence(timeout: 5))
+        let visit = app.buttons.matching(NSPredicate(
+            format: "identifier BEGINSWITH %@", "business-completed-visit-"
+        )).firstMatch
+        reveal(visit, in: app)
+        visit.tap()
+        XCTAssertTrue(app.navigationBars["Visit"].waitForExistence(timeout: 5))
+        let recordedService = app.staticTexts["Trim"].firstMatch
+        reveal(recordedService, in: app)
+        XCTAssertTrue(recordedService.exists)
+        capture(app, "Deleted catalog service keeps recorded work after relaunch")
     }
 
     @MainActor
@@ -99,15 +111,31 @@ final class ServiceDeletionUITests: XCTestCase {
         }
         XCTAssertTrue(app.navigationBars["Clients"].exists)
         app.openBusinessRoot()
-        app.buttons["Services"].tap()
+        let services = app.buttons["Services"]
+        for _ in 0..<8 {
+            if services.exists && services.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(services.exists)
+        services.tap()
         XCTAssertTrue(app.navigationBars["Services"].waitForExistence(timeout: 3))
     }
 
     @MainActor
     private func openConfirmation(in app: XCUIApplication) {
-        app.buttons["Actions"].tap()
-        app.buttons["Delete"].tap()
-        XCTAssertTrue(app.buttons["service-delete-confirmation"].waitForExistence(timeout: 3))
+        let deletion = app.buttons["service-delete-action"]
+        reveal(deletion, in: app)
+        deletion.tap()
+        XCTAssertTrue(app.buttons["service-delete-confirmation"].firstMatch.waitForExistence(timeout: 3))
+    }
+
+    @MainActor
+    private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
+        for _ in 0..<14 {
+            if element.exists && element.isHittable { return }
+            app.swipeUp()
+        }
+        XCTAssertTrue(element.exists)
     }
 
     @MainActor
@@ -121,6 +149,10 @@ final class ServiceDeletionUITests: XCTestCase {
     @MainActor
     private func launch(_ store: String, largestText: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        if largestText {
+            app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        }
         app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] = store
         app.launchEnvironment["FARRIERFLOW_UI_TEST_SCENARIO"] = "invoice-ready"
         app.launchEnvironment["FARRIERFLOW_UI_TEST_COLOR_SCHEME"] = largestText ? "dark" : "light"

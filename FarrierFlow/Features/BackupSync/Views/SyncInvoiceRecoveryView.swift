@@ -25,7 +25,7 @@ struct SyncInvoiceRecoveryView: View {
                 if !invoices.isEmpty {
                     Section {
                         ForEach(invoices, id: \.number) { InvoiceHistoryRow(content: $0) }
-                    } header: { Text(InvoiceHistoryCopy.localOnly) }
+                    } header: { Text(InvoiceHistoryCopy.localOnly).recordSectionHeading() }
                 }
                 Section {
                     DisclosureGroup(BackupSyncCopy.thisIPhone) { profile(review.localProfile) }

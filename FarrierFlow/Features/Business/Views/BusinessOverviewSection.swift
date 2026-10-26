@@ -8,7 +8,7 @@ struct BusinessOverviewSection: View {
     let open: (BusinessOverviewRoute) -> Void
 
     var body: some View {
-        Section("Business Overview") {
+        RecordSection(Text("Business Overview")) {
             if let summary = model.summary {
                 let layout = dynamicTypeSize.isAccessibilitySize
                     ? AnyLayout(VStackLayout(alignment: .leading, spacing: SpacingTokens.related))

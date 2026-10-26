@@ -8,6 +8,7 @@ struct InvoiceListView: View {
     @State private var model = InvoiceListModel()
     @State private var hasLocalHistory = false
     @State private var showsHistory = false
+    @State private var searchText = ""
     private let filter: InvoiceListFilter
 
     init(filter: InvoiceListFilter = .all) {
@@ -26,7 +27,9 @@ struct InvoiceListView: View {
             }
         }
         .farrierFlowScreenBackground()
+        .toolbarTitleDisplayMode(.inline)
         .navigationTitle(filter == .unpaid ? Text("Unpaid Invoices") : Text("Invoices"))
+        .searchable(text: $searchText, prompt: "Client or invoice number")
         .sheet(isPresented: $showsHistory) {
             InvoiceHistorySheet(container: context.container).dynamicTypeSize(dynamicTypeSize)
         }
@@ -45,6 +48,9 @@ struct InvoiceListView: View {
 
     @ViewBuilder
     private var content: some View {
+        let matchingInvoices = model.summaries.filter {
+            RecordSearch.matches(searchText, fields: [$0.clientName, $0.number])
+        }
         if model.summaries.isEmpty && !hasLocalHistory {
             ContentUnavailableView {
                 if filter == .unpaid {
@@ -70,7 +76,11 @@ struct InvoiceListView: View {
                         }
                     } footer: { Text(InvoiceHistoryCopy.notProtected) }
                 }
-                ForEach(model.summaries) { summary in
+                if matchingInvoices.isEmpty, !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    ContentUnavailableView.search(text: searchText)
+                        .listRowBackground(Color.clear)
+                }
+                ForEach(matchingInvoices) { summary in
                     RecordNavigationLink(value: InvoiceRoute.detail(summary.id)) { InvoiceRow(summary: summary) }
                     .badge(
                         dynamicTypeSize.isAccessibilitySize ? nil : Text(summary.status.displayName)

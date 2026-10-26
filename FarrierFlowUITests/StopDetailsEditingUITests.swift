@@ -200,8 +200,8 @@ final class StopDetailsEditingUITests: XCTestCase {
         openAppointment("Monnahey Boy", in: app)
         openEditor(in: app)
         let picker = app.buttons["appointment-barn-picker"]
-        picker.tap()
         for _ in 0..<2 {
+            picker.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
             let option = app.buttons.matching(NSPredicate(format: "label == %@", "The Old Barn")).firstMatch
             XCTAssertTrue(option.waitForExistence(timeout: 3))
             option.tap()

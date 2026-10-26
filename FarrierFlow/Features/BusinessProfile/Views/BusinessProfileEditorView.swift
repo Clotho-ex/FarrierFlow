@@ -329,7 +329,7 @@ struct BusinessProfileEditorView: View {
 
                 currencyControl
             } header: {
-                Text("Business Details")
+                Text("Business Details").recordSectionHeading()
             }
             .listRowBackground(ColorTokens.surface)
 
@@ -389,7 +389,7 @@ struct BusinessProfileEditorView: View {
                     .disabled(!allowsEditing)
                 }
             } header: {
-                Text("Contact Information")
+                Text("Contact Information").recordSectionHeading()
             } footer: {
                 Text("Optional business contact details.")
             }
@@ -402,7 +402,7 @@ struct BusinessProfileEditorView: View {
                 .disabled(!model.canOpenServiceCatalog)
                 .accessibilityIdentifier("business-profile-services")
             } header: {
-                Text("Your Services")
+                Text("Your Services").recordSectionHeading()
             } footer: {
                 if model.canOpenServiceCatalog {
                     Text("Manage the services and prices you offer.")
@@ -456,7 +456,7 @@ struct BusinessProfileEditorView: View {
                     .disabled(!allowsEditing)
                 }
             } header: {
-                Text("Appointment & Invoice Defaults")
+                Text("Appointment & Invoice Defaults").recordSectionHeading()
             } footer: {
                 Text("Defaults prefill new drafts and can be adjusted individually.")
             }

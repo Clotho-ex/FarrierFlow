@@ -15,7 +15,7 @@ final class ClientListHierarchyUITests: XCTestCase {
         capture(app, name: "Clients — Light, standard text")
         print("CLIENT_ROW_FRAME standard=\(arthur.frame)")
         XCTAssertTrue(arthur.label.contains("3 horses"))
-        XCTAssertTrue(arthur.label.contains("+13625849"))
+        XCTAssertFalse(arthur.label.contains("+13625849"))
 
         app.navigationBars["Clients"].buttons["Add Client"].tap()
         fillName(longName, in: app)
@@ -47,7 +47,7 @@ final class ClientListHierarchyUITests: XCTestCase {
         let row = app.buttons["client-row-\(longName)"]
         XCTAssertTrue(row.waitForExistence(timeout: 3))
         XCTAssertTrue(row.label.contains(longName))
-        XCTAssertTrue(row.label.contains("+13625849"))
+        XCTAssertFalse(row.label.contains("+13625849"))
         XCTAssertTrue(row.label.contains("3 horses"))
         capture(app, name: "Clients — Dark, largest accessibility text")
         row.tap()
@@ -65,7 +65,7 @@ final class ClientListHierarchyUITests: XCTestCase {
         app.buttons["client-row-John Doe"].tap()
         XCTAssertTrue(app.navigationBars["Client"].waitForExistence(timeout: 3))
         capture(app, name: "Client profile — Light")
-        XCTAssertTrue(app.staticTexts["Profile"].exists)
+        XCTAssertTrue(app.staticTexts["Contact"].exists)
         XCTAssertFalse(app.staticTexts["Client profile"].exists)
         assertContactActions(in: app, email: "example@gmail.com")
         XCTAssertTrue(app.buttons["Add Horse"].isHittable)
@@ -101,7 +101,7 @@ final class ClientListHierarchyUITests: XCTestCase {
         app.launch()
         app.selectFarrierFlowTab("Clients")
         app.buttons["client-row-\(longName)"].tap()
-        XCTAssertTrue(app.staticTexts["Profile"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Contact"].waitForExistence(timeout: 3))
         capture(app, name: "Client profile — Largest accessibility text, top")
         assertContactActions(in: app, email: address)
         let email = contactAction("client-email-action", in: app)
@@ -116,6 +116,53 @@ final class ClientListHierarchyUITests: XCTestCase {
         capture(app, name: "Client profile — Largest accessibility text, horses")
         addHorse.tap()
         XCTAssertTrue(app.navigationBars["New Horse"].waitForExistence(timeout: 3))
+    }
+
+    @MainActor
+    func testClientPhoneLinksAreDiscoverableInProfileAndAppointment() {
+        for largestText in [false, true] {
+            let app = XCUIApplication()
+            app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] = "PhoneAffordances-\(UUID())"
+            app.launchEnvironment["FARRIERFLOW_UI_TEST_SCENARIO"] = "payment-pending"
+            app.launchEnvironment["FARRIERFLOW_UI_TEST_COLOR_SCHEME"] = largestText ? "dark" : "light"
+            if largestText {
+                app.launchEnvironment["FARRIERFLOW_UI_TEST_DYNAMIC_TYPE_SIZE"] = "accessibility5"
+            }
+            app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+            app.launch()
+            app.selectFarrierFlowTab("Clients")
+            app.buttons["client-row-Invoice Client"].tap()
+            verifyPhone("client-phone-action", largestText: largestText, in: app)
+            capture(app, name: "Client profile call affordance AX \(largestText)")
+            app.selectFarrierFlowTab("Schedule")
+            app.segmentedControls["schedule-status-tabs"].buttons["Completed"].tap()
+            let appointment = app.buttons["appointment-row-Invoice Service Location"].firstMatch
+            XCTAssertTrue(appointment.waitForExistence(timeout: 3))
+            appointment.tap()
+            verifyPhone("appointment-call-Milo", largestText: largestText, in: app)
+            capture(app, name: "Appointment call affordance AX \(largestText)")
+            app.terminate()
+        }
+    }
+
+    @MainActor
+    private func verifyPhone(_ identifier: String, largestText: Bool, in app: XCUIApplication) {
+        let phone = contactAction(identifier, in: app)
+        for _ in 0..<10 {
+            let top = app.navigationBars.allElementsBoundByIndex.map { $0.frame.maxY }.max() ?? 100
+            if phone.exists, phone.isHittable,
+               phone.frame.minY >= top, phone.frame.maxY <= app.tabBars.firstMatch.frame.minY { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(phone.exists)
+        XCTAssertTrue(phone.isHittable)
+        XCTAssertTrue(phone.isEnabled)
+        XCTAssertTrue(phone.label.contains("Call 555-0100"))
+        XCTAssertTrue(phone.elementType == .link || phone.elementType == .button)
+        XCTAssertGreaterThanOrEqual(phone.frame.height, 44)
+        if !largestText {
+            XCTAssertLessThan(phone.frame.height, 100, "A short phone number must retain a compact row.")
+        }
     }
 
     @MainActor

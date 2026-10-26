@@ -16,6 +16,21 @@ struct ClientContactURLTests {
         #expect(ClientContactURL.phone(value) == nil)
     }
 
+    @Test(arguments: ["++15550100", "555+0100", "+", "12", "+1234567890123456", "5550100,", "5550100;", ",5550100", ";5550100", "5550100,123,", "5550100;+123"])
+    func malformedOrIncompleteNumbersHaveNoCallAction(_ value: String) {
+        #expect(ClientContactURL.phone(value) == nil)
+    }
+
+    @Test(arguments: [
+        ("+44 7700 900123", "tel:+447700900123"),
+        ("+90 (532) 555 01 24", "tel:+905325550124"),
+        ("555-0100,123", "tel:5550100,123"),
+        ("555-0100;123", "tel:5550100;123")
+    ])
+    func internationalAndExtensionNumbersRetainTheirDialingMeaning(_ pair: (String, String)) throws {
+        #expect(try #require(ClientContactURL.phone(pair.0)).absoluteString == pair.1)
+    }
+
     @Test
     func emailPreservesPlusAddressingAndUnicode() throws {
         let address = "josé+appointments@example.com"

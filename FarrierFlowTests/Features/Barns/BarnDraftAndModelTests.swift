@@ -6,6 +6,34 @@ import Testing
 @MainActor
 struct BarnDraftAndModelTests {
     @Test
+    func listFailureIsDistinctFromEmptyAndRetryPreservesSavedRows() throws {
+        enum Failure: Error { case unavailable }
+        let container = try ModelContainerFactory.inMemoryTest()
+        var fails = true
+        let model = BarnListModel(fetching: { descriptor, context in
+            if fails { throw Failure.unavailable }
+            return try context.fetch(descriptor)
+        })
+        #expect(model.loadState == .loading)
+        model.load(in: ModelContext(container))
+        #expect(model.loadState == .failed && model.barns.isEmpty)
+        fails = false
+        model.load(in: ModelContext(container))
+        #expect(model.loadState == .loaded && model.barns.isEmpty && model.alert == nil)
+        container.mainContext.insert(Barn(name: "North Field"))
+        try container.mainContext.save()
+        model.load(in: ModelContext(container))
+        let saved = model.barns
+        #expect(saved.map(\.name) == ["North Field"])
+        fails = true
+        model.load(in: ModelContext(container))
+        #expect(model.loadState == .failed && model.barns == saved && model.alert != nil)
+        fails = false
+        model.load(in: ModelContext(container))
+        #expect(model.loadState == .loaded && model.barns == saved && model.alert == nil)
+    }
+
+    @Test
     func draftRequiresOnlyAName() {
         #expect(!BarnDraft().isValid)
         #expect(BarnDraft(name: "Private Stable").isValid)

@@ -2,6 +2,122 @@ import XCTest
 
 final class InvoiceFlowUITests: XCTestCase {
     @MainActor
+    func testMarkUnpaidKeepsConfirmationCancellationAndPersistence() {
+        verifyMarkUnpaid(colorScheme: "light")
+    }
+
+    @MainActor
+    func testMarkUnpaidMenuInDarkAppearance() {
+        verifyMarkUnpaid(colorScheme: "dark")
+    }
+
+    @MainActor
+    private func verifyMarkUnpaid(colorScheme: String) {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] =
+            "InvoiceUnpaidStyle-\(UUID().uuidString)"
+        app.launchEnvironment["FARRIERFLOW_UI_TEST_SCENARIO"] = "invoice-ready"
+        app.launchEnvironment["FARRIERFLOW_UI_TEST_COLOR_SCHEME"] = colorScheme
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        defer { app.terminate() }
+
+        let create = app.buttons["today-create-invoice-action"]
+        XCTAssertTrue(create.waitForExistence(timeout: 5))
+        create.tap()
+        let visit = app.buttons["invoice-visit-choice-0"]
+        XCTAssertTrue(visit.waitForExistence(timeout: 5))
+        if !accessibilityText(of: visit).contains("Selected") { visit.tap() }
+        app.buttons["invoice-generate-action"].tap()
+
+        let markPaid = app.buttons["invoice-mark-paid-action"]
+        XCTAssertTrue(markPaid.waitForExistence(timeout: 5))
+        markPaid.tap()
+        XCTAssertTrue(app.navigationBars["Record Payment"].waitForExistence(timeout: 3))
+        app.buttons["payment-method-picker"].tap()
+        let cash = app.buttons["Cash"]
+        XCTAssertTrue(cash.waitForExistence(timeout: 3))
+        cash.tap()
+        app.buttons["payment-confirm"].tap()
+        XCTAssertTrue(app.staticTexts["Status, Paid"].waitForExistence(timeout: 5))
+
+        let more = app.buttons["invoice-more-actions"]
+        more.tap()
+        let markUnpaid = app.buttons["invoice-mark-unpaid-action"]
+        XCTAssertTrue(markUnpaid.waitForExistence(timeout: 3))
+        XCTAssertTrue(markUnpaid.isEnabled)
+        let menuCapture = XCTAttachment(screenshot: app.screenshot())
+        menuCapture.name = "Neutral Mark as Unpaid menu \(colorScheme)"
+        menuCapture.lifetime = .keepAlways
+        add(menuCapture)
+        markUnpaid.tap()
+
+        let confirmation = app.alerts["Mark Invoice Unpaid?"]
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 3))
+        XCTAssertTrue(confirmation.staticTexts[
+            "This removes the recorded payment and makes the invoice outstanding again."
+        ].exists)
+        let confirmationCapture = XCTAttachment(screenshot: app.screenshot())
+        confirmationCapture.name = "Neutral payment reversal confirmation \(colorScheme)"
+        confirmationCapture.lifetime = .keepAlways
+        add(confirmationCapture)
+        confirmation.buttons["Cancel"].tap()
+        XCTAssertTrue(app.staticTexts["Status, Paid"].exists)
+
+        more.tap()
+        XCTAssertTrue(markUnpaid.waitForExistence(timeout: 3))
+        markUnpaid.tap()
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 3))
+        confirmation.buttons["invoice-mark-unpaid-confirmation"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Status, Unpaid"].waitForExistence(timeout: 5))
+        more.tap()
+        XCTAssertTrue(app.buttons["invoice-delete-action"].waitForExistence(timeout: 3))
+        XCTAssertFalse(markUnpaid.exists)
+        let deleteCapture = XCTAttachment(screenshot: app.screenshot())
+        deleteCapture.name = "Destructive Delete Invoice menu \(colorScheme)"
+        deleteCapture.lifetime = .keepAlways
+        add(deleteCapture)
+
+        app.terminate()
+        app.launch()
+        openInvoices(in: app)
+        let invoice = app.buttons["invoice-row-0001"]
+        XCTAssertTrue(invoice.waitForExistence(timeout: 5))
+        XCTAssertTrue(accessibilityText(of: invoice).contains("Unpaid"))
+    }
+
+    @MainActor
+    func testPaymentSheetHasContentOnEveryPresentation() {
+        continueAfterFailure = false
+        let app = launch(storeName: "PaymentFirstPresentation-\(UUID())")
+        defer { app.terminate() }
+        let create = app.buttons["today-create-invoice-action"]
+        XCTAssertTrue(create.waitForExistence(timeout: 5))
+        create.tap()
+        let visit = app.buttons["invoice-visit-choice-0"]
+        XCTAssertTrue(visit.waitForExistence(timeout: 5))
+        if !accessibilityText(of: visit).contains("Selected") { visit.tap() }
+        app.buttons["invoice-generate-action"].tap()
+        let paid = app.buttons["invoice-mark-paid-action"]
+        XCTAssertTrue(paid.waitForExistence(timeout: 5))
+        for index in 0..<3 {
+            paid.tap()
+            XCTAssertTrue(app.navigationBars["Record Payment"].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.buttons["payment-method-picker"].exists)
+            XCTAssertTrue(app.buttons["payment-confirm"].exists)
+            if index == 0 {
+                let screenshot = XCTAttachment(screenshot: app.screenshot())
+                screenshot.name = "First payment presentation contains form"
+                screenshot.lifetime = .keepAlways
+                add(screenshot)
+            }
+            app.navigationBars["Record Payment"].buttons["Cancel"].tap()
+            XCTAssertTrue(paid.waitForExistence(timeout: 3))
+        }
+    }
+
+    @MainActor
     func testInvoiceToolbarKeepsPrimaryActionsAtTopAndDeleteInMore() {
         let app = XCUIApplication()
         app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] =
@@ -314,7 +430,7 @@ final class InvoiceFlowUITests: XCTestCase {
             app.staticTexts["This visit has invoiced work. Corrections do not change saved invoices."]
                 .waitForExistence(timeout: 3)
         )
-        XCTAssertTrue(app.buttons["visit-edit-action"].exists)
+        XCTAssertTrue(app.buttons["visit-detail-actions"].exists)
         XCTAssertTrue(app.buttons["visit-invoice-0001"].waitForExistence(timeout: 3))
         app.buttons["visit-invoice-0001"].tap()
         let paidMoreActions = app.buttons["invoice-more-actions"]
@@ -353,7 +469,7 @@ final class InvoiceFlowUITests: XCTestCase {
         history.tap()
 
         let photographs = app.buttons.matching(
-            NSPredicate(format: "label CONTAINS %@", "Hoof Photos")
+            NSPredicate(format: "label CONTAINS %@", "Photos")
         ).firstMatch
         XCTAssertTrue(photographs.waitForExistence(timeout: 3))
         photographs.tap()
@@ -364,7 +480,7 @@ final class InvoiceFlowUITests: XCTestCase {
         let fullImage = app.images.matching(
             NSPredicate(
                 format: "label BEGINSWITH %@",
-                "Hoof photo for Milo, 1 of 1, created "
+                "Photo for Milo, 1 of 1, created "
             )
         ).firstMatch
         XCTAssertTrue(fullImage.waitForExistence(timeout: 3))

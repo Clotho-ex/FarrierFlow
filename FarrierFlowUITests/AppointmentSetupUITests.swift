@@ -17,7 +17,7 @@ final class AppointmentSetupUITests: XCTestCase {
     }
 
     @MainActor
-    func testAppointmentCreatesMissingRecordsAndAdditionalLocationWithoutLosingDraft() {
+    func testAppointmentLocationCreationKeepsDraftWithoutOfferingHorseCreation() {
         continueAfterFailure = false
         let app = launch()
         defer { app.terminate() }
@@ -34,48 +34,12 @@ final class AppointmentSetupUITests: XCTestCase {
         XCTAssertTrue(app.buttons["appointment-barn-picker"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.buttons["appointment-barn-picker"].value.debugDescription.contains("Alpha Barn"))
         addLocation("Beta Barn", in: app)
-        guard addHorse(in: app) else { return }
-        let newHorse = app.buttons["appointment-create-horse"]
-        reveal(newHorse, in: app)
-        XCTAssertEqual(newHorse.label, "New Horse")
-        newHorse.tap()
-        app.navigationBars["New Horse"].buttons["Cancel"].tap()
-        XCTAssertTrue(app.navigationBars["New Appointment"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.buttons["appointment-horse-Setup Horse"].value as? String, "Selected")
-        let service = app.buttons["appointment-service-Setup Horse"]
-        reveal(service, in: app)
-        service.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        app.buttons["appointment-create-service"].tap()
-        type("Trim\n", into: app.textFields["service-name-field"])
-        type("45", into: app.textFields["service-price-field"])
-        app.navigationBars["New Service"].buttons["Save"].tap()
-        XCTAssertTrue(app.navigationBars["New Appointment"].waitForExistence(timeout: 5))
-        reveal(service, in: app)
-        XCTAssertTrue(String(describing: service.value).contains("Trim"))
-        service.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        app.buttons["appointment-create-service"].tap()
-        app.navigationBars["New Service"].buttons["Cancel"].tap()
-        XCTAssertTrue(service.waitForExistence(timeout: 5))
-        XCTAssertTrue(String(describing: service.value).contains("Trim"))
-        app.navigationBars["New Appointment"].buttons["Save"].tap()
-        XCTAssertTrue(app.navigationBars["Schedule"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["appointment-row-Beta Barn"].waitForExistence(timeout: 3))
-        app.terminate()
-        app.launch()
-        app.tabBars.buttons["Schedule"].tap()
-        let appointment = app.buttons["appointment-row-Beta Barn"]
-        XCTAssertTrue(appointment.waitForExistence(timeout: 5))
-        appointment.tap()
-        XCTAssertTrue(app.navigationBars["Appointment"].waitForExistence(timeout: 3))
-        app.buttons["appointment-actions-menu"].tap()
-        app.buttons["appointment-edit-action"].tap()
-        let savedNotes = app.textViews["Appointment Notes"]
-        reveal(savedNotes, in: app)
-        XCTAssertEqual(savedNotes.value as? String, "Keep this draft")
-        let savedService = app.buttons["appointment-service-Setup Horse"]
-        reveal(savedService, in: app)
-        XCTAssertTrue(String(describing: savedService.value).contains("Trim"))
-        app.navigationBars["Edit Appointment"].buttons["Cancel"].tap()
+        XCTAssertFalse(app.buttons["appointment-create-horse"].exists)
+        let notes = app.textViews["Appointment Notes"]
+        reveal(notes, in: app)
+        XCTAssertEqual(notes.value as? String, "Keep this draft")
+        capture("New Appointment keeps draft without New Horse action", in: app)
+        app.navigationBars["New Appointment"].buttons["Cancel"].tap()
     }
 
     @MainActor
@@ -85,10 +49,8 @@ final class AppointmentSetupUITests: XCTestCase {
         openAppointment(in: app)
         addLocation("Alpha Barn", in: app)
         addLocation("Beta Barn", in: app)
-        guard addHorse(in: app) else { return }
         app.navigationBars["New Appointment"].buttons["Cancel"].tap()
-        app.tabBars.buttons["Clients"].tap()
-        app.buttons["client-row-Setup Client"].tap()
+        guard addHorse(in: app) else { return }
         app.buttons["horse-row-Setup Horse"].tap()
         app.buttons["Edit"].tap()
         app.buttons["horse-barn-picker"].tap()
@@ -139,6 +101,109 @@ final class AppointmentSetupUITests: XCTestCase {
     @MainActor
     func testAppointmentHierarchySupportsLargestTextAndDurationValidation() {
         verifyAppointmentHierarchy(largestText: true)
+    }
+
+    @MainActor
+    func testAppointmentDetailHierarchyAndDurationUnitPersist() {
+        verifyDetailHierarchy(largestText: false)
+    }
+
+    @MainActor
+    func testAppointmentDetailHierarchyAtLargestTextInDarkMode() {
+        verifyDetailHierarchy(largestText: true)
+    }
+
+    @MainActor
+    func testLongAppointmentNotesRemainSelectableAndUntruncated() {
+        let notes = "Gate code: 1428. " + String(repeating:
+            "Use the north entrance, keep the gate closed, and call before unloading. ", count: 7
+        ) + "Final instruction: leave the barn door latched."
+        verifyDetailHierarchy(largestText: false, noteText: notes, verifySelection: true)
+    }
+
+    @MainActor
+    private func verifyDetailHierarchy(largestText: Bool, noteText: String? = nil, verifySelection: Bool = false) {
+        continueAfterFailure = false
+        let app = launch(largestText: largestText, scenario: "next-appointment")
+        defer { app.terminate() }
+        openAppointment(in: app)
+        app.buttons["appointment-barn-picker"]
+            .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        app.buttons["Next Appointment Service Location"].tap()
+        let horse = app.buttons["appointment-horse-Atlas"]
+        reveal(horse, in: app)
+        horse.tap()
+        let details = app.buttons["appointment-additional-details"]
+        reveal(details, in: app)
+        details.tap()
+        let duration = app.textFields["appointment-duration"]
+        reveal(duration, in: app)
+        type("50", into: duration)
+        XCTAssertEqual(duration.value as? String, "50")
+        dismissKeyboard(in: app)
+        // Capture the native disclosure and its sibling fields together for layout review.
+        reveal(details, in: app, towardTop: true)
+        XCTAssertEqual(duration.label, "Expected Duration (minutes)")
+        capture("Unindented duration with visible Minutes unit \(largestText ? "AX dark" : "light")", in: app)
+        let notes = noteText ?? "Check the rear shoes and call before arrival. This longer appointment note must wrap fully without overlapping its label or clipping the final sentence. Keep the gate closed."
+        let noteField = app.textViews["Appointment Notes"]
+        reveal(noteField, in: app)
+        type(notes, into: noteField)
+        dismissKeyboard(in: app)
+        capture("Aligned appointment details and duration unit \(largestText ? "AX dark" : "light")", in: app)
+        app.navigationBars["New Appointment"].buttons["Save"].tap()
+        XCTAssertTrue(app.navigationBars["Schedule"].waitForExistence(timeout: 5))
+        app.terminate()
+        app.launch()
+        app.selectFarrierFlowTab("Schedule")
+        let row = app.buttons["appointment-row-Next Appointment Service Location"]
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        row.tap()
+        XCTAssertTrue(app.navigationBars["Appointment"].waitForExistence(timeout: 5))
+        let address = app.descendants(matching: .any)["appointment-detail-address"].firstMatch
+        reveal(address, in: app)
+        XCTAssertTrue(address.label.contains("Directions to 100 Follow Up Road"))
+        XCTAssertTrue(address.elementType == .link || address.elementType == .button)
+        XCTAssertGreaterThanOrEqual(address.frame.height, 44)
+        let savedDuration = app.descendants(matching: .any)["appointment-detail-expected-duration"].firstMatch
+        reveal(savedDuration, in: app)
+        XCTAssertTrue(savedDuration.label.contains("50 minutes"), savedDuration.label)
+        let savedNotes = app.descendants(matching: .any)["appointment-detail-notes"].firstMatch
+        reveal(savedNotes, in: app)
+        XCTAssertTrue(savedNotes.label.contains(notes), savedNotes.label)
+        capture("Appointment compact label and value hierarchy \(largestText ? "AX dark" : "light")", in: app)
+        if verifySelection {
+            savedNotes.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
+                .press(forDuration: 1)
+            let copy = app.buttons["Copy"].firstMatch
+            let copyItem = app.menuItems["Copy"].firstMatch
+            XCTAssertTrue(copy.waitForExistence(timeout: 3) || copyItem.waitForExistence(timeout: 3),
+                          "Read-only notes should offer native text copying")
+            capture("Long notes native text selection", in: app)
+            app.navigationBars["Appointment"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        }
+        if largestText {
+            reveal(app.staticTexts["Atlas"].firstMatch, in: app)
+            capture("Appointment long note ending remains reachable AX dark", in: app)
+        }
+        app.buttons["appointment-actions-menu"].tap()
+        app.buttons["appointment-edit-action"].tap()
+        reveal(duration, in: app)
+        XCTAssertEqual(duration.value as? String, "50")
+        capture("Persisted duration with visible unit \(largestText ? "AX dark" : "light")", in: app)
+        reveal(noteField, in: app)
+        XCTAssertEqual(noteField.value as? String, notes)
+        if largestText {
+            reveal(duration, in: app, towardTop: true)
+            let longDuration = "9223372036854775807"
+            type(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 2) + longDuration,
+                 into: duration, atTrailingEdge: true)
+            dismissKeyboard(in: app)
+            XCTAssertEqual(duration.value as? String, longDuration)
+            XCTAssertLessThanOrEqual(duration.frame.maxX, app.frame.maxX - 16)
+            capture("Long duration remains bounded beside unit AX dark", in: app)
+        }
+        app.navigationBars["Edit Appointment"].buttons["Cancel"].tap()
     }
 
     @MainActor
@@ -239,6 +304,7 @@ final class AppointmentSetupUITests: XCTestCase {
         let row = app.buttons["appointment-row-Next Appointment Service Location"]
         XCTAssertTrue(row.waitForExistence(timeout: 5))
         row.tap()
+        XCTAssertFalse(app.descendants(matching: .any)["appointment-detail-notes"].firstMatch.exists)
         app.buttons["appointment-actions-menu"].tap()
         app.buttons["appointment-edit-action"].tap()
         let savedAtlas = app.buttons["appointment-service-Atlas"]
@@ -262,6 +328,7 @@ final class AppointmentSetupUITests: XCTestCase {
 
     @MainActor
     private func verifyInitialServices(largestText: Bool, readOnly: Bool = false) {
+        continueAfterFailure = false
         let app = launch(initialSetup: true, largestText: largestText, readOnly: readOnly)
         defer { app.terminate() }
         let start = app.buttons["onboarding-briefing-continue"]
@@ -271,6 +338,7 @@ final class AppointmentSetupUITests: XCTestCase {
         waitForExpectations(timeout: 10)
         start.tap()
         type("Field Farrier", into: app.textFields["business-profile-name-field"])
+        dismissKeyboard(in: app)
         let add = app.buttons["business-setup-add-service"]
         reveal(add, in: app)
         XCTAssertGreaterThanOrEqual(add.frame.height, 44)
@@ -294,6 +362,7 @@ final class AppointmentSetupUITests: XCTestCase {
         app.launch()
         app.tabBars.buttons["Clients"].tap()
         app.openBusinessRoot()
+        reveal(app.buttons["Business Profile"], in: app)
         app.buttons["Business Profile"].tap()
         let services = app.buttons["business-profile-services"]
         reveal(services, in: app)
@@ -303,13 +372,15 @@ final class AppointmentSetupUITests: XCTestCase {
     }
 
     @MainActor
-    private func launch(initialSetup: Bool = false, largestText: Bool = false, readOnly: Bool = false) -> XCUIApplication {
+    private func launch(initialSetup: Bool = false, largestText: Bool = false, readOnly: Bool = false, scenario: String? = nil) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] = "AppointmentSetup-\(UUID())"
         if readOnly { app.launchEnvironment["FARRIERFLOW_UI_TEST_SUBSCRIPTION_ACCESS"] = "read-only" }
         if initialSetup { app.launchEnvironment["FARRIERFLOW_UI_TEST_SCENARIO"] = "owner-setup" }
+        if let scenario { app.launchEnvironment["FARRIERFLOW_UI_TEST_SCENARIO"] = scenario }
         if largestText {
+            app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
             app.launchEnvironment["FARRIERFLOW_UI_TEST_DYNAMIC_TYPE_SIZE"] = "accessibility5"
             app.launchEnvironment["FARRIERFLOW_UI_TEST_COLOR_SCHEME"] = "dark"
         }
@@ -327,8 +398,12 @@ final class AppointmentSetupUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Schedule"].exists)
         let schedule = app.navigationBars["Schedule"].buttons["Schedule Appointment"]
         XCTAssertTrue(schedule.waitForExistence(timeout: 3))
-        schedule.tap()
-        XCTAssertTrue(app.navigationBars["New Appointment"].waitForExistence(timeout: 3))
+        for _ in 0..<2 {
+            schedule.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            if app.navigationBars["New Appointment"].waitForExistence(timeout: 3) { return }
+        }
+        capture("Appointment toolbar activation failure", in: app)
+        XCTFail("Schedule toolbar did not open the appointment editor: \(app.debugDescription)")
     }
 
     @MainActor
@@ -357,18 +432,19 @@ final class AppointmentSetupUITests: XCTestCase {
 
     @MainActor
     private func addHorse(in app: XCUIApplication) -> Bool {
-        let newHorse = app.buttons["appointment-create-horse"]
-        reveal(newHorse, in: app)
-        XCTAssertEqual(newHorse.label, "New Horse")
-        newHorse.tap()
-        guard type("Setup Horse", into: app.textFields["horse-name-field"]) else { return false }
-        app.buttons["horse-client-picker"].tap()
-        app.buttons["Create New Client"].tap()
-        type("Setup Client", into: app.textFields["client-name-field"])
+        app.selectFarrierFlowTab("Clients")
+        app.navigationBars["Clients"].buttons["Add Client"].tap()
+        guard type("Setup Client", into: app.textFields["client-name-field"]) else { return false }
         app.navigationBars["New Client"].buttons["Save"].tap()
-        XCTAssertTrue(app.navigationBars["New Horse"].waitForExistence(timeout: 3))
+        let client = app.buttons["client-row-Setup Client"]
+        XCTAssertTrue(client.waitForExistence(timeout: 5))
+        client.tap()
+        app.buttons["Add Horse"].tap()
+        guard type("Setup Horse", into: app.textFields["horse-name-field"]) else { return false }
+        app.buttons["horse-barn-picker"].tap()
+        app.buttons["Beta Barn"].tap()
         app.navigationBars["New Horse"].buttons["Save"].tap()
-        return app.navigationBars["New Appointment"].waitForExistence(timeout: 5)
+        return app.navigationBars["Client"].waitForExistence(timeout: 5)
     }
 
     @MainActor
@@ -406,6 +482,15 @@ final class AppointmentSetupUITests: XCTestCase {
 
     @MainActor
     private func dismissKeyboard(in app: XCUIApplication) {
+        let typingTip = app.staticTexts[
+            "Speed up your typing by sliding your finger across the letters to compose a word."
+        ]
+        if typingTip.exists,
+           let continueButton = app.buttons.matching(NSPredicate(format: "label == %@", "Continue"))
+            .allElementsBoundByIndex.filter(\.isHittable)
+            .max(by: { $0.frame.minY < $1.frame.minY }) {
+            continueButton.tap()
+        }
         if app.buttons["Done"].exists { app.buttons["Done"].tap() }
     }
 
@@ -424,18 +509,23 @@ final class AppointmentSetupUITests: XCTestCase {
             let target = element.exists ? element.frame : .zero
             if element.exists, element.isHittable,
                target.midY > top + 8, target.midY < bottom - 8 { return }
+            let onboarding = app.scrollViews["onboarding-business"]
             let surface = app.collectionViews.allElementsBoundByIndex.last(where: \.isHittable)
-                ?? app.scrollViews.allElementsBoundByIndex.last(where: \.isHittable) ?? app
+                ?? (onboarding.exists ? onboarding : app.scrollViews.allElementsBoundByIndex
+                    .first(where: \.isHittable)) ?? app
+            let visibleTop = max(top + 8, surface.frame.minY)
+            let visibleBottom = min(bottom - 8, surface.frame.maxY)
+            let origin = app.coordinate(withNormalizedOffset: .zero)
+            let upper = origin.withOffset(CGVector(
+                dx: surface.frame.minX + 16, dy: visibleTop + (visibleBottom - visibleTop) * 0.2
+            ))
+            let lower = origin.withOffset(CGVector(
+                dx: surface.frame.minX + 16, dy: visibleTop + (visibleBottom - visibleTop) * 0.8
+            ))
             if (element.exists && target.midY <= top + 8) || (!element.exists && towardTop) {
-                surface.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.25))
-                    .press(forDuration: 0.05, thenDragTo: surface.coordinate(
-                        withNormalizedOffset: CGVector(dx: 0.02, dy: 0.75)
-                    ))
+                upper.press(forDuration: 0.05, thenDragTo: lower)
             } else {
-                surface.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.75))
-                    .press(forDuration: 0.05, thenDragTo: surface.coordinate(
-                        withNormalizedOffset: CGVector(dx: 0.02, dy: 0.25)
-                    ))
+                lower.press(forDuration: 0.05, thenDragTo: upper)
             }
         }
         capture("Scroll target failure", in: app)

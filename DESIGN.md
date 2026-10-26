@@ -180,7 +180,11 @@ alignment improves scanning.
 - `largeTitle` and `title`: screen identity only; never oversized dashboard
   display text. Onboarding may use a centered scaled `largeTitle` hero that
   hands off to the native inline navigation title when scrolled.
-- `title2` and `headline`: next action, record name, and section priority.
+- `title2` and `headline`: next action and record names.
+- Section headings use `Typography.sectionHeading`: regular secondary
+  `subheadline`, matching the Clients count heading. Native grouped sections
+  retain their spacing and surfaces. Record identities in headers retain their
+  stronger record-title style.
 - `body` and `callout`: instructions, values, and operational detail.
 - `subheadline`, `footnote`, and `caption`: metadata and secondary explanation;
   never required recovery instructions by themselves.
@@ -268,9 +272,8 @@ background without introducing nested cards or glass.
 - **Do** preserve standard `TabView`, `NavigationStack`, `List`, `Form`,
   toolbars, sheets, alerts, and confirmation dialogs.
 - **Do** give Business its own native grouped Operations/Settings list. Today,
-  Schedule, and Clients remain the daily-work tabs; iOS 27 uses the native
-  prominent role to separate Business at the trailing edge. Older systems keep
-  four ordinary tabs. Clients keeps Add Client, while contextual record links
+  Schedule, Clients, and Business share one native tab bar with four visible
+  titles on every supported system. Clients keeps Add Client, while contextual record links
   remain available throughout the app. At accessibility text sizes, Business
   uses native text-only row labels so icons do not squeeze long titles.
 - **Do** respect Dynamic Type, VoiceOver, Reduce Motion, Increased Contrast,

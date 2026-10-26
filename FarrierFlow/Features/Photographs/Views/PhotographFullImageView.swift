@@ -88,7 +88,7 @@ struct PhotographFullImageView: View {
                 .hour().minute().locale(locale)
         )
         return String(
-            localized: "Hoof photo for \(horseName), \(position) of \(total), created \(date)",
+            localized: "Photo for \(horseName), \(position) of \(total), created \(date)",
             locale: locale
         )
     }

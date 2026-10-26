@@ -20,7 +20,137 @@ struct UserControlledDeletionTests {
         try DomainGraphValidator.validateAll(in: graph.context)
     }
 
-    @Test(arguments: ["client", "horse", "service", "barn", "appointment", "visit", "invoice", "work"])
+    @Test
+    func serviceDeletionPreservesPaidRecordedWorkAndInvoiceLinks() throws {
+        let graph = try graphWithPaidWork()
+        let service = try #require(graph.context.fetch(FetchDescriptor<Service>()).first)
+        let lines = graph.invoice.invoiceVisits.flatMap(\.lineItems)
+        let sourceIDs = lines.compactMap { $0.sourceWorkItem?.syncID }
+        try RecordDeletionRules.delete(service, in: graph.context)
+        #expect(try graph.context.fetchCount(FetchDescriptor<Service>()) == 0)
+        #expect(try graph.context.fetch(FetchDescriptor<WorkItem>()).allSatisfy { $0.service == nil })
+        #expect(lines.compactMap { $0.sourceWorkItem?.syncID } == sourceIDs)
+        #expect(try graph.context.fetchCount(FetchDescriptor<WorkItem>()) == 2)
+        #expect(graph.invoice.statusRawValue == "paid")
+        #expect(graph.invoice.payments.count == 1)
+        try DomainGraphValidator.validateAll(in: graph.context)
+    }
+
+    @Test
+    func appointmentDeletionPreservesPaidRecordedWorkAndInvoiceSources() throws {
+        let graph = try graphWithPaidWork()
+        let appointment = try #require(graph.context.fetch(FetchDescriptor<Appointment>()).first)
+        let visit = try #require(appointment.visit)
+        try RecordDeletionRules.delete(appointment, in: graph.context)
+        #expect(try graph.context.fetchCount(FetchDescriptor<Appointment>()) == 0)
+        #expect(try graph.context.fetchCount(FetchDescriptor<Visit>()) == 1)
+        #expect(try graph.context.fetchCount(FetchDescriptor<WorkItem>()) == 2)
+        #expect(visit.appointment == nil)
+        #expect(graph.invoice.invoiceVisits.first?.sourceVisit === visit)
+        #expect(graph.invoice.payments.count == 1)
+        _ = try VisitDetailModel.loadDetail(visitID: visit.persistentModelID, in: graph.context)
+        _ = try VisitSaveUseCase.loadDraft(visitID: visit.persistentModelID, in: graph.context)
+        try DomainGraphValidator.validateAll(in: graph.context)
+    }
+
+    @Test
+    func explicitRecordedWorkDeletionKeepsTheScheduledAppointment() throws {
+        let graph = try graphWithPaidWork()
+        let visit = try #require(graph.context.fetch(FetchDescriptor<Visit>()).first)
+        try RecordDeletionRules.delete(visit, in: graph.context)
+        #expect(try graph.context.fetchCount(FetchDescriptor<Appointment>()) == 1)
+        #expect(try graph.context.fetchCount(FetchDescriptor<Visit>()) == 0)
+        #expect(try graph.context.fetchCount(FetchDescriptor<WorkItem>()) == 0)
+        #expect(graph.invoice.payments.count == 1)
+        #expect(graph.invoice.invoiceVisits.first?.sourceVisit == nil)
+        try DomainGraphValidator.validateAll(in: graph.context)
+    }
+
+    @Test
+    func unfinishedWorkRemainsAccessibleAfterScheduleRemoval() throws {
+        let graph = try graphWithPaidWork()
+        try RecordDeletionPlan.execute(.invoice(graph.invoice.persistentModelID), in: graph.context)
+        let visit = try #require(graph.context.fetch(FetchDescriptor<Visit>()).first)
+        visit.completedAt = nil
+        try DomainGraphValidator.save(graph.context)
+        try RecordDeletionPlan.execute(.scheduledVisit(visit.persistentModelID), in: graph.context)
+        let work = try CompletedVisitListModel.summaries(in: graph.context, locale: Locale(identifier: "en_US"))
+        #expect(work.map(\.id) == [visit.persistentModelID])
+        #expect(work.first?.completedAt == nil)
+        let detail = try VisitDetailModel.loadDetail(visitID: visit.persistentModelID, in: graph.context)
+        #expect(detail.horses.flatMap(\.workItems).count == 2)
+        let draft = try VisitSaveUseCase.loadDraft(visitID: visit.persistentModelID, in: graph.context)
+        _ = try VisitSaveUseCase.saveProgress(draft: draft, in: graph.context)
+        let today = TodayModel()
+        today.load(in: graph.context, now: .now, calendar: .current)
+        #expect(today.loadState == .loaded)
+    }
+
+    @Test
+    func scheduledVisitDeletionKeepsPhotoFilesAndPaidWork() async throws {
+        let graph = try graphWithPaidWork()
+        let directory = try TemporaryStoreFixtures.makeDirectory(prefix: "FarrierFlow-Kept-Photos-")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let files = PhotographFileStore(rootURL: directory.appending(path: "HoofPhotographs"))
+        let library = PhotographLibrary(container: graph.container, fileStore: files, protectedDataAvailable: { true })
+        let member = try #require(graph.horse.visitHorses.first)
+        let visit = try #require(member.visit)
+        let photoID = try await library.add(sourceData: PhotographTestFixtures.jpeg(), to: member.persistentModelID)
+        let plan = try RecordDeletionPlan(target: .scheduledVisit(visit.persistentModelID), in: ModelContext(graph.container))
+        #expect(plan.impact.photoIDs.isEmpty)
+        try await library.deleteRecords(confirming: plan.impact)
+        let context = ModelContext(graph.container)
+        #expect(try context.fetchCount(FetchDescriptor<WorkItem>()) == 2)
+        #expect(try context.fetchCount(FetchDescriptor<Photograph>()) == 1)
+        #expect(FileManager.default.fileExists(atPath: files.canonicalURL(for: photoID).path))
+        #expect(try context.fetchCount(FetchDescriptor<Payment>()) == 1)
+        try DomainGraphValidator.validateAll(in: context)
+    }
+
+    @Test
+    func appointmentStartedAfterConfirmationCannotBeDeleted() throws {
+        let graph = try graphWithPaidWork()
+        let barn = try #require(graph.horse.currentBarn)
+        let appointment = ModelFixtures.makeAppointment(barn: barn, horses: [graph.horse], in: graph.context)
+        try DomainGraphValidator.save(graph.context)
+        let target = RecordDeletionTarget.appointment(appointment.persistentModelID)
+        let impact = try RecordDeletionPlan(target: target, in: graph.context).impact
+        _ = ModelFixtures.makeVisit(appointment: appointment, in: graph.context)
+        try DomainGraphValidator.save(graph.context)
+        let before = try SyncGraphCodec.capture(in: graph.context)
+        #expect(throws: RecordDeletionError.dependenciesChanged) {
+            try RecordDeletionPlan.execute(target, confirming: impact, in: graph.context)
+        }
+        #expect(try SyncGraphCodec.capture(in: ModelContext(graph.container)) == before)
+    }
+
+    @Test(arguments: [false, true])
+    func unstartedAppointmentDeletionPreservesUnrelatedHistoryAndRollsBackOnFailure(failSave: Bool) throws {
+        let graph = try graphWithPaidWork()
+        let barn = try #require(graph.horse.currentBarn)
+        let appointment = ModelFixtures.makeAppointment(barn: barn, horses: [graph.horse], in: graph.context)
+        try DomainGraphValidator.save(graph.context)
+        let before = try SyncGraphCodec.capture(in: graph.context)
+        let target = RecordDeletionTarget.appointment(appointment.persistentModelID)
+        if failSave {
+            #expect(throws: ForcedFailure.expected) {
+                try RecordDeletionPlan.execute(target, in: graph.context, saving: { _ in throw ForcedFailure.expected })
+            }
+            #expect(try SyncGraphCodec.capture(in: ModelContext(graph.container)) == before)
+        } else {
+            try RecordDeletionPlan.execute(target, in: graph.context)
+            let after = try SyncGraphCodec.capture(in: graph.context)
+            let receiver = try ModelContainerFactory.inMemoryTest()
+            try SyncGraphCodec.apply(before, in: receiver.mainContext)
+            try SyncGraphCodec.apply(after, in: receiver.mainContext)
+            #expect(try SyncGraphCodec.capture(in: receiver.mainContext) == after)
+            #expect(try graph.context.fetchCount(FetchDescriptor<Appointment>()) == 1)
+            #expect(try graph.context.fetchCount(FetchDescriptor<WorkItem>()) == 2)
+            #expect(graph.invoice.payments.count == 1)
+        }
+    }
+
+    @Test(arguments: ["client", "horse", "barn", "service", "appointment", "scheduledVisit", "visit", "invoice", "work"])
     func deletionRoundTripsToExistingAndNewDevices(_ kind: String) throws {
         let graph = try graphWithPaidWork()
         let before = try SyncGraphCodec.capture(in: graph.context)
@@ -54,16 +184,17 @@ struct UserControlledDeletionTests {
             #expect(try graph.context.fetchCount(FetchDescriptor<Appointment>()) == 1)
             #expect(try graph.context.fetchCount(FetchDescriptor<Visit>()) == 1)
         }
-        if ["barn", "appointment", "visit"].contains(kind) {
+        if kind == "barn" {
             #expect(try graph.context.fetchCount(FetchDescriptor<Appointment>()) == 0)
             #expect(try graph.context.fetchCount(FetchDescriptor<Visit>()) == 0)
         }
         if kind == "service" {
-            #expect(try graph.context.fetch(FetchDescriptor<VisitHorse>()).allSatisfy { $0.outcomeRawValue == "notServiced" })
+            #expect(try graph.context.fetch(FetchDescriptor<VisitHorse>()).allSatisfy { $0.outcomeRawValue == "serviced" })
+            #expect(try graph.context.fetchCount(FetchDescriptor<WorkItem>()) == 2)
         }
     }
 
-    @Test(arguments: ["client", "horse", "service", "barn", "appointment", "visit", "invoice", "work"])
+    @Test(arguments: ["client", "horse", "barn", "service", "appointment", "scheduledVisit", "visit", "invoice", "work"])
     func failedDeletionRestoresEntireGraph(_ kind: String) throws {
         let graph = try graphWithPaidWork()
         let before = try SyncGraphCodec.capture(in: graph.context)
@@ -107,8 +238,8 @@ struct UserControlledDeletionTests {
         #expect(graph.invoice.invoiceVisits.first?.lineItems.first?.sourceWorkItem == nil)
     }
 
-    @Test
-    func detachedFinancialSnapshotsSurvivePersistentReopen() throws {
+    @Test(arguments: ["client", "service", "appointment", "scheduledVisit"])
+    func detachedFinancialSnapshotsSurvivePersistentReopen(kind: String) throws {
         let directory = try TemporaryStoreFixtures.makeDirectory(prefix: "FarrierFlow-Detached-Invoices-")
         defer { try? FileManager.default.removeItem(at: directory) }
         let url = directory.appending(path: "records.store")
@@ -117,8 +248,16 @@ struct UserControlledDeletionTests {
         do {
             let container = try ModelContainerFactory.persistentStoreTest(at: url)
             try SyncGraphCodec.apply(SyncGraphCodec.capture(in: graph.context), in: container.mainContext)
-            let client = try #require(container.mainContext.fetch(FetchDescriptor<Client>()).first { $0.name == "Delete Client" })
-            try RecordDeletionRules.delete(client, in: container.mainContext)
+            if kind == "service" {
+                let service = try #require(container.mainContext.fetch(FetchDescriptor<Service>()).first)
+                try RecordDeletionRules.delete(service, in: container.mainContext)
+            } else if kind == "appointment" || kind == "scheduledVisit" {
+                let visit = try #require(container.mainContext.fetch(FetchDescriptor<Visit>()).first)
+                try RecordDeletionPlan.execute(.scheduledVisit(visit.persistentModelID), in: container.mainContext)
+            } else {
+                let client = try #require(container.mainContext.fetch(FetchDescriptor<Client>()).first { $0.name == "Delete Client" })
+                try RecordDeletionRules.delete(client, in: container.mainContext)
+            }
             expected = try SyncGraphCodec.capture(in: container.mainContext)
         }
         let reopened = try ModelContainerFactory.persistentStoreTest(at: url)
@@ -206,7 +345,7 @@ struct UserControlledDeletionTests {
 
     }
 
-    @Test(arguments: ["client", "horse", "service", "barn", "appointment", "visit", "invoice", "work"])
+    @Test(arguments: ["client", "horse", "barn", "service", "appointment", "scheduledVisit", "visit", "invoice", "work"])
     func cascadeRemainsAtomicWhenSyncBatchLimitIsOne(_ kind: String) throws {
         let graph = try graphWithPaidWork()
         let before = try SyncGraphCodec.capture(in: graph.context)
@@ -232,6 +371,7 @@ struct UserControlledDeletionTests {
         case "horse": .horse(graph.horse.persistentModelID)
         case "service": .service(try #require(graph.context.fetch(FetchDescriptor<Service>()).first).persistentModelID)
         case "barn": .barn(try #require(graph.horse.currentBarn).persistentModelID)
+        case "scheduledVisit": .scheduledVisit(try #require(graph.context.fetch(FetchDescriptor<Visit>()).first).persistentModelID)
         case "appointment": .appointment(try #require(graph.context.fetch(FetchDescriptor<Appointment>()).first).persistentModelID)
         case "visit": .visit(try #require(graph.context.fetch(FetchDescriptor<Visit>()).first).persistentModelID)
         case "invoice": .invoice(graph.invoice.persistentModelID)

@@ -33,7 +33,7 @@ extension FarrierFlowSchemaV5 {
             completedAt: Date? = nil,
             serviceLocationNameSnapshot: String,
             serviceLocationAddressSnapshot: String? = nil,
-            appointment: Appointment,
+            appointment: Appointment?,
             barn: Barn
         ) {
             self.syncID = syncID

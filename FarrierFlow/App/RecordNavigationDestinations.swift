@@ -17,6 +17,8 @@ struct RecordNavigationDestinations: ViewModifier {
                     AppointmentDetailView(appointmentID: id)
                 case .visit(let id):
                     VisitDetailView(visitID: id, container: context.container)
+                case .recordedWork(let id):
+                    VisitDetailView(visitID: id, container: context.container, allowsDeletingRecordedWork: true)
                 }
             }
             .navigationDestination(for: BarnRoute.self) { route in

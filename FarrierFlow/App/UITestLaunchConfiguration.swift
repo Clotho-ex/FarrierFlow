@@ -186,6 +186,7 @@ enum UITestScenario: String {
     case paymentPending = "payment-pending"
     case deletionReferences = "deletion-references"
     case nextAppointment = "next-appointment"
+    case clientDirectory = "client-directory"
     case scheduleRows = "schedule-rows"
     case ownerSetup = "owner-setup"
 }

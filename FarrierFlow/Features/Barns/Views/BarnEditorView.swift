@@ -2,12 +2,15 @@ import SwiftData
 import SwiftUI
 
 struct BarnEditorView: View {
+    private enum Field: Hashable { case name, address, contactNotes }
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Environment(\.analyticsClient) private var analyticsClient
     @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model: BarnEditorModel
     @State private var showsMoreDetails: Bool
+    @State private var dismissalBaseline: BarnDraft?
+    @FocusState private var focusedField: Field?
     private let createdBarnID: Binding<PersistentIdentifier?>?
 
     init(
@@ -22,34 +25,53 @@ struct BarnEditorView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Barn or Service Location") {
+                RecordSection(Text("Barn or Service Location")) {
                     TextField("Name", text: $model.draft.name)
+                        .focused($focusedField, equals: .name)
+                        .submitLabel(.done)
+                        .onSubmit { focusedField = nil }
                         .accessibilityIdentifier("barn-name-field")
-                    DisclosureGroup(
-                        "Arrival Details",
-                        isExpanded: $showsMoreDetails
-                    ) {
+                    DisclosureGroup(isExpanded: $showsMoreDetails) {
                         TextField(
                             "Address",
                             text: $model.draft.address,
                             axis: .vertical
                         )
-                        TextEditor(text: $model.draft.contactNotes)
-                            .frame(minHeight: 88)
-                            .accessibilityLabel("Contact Notes")
+                        .focused($focusedField, equals: .address)
+                        .textContentType(.fullStreetAddress)
+                        .accessibilityIdentifier("barn-address-field")
+                        VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
+                            Text("Contact Notes")
+                                .font(.caption)
+                                .foregroundStyle(ColorTokens.textSecondary)
+                                .accessibilityHidden(true)
+                            TextEditor(text: $model.draft.contactNotes)
+                                .frame(minHeight: 88)
+                                .focused($focusedField, equals: .contactNotes)
+                                .accessibilityLabel("Contact Notes")
+                                .accessibilityIdentifier("barn-contact-notes-field")
+                        }
                         Text("Gate codes, parking, or arrival instructions.")
                             .font(.footnote)
                             .foregroundStyle(ColorTokens.textSecondary)
+                    } label: {
+                        Text("Arrival Details")
+                            .accessibilityIdentifier("barn-more-details")
                     }
-                    .accessibilityIdentifier("barn-more-details")
                 }
                 .listRowBackground(ColorTokens.surface)
             }
             .farrierFlowScrollBackground()
+            .scrollDismissesKeyboard(.interactively)
             .disabled(!subscription.allowsMutations)
             .navigationTitle(model.barnID == nil ? "New Service Location" : "Edit Service Location")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { focusedField = nil }
+                        .accessibilityIdentifier("barn-keyboard-done")
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                         .tint(ColorTokens.textSecondary)
@@ -71,6 +93,11 @@ struct BarnEditorView: View {
             .alert(item: $model.alert) {
                 Alert(title: Text($0.title), message: Text($0.message))
             }
+            .onAppear { if dismissalBaseline == nil { dismissalBaseline = model.draft } }
+            .onChange(of: showsMoreDetails) { _, expanded in
+                if !expanded { focusedField = nil }
+            }
         }
+        .interactiveDismissDisabled(dismissalBaseline.map { $0 != model.draft } ?? false)
     }
 }

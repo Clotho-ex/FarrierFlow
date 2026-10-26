@@ -13,9 +13,9 @@ final class VisitCompletionUITests: XCTestCase {
         app.buttons["visit-start-action"].tap()
         assertOutcome(.pending, for: graph.servicedHorseName, in: app)
         assertOutcome(.pending, for: graph.notServicedHorseName, in: app)
-        XCTAssertFalse(app.buttons["visit-complete"].isEnabled)
+        XCTAssertFalse(app.buttons["visit-complete"].exists)
 
-        app.buttons["Cancel"].tap()
+        app.buttons["visit-close"].tap()
         attemptRelocation(
             of: graph.servicedHorseName,
             for: graph.clientName,
@@ -40,15 +40,16 @@ final class VisitCompletionUITests: XCTestCase {
             for: graph.servicedHorseName,
             in: app
         )
-        let workNotes = app.textViews["visit-work-notes-\(graph.servicedHorseName)"]
+        let workNotes = openWorkNotes(for: graph.servicedHorseName, in: app)
         XCTAssertTrue(bringIntoView(workNotes, in: app))
         focusAndType("Front shoes", in: workNotes)
         let keyboard = app.keyboards.firstMatch
         XCTAssertTrue(keyboard.waitForExistence(timeout: 3))
         app.buttons["visit-dismiss-keyboard"].tap()
         XCTAssertTrue(keyboard.waitForNonExistence(timeout: 3))
+        showSaveProgress(in: app)
         XCTAssertTrue(app.buttons["visit-save-progress"].isEnabled)
-        app.buttons["visit-save-progress"].tap()
+        saveProgress(in: app)
 
         app.terminate()
         app.launch()
@@ -123,8 +124,8 @@ final class VisitCompletionUITests: XCTestCase {
             app.buttons["visit-work-item-\(graph.servicedHorseName)-\(serviceName)"]
                 .waitForExistence(timeout: 3)
         )
-        app.buttons["visit-save-progress"].tap()
-        app.buttons["Cancel"].tap()
+        saveProgress(in: app)
+        app.buttons["visit-close"].tap()
         if app.navigationBars.buttons["Stop Details"].exists {
             app.navigationBars.buttons["Stop Details"].tap()
             app.buttons["stop-details-close"].tap()
@@ -356,7 +357,7 @@ final class VisitCompletionUITests: XCTestCase {
         XCTAssertEqual(accessibilityText(of: secondWorkItem).filter(\.isNumber), "6450")
         XCTAssertFalse(app.navigationBars["Add Service"].exists)
 
-        app.buttons["visit-save-progress"].tap()
+        saveProgress(in: app)
         app.terminate()
         app.launch()
 
@@ -395,6 +396,7 @@ final class VisitCompletionUITests: XCTestCase {
         for _ in 0..<4 {
             scrollForm(in: app, upward: false)
         }
+        app.buttons["visit-actions-menu"].tap()
         tapAfterBringingIntoView(applyWork, in: app)
         let applyWorkNavigationBar = app.navigationBars["Apply Work to Horses"]
         XCTAssertTrue(applyWorkNavigationBar.waitForExistence(timeout: 3))
@@ -405,18 +407,13 @@ final class VisitCompletionUITests: XCTestCase {
         applyWorkNavigationBar.buttons["Cancel"].tap()
         XCTAssertTrue(applyWorkNavigationBar.waitForNonExistence(timeout: 5))
         for horseName in [graph.notServicedHorseName, thirdHorseName] {
-            XCTAssertTrue(
-                bringIntoViewFromTop(
-                    app.buttons["visit-outcome-\(horseName)"],
-                    in: app
-                )
-            )
             assertOutcome(.pending, for: horseName, in: app)
         }
 
         for _ in 0..<4 {
             scrollForm(in: app, upward: false)
         }
+        app.buttons["visit-actions-menu"].tap()
         tapAfterBringingIntoView(applyWork, in: app)
         let secondTarget = app.descendants(matching: .any)[
             "visit-batch-target-\(graph.notServicedHorseName)"
@@ -438,12 +435,6 @@ final class VisitCompletionUITests: XCTestCase {
             graph.servicedHorseName,
             thirdHorseName,
         ] {
-            XCTAssertTrue(
-                bringIntoViewFromTop(
-                    app.buttons["visit-outcome-\(horseName)"],
-                    in: app
-                )
-            )
             assertOutcome(.serviced, for: horseName, in: app)
             let workItem = app.buttons["visit-work-item-\(horseName)-\(serviceName)"]
             XCTAssertTrue(bringIntoView(workItem, in: app))
@@ -453,7 +444,7 @@ final class VisitCompletionUITests: XCTestCase {
         XCTAssertTrue(app.buttons["visit-complete"].isEnabled)
         XCTAssertFalse(applyWork.exists)
 
-        app.buttons["visit-save-progress"].tap()
+        saveProgress(in: app)
         app.terminate()
         app.launch()
 
@@ -466,12 +457,6 @@ final class VisitCompletionUITests: XCTestCase {
             graph.servicedHorseName,
             thirdHorseName,
         ] {
-            XCTAssertTrue(
-                bringIntoViewFromTop(
-                    app.buttons["visit-outcome-\(horseName)"],
-                    in: app
-                )
-            )
             assertOutcome(.serviced, for: horseName, in: app)
             let workItem = app.buttons["visit-work-item-\(horseName)-\(serviceName)"]
             XCTAssertTrue(bringIntoView(workItem, in: app))
@@ -492,11 +477,10 @@ final class VisitCompletionUITests: XCTestCase {
         openAppointment(at: graph.primaryBarnName, in: app)
         app.buttons["visit-start-action"].tap()
         let complete = app.buttons["visit-complete"]
-        XCTAssertTrue(complete.waitForExistence(timeout: 3))
-        XCTAssertFalse(complete.isEnabled)
+        XCTAssertFalse(complete.exists)
 
         app.buttons["visit-photographs-\(graph.servicedHorseName)"].tap()
-        XCTAssertTrue(app.navigationBars["Hoof Photos"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.navigationBars["Photos"].waitForExistence(timeout: 3))
         app.buttons["photograph-add-menu"].tap()
         app.buttons["Camera"].tap()
         XCTAssertTrue(app.alerts["Camera Unavailable"].waitForExistence(timeout: 3))
@@ -504,23 +488,23 @@ final class VisitCompletionUITests: XCTestCase {
 
         app.buttons["photograph-add-menu"].tap()
         app.buttons["Photo Library"].tap()
-        let photosNavigation = app.navigationBars["Photos"]
-        XCTAssertTrue(photosNavigation.waitForExistence(timeout: 5))
-        photosNavigation.buttons["Cancel"].tap()
-        XCTAssertTrue(photosNavigation.waitForNonExistence(timeout: 5))
-        let visitBackButton = app.navigationBars["Hoof Photos"].buttons["Visit"]
+        let pickerCancel = app.navigationBars.matching(identifier: "Photos").buttons["Cancel"].firstMatch
+        XCTAssertTrue(pickerCancel.waitForExistence(timeout: 5))
+        pickerCancel.tap()
+        XCTAssertTrue(pickerCancel.waitForNonExistence(timeout: 5))
+        let visitBackButton = app.navigationBars["Photos"].buttons["Visit"]
         XCTAssertTrue(visitBackButton.waitForExistence(timeout: 3))
         XCTAssertTrue(visitBackButton.isHittable)
         visitBackButton.tap()
 
         select(.notServiced, for: graph.servicedHorseName, in: app)
         select(.notServiced, for: graph.notServicedHorseName, in: app)
-        XCTAssertFalse(complete.isEnabled)
+        XCTAssertFalse(complete.exists)
         XCTAssertFalse(app.navigationBars["Next Appointment"].exists)
 
         select(.serviced, for: graph.servicedHorseName, in: app)
         XCTAssertTrue(app.staticTexts["visit-unsaved-state"].waitForExistence(timeout: 3))
-        app.buttons["Cancel"].tap()
+        app.buttons["visit-close"].tap()
         XCTAssertTrue(app.staticTexts["Discard Unsaved Changes?"].waitForExistence(timeout: 3))
         keepEditing(in: app)
         XCTAssertTrue(
@@ -539,7 +523,7 @@ final class VisitCompletionUITests: XCTestCase {
 
         openAppointment(at: graph.primaryBarnName, in: app)
         app.buttons["visit-start-action"].tap()
-        app.buttons["Cancel"].tap()
+        app.buttons["visit-close"].tap()
 
         app.buttons["appointment-actions-menu"].tap()
         app.buttons["appointment-delete-action"].tap()
@@ -1063,12 +1047,34 @@ final class VisitCompletionUITests: XCTestCase {
     }
 
     @MainActor
+    private func expandHorse(_ horseName: String, in app: XCUIApplication) {
+        let outcome = app.buttons["visit-outcome-\(horseName)"]
+        if !outcome.exists {
+            let header = app.buttons["visit-horse-toggle-\(horseName)"]
+            tapAfterBringingIntoView(header, in: app)
+        }
+    }
+
+    @MainActor
+    private func showSaveProgress(in app: XCUIApplication) {
+        let save = app.buttons["visit-save-progress"]
+        if !save.exists || !save.isHittable { app.buttons["visit-actions-menu"].tap() }
+    }
+
+    @MainActor
+    private func saveProgress(in app: XCUIApplication) {
+        showSaveProgress(in: app)
+        app.buttons["visit-save-progress"].tap()
+    }
+
+    @MainActor
     private func select(
         _ outcome: VisitOutcome,
         for horseName: String,
         assertsSelection: Bool = true,
         in app: XCUIApplication
     ) {
+        expandHorse(horseName, in: app)
         let picker = app.buttons["visit-outcome-\(horseName)"]
         guard bringIntoView(picker, in: app) else {
             XCTFail("Expected outcome picker to become visible and hittable")
@@ -1106,6 +1112,7 @@ final class VisitCompletionUITests: XCTestCase {
         for horseName: String,
         in app: XCUIApplication
     ) {
+        expandHorse(horseName, in: app)
         tapAfterBringingIntoView(
             app.buttons["visit-add-service-\(horseName)"],
             in: app
@@ -1126,6 +1133,7 @@ final class VisitCompletionUITests: XCTestCase {
 
     @MainActor
     private func assertOutcome(_ outcome: VisitOutcome, for horseName: String, in app: XCUIApplication) {
+        expandHorse(horseName, in: app)
         let picker = app.buttons["visit-outcome-\(horseName)"]
         XCTAssertTrue(picker.waitForExistence(timeout: 3))
         XCTAssertTrue(picker.label.contains(horseName))
@@ -1145,8 +1153,18 @@ final class VisitCompletionUITests: XCTestCase {
     }
 
     @MainActor
+    private func openWorkNotes(for horseName: String, in app: XCUIApplication) -> XCUIElement {
+        expandHorse(horseName, in: app)
+        let editor = app.descendants(matching: .any)["visit-work-notes-\(horseName)"].firstMatch
+        if !editor.exists {
+            tapAfterBringingIntoView(app.buttons["visit-work-notes-toggle-\(horseName)"], in: app)
+        }
+        return editor
+    }
+
+    @MainActor
     private func assertWorkNotes(_ expected: String, for horseName: String, in app: XCUIApplication) {
-        let workNotes = app.textViews["visit-work-notes-\(horseName)"]
+        let workNotes = openWorkNotes(for: horseName, in: app)
         XCTAssertTrue(workNotes.waitForExistence(timeout: 3))
         XCTAssertTrue(accessibilityText(of: workNotes).contains(expected))
     }
@@ -1166,13 +1184,15 @@ final class VisitCompletionUITests: XCTestCase {
         let snapshot = app.descendants(matching: .any)["visit-detail-service-location-snapshot"].firstMatch
         XCTAssertTrue(snapshot.waitForExistence(timeout: 3))
         XCTAssertTrue(accessibilityText(of: snapshot).contains(graph.primaryBarnName))
-        let servicedResult = assertVisitResult(
+        _ = assertVisitResult(
             .serviced,
             horseName: graph.servicedHorseName,
             in: app
         )
-        XCTAssertTrue(accessibilityText(of: servicedResult).contains("Work Notes"))
-        XCTAssertTrue(accessibilityText(of: servicedResult).contains("Front shoes"))
+        let notes = app.descendants(matching: .any)["visit-result-notes-\(graph.servicedHorseName)"]
+        XCTAssertTrue(bringIntoView(notes, in: app))
+        XCTAssertTrue(accessibilityText(of: notes).contains("Work Notes"))
+        XCTAssertTrue(accessibilityText(of: notes).contains("Front shoes"))
         _ = assertVisitResult(.notServiced, horseName: graph.notServicedHorseName, in: app)
     }
 

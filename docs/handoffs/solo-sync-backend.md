@@ -436,3 +436,33 @@ Advisor retains the existing public event-trigger helper execute warnings
 eight informational default-deny private-table entries, and an Auth
 [leaked-password protection](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection)
 warning. This deployment changed no helper grants or Auth settings.
+
+
+## Service and schedule deletion preservation — 2026-10-25
+
+Deployed to FarrierFlow Dev (`xufledziawaapvrifbfv`):
+
+- `20261025103029`, `preserve_recorded_work_when_deleting_service`: permits
+  WorkItem.service to detach when removing a catalog Service.
+- `20261025104527`, `preserve_recorded_work_after_schedule_deletion`: permits
+  Visit.appointment to detach while retaining VisitHorse, WorkItem, Photograph
+  and invoice-source identities. Relationship and membership checks remain
+  required whenever an Appointment reference is present.
+
+The incremental sources are the matching 2026-10-25 repair SQL files. The only
+function replacements are ff_private.kind_schema and ff_private.validate_graph;
+existing grants and stored business records are preserved. Baseline definitions
+were compared with the live project before deployment and migration history was
+read back afterward.
+
+Both `hosted_service_deletion_contract.sql` and
+`hosted_visit_history_preservation_contract.sql` passed through the hosted
+bootstrap/push/pull RPCs using a synthetic owner session and two registered
+client-device IDs. They verify exact-operation retries, retained work, photo
+metadata, paid invoice/payment snapshots, and separate explicit Recorded Work
+deletion. Each test rolls back its synthetic users, workspace and transactions;
+no customer record or Storage object is changed. This establishes hosted API
+behavior, not two-physical-iPhone acceptance or cloud photo-byte transfer.
+
+The local iOS client changes are separate from deployment and remain uncommitted.
+An updated app build is required to use detached historical records.

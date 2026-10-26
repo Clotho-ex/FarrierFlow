@@ -6,15 +6,13 @@ struct VisitHorseOutcomeRow: View {
 
     let horse: VisitHorseDraft
     let selectableOutcomes: [VisitOutcome]
-    @Binding var workNotes: String
-    @FocusState.Binding var focusedWorkNotesID: PersistentIdentifier?
     let onOutcomeSelected: (VisitOutcome) -> Void
 
     var body: some View {
         Group {
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
-                    Text("Work Status")
+                    Text("Work Outcome")
                         .font(Typography.recordMetadata)
                         .foregroundStyle(ColorTokens.textSecondary)
                     outcomePicker
@@ -26,35 +24,26 @@ struct VisitHorseOutcomeRow: View {
                 outcomePicker
             }
         }
-        .accessibilityLabel("\(horse.horseName) Work Status")
+        .accessibilityLabel("\(horse.horseName) Work Outcome")
         .accessibilityValue(Text(horse.outcome.localizedTitle))
         .accessibilityIdentifier("visit-outcome-\(horse.horseName)")
 
-        if horse.outcome == .serviced {
-            VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
-                Text("Work Notes")
-                    .font(Typography.recordMetadata)
-                    .foregroundStyle(ColorTokens.textSecondary)
-                TextEditor(text: $workNotes)
-                    .frame(minHeight: 88)
-                    .focused($focusedWorkNotesID, equals: horse.id)
-                    .accessibilityLabel("Work Notes")
-                    .accessibilityIdentifier("visit-work-notes-\(horse.horseName)")
-            }
-        }
     }
 
     private var outcomePicker: some View {
         Picker(
-            "Work Status",
+            "Work Outcome",
             selection: Binding(
                 get: { horse.outcome },
                 set: { onOutcomeSelected($0) }
             )
         ) {
             ForEach(selectableOutcomes, id: \.self) { outcome in
-                Text(outcome.localizedTitle)
-                    .tag(outcome)
+                Group {
+                    if outcome == .pending { Text("Choose") }
+                    else { Text(outcome.localizedTitle) }
+                }
+                .tag(outcome)
             }
         }
     }

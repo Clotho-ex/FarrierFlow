@@ -9,11 +9,33 @@ enum BackupSyncUITestFixtures {
     static func make(container: ModelContainer, preferences: UserDefaults) throws -> BackupSyncModel? {
         guard ProcessInfo.processInfo.environment[UITestLaunchConfiguration.scenarioEnvironmentKey] == "app-store-showcase",
               let state = ProcessInfo.processInfo.environment["FARRIERFLOW_UI_TEST_CLOUD_STATE"],
-              ["connected", "pending", "unconfirmed", "history", "recovery", "offline"].contains(state) else { return nil }
+              ["connected", "pending", "unconfirmed", "history", "recovery", "offline", "conflicts"].contains(state) else { return nil }
         let account = UUID(), workspace = UUID()
         let store = SyncJournalStore(container: container)
         let device = UUID()
         try store.bind(accountID: account, workspaceID: workspace, deviceID: device)
+        if state == "conflicts" {
+            guard let initial = try store.stage() else { throw SyncJournalError.invalidMutation }
+            try store.acknowledge(operationID: initial.operationID, revision: 1)
+            try store.receive(.init(workspaceID: workspace, revision: 1, mutations: initial.mutations))
+            let clients = try container.mainContext.fetch(FetchDescriptor<Client>())
+            let mutations = initial.mutations.filter { $0.kind == .client }.map { mutation in
+                var fields = mutation.record?.fields ?? [:]
+                fields["phone"] = .string("555-Cloud")
+                return SyncMutation(id: mutation.id, kind: .client, expectedRevision: 1,
+                    record: .init(id: mutation.id, kind: .client, fields: fields))
+            }
+            clients.forEach { $0.phone = "555-iPhone" }
+            try DomainGraphValidator.save(container.mainContext)
+            try store.receive(.init(workspaceID: workspace, revision: 2, mutations: mutations))
+            let runtime = BackupSyncRuntime(container: container, transport: OfflineUITestTransport(),
+                photoTransport: RecoveryUITestPhotos(), library: .init(container: container,
+                    fileStore: .init(rootURL: FileManager.default.temporaryDirectory.appending(path: "UI-Conflicts-\(account)"))), deviceID: device)
+            try runtime.refreshStatus()
+            let session = CloudAccountSession(authentication: DeletionUITestAuthentication(account: account),
+                preferences: preferences, connected: { _ in }, stopped: { runtime.stop() })
+            return BackupSyncModel(session: session, runtime: runtime, preferences: preferences)
+        }
         if state == "offline" {
             let runtime = BackupSyncRuntime(container: container, transport: OfflineUITestTransport(),
                 photoTransport: RecoveryUITestPhotos(), library: .init(container: container,

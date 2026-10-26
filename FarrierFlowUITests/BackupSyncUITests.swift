@@ -2,6 +2,31 @@ import XCTest
 
 final class BackupSyncUITests: XCTestCase {
     @MainActor
+    func testPhoneOnlyConflictsIdentifyTheCustomerBeforeAnyChoice() {
+        for largeText in [false, true] {
+            let app = openCloudFixture(state: "conflicts", dark: largeText, accessibility: largeText)
+            let review = app.buttons["backup-sync-review"]
+            XCTAssertTrue(review.waitForExistence(timeout: 5))
+            review.tap()
+            XCTAssertTrue(app.navigationBars["Review Changes"].waitForExistence(timeout: 3))
+            let customerNames = ["Casey Bennett", "Jordan Ellis", "Morgan Reed"]
+            var seen = Set<String>()
+            for _ in 0..<24 {
+                for name in customerNames where !seen.contains(name) && app.staticTexts[name].isHittable {
+                    seen.insert(name)
+                    attachHistoryScreenshot(app, name: "Named conflict \(name) \(largeText ? "AX dark" : "light")")
+                }
+                if seen.count == customerNames.count { break }
+                app.swipeUp()
+            }
+            XCTAssertEqual(seen, Set(customerNames), "Every phone-only conflict must identify its customer")
+            let apply = app.buttons["Apply Reviewed Choices"]
+            for _ in 0..<10 where !apply.exists { app.swipeUp() }
+            XCTAssertFalse(apply.isEnabled)
+            app.terminate()
+        }
+    }
+    @MainActor
     func testBackupSettingsHierarchyIsCompactAndNative() {
         verifySettingsHierarchy(dark: false, accessibility: false)
     }
@@ -321,6 +346,7 @@ final class BackupSyncUITests: XCTestCase {
         selectClients(app)
         XCTAssertTrue(app.tabBars.buttons["Business"].waitForExistence(timeout: 3))
         app.openBusinessRoot()
+        for _ in 0..<12 where !app.buttons["backup-sync-open"].isHittable { app.swipeUp() }
         XCTAssertTrue(app.buttons["backup-sync-open"].waitForExistence(timeout: 3))
         app.buttons["backup-sync-open"].press(forDuration: 0.15)
         XCTAssertTrue(app.navigationBars["Backup & Sync"].waitForExistence(timeout: 3))

@@ -73,15 +73,15 @@ struct RecordDeletionRulesTests {
     }
 
     @Test
-    func appointmentDeletionRemovesVisitAndMemberships() throws {
+    func appointmentDeletionPreservesStartedVisitAndMemberships() throws {
         let graph = try makeGraph()
         _ = ModelFixtures.makeVisit(appointment: graph.appointment, in: graph.context)
         try graph.context.save()
         try RecordDeletionRules.delete(graph.appointment, in: graph.context)
         #expect(try graph.context.fetchCount(FetchDescriptor<Appointment>()) == 0)
         #expect(try graph.context.fetchCount(FetchDescriptor<AppointmentHorse>()) == 0)
-        #expect(try graph.context.fetchCount(FetchDescriptor<Visit>()) == 0)
-        #expect(try graph.context.fetchCount(FetchDescriptor<VisitHorse>()) == 0)
+        #expect(try graph.context.fetchCount(FetchDescriptor<Visit>()) == 1)
+        #expect(try graph.context.fetchCount(FetchDescriptor<VisitHorse>()) == 1)
         #expect(try graph.context.fetchCount(FetchDescriptor<Horse>()) == 1)
     }
 
@@ -95,8 +95,8 @@ struct RecordDeletionRulesTests {
 
         #expect(try graph.context.fetchCount(FetchDescriptor<Visit>()) == 0)
         #expect(try graph.context.fetchCount(FetchDescriptor<VisitHorse>()) == 0)
-        #expect(try graph.context.fetchCount(FetchDescriptor<Appointment>()) == 0)
-        #expect(try graph.context.fetchCount(FetchDescriptor<AppointmentHorse>()) == 0)
+        #expect(try graph.context.fetchCount(FetchDescriptor<Appointment>()) == 1)
+        #expect(try graph.context.fetchCount(FetchDescriptor<AppointmentHorse>()) == 1)
         #expect(try graph.context.fetchCount(FetchDescriptor<Barn>()) == 1)
         #expect(try graph.context.fetchCount(FetchDescriptor<Horse>()) == 1)
         #expect(try graph.context.fetchCount(FetchDescriptor<Client>()) == 1)
@@ -196,7 +196,7 @@ struct RecordDeletionRulesTests {
     }
 
     @Test
-    func deletingServiceClearsDefaultsAndRecordedWork() throws {
+    func deletingReferencedServiceClearsDefaultsAndPreservesRecordedWork() throws {
         let graph = try makeGraph()
         let visit = ModelFixtures.makeVisit(appointment: graph.appointment, in: graph.context)
         let visitHorse = try #require(visit.visitHorses.first)
@@ -209,10 +209,16 @@ struct RecordDeletionRulesTests {
             in: graph.context
         )
 
+        let plannedHorse = try #require(graph.appointment.appointmentHorses.first)
+        plannedHorse.plannedService = service
+        try DomainGraphValidator.save(graph.context)
         try RecordDeletionRules.delete(service, in: graph.context)
         #expect(try graph.context.fetchCount(FetchDescriptor<Service>()) == 0)
-        #expect(try graph.context.fetchCount(FetchDescriptor<WorkItem>()) == 0)
+        #expect(try graph.context.fetchCount(FetchDescriptor<WorkItem>()) == 1)
+        #expect(plannedHorse.plannedService == nil)
         #expect(graph.horse.defaultService == nil)
+        #expect(try graph.context.fetch(FetchDescriptor<WorkItem>()).first?.service == nil)
+        try DomainGraphValidator.validateAll(in: graph.context)
     }
 
     @Test

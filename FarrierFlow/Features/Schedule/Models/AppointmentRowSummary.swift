@@ -50,6 +50,10 @@ struct AppointmentRowSummary {
         }
 
         // Appointment plans describe this booking; saved horse defaults are not a plan.
+        guard state != .completed else {
+            plannedServices = nil
+            return
+        }
         let plans = memberships.compactMap(\.plannedService)
         let names = Set(plans.map(\.name)).sorted(using: String.StandardComparator(.localizedStandard))
         guard !names.isEmpty else {

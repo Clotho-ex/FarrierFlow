@@ -12,10 +12,6 @@ struct VisitHorseResultRow: View {
                 outcomeText
                     .font(Typography.recordMetadata)
             }
-            if let workNotes = horse.workNotes {
-                LabeledContent("Work Notes", value: workNotes)
-                    .font(Typography.recordMetadata)
-            }
         }
         .accessibilityElement(children: .combine)
         .badge(dynamicTypeSize.isAccessibilitySize ? nil : outcomeText)

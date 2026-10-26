@@ -15,7 +15,7 @@ nonisolated enum WorkItemRules {
         var serviceIDs = Set<PersistentIdentifier>()
         var currencyCode: String?
         for workItem in workItems {
-            guard serviceIDs.insert(workItem.serviceID).inserted else {
+            if let serviceID = workItem.serviceID, !serviceIDs.insert(serviceID).inserted {
                 return .duplicateService
             }
             guard TextNormalization.required(workItem.serviceNameSnapshot) == workItem.serviceNameSnapshot else {

@@ -40,7 +40,7 @@ extension FarrierFlowSchemaV5 {
             serviceNameSnapshot: String,
             amountMinorUnits: Int64,
             currencyCode: String = "USD",
-            service: Service,
+            service: Service?,
             visitHorse: VisitHorse
         ) {
             self.syncID = syncID

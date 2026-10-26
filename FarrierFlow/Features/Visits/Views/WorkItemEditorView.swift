@@ -13,6 +13,7 @@ struct WorkItemEditorView: View {
     @State private var priceInput: String
     @State private var showsRemoveConfirmation = false
     @State private var showsUpdateError = false
+    @FocusState private var isPriceFocused: Bool
 
     init(
         model: VisitEditorModel,
@@ -33,7 +34,7 @@ struct WorkItemEditorView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Service") {
+                RecordSection(Text("Service")) {
                     LabeledContent("Service", value: workItem.serviceNameSnapshot)
                     if workItem.serviceIsArchived {
                         Text("Archived")
@@ -55,9 +56,10 @@ struct WorkItemEditorView: View {
                 }
                 .listRowBackground(ColorTokens.surface)
 
-                Section("Amount") {
+                RecordSection(Text("Amount")) {
                     TextField("Price", text: $priceInput)
                         .keyboardType(.decimalPad)
+                        .focused($isPriceFocused)
                         .accessibilityLabel("Price")
                         .accessibilityHint("Enter an amount in \(currencyLabel) with up to two decimal places.")
                         .accessibilityIdentifier("work-item-price-field")
@@ -91,10 +93,16 @@ struct WorkItemEditorView: View {
                 .listRowBackground(ColorTokens.surface)
             }
             .farrierFlowScrollBackground()
+            .scrollDismissesKeyboard(.interactively)
             .disabled(!subscription.allowsMutations)
             .navigationTitle("Edit Service")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { isPriceFocused = false }
+                        .accessibilityIdentifier("work-item-keyboard-done")
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                         .tint(ColorTokens.textSecondary)
@@ -114,11 +122,7 @@ struct WorkItemEditorView: View {
                 }
             }
         }
-        .confirmationDialog(
-            "Remove Service?",
-            isPresented: $showsRemoveConfirmation,
-            titleVisibility: .visible
-        ) {
+        .alert("Remove Service?", isPresented: $showsRemoveConfirmation) {
             Button("Remove Service", role: .destructive) {
                 guard subscription.allowsMutations else { return }
                 if model.removeWorkItem(workItem.id, from: visitHorseID) {
@@ -127,7 +131,7 @@ struct WorkItemEditorView: View {
                     showsUpdateError = true
                 }
             }
-            Button("Keep Editing", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         } message: {
             Text("This removes the Service from this horse’s visit. The reusable Service is kept.")
         }

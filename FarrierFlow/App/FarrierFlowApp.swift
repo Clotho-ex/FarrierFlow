@@ -112,6 +112,7 @@ struct FarrierFlowApp: App {
                         .uiTestAppClock(referenceDate: uiTestReferenceDate)
                         .environment(dependencies.subscriptionAccessModel)
                         .environment(\.backupSync, dependencies.backupSyncModel)
+                        .uiTestContactActionCapture()
                 case .failure:
                     ModelContainerFailureView()
                 }

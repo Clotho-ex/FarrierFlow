@@ -108,7 +108,6 @@ struct WorkItemDomainValidationTests {
         ("snapshot", DomainGraphViolation.workItemServiceNameSnapshotNotNormalized),
         ("amount", DomainGraphViolation.workItemAmountNegative),
         ("currency", DomainGraphViolation.workItemCurrencyInvalid),
-        ("service", DomainGraphViolation.workItemMissingService),
         ("owner", DomainGraphViolation.workItemMissingVisitHorse),
     ])
     func rejectsInvalidWorkItemPersistence(
@@ -130,8 +129,6 @@ struct WorkItemDomainValidationTests {
             workItem.amountMinorUnits = -1
         case "currency":
             workItem.currencyCode = "JPY"
-        case "service":
-            workItem.service = nil
         case "owner":
             workItem.visitHorse = nil
         default:

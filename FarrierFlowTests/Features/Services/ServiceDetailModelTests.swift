@@ -75,7 +75,7 @@ struct ServiceDetailModelTests {
     }
 
     @Test
-    func deletingReferencedAndUnreferencedServicesRemovesTheirWork() throws {
+    func deletingServicesPreservesRecordedWork() throws {
         let container = try ModelContainerFactory.inMemoryTest()
         let context = container.mainContext
         let unreferenced = ModelFixtures.makeService(in: context)
@@ -91,9 +91,51 @@ struct ServiceDetailModelTests {
         let referencedModel = ServiceDetailModel()
         referencedModel.load(id: referenced.persistentModelID, in: referencedContext)
         #expect(referencedModel.delete(in: referencedContext))
+        #expect(referencedModel.alert == nil)
         #expect(try referencedContext.fetchCount(FetchDescriptor<Service>()) == 0)
-        #expect(try referencedContext.fetchCount(FetchDescriptor<WorkItem>()) == 0)
+        #expect(try referencedContext.fetchCount(FetchDescriptor<WorkItem>()) == 1)
         try DomainGraphValidator.validateAll(in: referencedContext)
+    }
+
+    @Test(arguments: [false, true])
+    func deletedServicesKeepVisitWorkEditable(completed: Bool) throws {
+        let (container, service) = try serviceWithRecordedWork()
+        let context = container.mainContext
+        let visit = try #require(context.fetch(FetchDescriptor<Visit>()).first)
+        if !completed { visit.completedAt = nil }
+        let member = try #require(visit.visitHorses.first)
+        let otherService = ModelFixtures.makeService(name: "Brushing", in: context)
+        _ = ModelFixtures.makeWorkItem(service: otherService, visitHorse: member, in: context)
+        try DomainGraphValidator.save(context)
+        try RecordDeletionRules.delete(service, in: context)
+        try RecordDeletionRules.delete(otherService, in: context)
+        var draft = try VisitSaveUseCase.loadDraft(visitID: visit.persistentModelID, in: context)
+        #expect(draft.horses[0].workItems.count == 2)
+        #expect(draft.horses[0].workItems.allSatisfy { $0.serviceID == nil })
+        #expect(VisitRules.batchSourceViolation(for: draft.horses[0]) == .sourceContainsDeletedService)
+        draft.horses[0].workItems[0].amountMinorUnits = 8_000
+        let saved = try completed
+            ? VisitSaveUseCase.saveCorrection(draft: draft, in: context)
+            : VisitSaveUseCase.saveProgress(draft: draft, in: context)
+        #expect(saved.horses[0].workItems[0].amountMinorUnits == 8_000)
+        #expect(saved.horses[0].workItems.count == 2)
+        try DomainGraphValidator.validateAll(in: context)
+    }
+
+    @Test
+    func savingNewWorkWithoutACatalogServiceIsRejected() throws {
+        let (container, _) = try serviceWithRecordedWork()
+        let context = container.mainContext
+        let visit = try #require(context.fetch(FetchDescriptor<Visit>()).first)
+        var draft = try VisitSaveUseCase.loadDraft(visitID: visit.persistentModelID, in: context)
+        draft.horses[0].workItems.append(WorkItemDraft(
+            serviceID: nil, serviceNameSnapshot: "Deleted Service", amountMinorUnits: 5_000
+        ))
+        #expect(throws: DomainGraphViolation.workItemMissingService) {
+            _ = try VisitSaveUseCase.saveCorrection(draft: draft, in: context)
+        }
+        #expect(try context.fetchCount(FetchDescriptor<WorkItem>()) == 1)
+        try DomainGraphValidator.validateAll(in: context)
     }
 
     private func serviceWithRecordedWork() throws -> (ModelContainer, Service) {

@@ -123,7 +123,6 @@ struct DomainGraphValidatorTests {
     }
 
     @Test(arguments: [
-        ("appointment", DomainGraphViolation.visitMissingAppointment),
         ("barn", DomainGraphViolation.visitMissingBarn),
     ])
     func saveRejectsVisitWithoutRequiredRelationship(

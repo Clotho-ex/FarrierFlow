@@ -237,6 +237,7 @@ struct BackupSyncView: View {
 
     private func zoneHeading(_ title: LocalizedStringResource, identifier: String) -> some View {
         Text(title)
+            .recordSectionHeading()
             .accessibilityIdentifier(identifier)
     }
 

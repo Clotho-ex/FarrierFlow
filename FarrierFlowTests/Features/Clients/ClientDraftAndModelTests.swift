@@ -7,6 +7,34 @@ import Testing
 @MainActor
 struct ClientDraftAndModelTests {
     @Test
+    func listFailureIsDistinctFromEmptyAndRetryPreservesSavedRows() throws {
+        enum Failure: Error { case unavailable }
+        let container = try ModelContainerFactory.inMemoryTest()
+        var fails = true
+        let model = ClientListModel(fetching: { descriptor, context in
+            if fails { throw Failure.unavailable }
+            return try context.fetch(descriptor)
+        })
+        #expect(model.loadState == .loading)
+        model.load(in: ModelContext(container))
+        #expect(model.loadState == .failed && model.clients.isEmpty)
+        fails = false
+        model.load(in: ModelContext(container))
+        #expect(model.loadState == .loaded && model.clients.isEmpty && model.alert == nil)
+        container.mainContext.insert(Client(name: "Jordan"))
+        try container.mainContext.save()
+        model.load(in: ModelContext(container))
+        let saved = model.clients
+        #expect(saved.map(\.name) == ["Jordan"])
+        fails = true
+        model.load(in: ModelContext(container))
+        #expect(model.loadState == .failed && model.clients == saved && model.alert != nil)
+        fails = false
+        model.load(in: ModelContext(container))
+        #expect(model.loadState == .loaded && model.clients == saved && model.alert == nil)
+    }
+
+    @Test
     func draftRequiresTrimmedNameOnly() {
         #expect(!ClientDraft(name: "  ").isValid)
         #expect(ClientDraft(name: " Alex ", phone: "not formatted").isValid)

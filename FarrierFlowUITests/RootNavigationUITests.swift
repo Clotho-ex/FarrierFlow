@@ -2,7 +2,7 @@ import XCTest
 
 final class RootNavigationUITests: XCTestCase {
     @MainActor
-    func testShowcaseVisitEditorLabelsHoofPhotosOnce() {
+    func testShowcaseVisitEditorLabelsPhotosOnce() {
         let app = launchShowcase(storeName: "VisitEditorPhotographs")
         defer { app.terminate() }
 
@@ -12,6 +12,7 @@ final class RootNavigationUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Visit"].waitForExistence(timeout: 3))
 
         let photographs = app.buttons["visit-photographs-Atlas"].firstMatch
+        if !photographs.exists { app.buttons["visit-horse-toggle-Atlas"].tap() }
         for _ in 0..<4 where !photographs.isHittable {
             app.swipeUp()
         }
@@ -24,9 +25,9 @@ final class RootNavigationUITests: XCTestCase {
             "The Visit editor should visibly label the photograph row."
         )
         XCTAssertEqual(
-            photographs.label.components(separatedBy: "Hoof Photos").count - 1,
+            photographs.label.components(separatedBy: "Photos").count - 1,
             1,
-            "The Visit editor should show exactly one Hoof Photos label before its count."
+            "The Visit editor should show exactly one Photos label before its count."
         )
     }
 
@@ -37,17 +38,17 @@ final class RootNavigationUITests: XCTestCase {
 
         assertContentStartsBelowToolbar(
             tab: "Today",
-            content: app.staticTexts["Northline Farrier Service"].firstMatch,
-            minimumGap: 57,
+            content: app.staticTexts["today-date"].firstMatch,
+            minimumGap: 0,
             in: app
         )
-        let todayIdentity = app.staticTexts["Northline Farrier Service"].firstMatch
+        let todayDate = app.staticTexts["today-date"].firstMatch
         let todayAction = app.buttons["today-run-sheet-active"].firstMatch
         XCTAssertTrue(todayAction.waitForExistence(timeout: 3))
         XCTAssertGreaterThanOrEqual(
-            todayAction.frame.minY - todayIdentity.frame.maxY,
-            52,
-            "Today should keep a standard section rhythm between identity and action."
+            todayAction.frame.minY - todayDate.frame.maxY,
+            12,
+            "Today should separate its date from the next action without repeating business identity."
         )
         assertContentStartsBelowToolbar(
             tab: "Schedule",
@@ -59,8 +60,8 @@ final class RootNavigationUITests: XCTestCase {
         )
         assertContentStartsBelowToolbar(
             tab: "Clients",
-            content: app.descendants(matching: .any)["client-row-Jordan Ellis"].firstMatch,
-            minimumGap: 114,
+            content: app.descendants(matching: .any)["client-row-Casey Bennett"].firstMatch,
+            minimumGap: 16,
             in: app
         )
     }
@@ -90,6 +91,27 @@ final class RootNavigationUITests: XCTestCase {
             content: app.descendants(matching: .any)["client-row-Jordan Ellis"].firstMatch,
             in: app
         )
+    }
+
+    @MainActor
+    func testAllFourNamedTabsShareOneNativeBar() {
+        let app = launchShowcase(storeName: "UnifiedRootTabs")
+        defer { app.terminate() }
+        let bar = app.tabBars.firstMatch
+        XCTAssertTrue(bar.waitForExistence(timeout: 5))
+        XCTAssertEqual(bar.buttons.count, 4)
+        for title in ["Today", "Schedule", "Clients", "Business"] {
+            let tab = bar.buttons[title]
+            XCTAssertTrue(tab.exists)
+            XCTAssertTrue(tab.isHittable)
+            XCTAssertGreaterThanOrEqual(tab.frame.height, 44)
+        }
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "Unified native bar with four visible titles"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+        app.selectFarrierFlowTab("Business")
+        XCTAssertTrue(app.navigationBars["Business"].waitForExistence(timeout: 5))
     }
 
     @MainActor

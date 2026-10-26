@@ -67,7 +67,7 @@ struct InvoiceCreationView: View {
 
     private var form: some View {
         Form {
-            Section("Client") {
+            RecordSection(Text("Client")) {
                 Text(model.clientName ?? "")
             }
             .listRowBackground(ColorTokens.surface)
@@ -89,12 +89,12 @@ struct InvoiceCreationView: View {
                         .foregroundStyle(ColorTokens.textSecondary)
                 }
             } header: {
-                Text("Completed Visits")
+                Text("Completed Visits").recordSectionHeading()
             } footer: {
                 Text("Selecting a visit includes all eligible recorded work for this client.")
             }
             .listRowBackground(ColorTokens.surface)
-            Section("Selection Summary") {
+            RecordSection(Text("Selection Summary")) {
                 LabeledContent("Visits") {
                     Text(model.selectionSummary?.visitCount ?? 0, format: .number)
                 }
@@ -111,7 +111,7 @@ struct InvoiceCreationView: View {
             }
             .listRowBackground(ColorTokens.surface)
             if !model.hasValidBusinessProfile {
-                Section("Finish Business Setup") {
+                RecordSection(Text("Finish Business Setup")) {
                     RecordNavigationLink {
                         BusinessProfileEditorView(onSaved: reload)
                     } label: {
@@ -123,7 +123,7 @@ struct InvoiceCreationView: View {
                 .listRowBackground(ColorTokens.surface)
             }
             if let draft = model.draft {
-                Section("Invoice") {
+                RecordSection(Text("Invoice")) {
                     DatePicker(
                         "Invoice Date",
                         selection: Binding(
@@ -138,7 +138,7 @@ struct InvoiceCreationView: View {
                     }
                 }
                 .listRowBackground(ColorTokens.surface)
-                Section("Note") {
+                RecordSection(Text("Note")) {
                     TextField(
                         "Invoice Note",
                         text: draftBinding(\.note, fallback: draft.note),

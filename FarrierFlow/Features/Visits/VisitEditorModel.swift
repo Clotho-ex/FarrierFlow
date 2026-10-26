@@ -19,12 +19,6 @@ nonisolated enum VisitEditorMode: Equatable {
     case correction
 }
 
-nonisolated enum VisitAddServiceRequest: Equatable {
-    case createService
-    case chooseService
-    case serviceAdded
-}
-
 nonisolated struct VisitBatchWorkSourceChoice: Equatable, Identifiable {
     let id: PersistentIdentifier
     let horseName: String
@@ -35,6 +29,12 @@ nonisolated struct VisitBatchWorkTargetChoice: Equatable, Identifiable {
     let id: PersistentIdentifier
     let horseName: String
     let violation: VisitBatchWorkViolation?
+}
+
+nonisolated struct VisitHorseContext: Equatable {
+    let clientID: PersistentIdentifier?
+    let clientName: String?
+    let safetyNotes: String?
 }
 
 @MainActor
@@ -58,6 +58,10 @@ final class VisitEditorModel {
 
     private(set) var loadState: VisitEditorLoadState = .loading
     private(set) var lastSavedDraft: VisitDraft?
+    private(set) var hasScheduledAppointment = false
+    private(set) var serviceLocationName: String?
+    private(set) var serviceLocationAddress: String?
+    private(set) var horseContext: [PersistentIdentifier: VisitHorseContext] = [:]
     var draft: VisitDraft?
     private(set) var pendingOutcomeChange: VisitOutcomeChange?
     private var backgroundSaveErrorPending = false
@@ -69,6 +73,25 @@ final class VisitEditorModel {
 
     var isDirty: Bool {
         draft != lastSavedDraft
+    }
+
+    var recordedHorseCount: Int {
+        draft?.horses.filter(\.hasRecordedOutcome).count ?? 0
+    }
+
+    var sharedClientName: String? {
+        guard let horses = draft?.horses, !horses.isEmpty,
+              let first = horses.first.flatMap({ horseContext[$0.id] }),
+              let clientID = first.clientID,
+              let name = first.clientName.flatMap(TextNormalization.optional),
+              horses.allSatisfy({ horseContext[$0.id]?.clientID == clientID }) else {
+            return nil
+        }
+        return name
+    }
+
+    var savedRecordedTotal: VisitRecordedTotal {
+        lastSavedDraft?.recordedTotal ?? .none
     }
 
     var canSaveProgress: Bool {
@@ -152,8 +175,25 @@ final class VisitEditorModel {
                 throw VisitSaveError.visitUnavailable
             }
             let loadedDraft = try loading(visitID, context)
+            var loadedContext: [PersistentIdentifier: VisitHorseContext] = [:]
+            if mode == .inProgress {
+                guard let visit = try context.existingModel(Visit.self, for: visitID) else {
+                    throw VisitSaveError.visitUnavailable
+                }
+                hasScheduledAppointment = visit.appointment != nil
+                serviceLocationName = visit.serviceLocationNameSnapshot
+                serviceLocationAddress = visit.serviceLocationAddressSnapshot
+                for membership in visit.visitHorses {
+                    loadedContext[membership.persistentModelID] = VisitHorseContext(
+                        clientID: membership.horse?.client?.persistentModelID,
+                        clientName: membership.horse?.client?.name,
+                        safetyNotes: membership.horse?.safetyNotes
+                    )
+                }
+            }
             draft = loadedDraft
             lastSavedDraft = loadedDraft
+            horseContext = loadedContext
             alert = nil
             loadState = .loaded
         } catch {
@@ -275,28 +315,12 @@ final class VisitEditorModel {
             let usedServiceIDs = Set(
                 horse.workItems
                     .filter { $0.id != workItemID }
-                    .map(\.serviceID)
+                    .compactMap(\.serviceID)
             )
             return ServiceRules.activeChoices(services).filter { !usedServiceIDs.contains($0.id) }
         } catch {
             Self.logger.error("Failed to load Services: \(error, privacy: .public)")
             return []
-        }
-    }
-
-    func requestAddService(
-        to visitHorseID: PersistentIdentifier
-    ) -> VisitAddServiceRequest {
-        let services = eligibleServices(for: visitHorseID)
-        switch services.count {
-        case 0:
-            return .createService
-        case 1:
-            return addService(services[0], to: visitHorseID)
-                ? .serviceAdded
-                : .chooseService
-        default:
-            return .chooseService
         }
     }
 
@@ -403,7 +427,7 @@ final class VisitEditorModel {
     @discardableResult
     func updateWorkItem(
         _ workItemID: UUID,
-        serviceID: PersistentIdentifier,
+        serviceID: PersistentIdentifier?,
         priceInput: String,
         for visitHorseID: PersistentIdentifier,
         locale: Locale = .current
@@ -427,7 +451,8 @@ final class VisitEditorModel {
             return false
         }
         if current.serviceID != serviceID {
-            guard replaceWorkItem(workItemID, with: serviceID, for: visitHorseID) else {
+            guard let serviceID,
+                  replaceWorkItem(workItemID, with: serviceID, for: visitHorseID) else {
                 return false
             }
             guard
@@ -620,6 +645,7 @@ final class VisitEditorModel {
              .sourceMustBeServiced,
              .sourceRequiresRecordedWork,
              .invalidSourceWork,
+             .sourceContainsDeletedService,
              .sourceContainsArchivedService:
             message = "The source horse no longer has eligible recorded work."
         case .duplicateTarget,

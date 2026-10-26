@@ -76,7 +76,7 @@ struct ApplyVisitWorkView: View {
     }
 
     private var sourceSection: some View {
-        Section("Source Horse") {
+        RecordSection(Text("Source Horse")) {
             Picker("Copy Work From", selection: $selectedSourceID) {
                 ForEach(sourceChoices) { source in
                     Text(source.horseName)
@@ -107,7 +107,7 @@ struct ApplyVisitWorkView: View {
                 )
             }
         } header: {
-            Text("Recorded Work")
+            Text("Recorded Work").recordSectionHeading()
         } footer: {
             Text("Service names and prices are copied exactly. Work Notes and photographs are not copied.")
         }
@@ -142,7 +142,7 @@ struct ApplyVisitWorkView: View {
                 }
             }
         } header: {
-            Text("Apply To")
+            Text("Apply To").recordSectionHeading()
         } footer: {
             Text("Horses with an outcome, Work Notes, or recorded Services are never changed.")
         }
@@ -190,6 +190,7 @@ struct ApplyVisitWorkView: View {
              .sourceMustBeServiced,
              .sourceRequiresRecordedWork,
              .invalidSourceWork,
+             .sourceContainsDeletedService,
              .sourceContainsArchivedService,
              .targetHorseUnavailable,
              .invalidResult:

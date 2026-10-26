@@ -325,13 +325,11 @@ enum DomainGraphValidator {
         businessCurrencyCode: String?,
         serviceWorkItems: [ObjectIdentifier: Set<ObjectIdentifier>]
     ) throws {
-        guard let service = workItem.service else {
-            throw DomainGraphViolation.workItemMissingService
-        }
         guard let visitHorse = workItem.visitHorse else {
             throw DomainGraphViolation.workItemMissingVisitHorse
         }
-        guard serviceWorkItems[ObjectIdentifier(service)]?.contains(ObjectIdentifier(workItem)) == true else {
+        if let service = workItem.service,
+           serviceWorkItems[ObjectIdentifier(service)]?.contains(ObjectIdentifier(workItem)) != true {
             throw DomainGraphViolation.workItemServiceInverseMismatch
         }
         guard visitHorse.workItems.contains(where: { $0 === workItem }) else {
@@ -344,7 +342,7 @@ enum DomainGraphValidator {
             throw DomainGraphViolation.workItemAmountNegative
         }
         guard BusinessCurrency.isSupported(workItem.currencyCode),
-              workItem.currencyCode == service.currencyCode,
+              workItem.service.map({ $0.currencyCode == workItem.currencyCode }) ?? true,
               businessCurrencyCode.map({ $0 == workItem.currencyCode }) ?? true
         else {
             throw DomainGraphViolation.workItemCurrencyInvalid
@@ -616,13 +614,11 @@ enum DomainGraphValidator {
         memberships: [VisitHorse],
         appointmentMemberships: inout [PersistentIdentifier: [AppointmentHorse]]
     ) throws {
-        guard let appointment = visit.appointment else {
-            throw DomainGraphViolation.visitMissingAppointment
-        }
+        let appointment = visit.appointment
         guard let barn = visit.barn else {
             throw DomainGraphViolation.visitMissingBarn
         }
-        guard appointment.visit === visit, appointment.barn === barn else {
+        if let appointment, appointment.visit !== visit || appointment.barn !== barn {
             throw DomainGraphViolation.appointmentVisitMismatch
         }
         guard TextNormalization.required(visit.serviceLocationNameSnapshot) != nil else {
@@ -635,14 +631,14 @@ enum DomainGraphValidator {
             throw DomainGraphViolation.invoiceVisitSourceInverseMismatch
         }
 
-        let appointmentHorseIDs = try Set(
-            appointmentMemberships[appointment.persistentModelID, default: []].map { membership in
+        let appointmentHorseIDs = try appointment.map { appointment in
+            try Set(appointmentMemberships[appointment.persistentModelID, default: []].map { membership in
                 guard let horse = membership.horse else {
                     throw DomainGraphViolation.appointmentHorseMissingHorse
                 }
                 return horse.persistentModelID
-            }
-        )
+            })
+        }
 
         var visitHorseIDs = Set<PersistentIdentifier>()
         var hasPendingHorse = false
@@ -668,10 +664,8 @@ enum DomainGraphValidator {
             }
             var serviceIDs = Set<PersistentIdentifier>()
             for workItem in workItems {
-                guard let service = workItem.service else {
-                    throw DomainGraphViolation.workItemMissingService
-                }
-                guard serviceIDs.insert(service.persistentModelID).inserted else {
+                if let service = workItem.service,
+                   !serviceIDs.insert(service.persistentModelID).inserted {
                     throw DomainGraphViolation.duplicateWorkItemService
                 }
             }
@@ -694,7 +688,7 @@ enum DomainGraphValidator {
             }
         }
 
-        guard visitHorseIDs == appointmentHorseIDs else {
+        if let appointmentHorseIDs, visitHorseIDs != appointmentHorseIDs {
             throw DomainGraphViolation.visitMembershipMismatch
         }
 

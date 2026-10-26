@@ -66,6 +66,7 @@ final class BusinessOverviewUITests: XCTestCase {
         capture(app, "Current month completed visits")
         rows.firstMatch.tap()
         XCTAssertTrue(app.navigationBars["Visit"].waitForExistence(timeout: 3))
+        app.buttons["visit-detail-actions"].tap()
         app.buttons["visit-delete-action"].tap()
         let confirm = app.buttons["visit-delete-confirmation"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 3))
@@ -99,7 +100,7 @@ final class BusinessOverviewUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Completed Visits"].waitForExistence(timeout: 3))
         visitRows(in: app).firstMatch.tap()
         XCTAssertTrue(app.navigationBars["Visit"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.descendants(matching: .any)["visit-detail-accessibility-overview"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["visit-detail-work-dates"].waitForExistence(timeout: 3))
         XCTAssertFalse(app.buttons["visit-edit-action"].exists)
         XCTAssertFalse(app.buttons["visit-delete-action"].exists)
         capture(app, "Existing read-only Visit detail")

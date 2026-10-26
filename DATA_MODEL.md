@@ -1,3 +1,24 @@
+## Schedule removal and Recorded Work (2026-10-25)
+
+Removing an appointment or using Delete Visit outside Recorded Work deletes only
+the scheduling record and its AppointmentHorse joins. The Visit retains its own
+VisitHorse records, work snapshots, photos and invoice links with a nil source
+Appointment. Completed and detached in-progress records remain accessible in
+Recorded Work. Only that screen exposes Delete Recorded Work, which deletes the
+historical aggregate and its photos while retaining any scheduled appointment and
+immutable invoices. Existing parent-record deletion policies are unchanged.
+No local schema migration is required; matching sync contract changes are deployed
+to FarrierFlow Dev.
+
+## Catalogue service deletion (2026-10-25)
+
+Deleting a catalogue Service clears horse defaults and appointment plans, and
+nulls the optional WorkItem service reference. Recorded names, amounts, currencies,
+visit outcomes, photos and invoice links remain intact. Historical work remains
+editable and invoiceable from its snapshots. Creating new work still requires an
+active catalog Service. No local schema migration is required. The matching sync
+contract update is deployed to FarrierFlow Dev.
+
 # FarrierFlow Data Model
 
 ## Appointment service planning (V5)
@@ -82,8 +103,8 @@ it adds no model or migration.
 - Client information for an appointment is derived from its selected horses.
 - One appointment may contain horses owned by multiple clients.
 - An appointment has zero or one Visit.
-- A Visit belongs to exactly one Appointment and one Barn.
-- A Visit contains exactly one VisitHorse for every AppointmentHorse.
+- A Visit belongs to one Barn and optionally retains its source Appointment.
+- While linked, a Visit contains exactly one VisitHorse per AppointmentHorse.
 - A VisitHorse belongs to exactly one Visit and one Horse.
 - A Photograph belongs to exactly one VisitHorse and never changes ownership.
 - A VisitHorse may own photographs while Pending, Serviced, or Not Serviced.
@@ -301,9 +322,8 @@ duration is absent, Today and Schedule display only the start time.
 
 ### Deletion
 
-An Appointment with a Visit cannot be deleted. When no Visit exists, deleting
-an Appointment cascades only to its AppointmentHorse records. It never deletes
-its Barn, Horses, Clients, or Visit.
+Deleting an Appointment removes its AppointmentHorse records and detaches any
+Visit. The recorded Visit, work, photos, Barn, Horses and Clients remain intact.
 
 ## AppointmentHorse
 
@@ -354,9 +374,9 @@ Visit state is derived from `completedAt`; it is not redundantly persisted.
 
 ### Relationships
 
-- `appointment: Appointment?` is the inverse of `Appointment.visit`. Optional
-  in SwiftData storage for iOS 18 deletion compatibility; required by the
-  domain contract and validated before save.
+- `appointment: Appointment?` is the inverse of `Appointment.visit`. Required
+  when starting work; optional for retained history after schedule removal.
+  A present reference and its exact membership are validated before save.
 - `barn: Barn?` is the inverse of `Barn.visits`. Optional in SwiftData storage
   for iOS 18 deletion compatibility; required by the domain contract and
   validated before save.
@@ -475,8 +495,9 @@ integer minor units, supported business currency code, and archive state. An
 archived Service remains historical but is not eligible for new WorkItems or as
 a Horse default.
 
-`WorkItem` belongs to one VisitHorse and one Service. It stores the recorded
-Service-name, amount, and currency snapshots. A VisitHorse prevents
+`WorkItem` belongs to one VisitHorse and optionally references its catalog Service.
+It stores the recorded Service-name, amount, and currency snapshots, which survive
+catalog deletion. A VisitHorse prevents
 duplicate WorkItems for the same Service. Every serviced VisitHorse must have at
 least one WorkItem before completion; not-serviced VisitHorses have none. A
 completed Visit may correct these values only until any of its WorkItems is
@@ -596,7 +617,7 @@ both be explicitly deleted; completed Visits can be deleted with their Appointme
 | `Invoice.client` | `Client.invoices` | Nullify | Deleting an eligible unpaid Invoice removes only the inverse; Client remains |
 | `Invoice.payments` | `Payment.invoice` | Cascade | Deleting an eligible unpaid Invoice has no Payment; ownership protects future aggregate cleanup |
 | `Payment.invoice` | `Invoice.payments` | Nullify | Removing recorded Payment evidence clears only its Invoice inverse |
-| `Service.workItems` | `WorkItem.service` | Deny | Service cannot be deleted while historical WorkItems reference it |
+| `Service.workItems` | `WorkItem.service` | Deny | Deletion explicitly detaches recorded WorkItems before removing the Service |
 | `VisitHorse.workItems` | `WorkItem.visitHorse` | Cascade | Deleting an owned in-progress VisitHorse deletes its WorkItems |
 | `WorkItem.invoiceLineItem` | `InvoiceLineItem.sourceWorkItem` | Deny | A billed WorkItem cannot be deleted or billed again |
 | `Visit.invoiceVisits` | `InvoiceVisit.sourceVisit` | Deny | A Visit with invoice history cannot be deleted |
@@ -684,8 +705,9 @@ Immediately before every controlled save, complete-graph validation rejects:
 - Work Notes on pending or not-serviced membership.
 - A Photograph without an inverse-matching VisitHorse, with invalid dimensions
   or byte count, or with a duplicate UUID.
-- A WorkItem without inverse-matching VisitHorse and Service, with an invalid
-  snapshot or amount, or duplicated for one Service within a VisitHorse.
+- A WorkItem without an inverse-matching VisitHorse, with a non-matching Service
+  inverse when present, an invalid snapshot or amount, or a duplicate non-nil
+  Service within a VisitHorse.
 - Multiple Business Profiles, an invalid next-number sequence, or a nonpositive
   owner default.
 - An Invoice without one Client, at least one InvoiceVisit and InvoiceLineItem,

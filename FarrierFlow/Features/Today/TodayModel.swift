@@ -290,7 +290,7 @@ final class TodayModel {
     ) throws -> [TodayVisitSummary] {
         let visits = try context.fetch(
             FetchDescriptor<Visit>(
-                predicate: #Predicate { $0.completedAt == nil },
+                predicate: #Predicate { $0.completedAt == nil && $0.appointment != nil },
                 sortBy: [SortDescriptor(\.startedAt)]
             )
         )

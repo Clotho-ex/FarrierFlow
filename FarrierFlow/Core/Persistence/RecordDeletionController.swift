@@ -35,6 +35,10 @@ final class RecordDeletionController {
     }
 
     private func show(_ error: Error) {
+        if let block = error as? RecordDeletionBlock {
+            alert = block.alert
+            return
+        }
         let message: LocalizedStringResource
         switch error {
         case RecordDeletionError.dependenciesChanged:

@@ -50,7 +50,8 @@ struct RecordUsageSnapshot: Equatable {
             }
             // Horse history already shows started visits. Services can also be
             // referenced by a planned choice before any work is recorded.
-            guard includingStarted || appointment.visit == nil else { continue }
+            guard appointment.visit?.completedAt == nil,
+                  includingStarted || appointment.visit == nil else { continue }
             records[appointment.persistentModelID] = AppointmentReference(
                 id: appointment.persistentModelID,
                 startDate: appointment.startDate,

@@ -42,38 +42,89 @@ struct AppointmentDetailView: View {
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
 
+                    if let visit = detail.visit, visit.completedAt != nil {
+                        Section {
+                            Button {
+                                model.present(visitID: visit.id, completedAt: visit.completedAt)
+                            } label: {
+                                LabeledContent {
+                                    Image(systemName: "arrow.right")
+                                        .accessibilityHidden(true)
+                                } label: {
+                                    Text("View Completed Visit")
+                                }
+                            }
+                            .foregroundStyle(ColorTokens.textPrimary)
+                            .accessibilityIdentifier("visit-view-action")
+                        }
+                        .listRowBackground(ColorTokens.recordSurface)
+                    }
+
+                    if detail.visit == nil, subscription.allowsMutations {
+                        Section {
+                            Button {
+                                guard subscription.allowsMutations else { return }
+                                model.startVisit(
+                                    in: context.container,
+                                    analyticsClient: analyticsClient
+                                )
+                            } label: {
+                                AppointmentActionLabel(
+                                    title: "Start Visit",
+                                    systemImage: "arrow.right"
+                                )
+                            }
+                            .farrierFlowPrimaryAction()
+                            .controlSize(.large)
+                            .accessibilityIdentifier("visit-start-action")
+                        }
+                        .listRowInsets(
+                            EdgeInsets(
+                                top: 0,
+                                leading: 20,
+                                bottom: SpacingTokens.standard,
+                                trailing: 20
+                            )
+                        )
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                    }
+
                     if hasSupplementalDetails(detail) {
-                        Section("Details") {
+                        RecordSection(Text("Details")) {
                             if let address = detail.barnAddress {
-                                LabeledContent("Address", value: address)
+                                ServiceLocationAddress(address: address, title: "Address")
                                     .accessibilityIdentifier("appointment-detail-address")
                             }
                             if let arrivalNotes = detail.barnContactNotes {
-                                LabeledContent("Arrival Notes", value: arrivalNotes)
+                                RecordDetailField("Arrival Notes") { Text(arrivalNotes) }
+                                    .accessibilityElement(children: .combine)
                                     .accessibilityIdentifier(
                                         "appointment-detail-arrival-notes"
                                     )
                             }
                             if let duration = detail.expectedDurationMinutes {
-                                LabeledContent(
-                                    "Expected Duration",
-                                    value: AppointmentDurationFormatter.string(
+                                RecordDetailField("Expected Duration") {
+                                    Text(AppointmentDurationFormatter.string(
                                         minutes: duration,
                                         locale: locale
-                                    )
-                                )
+                                    ))
+                                }
+                                .accessibilityElement(children: .combine)
                                 .accessibilityIdentifier(
                                     "appointment-detail-expected-duration"
                                 )
                             }
-                            if let notes = detail.notes {
-                                LabeledContent("Notes", value: notes)
+                            if let notes = TextNormalization.optional(detail.notes ?? "") {
+                                AppointmentNoteView(note: notes)
+                                    .accessibilityElement(children: .combine)
+                                    .accessibilityIdentifier("appointment-detail-notes")
                             }
                         }
                         .listRowBackground(ColorTokens.recordSurface)
                     }
 
-                    Section("Horses") {
+                    RecordSection(Text("Horses")) {
                         ForEach(detail.horses) { horse in
                             if let horseName = horse.name {
                                 VStack(
@@ -91,15 +142,17 @@ struct AppointmentDetailView: View {
                                     )
                                         .font(Typography.recordMetadata)
                                         .foregroundStyle(ColorTokens.textSecondary)
-                                    if let serviceName = horse.plannedServiceName {
+                                    if detail.visit?.completedAt == nil,
+                                       let serviceName = horse.plannedServiceName {
                                         LabeledContent("Service", value: serviceName)
                                             .font(Typography.recordMetadata)
                                             .accessibilityIdentifier("appointment-planned-service-\(horseName)")
                                     }
                                     if let phone = horse.clientPhone {
-                                        Text(phone)
+                                        clientPhone(phone)
                                             .font(Typography.recordMetadata)
                                             .foregroundStyle(ColorTokens.textSecondary)
+                                            .accessibilityIdentifier("appointment-call-\(horseName)")
                                     }
                                     if let safetyNotes = horse.safetyNotes {
                                         Label {
@@ -119,34 +172,31 @@ struct AppointmentDetailView: View {
                         }
                     }
                     .listRowBackground(ColorTokens.recordSurface)
-                    if detail.visit == nil, subscription.allowsMutations {
+
+                    if detail.visit?.completedAt != nil,
+                       detail.horses.contains(where: { $0.plannedServiceName != nil }) {
                         Section {
-                            Button {
-                                guard subscription.allowsMutations else { return }
-                                model.startVisit(
-                                    in: context.container,
-                                    analyticsClient: analyticsClient
-                                )
+                            DisclosureGroup {
+                                ForEach(detail.horses) { horse in
+                                    if let serviceName = horse.plannedServiceName {
+                                        VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
+                                            Text(verbatim: horse.name ?? String(localized: "Horse unavailable", locale: locale))
+                                                .font(.subheadline)
+                                                .foregroundStyle(ColorTokens.textSecondary)
+                                            Text(serviceName)
+                                        }
+                                        .accessibilityElement(children: .combine)
+                                        .accessibilityIdentifier("appointment-original-plan-\(horse.name ?? "unavailable")")
+                                    }
+                                }
                             } label: {
-                                AppointmentActionLabel(
-                                    title: "Start Visit",
-                                    systemImage: "arrow.right"
-                                )
+                                Text("Original Planned Services")
+                                    .accessibilityIdentifier("appointment-original-plan")
                             }
-                            .farrierFlowBorderedAction()
-                            .accessibilityIdentifier("visit-start-action")
                         }
-                        .listRowInsets(
-                            EdgeInsets(
-                                top: 0,
-                                leading: 20,
-                                bottom: SpacingTokens.standard,
-                                trailing: 20
-                            )
-                        )
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
+                        .listRowBackground(ColorTokens.recordSurface)
                     }
+
                 }
                 .listSectionSpacing(.custom(SpacingTokens.standard))
                 .contentMargins(.top, 0, for: .scrollContent)
@@ -156,9 +206,9 @@ struct AppointmentDetailView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItemGroup(placement: .topBarTrailing) {
-                        if let visit = detail.visit {
-                            Button(visit.completedAt == nil && subscription.allowsMutations ? "Resume Visit" : "View Visit") {
-                                if visit.completedAt == nil, !subscription.allowsMutations {
+                        if let visit = detail.visit, visit.completedAt == nil {
+                            Button(subscription.allowsMutations ? "Resume Visit" : "View Visit") {
+                                if !subscription.allowsMutations {
                                     model.visitPresentation = .detail(visit.id)
                                 } else {
                                     model.present(
@@ -168,9 +218,7 @@ struct AppointmentDetailView: View {
                                 }
                             }
                             .accessibilityIdentifier(
-                                visit.completedAt == nil
-                                    ? (subscription.allowsMutations ? "visit-resume-action" : "visit-view-action")
-                                    : "visit-view-action"
+                                subscription.allowsMutations ? "visit-resume-action" : "visit-view-action"
                             )
                         }
                         if subscription.allowsMutations {
@@ -261,7 +309,27 @@ struct AppointmentDetailView: View {
         detail.barnAddress != nil
             || detail.barnContactNotes != nil
             || detail.expectedDurationMinutes != nil
-            || detail.notes != nil
+            || TextNormalization.optional(detail.notes ?? "") != nil
+    }
+
+    @ViewBuilder
+    private func clientPhone(_ phone: String) -> some View {
+        if let url = ClientContactURL.phone(phone) {
+            Link(destination: url) {
+                HStack(alignment: .firstTextBaseline, spacing: SpacingTokens.compact) {
+                    Image(systemName: "phone")
+                        .accessibilityHidden(true)
+                    Text(verbatim: phone)
+                }
+                .foregroundStyle(ColorTokens.brandActionText)
+                .frame(maxWidth: .infinity, minHeight: SpacingTokens.minimumTouchTarget, alignment: .leading)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text("Call \(phone)"))
+        } else {
+            Text(verbatim: phone)
+        }
     }
 
     private func handleVisitEditorDismissal() {
@@ -366,8 +434,13 @@ private struct AppointmentSummaryHeader: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
+    @ViewBuilder
     private var statusBadge: some View {
-        RecordStatusPill(title: status.title, tone: status.tone)
+        if case .completed = status {
+            CompletedStatusPill()
+        } else {
+            RecordStatusPill(title: status.title, tone: status.tone)
+        }
     }
 }
 

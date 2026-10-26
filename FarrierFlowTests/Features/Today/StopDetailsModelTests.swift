@@ -25,7 +25,7 @@ struct StopDetailsModelTests {
         #expect(Set(stops.flatMap(\.appointments).map(\.id)) == fixture.ids)
         let schedule = ScheduleModel()
         schedule.load(in: fixture.context, now: fixture.start, calendar: .current)
-        #expect(Set(schedule.sections.flatMap(\.appointments).map(\.persistentModelID)) == fixture.ids)
+        #expect(Set(schedule.sections.flatMap(\.appointments).map(\.id)) == fixture.ids)
         #expect(schedule.sections.flatMap(\.appointments).last?.startDate == editor.draft.startDate)
     }
 

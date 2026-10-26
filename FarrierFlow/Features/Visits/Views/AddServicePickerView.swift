@@ -4,6 +4,7 @@ import SwiftUI
 struct AddServicePickerView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(SubscriptionAccessModel.self) private var subscription
 
     @Bindable var model: VisitEditorModel
@@ -31,34 +32,29 @@ struct AddServicePickerView: View {
     }
 
     var body: some View {
-        Group {
-            if services.isEmpty {
-                ContentUnavailableView {
-                    Label("No Services Available", systemImage: "wrench.and.screwdriver")
-                } description: {
-                    Text("Add or reactivate a Service before recording work.")
-                } actions: {
-                    if subscription.allowsMutations, replacingWorkItemID == nil {
-                        Button("Create Service", systemImage: "plus") {
-                            showsServiceEditor = true
-                        }
-                        .accessibilityIdentifier("visit-create-service-action")
-                    }
+        let choices = services
+        List {
+            Section {
+                if choices.isEmpty {
+                    Text("No Services Available")
+                        .foregroundStyle(ColorTokens.textSecondary)
                 }
-            } else {
-                List(services) { service in
+                ForEach(choices) { service in
                     Button {
                         select(service)
                     } label: {
-                        HStack(alignment: .firstTextBaseline, spacing: SpacingTokens.rowContent) {
+                        serviceRowLayout {
                             Text(service.name)
                                 .font(Typography.recordTitle)
-                            Spacer(minLength: SpacingTokens.rowContent)
+                            if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: SpacingTokens.rowContent) }
                             Text(formattedAmount(for: service))
                                 .font(Typography.recordMetadata)
                                 .foregroundStyle(ColorTokens.textSecondary)
                                 .monospacedDigit()
                         }
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(.rect)
                     }
                     .disabled(!subscription.allowsMutations)
                     .accessibilityLabel("\(service.name), \(formattedAmount(for: service))")
@@ -66,12 +62,27 @@ struct AddServicePickerView: View {
                     .accessibilityIdentifier("visit-service-option-\(service.name)")
                     .listRowBackground(ColorTokens.surface)
                 }
-                .farrierFlowScrollBackground()
+            }
+            .listRowBackground(ColorTokens.surface)
+            if subscription.allowsMutations {
+                Section {
+                    Button("Create New Service", systemImage: "plus") { showsServiceEditor = true }
+                        .accessibilityIdentifier("visit-create-service-action")
+                }
+                .listRowBackground(ColorTokens.surface)
             }
         }
-        .farrierFlowScreenBackground()
+        .farrierFlowScrollBackground()
         .navigationTitle(replacingWorkItemID == nil ? "Add Service" : "Replace Service")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if replacingWorkItemID == nil {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .tint(ColorTokens.textSecondary)
+                }
+            }
+        }
         .sheet(isPresented: $showsServiceEditor, onDismiss: addCreatedServiceIfNeeded) {
             ServiceEditorView(createdServiceID: $createdServiceID)
         }
@@ -80,6 +91,12 @@ struct AddServicePickerView: View {
         } message: {
             Text("The Service is still in the visit. Try again.")
         }
+    }
+
+    private var serviceRowLayout: AnyLayout {
+        dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: SpacingTokens.rowContent))
+            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: SpacingTokens.rowContent))
     }
 
     private var services: [ServiceChoice] {
@@ -128,11 +145,18 @@ struct AddServicePickerView: View {
         guard let createdServiceID else { return }
         self.createdServiceID = nil
 
-        guard model.addService(createdServiceID, to: visitHorseID) else {
+        let succeeded: Bool
+        if let replacingWorkItemID {
+            succeeded = model.replaceWorkItem(replacingWorkItemID, with: createdServiceID, for: visitHorseID)
+        } else {
+            succeeded = model.addService(createdServiceID, to: visitHorseID)
+        }
+        guard succeeded else {
             showsSelectionError = true
             return
         }
 
-        dismiss()
+        if let onSuccessfulReplacement { onSuccessfulReplacement() }
+        else { dismiss() }
     }
 }

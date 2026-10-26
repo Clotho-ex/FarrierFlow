@@ -234,9 +234,6 @@ struct VisitDetailModelTests {
         try assertUnavailableAfterDirectSave { visit, _ in
             visit.completedAt = Date(timeIntervalSinceReferenceDate: 99)
         }
-        try assertUnavailableAfterDirectSave { visit, _ in
-            visit.appointment = nil
-        }
     }
 
     @Test

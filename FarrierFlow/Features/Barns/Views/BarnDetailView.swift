@@ -29,7 +29,7 @@ struct BarnDetailView: View {
                                 .foregroundStyle(ColorTokens.textPrimary)
                                 .accessibilityAddTraits(.isHeader)
                             if let address = barn.address {
-                                Text(address)
+                                ServiceLocationAddress(address: address)
                                     .font(Typography.recordMetadata)
                                     .foregroundStyle(ColorTokens.textSecondary)
                             }
@@ -145,12 +145,12 @@ struct BarnDetailView: View {
     private var horsesSectionHeader: some View {
         if dynamicTypeSize.isAccessibilitySize {
             VStack(alignment: .leading, spacing: SpacingTokens.tight) {
-                Text("Horses")
+                Text("Horses").recordSectionHeading()
                 addHorseButton
             }
         } else {
             HStack(spacing: SpacingTokens.compact) {
-                Text("Horses")
+                Text("Horses").recordSectionHeading()
                 Spacer(minLength: SpacingTokens.compact)
                 addHorseButton
             }

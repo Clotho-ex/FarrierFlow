@@ -20,10 +20,11 @@ struct ColorTokensTests {
                     traits.userInterfaceStyle = style
                     traits.accessibilityContrast = contrastMode
                 }
-                for surface in [ColorTokens.Palette.recordSurface, ColorTokens.Palette.featuredSurface] {
+                for surface in [ColorTokens.Palette.recordSurface, ColorTokens.Palette.featuredSurface, ColorTokens.Palette.noteSurface] {
                     #expect(contrast(ColorTokens.Palette.textPrimary, surface, traits: traits) >= 7)
                     #expect(contrast(ColorTokens.Palette.textSecondary, surface, traits: traits) >= 4.5)
                 }
+                #expect(contrast(ColorTokens.Palette.destructive, ColorTokens.Palette.surface, traits: traits) >= 4.5)
                 #expect(contrast(ColorTokens.Palette.brandActionText, ColorTokens.Palette.featuredSurface, traits: traits) >= 4.5)
             }
         }
@@ -45,7 +46,7 @@ struct ColorTokensTests {
         let colors = [
             ColorTokens.Palette.brandPrimary, ColorTokens.Palette.brandActionText,
             ColorTokens.Palette.background, ColorTokens.Palette.surface, ColorTokens.Palette.textPrimary,
-            ColorTokens.Palette.recordSurface, ColorTokens.Palette.featuredSurface,
+            ColorTokens.Palette.recordSurface, ColorTokens.Palette.featuredSurface, ColorTokens.Palette.noteSurface,
             ColorTokens.Palette.successTint, ColorTokens.Palette.warningTint, ColorTokens.Palette.destructiveTint,
             ElevationTokens.raisedShadowColor,
         ]

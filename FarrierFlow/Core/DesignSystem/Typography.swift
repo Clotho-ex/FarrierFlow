@@ -8,6 +8,7 @@
 import SwiftUI
 
 enum Typography {
+    static let sectionHeading: Font = .subheadline.weight(.regular)
     static let recordTitle: Font = .headline
     static let recordMetadata: Font = .subheadline
 }

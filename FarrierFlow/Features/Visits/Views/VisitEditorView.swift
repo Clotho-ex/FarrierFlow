@@ -6,12 +6,16 @@ struct VisitEditorView: View {
     @Environment(\.analyticsClient) private var analyticsClient
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.locale) private var locale
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.modelContext) private var context
     @Environment(PhotographLibrary.self) private var photographLibrary
     @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model: VisitEditorModel
     @State private var showsDismissConfirmation = false
     @State private var showsDiscardVisitConfirmation = false
     @State private var showsApplyWork = false
+    @State private var expandedHorseID: PersistentIdentifier?
+    @State private var deletion = RecordDeletionController()
     @State private var addServiceHorse: VisitHorseDraft?
     @State private var workItemEditorTarget: WorkItemEditorTarget?
     @FocusState private var focusedWorkNotesID: PersistentIdentifier?
@@ -49,52 +53,55 @@ struct VisitEditorView: View {
                     editorForm
                 }
             }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if subscription.allowsMutations, model.mode == .inProgress,
+                   model.loadState == .loaded, focusedWorkNotesID == nil {
+                    visitFooter
+                }
+            }
+            .disabled(deletion.isDeleting)
             .navigationTitle("Visit")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                    Button(model.mode == .inProgress ? "Close" : "Cancel") {
                         requestDismissal()
                     }
                     .tint(ColorTokens.textSecondary)
+                    .accessibilityIdentifier("visit-close")
                 }
                 if subscription.allowsMutations, model.mode == .inProgress, model.loadState == .loaded {
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {
-                            Button("Delete Visit", role: .destructive) {
-                                showsDiscardVisitConfirmation = true
+                            if let address = model.serviceLocationAddress,
+                               let url = ServiceLocationDirections.url(for: address) {
+                                Link("Directions", destination: url)
+                            }
+                            if model.canComplete {
+                                Button("Save Progress", action: saveProgress)
+                                    .disabled(!model.canSaveProgress)
+                                    .accessibilityIdentifier("visit-save-progress")
+                            }
+                            if model.canApplyWorkToHorses {
+                                Button("Apply Work to Horses", systemImage: "rectangle.on.rectangle") {
+                                    focusedWorkNotesID = nil
+                                    showsApplyWork = true
+                                }
+                                .accessibilityIdentifier("visit-apply-work-action")
+                            }
+                            if model.hasScheduledAppointment {
+                                Divider()
+                                Button("Delete Visit", systemImage: "trash", role: .destructive) {
+                                    requestDeletion()
+                                }
                             }
                         } label: {
-                            Label("Actions", systemImage: "ellipsis.circle")
+                            Label("Actions", systemImage: "ellipsis")
                         }
                         .tint(ColorTokens.textSecondary)
                         .accessibilityIdentifier("visit-actions-menu")
                     }
-                }
-                if subscription.allowsMutations, model.mode == .inProgress {
-                    ToolbarItemGroup(placement: .bottomBar) {
-                        Button("Save Progress") {
-                            guard subscription.allowsMutations else { return }
-                            focusedWorkNotesID = nil
-                            model.saveProgress()
-                        }
-                        .accessibilityIdentifier("visit-save-progress")
-                        .tint(ColorTokens.textSecondary)
-                        .disabled(!model.canSaveProgress)
-                        Spacer()
-                        Button("Complete Visit") {
-                            guard subscription.allowsMutations else { return }
-                            focusedWorkNotesID = nil
-                            if model.completeVisit(analyticsClient: analyticsClient) {
-                                onCompleted?(model.visitID)
-                                dismiss()
-                            }
-                        }
-                        .farrierFlowPrimaryAction()
-                        .accessibilityIdentifier("visit-complete")
-                        .disabled(!model.canComplete)
-                    }
-                } else if subscription.allowsMutations {
+                } else if subscription.allowsMutations, model.mode == .correction {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Save Changes") {
                             guard subscription.allowsMutations else { return }
@@ -121,7 +128,13 @@ struct VisitEditorView: View {
         .interactiveDismissDisabled(model.isDirty)
         .onAppear {
             model.load()
+            if expandedHorseID == nil {
+                expandedHorseID = model.draft?.horses.first(where: { !$0.hasRecordedOutcome })?.id
+                    ?? model.draft?.horses.first?.id
+            }
         }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
         .onChange(of: scenePhase) { _, newPhase in
             switch newPhase {
             case .background:
@@ -171,11 +184,23 @@ struct VisitEditorView: View {
         } message: {
             Text("Changing this outcome will clear its recorded services and Work Notes.")
         }
-        .recordDeletionSheet(
-            .visit(model.visitID), isPresented: $showsDiscardVisitConfirmation,
-            title: "Delete Visit?", confirmationTitle: "Delete Visit",
-            accessibilityPrefix: "visit-delete", alert: $model.alert
-        ) { dismiss() }
+        .alert("Delete Visit?", isPresented: $showsDiscardVisitConfirmation,
+               presenting: deletion.impact) { impact in
+            Button("Delete Visit", role: .destructive) {
+                guard subscription.allowsMutations else { return }
+                Task {
+                    if await deletion.delete(impact, using: photographLibrary) {
+                        dismiss()
+                    } else {
+                        model.alert = deletion.alert
+                    }
+                }
+            }
+            .accessibilityIdentifier("visit-delete-confirmation")
+            Button("Cancel", role: .cancel) {}
+        } message: { impact in
+            Text(impact.warning)
+        }
         .alert(item: $model.alert) {
             Alert(title: Text($0.title), message: Text($0.message))
         }
@@ -184,102 +209,35 @@ struct VisitEditorView: View {
     @ViewBuilder
     private var editorForm: some View {
         if let draft = model.draft {
+            let sharedClient = model.sharedClientName
             Form {
-                if model.isDirty {
+                if model.mode == .inProgress {
+                    visitSummary(draft, sharedClientName: sharedClient)
+                } else {
                     Section {
-                        Text("Unsaved Changes")
-                            .foregroundStyle(ColorTokens.textSecondary)
-                            .accessibilityIdentifier("visit-unsaved-state")
+                        VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
+                            Text("Corrections do not change saved invoices.")
+                                .font(.footnote)
+                                .accessibilityIdentifier("visit-correction-invoice-warning")
+                            if model.isDirty {
+                                Text("Unsaved Changes")
+                                    .accessibilityIdentifier("visit-unsaved-state")
+                            }
+                        }
+                        .foregroundStyle(ColorTokens.textSecondary)
                     }
-                    .listRowBackground(ColorTokens.surface)
-                }
-                if model.mode == .inProgress,
-                   let completionBlocker = model.completionBlocker {
-                    Section("Complete Visit") {
-                        Text(completionGuidance(for: completionBlocker))
-                            .foregroundStyle(ColorTokens.textSecondary)
-                            .accessibilityIdentifier("visit-completion-requirement")
-                    }
-                    .listRowBackground(ColorTokens.surface)
+                    .listRowBackground(Color.clear)
                 }
                 if model.mode == .correction, let blocker = model.correctionBlocker {
-                    Section("Save Changes") {
+                    RecordSection(Text("Save Changes")) {
                         Text(completionGuidance(for: blocker))
                             .foregroundStyle(ColorTokens.textSecondary)
                             .accessibilityIdentifier("visit-correction-requirement")
                     }
                     .listRowBackground(ColorTokens.surface)
                 }
-                if model.canApplyWorkToHorses {
-                    Section {
-                        Button("Apply Work to Horses", systemImage: "rectangle.on.rectangle") {
-                            focusedWorkNotesID = nil
-                            showsApplyWork = true
-                        }
-                        .accessibilityHint(
-                            "Copies recorded Services from one serviced horse to untouched horses."
-                        )
-                        .accessibilityIdentifier("visit-apply-work-action")
-                    } footer: {
-                        Text("Copy recorded Services and prices to untouched horses.")
-                    }
-                    .listRowBackground(ColorTokens.surface)
-                }
                 ForEach(draft.horses) { horse in
-                    Section(horse.horseName) {
-                        VisitHorseOutcomeRow(
-                            horse: horse,
-                            selectableOutcomes: VisitRules.selectableOutcomes(
-                                for: model.mode
-                            ),
-                            workNotes: Binding(
-                                get: {
-                                    model.draft?.horses.first(where: { $0.id == horse.id })?.workNotes
-                                        ?? ""
-                                },
-                                set: {
-                                    guard subscription.allowsMutations else { return }
-                                    model.setWorkNotes($0, for: horse.id)
-                                }
-                            ),
-                            focusedWorkNotesID: $focusedWorkNotesID,
-                            onOutcomeSelected: { outcome in
-                                guard subscription.allowsMutations else { return }
-                                if outcome != .serviced {
-                                    focusedWorkNotesID = nil
-                                }
-                                _ = model.requestOutcomeChange(
-                                    for: horse.id,
-                                    to: outcome
-                                )
-                            }
-                        )
-                        .disabled(!subscription.allowsMutations)
-                        if horse.outcome != .notServiced {
-                            visitWorkItems(for: horse)
-                        }
-                        RecordNavigationLink {
-                            PhotographCollectionView(
-                                visitHorseID: horse.id,
-                                horseName: horse.horseName,
-                                library: photographLibrary
-                            )
-                        } label: {
-                            HStack {
-                                Label("Hoof Photos", systemImage: "photo.on.rectangle")
-                                    .accessibilityIdentifier(
-                                        "visit-photographs-label-\(horse.horseName)"
-                                    )
-                                Spacer()
-                                PhotographCountLabel(
-                                    visitHorseID: horse.id,
-                                    library: photographLibrary
-                                )
-                            }
-                        }
-                        .accessibilityIdentifier("visit-photographs-\(horse.horseName)")
-                    }
-                    .listRowBackground(ColorTokens.surface)
+                    horseSection(horse, showsClient: sharedClient == nil)
                 }
             }
             .farrierFlowScrollBackground()
@@ -309,6 +267,173 @@ struct VisitEditorView: View {
         }
     }
 
+    private func visitSummary(_ draft: VisitDraft, sharedClientName: String?) -> some View {
+        Section {
+            VStack(alignment: .leading, spacing: SpacingTokens.related) {
+                if let location = model.serviceLocationName {
+                    Text(verbatim: location)
+                        .font(.title2.weight(.semibold))
+                        .accessibilityIdentifier("visit-service-location")
+                }
+                if let client = sharedClientName {
+                    Text("Client · \(client)")
+                        .font(.subheadline)
+                        .foregroundStyle(ColorTokens.textSecondary)
+                        .accessibilityIdentifier("visit-shared-client")
+                }
+                Text("\(model.recordedHorseCount) of \(draft.horses.count) horses recorded")
+                    .font(.subheadline)
+                    .foregroundStyle(ColorTokens.textSecondary)
+                    .accessibilityIdentifier("visit-progress-summary")
+                ProgressView(value: Double(model.recordedHorseCount), total: Double(max(draft.horses.count, 1)))
+                    .tint(ColorTokens.brandPrimary)
+                    .accessibilityHidden(true)
+                if let blocker = model.completionBlocker, blocker != .pendingOutcomePreventsCompletion {
+                    Text(completionGuidance(for: blocker))
+                        .font(.footnote)
+                        .foregroundStyle(ColorTokens.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("visit-completion-requirement")
+                }
+                if model.isDirty {
+                    Text("Unsaved Changes")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(ColorTokens.warning)
+                        .padding(.horizontal, SpacingTokens.related)
+                        .padding(.vertical, SpacingTokens.rowContent)
+                        .background(ColorTokens.warningTint, in: .capsule)
+                        .accessibilityIdentifier("visit-unsaved-state")
+                }
+            }
+        }
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+    }
+
+    @ViewBuilder
+    private func horseSection(_ horse: VisitHorseDraft, showsClient: Bool) -> some View {
+        if model.mode == .inProgress {
+            Section {
+                VisitHorseExecutionHeader(
+                    horse: horse, information: model.horseContext[horse.id],
+                    showsClient: showsClient,
+                    isExpanded: Binding(
+                        get: { expandedHorseID == horse.id },
+                        set: { expanded in
+                            focusedWorkNotesID = nil
+                            expandedHorseID = expanded ? horse.id : nil
+                        }
+                    )
+                )
+                if expandedHorseID == horse.id {
+                    horseControls(horse)
+                }
+            }
+            .listRowBackground(ColorTokens.surface)
+            .listRowSeparator(.hidden)
+        } else {
+            Section(horse.horseName) { horseControls(horse) }
+                .listRowBackground(ColorTokens.surface)
+        }
+    }
+
+    @ViewBuilder
+    private func horseControls(_ horse: VisitHorseDraft) -> some View {
+        VisitHorseOutcomeRow(
+            horse: horse,
+            selectableOutcomes: VisitRules.selectableOutcomes(for: model.mode),
+            onOutcomeSelected: { outcome in
+                guard subscription.allowsMutations else { return }
+                if outcome != .serviced { focusedWorkNotesID = nil }
+                _ = model.requestOutcomeChange(for: horse.id, to: outcome)
+            }
+        )
+        .disabled(!subscription.allowsMutations)
+        if horse.outcome != .notServiced { visitWorkItems(for: horse) }
+        NavigationLink {
+            PhotographCollectionView(
+                visitHorseID: horse.id, horseName: horse.horseName, library: photographLibrary
+            )
+        } label: {
+            metadataLayout {
+                Label("Photos", systemImage: "photo.on.rectangle")
+                    .accessibilityIdentifier("visit-photographs-label-\(horse.horseName)")
+                if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: SpacingTokens.compact) }
+                PhotographCountLabel(visitHorseID: horse.id, library: photographLibrary)
+                    .font(.subheadline)
+                    .foregroundStyle(ColorTokens.textSecondary)
+            }
+        }
+        .navigationLinkIndicatorVisibility(.visible)
+        .accessibilityHint("View or add photos for this horse")
+        .accessibilityIdentifier("visit-photographs-\(horse.horseName)")
+        if horse.outcome == .serviced {
+            VisitHorseNotesRow(
+                note: Binding(
+                    get: { model.draft?.horses.first(where: { $0.id == horse.id })?.workNotes ?? "" },
+                    set: {
+                        guard subscription.allowsMutations else { return }
+                        model.setWorkNotes($0, for: horse.id)
+                    }
+                ),
+                focusedHorseID: $focusedWorkNotesID,
+                horseID: horse.id, horseName: horse.horseName
+            )
+        }
+    }
+
+    private var metadataLayout: AnyLayout {
+        dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: SpacingTokens.compact))
+            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: SpacingTokens.compact))
+    }
+
+    private var visitFooter: some View {
+        VStack(spacing: SpacingTokens.compact) {
+            VisitRecordedTotalView(total: model.savedRecordedTotal)
+                .padding(.horizontal, SpacingTokens.standard)
+            Group {
+                if model.canComplete {
+                    Button {
+                        guard subscription.allowsMutations else { return }
+                        focusedWorkNotesID = nil
+                        if model.completeVisit(analyticsClient: analyticsClient) {
+                            onCompleted?(model.visitID)
+                            dismiss()
+                        }
+                    } label: {
+                        Text("Complete Visit").frame(maxWidth: .infinity)
+                    }
+                    .accessibilityIdentifier("visit-complete")
+                } else {
+                    Button(action: saveProgress) {
+                        Text("Save Progress").frame(maxWidth: .infinity)
+                    }
+                    .disabled(!model.canSaveProgress)
+                    .accessibilityIdentifier("visit-save-progress")
+                }
+            }
+            .font(.headline)
+            .farrierFlowPrimaryAction()
+            .controlSize(.large)
+            .padding(.horizontal, SpacingTokens.standard)
+            .padding(.vertical, SpacingTokens.related)
+            .background(ColorTokens.background)
+        }
+    }
+
+    private func saveProgress() {
+        guard subscription.allowsMutations else { return }
+        focusedWorkNotesID = nil
+        model.saveProgress()
+    }
+
+    private func requestDeletion() {
+        deletion.prepare(.scheduledVisit(model.visitID), in: context.container)
+        if deletion.impact != nil { showsDiscardVisitConfirmation = true }
+        else { model.alert = deletion.alert }
+    }
+
     private func requestDismissal() {
         if model.isDirty {
             showsDismissConfirmation = true
@@ -319,12 +444,28 @@ struct VisitEditorView: View {
 
     @ViewBuilder
     private func visitWorkItems(for horse: VisitHorseDraft) -> some View {
-        Text("Services")
-            .font(Typography.recordMetadata)
-            .foregroundStyle(ColorTokens.textSecondary)
+        HStack(alignment: .center) {
+            Text(horse.outcome == .pending ? "Planned Services" : "Services")
+                .font(Typography.recordMetadata)
+                .foregroundStyle(ColorTokens.textSecondary)
+            Spacer(minLength: SpacingTokens.compact)
+            if subscription.allowsMutations {
+                Button {
+                    focusedWorkNotesID = nil
+                    addServiceHorse = horse
+                } label: {
+                    Label("Add", systemImage: "plus")
+                        .font(.subheadline)
+                        .frame(minHeight: 44)
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("Add Service for \(horse.horseName)")
+                .accessibilityIdentifier("visit-add-service-\(horse.horseName)")
+            }
+        }
 
         if horse.workItems.isEmpty {
-            Text("No Recorded Services")
+            Text(horse.outcome == .pending ? "No Planned Services" : "No Recorded Services")
                 .foregroundStyle(ColorTokens.textSecondary)
                 .accessibilityIdentifier("visit-work-items-empty-\(horse.horseName)")
         } else {
@@ -351,36 +492,25 @@ struct VisitEditorView: View {
             }
         }
 
-        if subscription.allowsMutations {
-            Button("Add Service", systemImage: "plus") {
-                guard subscription.allowsMutations else { return }
-                switch model.requestAddService(to: horse.id) {
-                case .createService, .chooseService:
-                    addServiceHorse = horse
-                case .serviceAdded:
-                    break
-                }
+        if model.mode == .correction, horse.workItems.count > 1 {
+            if let currencyCode = horse.workItems.first?.currencyCode,
+               let subtotal = try? WorkItemRules.subtotal(for: horse.workItems),
+               let formattedSubtotal = MoneyFormatter.currency(
+                   minorUnits: subtotal,
+                   currencyCode: currencyCode,
+                   locale: locale
+               ) {
+                LabeledContent("Subtotal", value: formattedSubtotal)
+                    .font(Typography.recordMetadata)
+                    .monospacedDigit()
+                    .accessibilityLabel("Subtotal, \(formattedSubtotal)")
+                    .accessibilityIdentifier("visit-work-item-subtotal-\(horse.horseName)")
+            } else {
+                Text("Subtotal Unavailable")
+                    .font(Typography.recordMetadata)
+                    .foregroundStyle(ColorTokens.textSecondary)
+                    .accessibilityIdentifier("visit-work-item-subtotal-\(horse.horseName)")
             }
-            .accessibilityIdentifier("visit-add-service-\(horse.horseName)")
-        }
-
-        if let currencyCode = horse.workItems.first?.currencyCode,
-           let subtotal = try? WorkItemRules.subtotal(for: horse.workItems),
-           let formattedSubtotal = MoneyFormatter.currency(
-               minorUnits: subtotal,
-               currencyCode: currencyCode,
-               locale: locale
-           ) {
-            LabeledContent("Subtotal", value: formattedSubtotal)
-                .font(Typography.recordMetadata)
-                .monospacedDigit()
-                .accessibilityLabel("Subtotal, \(formattedSubtotal)")
-                .accessibilityIdentifier("visit-work-item-subtotal-\(horse.horseName)")
-        } else {
-            Text("Subtotal Unavailable")
-                .font(Typography.recordMetadata)
-                .foregroundStyle(ColorTokens.textSecondary)
-                .accessibilityIdentifier("visit-work-item-subtotal-\(horse.horseName)")
         }
     }
 

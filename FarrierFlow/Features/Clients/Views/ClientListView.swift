@@ -9,11 +9,23 @@ struct ClientListView: View {
     @State private var path = NavigationPath()
     @State private var model = ClientListModel()
     @State private var showsEditor = false
+    @State private var searchText = ""
 
     var body: some View {
+        let matchingClients = model.clients.filter { $0.matchesSearch(searchText) }
         NavigationStack(path: $path) {
             Group {
-                if model.clients.isEmpty {
+                if model.clients.isEmpty, model.loadState == .loading {
+                    ProgressView("Loading clients…")
+                } else if model.clients.isEmpty, model.loadState == .failed {
+                    ContentUnavailableView {
+                        Label("Couldn’t Load Clients", systemImage: "exclamationmark.circle")
+                    } description: {
+                        Text("FarrierFlow couldn’t load your clients.")
+                    } actions: {
+                        Button("Retry", action: reload)
+                    }
+                } else if model.clients.isEmpty {
                     ContentUnavailableView {
                         Label("No clients", systemImage: "person.2")
                     } description: {
@@ -25,27 +37,21 @@ struct ClientListView: View {
                             }
                         }
                     }
+                } else if matchingClients.isEmpty {
+                    ContentUnavailableView.search(text: searchText)
                 } else {
                     List {
                         Section {
                             ForEach(
-                                model.clients,
+                                matchingClients,
                                 id: \.id
                             ) { client in
-                                RecordNavigationLink(
-                                    value: ClientRoute.detail(
-                                        client.id
-                                    )
-                                ) {
-                                    ClientRow(client: client)
-                                }
+                                ClientRow(client: client)
                                 .listRowBackground(ColorTokens.surface)
                             }
                         } header: {
-                            Text(clientCountLabel)
-                                .font(Typography.recordMetadata)
-                                .foregroundStyle(ColorTokens.textSecondary)
-                                .textCase(nil)
+                            Text(clientCountLabel(matchingClients.count))
+                                .recordSectionHeading()
                         }
                     }
                     .listSectionSpacing(.custom(SpacingTokens.related))
@@ -54,6 +60,7 @@ struct ClientListView: View {
             }
             .farrierFlowScreenBackground()
             .navigationTitle("Clients")
+            .searchable(text: $searchText, prompt: "Name, phone, or horse")
             .toolbarTitleDisplayMode(
                 dynamicTypeSize.isAccessibilitySize ? .inline : .inlineLarge
             )
@@ -63,6 +70,7 @@ struct ClientListView: View {
                         Button("Add Client", systemImage: "plus") {
                             showsEditor = true
                         }
+                        .disabled(model.loadState != .loaded && model.clients.isEmpty)
                     }
                 }
             }
@@ -76,7 +84,8 @@ struct ClientListView: View {
             }
             .onChange(of: backupSync?.runtime?.recordsVersion) { _, _ in reload() }
             .alert(item: $model.alert) {
-                Alert(title: Text($0.title), message: Text($0.message))
+                Alert(title: Text($0.title), message: Text($0.message),
+                    primaryButton: .default(Text("Retry"), action: reload), secondaryButton: .cancel())
             }
         }
     }
@@ -85,10 +94,10 @@ struct ClientListView: View {
         model.load(in: ModelContext(context.container))
     }
 
-    private var clientCountLabel: LocalizedStringKey {
-        model.clients.count == 1
+    private func clientCountLabel(_ count: Int) -> LocalizedStringKey {
+        count == 1
             ? "1 client"
-            : "\(model.clients.count) clients"
+            : "\(count) clients"
     }
 
 }

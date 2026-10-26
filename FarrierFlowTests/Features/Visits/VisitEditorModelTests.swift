@@ -7,6 +7,123 @@ import Testing
 @MainActor
 struct VisitEditorModelTests {
     @Test
+    func sharedClientUsesEveryVisitHorseAndSavedTotalExcludesPlannedAndUnsavedWork() throws {
+        let graph = try makeVisitGraph()
+        let model = VisitEditorModel(visitID: graph.visitID, in: graph.container)
+        model.load()
+        #expect(model.sharedClientName == model.horseContext.values.first?.clientName)
+        #expect(model.sharedClientName != nil)
+        #expect(model.savedRecordedTotal == .none)
+        let milo = try #require(model.draft?.horses.first { $0.horseName == "Milo" })
+        _ = model.requestOutcomeChange(for: milo.id, to: .serviced)
+        #expect(model.savedRecordedTotal == .none)
+        model.saveProgress()
+        #expect(model.alert == nil)
+        #expect(model.savedRecordedTotal == .available(minorUnits: 12_500, currencyCode: "USD"))
+        var draft = try #require(model.draft)
+        let index = try horseIndex(named: "Milo", in: draft)
+        draft.horses[index].workItems[0].amountMinorUnits = 15_000
+        model.draft = draft
+        #expect(model.savedRecordedTotal == .available(minorUnits: 12_500, currencyCode: "USD"))
+        model.saveProgress()
+        #expect(model.savedRecordedTotal == .available(minorUnits: 15_000, currencyCode: "USD"))
+        model.load()
+        #expect(model.savedRecordedTotal == .available(minorUnits: 15_000, currencyCode: "USD"))
+    }
+
+    @Test
+    func recordedTotalAllowsSharedServicesAcrossHorsesButRefusesMixedCurrenciesInvalidWorkAndOverflow() throws {
+        let graph = try makeVisitGraph()
+        let model = VisitEditorModel(visitID: graph.visitID, in: graph.container)
+        model.load()
+        var draft = try #require(model.draft)
+        let milo = try horseIndex(named: "Milo", in: draft)
+        let scout = try horseIndex(named: "Scout", in: draft)
+        let service = try #require(draft.horses[milo].workItems.first)
+        draft.horses[milo].outcome = .serviced
+        draft.horses[scout].outcome = .serviced
+        draft.horses[scout].workItems = [WorkItemDraft(serviceID: service.serviceID,
+            serviceNameSnapshot: service.serviceNameSnapshot, amountMinorUnits: 12_500)]
+        #expect(draft.recordedTotal == .available(minorUnits: 25_000, currencyCode: "USD"))
+        draft.horses[scout].workItems = [WorkItemDraft(serviceID: service.serviceID,
+            serviceNameSnapshot: service.serviceNameSnapshot, amountMinorUnits: 12_500, currencyCode: "EUR")]
+        #expect(draft.recordedTotal == .unavailable)
+        draft.horses[scout].workItems = [WorkItemDraft(serviceID: service.serviceID,
+            serviceNameSnapshot: service.serviceNameSnapshot, amountMinorUnits: 12_500)]
+        draft.horses[scout].workItems[0].amountMinorUnits = Int64.max
+        #expect(draft.recordedTotal == .unavailable)
+        draft.horses[scout].workItems[0].amountMinorUnits = -1
+        #expect(draft.recordedTotal == .unavailable)
+        draft.horses[scout].outcome = .pending
+        #expect(draft.recordedTotal == .available(minorUnits: 12_500, currencyCode: "USD"))
+        draft.horses[milo].workItems[0].amountMinorUnits = 0
+        #expect(draft.recordedTotal == .available(minorUnits: 0, currencyCode: "USD"))
+    }
+
+    @Test
+    func progressUsesRecordedOutcomesAndKeepsTheVisitLocationSnapshot() throws {
+        let graph = try makeVisitGraph()
+        let model = VisitEditorModel(visitID: graph.visitID, in: graph.container)
+        model.load()
+        #expect(model.serviceLocationName == "North Field")
+        #expect(model.recordedHorseCount == 0)
+        let draft = try #require(model.draft)
+        let milo = try #require(draft.horses.first { $0.horseName == "Milo" })
+        let scout = try #require(draft.horses.first { $0.horseName == "Scout" })
+        #expect(!milo.workItems.isEmpty)
+        #expect(!milo.hasRecordedOutcome)
+        _ = model.requestOutcomeChange(for: scout.id, to: .serviced)
+        #expect(model.recordedHorseCount == 0)
+        #expect(!model.canComplete)
+        _ = model.requestOutcomeChange(for: milo.id, to: .serviced)
+        #expect(model.recordedHorseCount == 1)
+        _ = model.requestOutcomeChange(for: scout.id, to: .notServiced)
+        #expect(model.recordedHorseCount == 2)
+        #expect(model.canComplete)
+        let context = graph.container.mainContext
+        let barn = try #require(try context.existingModel(Barn.self, for: graph.barnID))
+        barn.name = "Renamed Barn"
+        try DomainGraphValidator.save(context)
+        model.load()
+        #expect(model.serviceLocationName == "North Field")
+        #expect(model.recordedHorseCount == 0)
+    }
+
+    @Test
+    func sameNamedHorsesRetainDistinctSavedOwnersAndHandlingNotesOutsideTheDraft() throws {
+        let container = try ModelContainerFactory.inMemoryTest()
+        let context = container.mainContext
+        let first = Client(name: "Jordan"), second = Client(name: "Casey"), barn = Barn(name: "North Field")
+        context.insert(first)
+        context.insert(second)
+        context.insert(barn)
+        let horses = [first, second].map { client in
+            let horse = Horse(name: "Peanut", safetyNotes: client === first ? "Needs a quiet approach" : nil,
+                client: client, currentBarn: barn)
+            context.insert(horse)
+            client.horses.append(horse)
+            barn.horses.append(horse)
+            return horse
+        }
+        let appointment = ModelFixtures.makeAppointment(barn: barn, horses: horses, in: context)
+        try DomainGraphValidator.save(context)
+        let visitID = try VisitStartUseCase.start(appointmentID: appointment.persistentModelID, now: .now, in: container)
+        let model = VisitEditorModel(visitID: visitID, in: container)
+        model.load()
+        #expect(model.loadState == .loaded)
+        #expect(Set(model.horseContext.values.compactMap(\.clientName)) == ["Jordan", "Casey"])
+        #expect(model.horseContext.values.filter { $0.safetyNotes == "Needs a quiet approach" }.count == 1)
+        #expect(model.draft?.horses.count == 2)
+        #expect(model.draft?.horses.allSatisfy { $0.horseName == "Peanut" && $0.outcome == .pending } == true)
+        #expect(!model.isDirty)
+        #expect(model.sharedClientName == nil)
+        second.name = first.name
+        try DomainGraphValidator.save(context)
+        model.load()
+        #expect(model.sharedClientName == nil)
+    }
+
+    @Test
     func loadStateRetainsPreviouslyLoadedDraftAfterFailureAndRetry() throws {
         let graph = try makeVisitGraph()
         var loadCount = 0
@@ -167,7 +284,7 @@ struct VisitEditorModelTests {
     }
 
     @Test
-    func addServiceRequestOffersCreationWhenNoEligibleServiceExists() throws {
+    func noEligibleServicesLeavesDraftUnchangedForExplicitCreation() throws {
         let graph = try makeVisitGraph()
         let model = VisitEditorModel(visitID: graph.visitID, in: graph.container)
         model.load()
@@ -175,12 +292,12 @@ struct VisitEditorModelTests {
             model.draft?.horses.first(where: { $0.horseName == "Milo" })
         )
 
-        #expect(model.requestAddService(to: milo.id) == .createService)
+        #expect(model.eligibleServices(for: milo.id).isEmpty)
         #expect(milo.workItems.count == 1)
     }
 
     @Test
-    func addServiceRequestAddsTheSoleEligibleServiceAtItsDefaultPrice() throws {
+    func soleEligibleServiceRequiresExplicitSelectionAndUsesItsDefaultPrice() throws {
         let graph = try makeVisitGraph()
         let model = VisitEditorModel(visitID: graph.visitID, in: graph.container)
         model.load()
@@ -188,17 +305,20 @@ struct VisitEditorModelTests {
             model.draft?.horses.first(where: { $0.horseName == "Scout" })
         )
 
-        #expect(model.requestAddService(to: scout.id) == .serviceAdded)
+        let beforeSelection = model.draft
+        let choice = try #require(model.eligibleServices(for: scout.id).first)
+        #expect(model.draft == beforeSelection)
+        #expect(model.addService(choice.id, to: scout.id))
         let workItem = try #require(
             model.draft?.horses.first(where: { $0.id == scout.id })?.workItems.first
         )
         #expect(workItem.serviceNameSnapshot == "Front Shoes")
         #expect(workItem.amountMinorUnits == 12_500)
-        #expect(!model.addService(workItem.serviceID, to: scout.id))
+        #expect(!model.addService(try #require(workItem.serviceID), to: scout.id))
     }
 
     @Test
-    func addServiceRequestRequiresSelectionWhenMultipleServicesAreEligible() throws {
+    func multipleEligibleServicesDoNotModifyTheDraft() throws {
         let graph = try makeVisitGraph()
         let context = ModelContext(graph.container)
         _ = ModelFixtures.makeService(
@@ -213,7 +333,7 @@ struct VisitEditorModelTests {
             model.draft?.horses.first(where: { $0.horseName == "Scout" })
         )
 
-        #expect(model.requestAddService(to: scout.id) == .chooseService)
+        #expect(model.eligibleServices(for: scout.id).count == 2)
         #expect(
             model.draft?.horses.first(where: { $0.id == scout.id })?.workItems.isEmpty
                 == true
@@ -221,7 +341,7 @@ struct VisitEditorModelTests {
     }
 
     @Test
-    func addServiceRequestExcludesArchivedServices() throws {
+    func explicitServiceChoicesExcludeArchivedServices() throws {
         let graph = try makeVisitGraph(includesDefaultService: false)
         let context = ModelContext(graph.container)
         _ = ModelFixtures.makeService(
@@ -237,7 +357,6 @@ struct VisitEditorModelTests {
             model.draft?.horses.first(where: { $0.horseName == "Milo" })
         )
 
-        #expect(model.requestAddService(to: milo.id) == .createService)
         #expect(model.eligibleServices(for: milo.id).isEmpty)
     }
 
@@ -655,7 +774,10 @@ struct VisitEditorModelTests {
         #expect(!model.requestOutcomeChange(for: scout.id, to: .serviced))
         #expect(model.completionBlocker == .servicedHorseRequiresWorkItem)
 
-        #expect(model.requestAddService(to: scout.id) == .serviceAdded)
+        let beforeSelection = model.draft
+        let choice = try #require(model.eligibleServices(for: scout.id).first)
+        #expect(model.draft == beforeSelection)
+        #expect(model.addService(choice.id, to: scout.id))
         #expect(model.completionBlocker == nil)
         #expect(model.canComplete)
     }
@@ -878,7 +1000,7 @@ struct VisitEditorModelTests {
     }
 
     @Test
-    func discardingInProgressVisitCascadesOnlyItsHorseMemberships() throws {
+    func discardingInProgressVisitKeepsScheduledHorseAssignments() throws {
         let graph = try makeVisitGraph()
         let context = ModelContext(graph.container)
 
@@ -888,8 +1010,11 @@ struct VisitEditorModelTests {
         #expect(try verificationContext.fetch(FetchDescriptor<Visit>()).isEmpty)
         #expect(try verificationContext.fetch(FetchDescriptor<VisitHorse>()).isEmpty)
         #expect(try verificationContext.fetch(FetchDescriptor<WorkItem>()).isEmpty)
-        #expect(try verificationContext.fetch(FetchDescriptor<Appointment>()).isEmpty)
-        #expect(try verificationContext.fetch(FetchDescriptor<AppointmentHorse>()).isEmpty)
+        let appointments = try verificationContext.fetch(FetchDescriptor<Appointment>())
+        #expect(appointments.map(\.persistentModelID) == [graph.appointmentID])
+        #expect(appointments.first?.visit == nil)
+        #expect(try verificationContext.fetchCount(FetchDescriptor<AppointmentHorse>()) == 2)
+        #expect(appointments.first?.appointmentHorses.count == 2)
         #expect(try verificationContext.fetch(FetchDescriptor<Barn>()).count == 1)
         #expect(try verificationContext.fetch(FetchDescriptor<Horse>()).count == 2)
         #expect(try verificationContext.fetch(FetchDescriptor<Client>()).count == 1)
@@ -907,7 +1032,13 @@ struct VisitEditorModelTests {
         let context = ModelContext(graph.container)
         try VisitDiscardUseCase.discard(visitID: graph.visitID, in: context)
         #expect(try context.fetchCount(FetchDescriptor<Visit>()) == 0)
-        #expect(try context.fetchCount(FetchDescriptor<Appointment>()) == 0)
+        let appointments = try context.fetch(FetchDescriptor<Appointment>())
+        #expect(appointments.map(\.persistentModelID) == [graph.appointmentID])
+        #expect(appointments.first?.visit == nil)
+        #expect(appointments.first?.appointmentHorses.count == 2)
+        #expect(try context.fetchCount(FetchDescriptor<VisitHorse>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<WorkItem>()) == 0)
+        try DomainGraphValidator.validateAll(in: context)
     }
 
     @Test

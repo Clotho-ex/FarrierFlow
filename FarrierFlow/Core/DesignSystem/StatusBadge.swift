@@ -105,3 +105,14 @@ struct RecordStatusPill: View {
             }
     }
 }
+
+struct CompletedStatusPill: View {
+    var body: some View {
+        Text("Completed")
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(ColorTokens.success)
+            .padding(.horizontal, SpacingTokens.related)
+            .padding(.vertical, SpacingTokens.rowContent)
+            .background(ColorTokens.successTint, in: .capsule)
+    }
+}

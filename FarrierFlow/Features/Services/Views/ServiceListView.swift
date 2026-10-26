@@ -22,6 +22,7 @@ struct ServiceListView: View {
         }
         .farrierFlowScreenBackground()
         .navigationTitle("Services")
+        .toolbarTitleDisplayMode(.inline)
         .toolbar {
             if subscription.allowsMutations {
             ToolbarItem(placement: .topBarTrailing) {
@@ -71,20 +72,20 @@ struct ServiceListView: View {
                 }
 
                 if model.activeServices.isEmpty {
-                    Section("Active") {
+                    RecordSection(Text("Active")) {
                         Text("No active services. Reactivate an archived service or add a new one.")
                             .foregroundStyle(ColorTokens.textSecondary)
                     }
                     .listRowBackground(ColorTokens.surface)
                 } else {
-                    Section("Active") {
+                    RecordSection(Text("Active")) {
                         serviceRows(model.activeServices)
                     }
                     .listRowBackground(ColorTokens.surface)
                 }
 
                 if !model.archivedServices.isEmpty {
-                    Section("Archived") {
+                    RecordSection(Text("Archived")) {
                         serviceRows(model.archivedServices)
                     }
                     .listRowBackground(ColorTokens.surface)

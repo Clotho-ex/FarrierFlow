@@ -5,7 +5,7 @@ struct CompletedVisitListView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.locale) private var locale
     @State private var model = CompletedVisitListModel()
-    let period: DateInterval
+    var period: DateInterval? = nil
 
     var body: some View {
         Group {
@@ -21,20 +21,26 @@ struct CompletedVisitListView: View {
                 ContentUnavailableView {
                     Label("No Completed Visits", systemImage: "checkmark.circle")
                 } description: {
-                    Text("There are no completed visits in this period.")
+                    if period == nil { Text("Completed visits and their recorded work appear here.") }
+                    else { Text("There are no completed visits in this period.") }
                 }
             } else {
                 List {
                     Section {
                         ForEach(model.visits) { visit in
-                            RecordNavigationLink(value: ClientRoute.visit(visit.id)) {
+                            RecordNavigationLink(value: period == nil ? ClientRoute.recordedWork(visit.id) : ClientRoute.visit(visit.id)) {
                                 VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
                                     Text(visit.locationName)
                                         .font(Typography.recordTitle)
+                                    if visit.completedAt == nil {
+                                        Text("In Progress")
+                                            .font(Typography.recordMetadata)
+                                            .foregroundStyle(ColorTokens.textSecondary)
+                                    }
                                     Text(visit.horseNames.joined(separator: ", "))
                                         .font(Typography.recordMetadata)
                                         .foregroundStyle(ColorTokens.textSecondary)
-                                    Text(visit.completedAt, format: .dateTime.month(.abbreviated).day().hour().minute())
+                                    Text(visit.recordedAt, format: visitDateFormat)
                                         .font(Typography.recordMetadata)
                                         .foregroundStyle(ColorTokens.textSecondary)
                                 }
@@ -45,7 +51,11 @@ struct CompletedVisitListView: View {
                             .listRowBackground(ColorTokens.surface)
                         }
                     } header: {
-                        Text(period.start, format: .dateTime.month(.wide).year())
+                        if let period {
+                            Text(period.start, format: .dateTime.month(.wide).year()).recordSectionHeading()
+                        } else {
+                            Text("Recorded Work").recordSectionHeading()
+                        }
                     }
                 }
                 .farrierFlowScrollBackground()
@@ -53,7 +63,8 @@ struct CompletedVisitListView: View {
             }
         }
         .farrierFlowScreenBackground()
-        .navigationTitle("Completed Visits")
+        .toolbarTitleDisplayMode(.inline)
+        .navigationTitle(period == nil ? "Recorded Work" : "Completed Visits")
         .onAppear(perform: reload)
         .onChange(of: locale) { _, _ in reload() }
         .onReceive(
@@ -62,6 +73,14 @@ struct CompletedVisitListView: View {
             ])
         ) {
             reload()
+        }
+    }
+
+    private var visitDateFormat: Date.FormatStyle {
+        if period == nil {
+            .dateTime.month(.abbreviated).day().year().hour().minute()
+        } else {
+            .dateTime.month(.abbreviated).day().hour().minute()
         }
     }
 

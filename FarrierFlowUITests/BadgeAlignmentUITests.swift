@@ -2,15 +2,20 @@ import XCTest
 
 final class BadgeAlignmentUITests: XCTestCase {
     @MainActor
-    func testAppointmentStatusUsesNativeRowBadgeValue() {
+    func testAppointmentStatusRemainsAccessibleInScheduleRow() {
         let app = launch(accessibilitySize: false)
         defer { app.terminate() }
         openTab("Schedule", in: app)
         let row = app.buttons["appointment-row-Invoice Service Location"].firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 5))
-        XCTAssertEqual(row.value as? String, "Completed")
+        XCTAssertTrue(accessibilityText(of: row).contains("Completed"))
+        XCTAssertFalse(accessibilityText(of: row).contains("Planned Services"))
         row.tap()
         XCTAssertTrue(app.buttons["visit-view-action"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.descendants(matching: .any)["appointment-summary"].firstMatch.value as? String, "Completed")
+        XCTAssertTrue(app.buttons["visit-view-action"].label.contains("View Completed Visit"))
+        XCTAssertFalse(app.navigationBars.buttons["visit-view-action"].exists)
+        capture(app, named: "Completed Appointment matching status pill")
         app.buttons["visit-view-action"].tap()
         let result = app.descendants(matching: .any)["visit-result-Milo"].firstMatch
         for _ in 0..<5 where !result.isHittable { app.swipeUp() }
@@ -23,7 +28,7 @@ final class BadgeAlignmentUITests: XCTestCase {
         }
         XCTAssertTrue(photographs.waitForExistence(timeout: 5))
         photographs.tap()
-        XCTAssertTrue(app.navigationBars["Hoof Photos"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Photos"].waitForExistence(timeout: 5))
     }
 
     @MainActor
@@ -96,11 +101,7 @@ final class BadgeAlignmentUITests: XCTestCase {
         openTab("Schedule", in: app)
         let appointment = app.buttons["appointment-row-Invoice Service Location"].firstMatch
         XCTAssertTrue(appointment.waitForExistence(timeout: 5))
-        if accessibilitySize {
-            XCTAssertTrue(accessibilityText(of: appointment).contains("Completed"))
-        } else {
-            XCTAssertEqual(appointment.value as? String, "Completed")
-        }
+        XCTAssertTrue(accessibilityText(of: appointment).contains("Completed"))
         XCTAssertTrue(appointment.label.contains("Milo"))
         XCTAssertGreaterThanOrEqual(appointment.frame.minX, 16)
         XCTAssertLessThanOrEqual(appointment.frame.maxX, app.frame.maxX - 16)
@@ -132,7 +133,12 @@ final class BadgeAlignmentUITests: XCTestCase {
         XCTAssertTrue(tab.waitForExistence(timeout: 5))
         for _ in 0..<2 {
             tab.tap()
-            if app.navigationBars[title].waitForExistence(timeout: 3) { return }
+            if app.navigationBars[title].waitForExistence(timeout: 3) {
+                if title == "Schedule" {
+                    app.segmentedControls["schedule-status-tabs"].buttons["Completed"].tap()
+                }
+                return
+            }
         }
         XCTFail("Expected the \(title) tab to open")
     }

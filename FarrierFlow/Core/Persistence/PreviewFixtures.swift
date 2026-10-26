@@ -219,6 +219,8 @@ enum UITestFixtures {
             try seedDeletionReferences(in: container, currencyCode: currencyCode, photographRootURL: photographRootURL)
         case .nextAppointment:
             try seedNextAppointment(in: container)
+        case .clientDirectory:
+            try seedClientDirectory(in: container)
         case .scheduleRows:
             try seedScheduleRows(in: container, now: now, calendar: calendar)
         case .ownerSetup:
@@ -232,6 +234,33 @@ enum UITestFixtures {
             return
         }
         context.insert(BusinessProfile(name: "UI Test Farrier"))
+        try DomainGraphValidator.save(context)
+    }
+
+    private static func seedClientDirectory(in container: ModelContainer) throws {
+        let context = container.mainContext
+        try seedOwnerIdentity(in: container)
+        guard try context.fetchCount(FetchDescriptor<Client>()) == 0 else { return }
+        let barn = Barn(name: "Diddly Squat Farm")
+        context.insert(barn)
+        let jeremy = Client(
+            name: "Jeremy Clarkson", phone: "+1 (928) 555-0124", email: "jeremy@example.com",
+            notes: "Likes beer.\n\nUse the west gate and close it after entering. The horses will be waiting in the covered yard.\n\nCall before arrival so the dogs can be brought inside."
+        )
+        let alexandria = Client(
+            name: "Alexandria Montgomery-Wellington and Family", phone: "+44 7700 900123",
+            email: "alexandria.montgomery.wellington.appointments@northfield.example",
+            notes: "Please call before arrival.\n\nThe entrance is beside the old stone wall. Continue past the paddocks to the covered yard.\n\nBring the horses into the yard before starting work."
+        )
+        let morgan = Client(name: "Morgan Reed")
+        let nora = Client(name: "Nora Wells", phone: "Ask at the barn")
+        for client in [jeremy, alexandria, morgan, nora] { context.insert(client) }
+        for (name, client) in [("Burger", jeremy), ("Tesco", jeremy), ("Atlas", morgan)] {
+            let horse = Horse(name: name, client: client, currentBarn: barn)
+            context.insert(horse)
+            client.horses.append(horse)
+            barn.horses.append(horse)
+        }
         try DomainGraphValidator.save(context)
     }
 
@@ -511,7 +540,7 @@ enum UITestFixtures {
             }
             let start = calendar.date(byAdding: .hour, value: 8 + index, to: day) ?? day
             let appointment = makeAppointment(startDate: start, barn: barn, horses: horses, in: context)
-            if index == 0 || index == 2 || index == 3 {
+            if index == 0 || index == 2 || index == 3 || index == 4 {
                 appointment.appointmentHorses.first?.plannedService = trim
             }
             if index == 2 {

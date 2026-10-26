@@ -78,56 +78,37 @@ final class EditorAccessibilityUITests: XCTestCase {
                 "Add or move a horse to this service location before scheduling an appointment."
             ].waitForExistence(timeout: 3)
         )
-        let horseName = app.textFields["horse-name-field"]
-        guard revealElement(app.buttons["appointment-create-horse"], in: app, towardTop: true) else { return }
-        let addHorse = app.buttons["appointment-create-horse"]
-        guard tapUntilDestinationAppears(
-            addHorse,
-            destination: horseName
-        ) else { return }
-        guard tapUntilDestinationAppears(
-            app.buttons["horse-more-details"],
-            destination: app.textViews["Additional Notes"]
-        ) else { return }
-        XCTAssertTrue(horseName.waitForExistence(timeout: 3))
-        app.buttons["horse-client-picker"].tap()
-        app.buttons["Accessible Client"].tap()
-        XCTAssertTrue(app.buttons["horse-client-picker"].label.contains("Accessible Client"))
-        guard focusAndType("Appointment Horse", in: horseName) else { return }
-        app.navigationBars["New Horse"].buttons["Save"].tap()
-        let selectedHorse = app.buttons["appointment-horse-Appointment Horse"]
-        XCTAssertTrue(selectedHorse.waitForExistence(timeout: 3))
-        XCTAssertEqual(selectedHorse.value as? String, "Selected")
-        guard revealElement(appointmentNotes, in: app) else { return }
-        XCTAssertEqual(appointmentNotes.value as? String, "Keep this draft")
-
-        guard revealElement(app.buttons["appointment-create-horse"], in: app, towardTop: true) else { return }
-        let addAnotherHorse = app.buttons["appointment-create-horse"]
-        guard addAnotherHorse.waitForExistence(timeout: 3) else {
-            XCTFail("Add Horse should remain available after creating the first horse")
-            return
+        XCTAssertFalse(app.buttons["appointment-create-horse"].exists)
+        app.navigationBars["New Appointment"].buttons["Cancel"].tap()
+        openClients(in: app)
+        app.buttons["client-row-Accessible Client"].tap()
+        for name in ["Appointment Horse", "Second Appointment Horse"] {
+            let addHorse = app.buttons["Add Horse"]
+            guard revealElement(addHorse, in: app) else { return }
+            addHorse.tap()
+            let horseName = app.textFields["horse-name-field"]
+            guard focusAndType(name, in: horseName) else { return }
+            app.buttons["horse-barn-picker"].tap()
+            app.buttons["Accessible Barn"].tap()
+            app.navigationBars["New Horse"].buttons["Save"].tap()
+            XCTAssertTrue(app.navigationBars["Client"].waitForExistence(timeout: 5))
         }
-        let secondHorseName = app.textFields["horse-name-field"]
-        guard tapUntilDestinationAppears(
-            addAnotherHorse,
-            destination: secondHorseName
-        ) else { return }
-        app.buttons["horse-client-picker"].tap()
-        app.buttons["Accessible Client"].tap()
-        XCTAssertTrue(app.buttons["horse-client-picker"].label.contains("Accessible Client"))
-        guard focusAndType("Second Appointment Horse", in: secondHorseName) else {
-            return
+        guard openSchedule(in: app) else { return }
+        app.navigationBars["Schedule"].buttons["Schedule Appointment"].tap()
+        XCTAssertTrue(app.navigationBars["New Appointment"].waitForExistence(timeout: 5))
+        app.buttons["appointment-barn-picker"].tap()
+        app.buttons["Accessible Barn"].tap()
+        for name in ["Appointment Horse", "Second Appointment Horse"] {
+            let horse = app.buttons["appointment-horse-\(name)"]
+            guard revealElement(horse, in: app) else { return }
+            horse.tap()
+            XCTAssertEqual(horse.value as? String, "Selected")
         }
-        app.navigationBars["New Horse"].buttons["Save"].tap()
-
-        let secondSelectedHorse = app.buttons[
-            "appointment-horse-Second Appointment Horse"
-        ]
-        XCTAssertTrue(secondSelectedHorse.waitForExistence(timeout: 3))
-        XCTAssertEqual(selectedHorse.value as? String, "Selected")
-        XCTAssertEqual(secondSelectedHorse.value as? String, "Selected")
+        app.buttons["appointment-additional-details"].tap()
         guard revealElement(appointmentNotes, in: app) else { return }
-        XCTAssertEqual(appointmentNotes.value as? String, "Keep this draft")
+        appointmentNotes.tap()
+        appointmentNotes.typeText("Keep this draft")
+        dismissAppointmentKeyboard(in: app)
         let serviceMenu = app.buttons["appointment-service-Appointment Horse"]
         guard revealElement(serviceMenu, in: app) else { return }
         serviceMenu.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
@@ -236,7 +217,7 @@ final class EditorAccessibilityUITests: XCTestCase {
         screenshot.lifetime = .keepAlways
         add(screenshot)
         let start = app.buttons["visit-start-action"]
-        guard revealElement(start, in: app) else { return }
+        guard revealElement(start, in: app, towardTop: true) else { return }
         start.tap()
         XCTAssertTrue(app.navigationBars["Visit"].waitForExistence(timeout: 5))
         XCTAssertTrue(revealElement(app.buttons["visit-work-item-Atlas-Next Appointment Trim"], in: app))

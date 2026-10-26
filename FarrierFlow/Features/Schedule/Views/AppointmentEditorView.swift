@@ -13,6 +13,7 @@ struct AppointmentEditorView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.locale) private var locale
     @Environment(\.analyticsClient) private var analyticsClient
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
@@ -20,12 +21,11 @@ struct AppointmentEditorView: View {
     @State private var model: AppointmentEditorModel
     @State private var showsBarnEditor = false
     @State private var createdBarnID: PersistentIdentifier?
-    @State private var showsHorseEditor = false
-    @State private var createdHorseID: PersistentIdentifier?
     @State private var showsServiceEditor = false
     @State private var createdServiceID: PersistentIdentifier?
     @State private var serviceHorseID: PersistentIdentifier?
     @State private var showsAdditionalDetails: Bool
+    @State private var dismissalBaseline: AppointmentDraft?
     private let onSaved: ((PersistentIdentifier) -> Void)?
 
     init(
@@ -46,7 +46,7 @@ struct AppointmentEditorView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Appointment") {
+                RecordSection(Text("Appointment")) {
                     if model.hasVisit {
                         LabeledContent(
                             "Service Location",
@@ -112,22 +112,15 @@ struct AppointmentEditorView: View {
                                 }
                             }
                         }
-                        if !model.hasVisit, model.draft.barnID != nil {
-                            Button("New Horse", systemImage: "plus") {
-                                focusedField = nil
-                                showsHorseEditor = true
-                            }
-                            .tint(ColorTokens.textSecondary)
-                            .accessibilityIdentifier("appointment-create-horse")
-                        }
                     } header: {
                         sectionHeaderLayout {
-                            Text("Horses")
+                            Text("Horses").recordSectionHeading()
                             if !dynamicTypeSize.isAccessibilitySize { Spacer() }
                             if showsHorseSelectionCount {
                                 Text(
                                     "\(model.draft.selectedHorseIDs.count) of \(model.eligibleHorses.count) selected"
                                 )
+                                .font(Typography.sectionHeading)
                                 .multilineTextAlignment(.trailing)
                                 .frame(maxWidth: .infinity, alignment: .trailing)
                                 .textCase(nil)
@@ -146,9 +139,10 @@ struct AppointmentEditorView: View {
                         }
                     } header: {
                         sectionHeaderLayout {
-                            Text("Planned Services")
+                            Text("Planned Services").recordSectionHeading()
                             if !dynamicTypeSize.isAccessibilitySize { Spacer() }
                             Text("Optional")
+                                .font(Typography.sectionHeading)
                                 .textCase(nil)
                         }
                     }
@@ -156,18 +150,49 @@ struct AppointmentEditorView: View {
                 }
                 Section {
                     DisclosureGroup(isExpanded: $showsAdditionalDetails) {
+                        EmptyView()
+                    } label: {
+                        Text("Additional Details")
+                            .accessibilityIdentifier("appointment-additional-details")
+                    }
+                    if showsAdditionalDetails {
                         VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
-                            Text("Expected Duration (minutes)")
+                            Text("Expected Duration")
                                 .font(.caption)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .foregroundStyle(ColorTokens.textSecondary)
                                 .accessibilityHidden(true)
-                            TextField("Minutes", text: $model.draft.expectedDurationText)
-                                .accessibilityLabel("Expected Duration (minutes)")
-                                .accessibilityIdentifier("appointment-duration")
-                                .keyboardType(.numberPad)
-                                .focused($focusedField, equals: .duration)
+                            HStack(alignment: .firstTextBaseline, spacing: SpacingTokens.rowContent) {
+                                // Fit short input to its text; keep long values within the row.
+                                Text(verbatim: model.draft.expectedDurationText.isEmpty
+                                     ? String(localized: "Optional", locale: locale)
+                                     : model.draft.expectedDurationText)
+                                .font(.body)
+                                .lineLimit(1)
+                                .padding(.trailing, SpacingTokens.rowContent)
+                                .hidden()
+                                .overlay(alignment: .leading) {
+                                    TextField("Optional", text: $model.draft.expectedDurationText)
+                                        .font(.body)
+                                        .accessibilityLabel("Expected Duration (minutes)")
+                                        .accessibilityIdentifier("appointment-duration")
+                                        .keyboardType(.numberPad)
+                                        .focused($focusedField, equals: .duration)
+                                }
+                                Text("Minutes")
+                                    .font(.caption)
+                                    .fixedSize(horizontal: true, vertical: false)
+                                    .foregroundStyle(ColorTokens.textSecondary)
+                                    .accessibilityHidden(true)
+                                    .accessibilityIdentifier("appointment-duration-unit")
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
+                        .frame(minHeight: SpacingTokens.minimumTouchTarget, alignment: .leading)
+                        .contentShape(.rect)
+                        .simultaneousGesture(TapGesture().onEnded {
+                            focusedField = .duration
+                        })
                         VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
                             Text("Appointment Notes")
                                 .font(.caption)
@@ -179,9 +204,6 @@ struct AppointmentEditorView: View {
                                 .focused($focusedField, equals: .notes)
                                 .accessibilityLabel("Appointment Notes")
                         }
-                    } label: {
-                        Text("Additional Details")
-                            .accessibilityIdentifier("appointment-additional-details")
                     }
                 } footer: {
                     appointmentRequirementGuidance
@@ -228,6 +250,7 @@ struct AppointmentEditorView: View {
             }
             .onAppear {
                 model.load(in: context)
+                if dismissalBaseline == nil { dismissalBaseline = model.draft }
             }
             .onChange(of: showsAdditionalDetails) { _, isExpanded in
                 if !isExpanded {
@@ -240,18 +263,14 @@ struct AppointmentEditorView: View {
             .sheet(isPresented: $showsServiceEditor, onDismiss: selectCreatedService) {
                 ServiceEditorView(createdServiceID: $createdServiceID)
             }
-            .sheet(isPresented: $showsHorseEditor, onDismiss: selectCreatedHorse) {
-                HorseEditorView(
-                    preselectedBarnID: model.draft.barnID,
-                    createdHorseID: $createdHorseID
-                )
-            }
+
             .alert(item: $model.alert) {
                 Alert(title: Text($0.title), message: Text($0.message))
             }
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
+        .interactiveDismissDisabled(dismissalBaseline.map { $0 != model.draft } ?? false)
     }
 
     private var sectionHeaderLayout: AnyLayout {
@@ -379,12 +398,6 @@ struct AppointmentEditorView: View {
         guard let createdBarnID else { return }
         self.createdBarnID = nil
         model.selectCreatedBarn(createdBarnID, in: context)
-    }
-
-    private func selectCreatedHorse() {
-        guard let createdHorseID else { return }
-        self.createdHorseID = nil
-        model.selectCreatedHorse(createdHorseID, in: context)
     }
 
     @ViewBuilder

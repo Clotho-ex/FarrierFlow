@@ -62,6 +62,52 @@ struct AppointmentRowSummaryTests {
     }
 
     @Test
+    func completedSummaryHidesPlanWithoutChangingPlanDefaultsOrActualWorkDates() throws {
+        let fixture = try makeFixture(horseCount: 1)
+        let usual = ModelFixtures.makeService(name: "Usual Shoeing", in: fixture.context)
+        let plan = ModelFixtures.makeService(name: "Planned Trim", in: fixture.context)
+        fixture.horses[0].defaultService = usual
+        fixture.appointment.appointmentHorses[0].plannedService = plan
+        let scheduledAt = fixture.appointment.startDate
+        let startedAt = scheduledAt.addingTimeInterval(-2 * 86_400)
+        let finishedAt = startedAt.addingTimeInterval(1_800)
+        try DomainGraphValidator.save(fixture.context)
+        #expect(AppointmentRowSummary(appointment: fixture.appointment).plannedServices == "Planned Trim")
+        let visitID = try VisitStartUseCase.start(
+            appointmentID: fixture.appointment.persistentModelID,
+            now: startedAt,
+            in: fixture.container
+        )
+        let actionContext = ModelContext(fixture.container)
+        let startedAppointment = try #require(try actionContext.existingModel(
+            Appointment.self, for: fixture.appointment.persistentModelID
+        ))
+        #expect(AppointmentRowSummary(appointment: startedAppointment).plannedServices == "Planned Trim")
+        var draft = try VisitSaveUseCase.loadDraft(visitID: visitID, in: actionContext)
+        draft.horses[0].outcome = .serviced
+        draft.horses[0].workItems = [WorkItemDraft(
+            serviceID: usual.persistentModelID,
+            serviceNameSnapshot: usual.name,
+            amountMinorUnits: usual.defaultAmountMinorUnits
+        )]
+        _ = try VisitSaveUseCase.complete(draft: draft, completedAt: finishedAt, in: actionContext)
+        let reopened = ModelContext(fixture.container)
+        let appointment = try #require(try reopened.existingModel(
+            Appointment.self, for: fixture.appointment.persistentModelID
+        ))
+        #expect(AppointmentRowSummary(appointment: appointment).plannedServices == nil)
+        #expect(AppointmentRowSummary(appointment: appointment).state == .completed)
+        let detail = AppointmentDetail(appointment: appointment)
+        #expect(detail.horses.first?.plannedServiceName == "Planned Trim")
+        #expect(detail.startDate == scheduledAt)
+        #expect(appointment.appointmentHorses.first?.horse?.defaultService?.name == "Usual Shoeing")
+        let work = try VisitDetailModel.loadDetail(visitID: visitID, in: reopened)
+        #expect(work.startedAt == startedAt)
+        #expect(work.completedAt == finishedAt)
+        #expect(work.horses.first?.workItems.first?.serviceNameSnapshot == "Usual Shoeing")
+    }
+
+    @Test
     func unavailableRelationshipsDoNotInventOwnerOrPlannedWork() throws {
         let fixture = try makeFixture(horseCount: 1)
         fixture.horses[0].client = nil

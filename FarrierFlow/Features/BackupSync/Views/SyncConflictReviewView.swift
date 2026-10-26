@@ -58,9 +58,15 @@ struct SyncConflictReviewView: View {
                                         Text(model.value(in: change, field: field, cloud: true, locale: locale))
                                     } label: { Text(SyncConflictPresentation.titles[field] ?? "Record Details") }
                                 }
-                            } label: { Text(change.kind.localizedTitle) }
+                            } label: {
+                                VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
+                                    Text(change.kind.localizedTitle)
+                                    Text(verbatim: model.identity(in: change, locale: locale))
+                                        .foregroundStyle(ColorTokens.textSecondary)
+                                }
+                            }
                         }
-                    } header: { Text(BackupSyncCopy.relatedChangesTitle) }
+                    } header: { Text(BackupSyncCopy.relatedChangesTitle).recordSectionHeading() }
                 }
                 ForEach(model.conflicts) { conflict in
                     Section {
@@ -85,7 +91,16 @@ struct SyncConflictReviewView: View {
                         } label: { Text(BackupSyncCopy.keepVersion) }
                         .pickerStyle(.inline)
                         DisclosureGroup("Record ID") { Text(conflict.id.uuidString).textSelection(.enabled) }
-                    } header: { Text(conflict.kind.localizedTitle) }
+                    } header: {
+                        VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
+                            Text(conflict.kind.localizedTitle).recordSectionHeading()
+                            Text(verbatim: model.identity(in: conflict, locale: locale))
+                                .font(.headline)
+                                .foregroundStyle(ColorTokens.textPrimary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .textCase(nil)
+                    }
                 }
                 Section {
                     Button(BackupSyncCopy.applyChoices) { confirmsChoices = true }

@@ -9,6 +9,8 @@ final class TodayEmptyStateUITests: XCTestCase {
         assertNoTodayToolbarAction(in: app)
         let schedule = app.buttons["Schedule Appointment"]
         XCTAssertTrue(schedule.isHittable)
+        XCTAssertLessThan(schedule.frame.width, app.frame.width * 0.8)
+        XCTAssertGreaterThanOrEqual(schedule.frame.height, 44)
         XCTAssertEqual(app.buttons.matching(identifier: "Schedule Appointment").count, 1)
         capture(app, "Today ready standard light")
         schedule.tap()
@@ -42,9 +44,9 @@ final class TodayEmptyStateUITests: XCTestCase {
         capture(app, "Today first horse light")
         addHorse.tap()
         XCTAssertTrue(app.navigationBars["New Horse"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.buttons["horse-client-picker"].label.contains("First Client"))
+        XCTAssertEqual(app.buttons["horse-client-picker"].value as? String, "First Client")
         let horseName = app.textFields["horse-name-field"]
-        horseName.tap()
+        horseName.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.8)).tap()
         horseName.typeText("Milo")
         if app.buttons["horse-keyboard-done"].exists { app.buttons["horse-keyboard-done"].tap() }
         app.buttons["horse-barn-picker"].tap()
@@ -78,7 +80,7 @@ final class TodayEmptyStateUITests: XCTestCase {
     }
 
     @MainActor
-    func testClearDayShowsFutureWorkAndViewSchedulePreservesTabHistory() {
+    func testClearDayUsesScheduleTabAndPreservesTabHistory() {
         let app = launch(scenario: "today-future")
         defer { app.terminate() }
         XCTAssertTrue(app.staticTexts["No stops today"].waitForExistence(timeout: 5))
@@ -86,15 +88,28 @@ final class TodayEmptyStateUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["No appointments scheduled"].exists)
         assertNoTodayToolbarAction(in: app)
         capture(app, "Today clear with future work light")
-        app.buttons["View Schedule"].tap()
+        XCTAssertFalse(app.buttons["View Schedule"].exists)
+        app.tabBars.buttons["Schedule"].tap()
         XCTAssertTrue(app.tabBars.buttons["Schedule"].isSelected)
         let appointment = app.buttons["appointment-row-North Field"]
         XCTAssertTrue(appointment.waitForExistence(timeout: 3))
         appointment.tap()
         XCTAssertTrue(app.navigationBars["Appointment"].waitForExistence(timeout: 3))
         app.tabBars.buttons["Today"].tap()
-        app.buttons["View Schedule"].tap()
+        XCTAssertFalse(app.buttons["View Schedule"].exists)
+        app.tabBars.buttons["Schedule"].tap()
         XCTAssertTrue(app.navigationBars["Appointment"].waitForExistence(timeout: 3))
+    }
+
+    @MainActor
+    func testClearDayUsesOnlyTheScheduleTabAtLargestText() {
+        let app = launch(scenario: "today-future", largestText: true)
+        defer { app.terminate() }
+        XCTAssertTrue(app.staticTexts["No stops today"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["View Schedule"].exists)
+        capture(app, "Clear Today without duplicate Schedule action AX dark")
+        app.tabBars.buttons["Schedule"].tap()
+        XCTAssertTrue(app.navigationBars["Schedule"].waitForExistence(timeout: 3))
     }
 
     @MainActor
@@ -103,6 +118,7 @@ final class TodayEmptyStateUITests: XCTestCase {
         defer { app.terminate() }
         XCTAssertTrue(app.staticTexts["All done for today"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["No appointments scheduled"].exists)
+        XCTAssertFalse(app.buttons["View Schedule"].exists)
         assertNoTodayToolbarAction(in: app)
         capture(app, "Today completed day light")
         let stop = app.buttons["today-stop-row"]

@@ -1,8 +1,8 @@
 import Foundation
 
-nonisolated struct ScheduleSection: Identifiable {
+struct ScheduleSection: Identifiable {
     let dayStart: Date
-    let appointments: [Appointment]
+    let appointments: [ScheduleAppointment]
 
     var id: Date { dayStart }
 }

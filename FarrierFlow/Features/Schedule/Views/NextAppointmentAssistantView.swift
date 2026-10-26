@@ -3,14 +3,13 @@ import SwiftUI
 
 struct NextAppointmentAssistantView: View {
     @Environment(\.appClock) private var appClock
+    @Environment(\.analyticsClient) private var analyticsClient
     @Environment(\.calendar) private var calendar
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model: NextAppointmentAssistantModel
-    @State private var editorSeed: NextAppointmentSeed?
-    @State private var savedAppointmentID: PersistentIdentifier?
     @State private var path: [ScheduleRoute] = []
 
     init(visitID: PersistentIdentifier) {
@@ -25,10 +24,31 @@ struct NextAppointmentAssistantView: View {
                 .navigationTitle("Next Appointment")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button(dismissActionTitle) {
-                            dismiss()
+                    if path.isEmpty, subscription.allowsMutations {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Schedule Appointment", systemImage: "checkmark") {
+                                guard subscription.allowsMutations else { return }
+                                if let id = model.schedule(in: context, now: appClock.now(),
+                                    calendar: calendar, locale: locale, analyticsClient: analyticsClient) {
+                                    path.append(.detail(id))
+                                }
+                            }
+                            .tint(ColorTokens.success)
+                            .disabled(model.makeSeed() == nil)
+                            .accessibilityIdentifier("next-appointment-confirm")
                         }
+                    }
+                }
+                .safeAreaInset(edge: .bottom) {
+                    if path.isEmpty {
+                    Button("Not Now", role: .cancel) { dismiss() }
+                        .frame(maxWidth: .infinity)
+                        .buttonStyle(.bordered)
+                        .tint(ColorTokens.textSecondary)
+                        .controlSize(.large)
+                        .padding(.horizontal, SpacingTokens.section)
+                        .padding(.vertical, SpacingTokens.related)
+                        .accessibilityIdentifier("next-appointment-not-now")
                     }
                 }
                 .navigationDestination(for: ScheduleRoute.self) { route in
@@ -38,15 +58,8 @@ struct NextAppointmentAssistantView: View {
                     }
                 }
                 .onAppear(perform: load)
-                .sheet(
-                    isPresented: editorIsPresented,
-                    onDismiss: handleEditorDismissal
-                ) {
-                    if let editorSeed {
-                        AppointmentEditorView(seed: editorSeed) { appointmentID in
-                            savedAppointmentID = appointmentID
-                        }
-                    }
+                .alert(item: $model.alert) {
+                    Alert(title: Text($0.title), message: Text($0.message))
                 }
         }
     }
@@ -74,7 +87,7 @@ struct NextAppointmentAssistantView: View {
     private func loadedForm(_ projection: NextAppointmentAssistantProjection) -> some View {
         VStack(spacing: 0) {
             Form {
-                Section("Visit") {
+                RecordSection(Text("Visit")) {
                     LabeledContent("Service Location", value: projection.sourceBarnName)
                     LabeledContent {
                         Text(
@@ -87,7 +100,7 @@ struct NextAppointmentAssistantView: View {
                 }
                 .listRowBackground(ColorTokens.surface)
 
-                Section("Appointment") {
+                RecordSection(Text("Appointment")) {
                     DatePicker(
                         "Proposed Start",
                         selection: Binding(
@@ -106,7 +119,7 @@ struct NextAppointmentAssistantView: View {
                 }
                 .listRowBackground(ColorTokens.surface)
 
-                Section("Horses") {
+                RecordSection(Text("Horses")) {
                     ForEach(projection.options) { option in
                         horseRow(option)
                     }
@@ -117,25 +130,6 @@ struct NextAppointmentAssistantView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(ColorTokens.background)
-        .safeAreaInset(edge: .bottom) {
-            if subscription.allowsMutations, hasSelectableHorse(in: projection) {
-                Button {
-                    editorSeed = model.makeSeed()
-                } label: {
-                    Text("Continue")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                }
-                .farrierFlowPrimaryAction()
-                .controlSize(.large)
-                .frame(maxWidth: .infinity)
-                .disabled(model.makeSeed() == nil)
-                .accessibilityIdentifier("next-appointment-continue")
-                .padding(.horizontal, 24)
-                .padding(.top, 8)
-                .padding(.bottom, 12)
-            }
-        }
     }
 
     @ViewBuilder
@@ -214,40 +208,6 @@ struct NextAppointmentAssistantView: View {
             calendar: calendar,
             locale: locale
         )
-    }
-
-    private var editorIsPresented: Binding<Bool> {
-        Binding(
-            get: { editorSeed != nil },
-            set: { isPresented in
-                if !isPresented {
-                    editorSeed = nil
-                }
-            }
-        )
-    }
-
-    private func handleEditorDismissal() {
-        editorSeed = nil
-        guard let savedAppointmentID else { return }
-        self.savedAppointmentID = nil
-        path.append(.detail(savedAppointmentID))
-    }
-
-    private var dismissActionTitle: LocalizedStringKey {
-        guard case .loaded = model.loadState,
-              let projection = model.projection,
-              hasSelectableHorse(in: projection)
-        else {
-            return "Done"
-        }
-        return "Not Now"
-    }
-
-    private func hasSelectableHorse(
-        in projection: NextAppointmentAssistantProjection
-    ) -> Bool {
-        projection.options.contains { $0.unavailabilityReason == nil }
     }
 
     private func selectedState(

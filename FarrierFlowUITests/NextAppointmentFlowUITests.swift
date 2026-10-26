@@ -8,7 +8,7 @@ final class NextAppointmentFlowUITests: XCTestCase {
     private let notServicedHorseName = "Clover"
 
     @MainActor
-    func testContinueActionRemainsPinnedWhileTheFormScrolls() {
+    func testConfirmationStaysInToolbarAndNotNowRemainsPinned() {
         let app = launch(storeName: "NextAppointmentPinnedAction-\(UUID().uuidString)")
         defer { app.terminate() }
 
@@ -17,16 +17,23 @@ final class NextAppointmentFlowUITests: XCTestCase {
         XCTAssertTrue(schedule.waitForExistence(timeout: 5))
         schedule.tap()
 
-        let continueButton = app.buttons["next-appointment-continue"]
+        let continueButton = app.buttons["next-appointment-confirm"]
         XCTAssertTrue(continueButton.waitForExistence(timeout: 5))
         XCTAssertTrue(continueButton.isHittable)
-        XCTAssertGreaterThan(continueButton.frame.width, app.frame.width * 0.8)
-        let pinnedFrame = continueButton.frame
+        XCTAssertLessThan(continueButton.frame.midY, app.frame.height * 0.2)
+        let notNow = app.buttons["next-appointment-not-now"]
+        XCTAssertTrue(notNow.isHittable)
+        XCTAssertFalse(app.navigationBars["Next Appointment"].buttons["Not Now"].exists)
+        let pinnedFrame = notNow.frame
+        let capture = XCTAttachment(screenshot: app.screenshot())
+        capture.name = "Next Appointment green toolbar confirmation and bottom Not Now"
+        capture.lifetime = .keepAlways
+        add(capture)
 
         app.swipeUp()
 
-        XCTAssertEqual(continueButton.frame.minY, pinnedFrame.minY, accuracy: 1)
-        XCTAssertEqual(continueButton.frame.width, pinnedFrame.width, accuracy: 1)
+        XCTAssertEqual(notNow.frame.minY, pinnedFrame.minY, accuracy: 1)
+        XCTAssertEqual(notNow.frame.width, pinnedFrame.width, accuracy: 1)
         XCTAssertTrue(continueButton.isHittable)
     }
 
@@ -38,6 +45,11 @@ final class NextAppointmentFlowUITests: XCTestCase {
         openSourceVisit(for: earliestHorseName, in: app)
         let schedule = app.buttons["schedule-next-appointment"]
         XCTAssertTrue(schedule.waitForExistence(timeout: 5))
+        XCTAssertGreaterThan(schedule.frame.width, app.frame.width * 0.65)
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "Primary next appointment action light"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
         schedule.tap()
 
         assertInitialProjection(in: app)
@@ -49,16 +61,7 @@ final class NextAppointmentFlowUITests: XCTestCase {
 
         setHorse(notServicedHorseName, selected: true, in: app)
 
-        app.buttons["next-appointment-continue"].tap()
-        XCTAssertTrue(app.navigationBars["New Appointment"].waitForExistence(timeout: 5))
-        XCTAssertTrue(
-            accessibilityText(of: app.buttons["appointment-barn-picker"])
-                .contains(barnName)
-        )
-        assertAppointmentSelection(earliestHorseName, selected: false, in: app)
-        assertAppointmentSelection(laterHorseName, selected: true, in: app)
-        assertAppointmentSelection(notServicedHorseName, selected: true, in: app)
-        app.navigationBars["New Appointment"].buttons["Save"].tap()
+        app.buttons["next-appointment-confirm"].tap()
 
         XCTAssertTrue(app.navigationBars["Appointment"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.cells.staticTexts[laterHorseName].exists)
@@ -91,9 +94,37 @@ final class NextAppointmentFlowUITests: XCTestCase {
             excludes: ["Selected", "Suggested"],
             in: app
         )
-        let continueButton = app.buttons["next-appointment-continue"]
+        let continueButton = app.buttons["next-appointment-confirm"]
         XCTAssertTrue(bringIntoView(continueButton, in: app))
         XCTAssertTrue(continueButton.isEnabled)
+    }
+
+    @MainActor
+    func testPrimaryScheduleActionRemainsReadableAtLargestTextAndCancelsCleanly() {
+        let app = XCUIApplication()
+        app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] = "NextAppointmentPrimaryAX-\(UUID())"
+        app.launchEnvironment["FARRIERFLOW_UI_TEST_SCENARIO"] = "next-appointment"
+        app.launchEnvironment["FARRIERFLOW_UI_TEST_DYNAMIC_TYPE_SIZE"] = "accessibility5"
+        app.launchEnvironment["FARRIERFLOW_UI_TEST_COLOR_SCHEME"] = "dark"
+        app.launch()
+        defer { app.terminate() }
+        openSourceVisit(for: earliestHorseName, in: app)
+        let schedule = app.buttons["schedule-next-appointment"]
+        XCTAssertTrue(bringIntoView(schedule, in: app))
+        if schedule.frame.maxY > app.tabBars.firstMatch.frame.minY { app.swipeUp() }
+        XCTAssertTrue(schedule.isEnabled)
+        XCTAssertTrue(schedule.isHittable)
+        XCTAssertGreaterThan(schedule.frame.width, app.frame.width * 0.65)
+        XCTAssertGreaterThanOrEqual(schedule.frame.height, 44)
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "Primary next appointment action AX dark"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+        schedule.tap()
+        XCTAssertTrue(app.navigationBars["Next Appointment"].waitForExistence(timeout: 5))
+        app.buttons["next-appointment-not-now"].tap()
+        XCTAssertTrue(app.navigationBars["Visit"].waitForExistence(timeout: 5))
+        XCTAssertTrue(schedule.isEnabled)
     }
 
     @MainActor
@@ -165,7 +196,7 @@ final class NextAppointmentFlowUITests: XCTestCase {
             if trigger.isHittable {
                 trigger.tap()
             }
-            if destination.waitForExistence(timeout: 3) {
+            if destination.waitForExistence(timeout: 3) || bringIntoView(destination, in: app) {
                 return true
             }
         }
@@ -178,7 +209,7 @@ final class NextAppointmentFlowUITests: XCTestCase {
         _ element: XCUIElement,
         in app: XCUIApplication
     ) -> Bool {
-        for _ in 0..<6 {
+        for _ in 0..<12 {
             if element.exists, element.isHittable {
                 return true
             }
@@ -208,7 +239,7 @@ final class NextAppointmentFlowUITests: XCTestCase {
             excludes: ["Suggested", "Selected"],
             in: app
         )
-        XCTAssertTrue(app.buttons["next-appointment-continue"].isEnabled)
+        XCTAssertTrue(app.buttons["next-appointment-confirm"].isEnabled)
     }
 
     @MainActor

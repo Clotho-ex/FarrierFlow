@@ -118,6 +118,12 @@ final class SyncConflictModel {
             .filter { conflict.local?.fields[$0] != conflict.remote?.fields[$0] }.sorted()
     }
 
+    func identity(in conflict: SyncConflict, locale: Locale) -> String {
+        guard let record = conflict.local ?? conflict.remote else { return conflict.id.uuidString }
+        return SyncConflictPresentation.identity(record,
+            graph: conflict.local == nil ? reviewedCloudGraph : reviewedGraph, locale: locale)
+    }
+
     func value(in conflict: SyncConflict, field: String, cloud: Bool, locale: Locale) -> String {
         let record = cloud ? conflict.remote : conflict.local
         return SyncConflictPresentation.value(record?.fields[field], key: field, record: record,

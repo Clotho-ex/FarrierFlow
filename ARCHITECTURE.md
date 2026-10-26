@@ -1,5 +1,16 @@
 # FarrierFlow Architecture
 
+## Independent schedule removal and recorded work (2026-10-25)
+
+The Visit is the historical work aggregate and can outlive its source Appointment.
+Schedule removal detaches Visit.appointment and preserves work, photos and invoice
+sources. Recorded Work has the sole aggregate-deletion entry point; that action
+removes Visit-owned records and photos without deleting the Appointment. Detached
+unfinished work remains resumable from Recorded Work and is excluded from Today's
+active scheduling projection. No new persisted property or local migration is
+required. The matching Dev sync validators preserve all relationship checks when
+a source Appointment is present and accept its deliberate absence.
+
 ## Appointment service planning (V5)
 
 V5 adds an optional `AppointmentHorse.plannedService` relationship, separate
@@ -478,8 +489,9 @@ valid join, and every AppointmentHorse must have both an Appointment and Horse.
 
 The shipping schema applies the same storage rule to `Visit.appointment`, `Visit.barn`,
 `VisitHorse.visit`, and `VisitHorse.horse`. These relationships are optional in
-SwiftData storage for iOS 18 deletion compatibility and required by the domain
-contract. `Visit.startedAt` and its service-location name snapshot remain
+SwiftData storage for iOS 18 deletion compatibility. All remain domain-required
+except Visit.appointment, which may be nil after deliberate schedule removal.
+`Visit.startedAt` and its service-location name snapshot remain
 non-optional scalar data; the address snapshot remains optional because a Barn
 address is optional.
 
@@ -595,12 +607,17 @@ using the user's current calendar and time zone. Today queries use an injected
 or explicitly supplied `Calendar` to calculate the local start and end of day,
 which keeps daylight-saving and test behavior deterministic.
 
-Schedule calculates the start of the current local calendar day using the same
-calendar rule and fetches appointments at or after that boundary. It excludes
-earlier appointments, groups results by local calendar day, orders groups
-ascending, and orders appointments chronologically within each group. A
-general past-Appointment destination remains deferred; completed Visit history
-is available only from Horse Detail.
+Schedule uses separate Scheduled and Completed projections. Scheduled includes
+uncompleted appointments at or after the current local day boundary, in time
+order; Completed includes completed appointments across dates, newest first.
+Each reload copies values from a fresh context so a cached inverse cannot hide a
+Visit completion. Each segment keeps its own service filter: appointment plans
+for Scheduled, actual WorkItems for Completed. Business also exposes all-time
+Recorded Work through the existing completed-Visit projection and destinations.
+
+Next Appointment confirmation saves its immutable seed through the existing
+AppointmentEditorModel, after rechecking current horse availability. Not Now
+only dismisses the assistant; confirmation is always explicit.
 
 Expected duration remains optional. The absence of duration does not create or
 imply an end date. The first slice does not derive duration from horse count,

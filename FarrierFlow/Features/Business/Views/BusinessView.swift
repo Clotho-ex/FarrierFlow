@@ -31,6 +31,8 @@ struct BusinessView: View {
                     InvoiceListView(filter: .unpaid)
                 case .completedVisits(let period):
                     CompletedVisitListView(period: period)
+                case .recordedWork:
+                    CompletedVisitListView()
                 }
             }
         }
@@ -60,20 +62,24 @@ struct BusinessView: View {
         List {
             BusinessOverviewSection(model: overview, retry: reload) { path.append($0) }
 
-            Section("Operations") {
+            RecordSection(Text("Operations")) {
                 NavigationLink(value: BarnRoute.list) {
                     Label("Service Locations", systemImage: "mappin.and.ellipse")
                 }
                 NavigationLink(value: ServiceRoute.list) {
                     Label("Services", systemImage: "wrench.and.screwdriver")
                 }
+                NavigationLink(value: BusinessOverviewRoute.recordedWork) {
+                    Label("Recorded Work", systemImage: "checkmark.circle")
+                }
+                .accessibilityIdentifier("business-recorded-work")
                 NavigationLink(value: InvoiceRoute.list) {
                     Label("Invoices", systemImage: "doc.text")
                 }
             }
             .listRowBackground(ColorTokens.surface)
 
-            Section("Settings") {
+            RecordSection(Text("Settings")) {
                 NavigationLink(value: BusinessProfileRoute.editor) {
                     Label("Business Profile", systemImage: "person.text.rectangle")
                 }
@@ -103,7 +109,7 @@ struct BusinessView: View {
                     Label("About FarrierFlow", systemImage: "info.circle")
                 }
             } header: {
-                Text("Support")
+                Text("Support").recordSectionHeading()
             } footer: {
                 VStack(spacing: SpacingTokens.compact) {
                     Text("FarrierFlow")

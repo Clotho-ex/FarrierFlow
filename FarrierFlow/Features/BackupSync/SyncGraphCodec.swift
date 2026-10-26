@@ -378,6 +378,8 @@ enum SyncGraphCodec {
             visitHorses.removeValue(forKey: id)
         }
         for (id, model) in visits where incoming[id] == nil {
+            model.appointment?.visit = nil
+            model.appointment = nil
             context.delete(model)
             visits.removeValue(forKey: id)
         }
@@ -386,6 +388,8 @@ enum SyncGraphCodec {
             appointmentHorses.removeValue(forKey: id)
         }
         for (id, model) in appointments where incoming[id] == nil {
+            model.visit?.appointment = nil
+            model.visit = nil
             context.delete(model)
             appointments.removeValue(forKey: id)
         }
@@ -624,7 +628,7 @@ enum SyncGraphCodec {
                     completedAt: try reader.optionalDate("completedAt"),
                     serviceLocationNameSnapshot: try reader.string("serviceLocationNameSnapshot"),
                     serviceLocationAddressSnapshot: try reader.optionalString("serviceLocationAddressSnapshot"),
-                    appointment: try reader.model("appointment", from: appointments),
+                    appointment: try reader.optionalModel("appointment", from: appointments),
                     barn: try reader.model("barn", from: barns)
                 )
                 context.insert(model)
@@ -634,7 +638,7 @@ enum SyncGraphCodec {
             model.completedAt = try reader.optionalDate("completedAt")
             model.serviceLocationNameSnapshot = try reader.string("serviceLocationNameSnapshot")
             model.serviceLocationAddressSnapshot = try reader.optionalString("serviceLocationAddressSnapshot")
-            model.appointment = try reader.model("appointment", from: appointments)
+            model.appointment = try reader.optionalModel("appointment", from: appointments)
             model.barn = try reader.model("barn", from: barns)
         }
         for record in updates where record.kind == .visitHorse {
@@ -704,7 +708,7 @@ enum SyncGraphCodec {
                     serviceNameSnapshot: try reader.string("serviceNameSnapshot"),
                     amountMinorUnits: try reader.int64("amountMinorUnits"),
                     currencyCode: try reader.string("currencyCode"),
-                    service: try reader.model("service", from: services),
+                    service: try reader.optionalModel("service", from: services),
                     visitHorse: try reader.model("visitHorse", from: visitHorses)
                 )
                 context.insert(model)
@@ -713,7 +717,7 @@ enum SyncGraphCodec {
             model.serviceNameSnapshot = try reader.string("serviceNameSnapshot")
             model.amountMinorUnits = try reader.int64("amountMinorUnits")
             model.currencyCode = try reader.string("currencyCode")
-            model.service = try reader.model("service", from: services)
+            model.service = try reader.optionalModel("service", from: services)
             model.visitHorse = try reader.model("visitHorse", from: visitHorses)
             if let holdID = try reader.optionalUUID("billingHoldID") {
                 try model.applyBillingHold(holdID)

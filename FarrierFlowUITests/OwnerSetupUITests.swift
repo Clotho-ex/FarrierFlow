@@ -765,23 +765,26 @@ final class OwnerSetupUITests: XCTestCase {
                 .contains(locationName)
         )
 
-        let addHorse = app.buttons["appointment-create-horse"]
-        tapAfterBringingIntoView(addHorse, in: app)
+        XCTAssertFalse(app.buttons["appointment-create-horse"].exists)
+        app.navigationBars["New Appointment"].buttons["Cancel"].tap()
+        app.selectFarrierFlowTab("Clients")
+        app.buttons["client-row-\(clientName)"].tap()
+        tapAfterBringingIntoView(app.buttons["Add Horse"], in: app)
         let horseNameField = app.textFields["horse-name-field"]
         XCTAssertTrue(horseNameField.waitForExistence(timeout: 3))
-        horseNameField.tap()
-        horseNameField.typeText(horseName)
-        app.buttons["horse-client-picker"].tap()
-        app.buttons[clientName].tap()
+        focusAndType(horseName, in: horseNameField, app: app)
+        app.buttons["horse-barn-picker"].tap()
+        app.buttons[locationName].tap()
         app.navigationBars["New Horse"].buttons["Save"].tap()
-
+        app.selectFarrierFlowTab("Schedule")
+        schedule.tap()
         XCTAssertTrue(app.navigationBars["New Appointment"].waitForExistence(timeout: 3))
-        XCTAssertTrue(
-            accessibilityText(of: app.buttons["appointment-barn-picker"])
-                .contains(locationName)
-        )
+        app.buttons["appointment-barn-picker"].tap()
+        app.buttons[locationName].tap()
+        app.buttons["appointment-horse-\(horseName)"].tap()
         app.navigationBars["New Appointment"].buttons["Save"].tap()
 
+        app.selectFarrierFlowTab("Today")
         XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 5))
         let scheduledStop = app.buttons["today-run-sheet-scheduled"]
         XCTAssertTrue(scheduledStop.waitForExistence(timeout: 5))
