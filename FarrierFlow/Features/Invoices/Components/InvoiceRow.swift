@@ -18,9 +18,11 @@ struct InvoiceRow: View {
         VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
             invoiceIdentity
             Text(formattedTotal)
+                .rollingStateText(value: formattedTotal)
                 .font(Typography.recordTitle)
             if dynamicTypeSize.isAccessibilitySize {
                 Text(summary.status.displayName)
+                    .rollingStateText(value: summary.status.rawValue)
                     .font(Typography.recordMetadata)
                     .foregroundStyle(summary.status == .paid ? ColorTokens.success : ColorTokens.textSecondary)
             }

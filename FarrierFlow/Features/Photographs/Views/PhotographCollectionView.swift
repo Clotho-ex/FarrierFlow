@@ -129,10 +129,11 @@ struct PhotographCollectionView: View {
             } message: { item in
                 Text(
                     item.availability == .available
-                        ? "This removes the photo from this horse’s visit."
-                        : "This removes the unavailable photo record."
+                        ? "You can’t recover this photo after deleting it."
+                        : "The unavailable photo will be removed from this visit."
                 )
             }
+            .tint(.primary)
             .alert(item: $model.alert) {
                 Alert(title: Text($0.title), message: Text($0.message))
             }

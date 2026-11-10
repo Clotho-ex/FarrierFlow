@@ -289,7 +289,6 @@ final class VisitDetailModel {
 
         var visitHorseIDs = Set<PersistentIdentifier>()
         var containsPendingOutcome = false
-        var containsServicedOutcome = false
         for visitHorse in visit.visitHorses {
             guard
                 visitHorse.visit === visit,
@@ -301,13 +300,7 @@ final class VisitDetailModel {
             else {
                 throw VisitDetailLoadError.invalidVisit
             }
-            guard
-                TextNormalization.optional(visitHorse.workNotes ?? "") == nil
-                    || outcome == .serviced
-            else {
-                throw VisitDetailLoadError.invalidVisit
-            }
-            guard outcome != .notServiced || visitHorse.workItems.isEmpty else {
+            guard visit.completedAt == nil || outcome != .notServiced || visitHorse.workItems.isEmpty else {
                 throw VisitDetailLoadError.invalidVisit
             }
             guard visit.completedAt == nil
@@ -317,7 +310,6 @@ final class VisitDetailModel {
                 throw VisitDetailLoadError.invalidVisit
             }
             containsPendingOutcome = containsPendingOutcome || outcome == .pending
-            containsServicedOutcome = containsServicedOutcome || outcome == .serviced
         }
 
         if appointment != nil, visitHorseIDs != appointmentHorseIDs {
@@ -327,8 +319,7 @@ final class VisitDetailModel {
         if let completedAt = visit.completedAt {
             guard
                 completedAt >= visit.startedAt,
-                !containsPendingOutcome,
-                containsServicedOutcome
+                !containsPendingOutcome
             else {
                 throw VisitDetailLoadError.invalidVisit
             }

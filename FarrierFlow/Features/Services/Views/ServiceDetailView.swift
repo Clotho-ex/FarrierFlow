@@ -137,6 +137,7 @@ struct ServiceDetailView: View {
                 } message: { impact in
                     Text(impact.warning)
                 }
+                .tint(.primary)
             } else {
                 ContentUnavailableView("Service Unavailable", systemImage: "exclamationmark.circle")
             }

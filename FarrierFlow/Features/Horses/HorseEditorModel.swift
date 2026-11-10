@@ -141,6 +141,7 @@ final class HorseEditorModel {
             }
         }
         guard
+            draft.isValid,
             let name = TextNormalization.required(draft.name),
             draft.appointmentIntervalWeeks > 0,
             let clientID = draft.clientID,

@@ -30,12 +30,17 @@ final class InvoiceCreationModel {
     private var derivedDueDate: Date?
     var alert: FeatureAlert?
 
+    var areAllVisitsSelected: Bool {
+        !visitChoices.isEmpty && draft?.selectedVisitIDs == Set(visitChoices.map(\.id))
+    }
+
     var canGenerate: Bool {
         guard
             loadState == .loaded,
             hasValidBusinessProfile,
             !isGenerating,
             let draft,
+            InputLimits.fits(draft.note, maximum: InputLimits.notes),
             selectionSummary != nil
         else {
             return false
@@ -153,10 +158,12 @@ final class InvoiceCreationModel {
     }
 
     func selectAll() {
-        guard var draft else {
-            return
-        }
-        draft.selectedVisitIDs = Set(visitChoices.map(\.id))
+        setAllVisitsSelected(true)
+    }
+
+    func setAllVisitsSelected(_ selected: Bool) {
+        guard var draft else { return }
+        draft.selectedVisitIDs = selected ? Set(visitChoices.map(\.id)) : []
         self.draft = draft
     }
 

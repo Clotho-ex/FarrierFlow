@@ -51,6 +51,7 @@ struct BarnListView: View {
                         }
                     } header: {
                         Text(serviceLocationCountLabel).recordSectionHeading()
+                            .rollingStateText(value: model.barns.count)
                             .textCase(nil)
                     }
                 }

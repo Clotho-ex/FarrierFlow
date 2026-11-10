@@ -6,11 +6,13 @@ struct NextAppointmentAssistantView: View {
     @Environment(\.analyticsClient) private var analyticsClient
     @Environment(\.calendar) private var calendar
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.selectedAppTab) private var selectedAppTab
+    @Environment(\.appointmentSaved) private var appointmentSaved
     @Environment(\.locale) private var locale
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model: NextAppointmentAssistantModel
-    @State private var path: [ScheduleRoute] = []
+    @State private var isScheduling = false
 
     init(visitID: PersistentIdentifier) {
         _model = State(
@@ -19,43 +21,41 @@ struct NextAppointmentAssistantView: View {
     }
 
     var body: some View {
-        NavigationStack(path: $path) {
+        NavigationStack {
             content
-                .navigationTitle("Next Appointment")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    if path.isEmpty, subscription.allowsMutations {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("Schedule Appointment", systemImage: "checkmark") {
-                                guard subscription.allowsMutations else { return }
-                                if let id = model.schedule(in: context, now: appClock.now(),
-                                    calendar: calendar, locale: locale, analyticsClient: analyticsClient) {
-                                    path.append(.detail(id))
+                .navigationTitle("Schedule Next Visit")
+                .toolbarTitleDisplayMode(.inline)
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    VStack(spacing: SpacingTokens.compact) {
+                        if subscription.allowsMutations {
+                            Button {
+                                guard !isScheduling else { return }
+                                isScheduling = true
+                                if model.schedule(in: context, now: appClock.now(),
+                                    calendar: calendar, locale: locale, analyticsClient: analyticsClient) != nil {
+                                    appointmentSaved()
+                                    finish()
+                                } else {
+                                    isScheduling = false
                                 }
+                            } label: {
+                                Text("Schedule Next Appointment").frame(maxWidth: .infinity)
                             }
-                            .tint(ColorTokens.success)
-                            .disabled(model.makeSeed() == nil)
+                            .font(.headline)
+                            .farrierFlowPrimaryAction()
+                            .controlSize(.large)
+                            .disabled(isScheduling || model.makeSeed() == nil)
                             .accessibilityIdentifier("next-appointment-confirm")
                         }
+                        Button("Not Now", role: .cancel, action: finish)
+                            .frame(maxWidth: .infinity, minHeight: SpacingTokens.minimumTouchTarget)
+                            .buttonStyle(.plain)
+                            .foregroundStyle(ColorTokens.textSecondary)
+                            .accessibilityIdentifier("next-appointment-not-now")
                     }
-                }
-                .safeAreaInset(edge: .bottom) {
-                    if path.isEmpty {
-                    Button("Not Now", role: .cancel) { dismiss() }
-                        .frame(maxWidth: .infinity)
-                        .buttonStyle(.bordered)
-                        .tint(ColorTokens.textSecondary)
-                        .controlSize(.large)
-                        .padding(.horizontal, SpacingTokens.section)
-                        .padding(.vertical, SpacingTokens.related)
-                        .accessibilityIdentifier("next-appointment-not-now")
-                    }
-                }
-                .navigationDestination(for: ScheduleRoute.self) { route in
-                    switch route {
-                    case let .detail(appointmentID):
-                        AppointmentDetailView(appointmentID: appointmentID)
-                    }
+                    .padding(.horizontal, SpacingTokens.standard)
+                    .padding(.vertical, SpacingTokens.compact)
+                    .background(ColorTokens.background)
                 }
                 .onAppear(perform: load)
                 .alert(item: $model.alert) {
@@ -177,15 +177,14 @@ struct NextAppointmentAssistantView: View {
                     .foregroundStyle(ColorTokens.textSecondary)
             }
             if let suggestedStart = option.suggestedStart {
-                LabeledContent {
-                    Text(
-                        suggestedStart,
-                        format: .dateTime.month().day().year().hour().minute()
-                    )
-                } label: {
-                    Text("Suggested")
+                if (model.projection?.options.count ?? 0) > 1 {
+                    LabeledContent {
+                        Text(suggestedStart, format: .dateTime.month().day().year().hour().minute())
+                    } label: {
+                        Text("Suggested")
+                    }
+                    .font(Typography.recordMetadata)
                 }
-                .font(Typography.recordMetadata)
             } else if option.outcome == .serviced,
                       option.unavailabilityReason == nil {
                 Text("Suggestion unavailable")
@@ -198,6 +197,11 @@ struct NextAppointmentAssistantView: View {
                     .foregroundStyle(ColorTokens.textSecondary)
             }
         }
+    }
+
+    private func finish() {
+        dismiss()
+        selectedAppTab?.wrappedValue = .today
     }
 
     private func load() {

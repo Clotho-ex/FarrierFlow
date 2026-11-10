@@ -9,6 +9,8 @@ struct ServiceEditorView: View {
     @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var model: ServiceEditorModel
     @State private var dismissalBaseline: ServiceDraft?
+    @State private var inputID = UUID()
+    @FocusState private var focusedField: ServiceFormFields.Field?
     private let createdServiceID: Binding<PersistentIdentifier?>?
 
     init(
@@ -23,7 +25,7 @@ struct ServiceEditorView: View {
         NavigationStack {
             Form {
                 RecordSection(Text("Service")) {
-                    ServiceFormFields(draft: $model.draft)
+                    ServiceFormFields(draft: $model.draft, inputID: inputID, focusedField: $focusedField)
                 }
                 .listRowBackground(ColorTokens.surface)
             }
@@ -32,6 +34,8 @@ struct ServiceEditorView: View {
             .disabled(!subscription.allowsMutations)
             .navigationTitle(model.serviceID == nil ? "New Service" : "Edit Service")
             .navigationBarTitleDisplayMode(.inline)
+            .keyboardDoneAccessory(isFocused: focusedField != nil, identifier: "service-keyboard-done") { focusedField = nil }
+            .keepFocusedInputVisible(focusedField)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -65,34 +69,30 @@ struct ServiceEditorView: View {
 }
 
 struct ServiceFormFields: View {
-    private enum Field: Hashable { case name, price }
+    enum Field: Hashable { case name(UUID), price(UUID) }
     @Environment(\.locale) private var locale
-    @FocusState private var focusedField: Field?
     @Binding var draft: ServiceDraft
+    let inputID: UUID
+    @FocusState.Binding var focusedField: Field?
 
     var body: some View {
         Group {
             TextField("Name", text: $draft.name)
                 .textInputAutocapitalization(.words)
-                .focused($focusedField, equals: .name)
+                .focused($focusedField, equals: .name(inputID))
                 .submitLabel(.next)
-                .onSubmit { focusedField = .price }
+                .onSubmit { focusedField = .price(inputID) }
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("service-name-field")
-                .toolbar {
-                    if focusedField != nil {
-                        ToolbarItemGroup(placement: .keyboard) {
-                            Spacer()
-                            Button("Done") { focusedField = nil }
-                                .accessibilityIdentifier("service-keyboard-done")
-                        }
-                    }
-                }
+                .inputLimit($draft.name, maximum: InputLimits.name)
+                .focusedInputAnchor(Field.name(inputID))
             TextField("Default Price", text: $draft.priceInput)
                 .keyboardType(.decimalPad)
-                .focused($focusedField, equals: .price)
+                .focused($focusedField, equals: .price(inputID))
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("service-price-field")
+                .inputLimit($draft.priceInput, maximum: InputLimits.price, rejectOverflow: true)
+                .focusedInputAnchor(Field.price(inputID))
             Text("Enter an amount in \(currencyLabel) with up to two decimal places.")
                 .font(.footnote)
                 .foregroundStyle(ColorTokens.textSecondary)
@@ -109,6 +109,7 @@ struct ServiceFormFields: View {
                locale: locale
            ) {
             Text(formatted)
+                .rollingStateText(value: formatted)
                 .font(.footnote)
                 .foregroundStyle(ColorTokens.textSecondary)
                 .accessibilityLabel(

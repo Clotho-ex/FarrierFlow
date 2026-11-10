@@ -20,6 +20,8 @@ nonisolated struct HorseDraft: Equatable {
 
     var isValid: Bool {
         TextNormalization.required(name) != nil
+            && InputLimits.fits(name, maximum: InputLimits.name)
+            && InputLimits.fits(safetyNotes, maximum: InputLimits.notes)
             && appointmentIntervalWeeks > 0
             && clientID != nil
             && barnID != nil

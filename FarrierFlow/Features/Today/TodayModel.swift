@@ -95,6 +95,7 @@ nonisolated struct TodayVisitSummary: Hashable {
     let horseNames: [String]
     let resolvedHorseCount: Int
     let totalHorseCount: Int
+    let recordedServiceCount: Int
 }
 
 nonisolated struct TodayInvoiceCandidate: Hashable {
@@ -187,16 +188,16 @@ final class TodayModel {
                 remainingAppointments = appointments
             }
 
-            let stops = TodayStopSummary.grouped(appointments)
             if case .openAppointment(let appointment) = primaryAction {
-                featuredStop = stops.first { $0.appointments.contains { $0.id == appointment.id } }
+                featuredStop = TodayStopSummary(
+                    id: .init(serviceLocationID: appointment.serviceLocationID,
+                              startDate: appointment.startDate, state: appointment.state),
+                    appointments: [appointment]
+                )
             } else {
                 featuredStop = nil
             }
-            let featuredIDs = Set(featuredStop?.appointments.map(\.id) ?? [])
-            remainingStops = TodayStopSummary.grouped(
-                remainingAppointments.filter { !featuredIDs.contains($0.id) }
-            )
+            remainingStops = TodayStopSummary.grouped(remainingAppointments)
             switch primaryAction {
             case .addClient:
                 emptyState = .addClient
@@ -322,7 +323,8 @@ final class TodayModel {
                 ),
                 horseNames: horseNames,
                 resolvedHorseCount: resolvedCount,
-                totalHorseCount: horseNames.count
+                totalHorseCount: horseNames.count,
+                recordedServiceCount: visit.visitHorses.reduce(0) { $0 + $1.workItems.count }
             )
         }.sorted { left, right in
             if left.startedAt != right.startedAt { return left.startedAt < right.startedAt }

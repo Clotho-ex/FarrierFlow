@@ -7,6 +7,30 @@ import Testing
 @MainActor
 struct StopDetailsModelTests {
     @Test
+    func directStartAndResumeReuseOneVisitAndRespectTheChosenAppointment() throws {
+        let fixture = try Fixture()
+        let model = StopDetailsModel(stop: fixture.stop)
+        model.load(in: fixture.container)
+        let id = fixture.peanutAppointment.persistentModelID
+        let first = try model.startOrResume(appointmentID: id, now: fixture.start, in: fixture.container)
+        let resumed = try model.startOrResume(appointmentID: id, now: fixture.start, in: fixture.container)
+        #expect(resumed == first)
+        let check = ModelContext(fixture.container)
+        #expect(try check.fetchCount(FetchDescriptor<Visit>()) == 1)
+        let visit = try #require(try check.existingModel(Visit.self, for: first))
+        #expect(visit.appointment?.persistentModelID == id)
+        #expect(visit.visitHorses.map { $0.horse?.name } == ["Peanut"])
+        #expect(try check.existingModel(Appointment.self, for: fixture.thunderAppointment.persistentModelID)?.visit == nil)
+        var draft = try VisitSaveUseCase.loadDraft(visitID: first, in: check)
+        draft.horses[0].outcome = .notServiced
+        _ = try VisitSaveUseCase.complete(draft: draft, completedAt: fixture.start, in: check)
+        #expect(throws: VisitStartError.visitAlreadyExists) {
+            try model.startOrResume(appointmentID: id, now: fixture.start, in: fixture.container)
+        }
+        #expect(try ModelContext(fixture.container).fetchCount(FetchDescriptor<Visit>()) == 1)
+    }
+
+    @Test
     func sharedEditorTimeChangeSplitsTheStopWithoutChangingAppointmentIdentities() throws {
         let fixture = try Fixture()
         let model = StopDetailsModel(stop: fixture.stop)

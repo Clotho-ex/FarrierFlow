@@ -24,6 +24,7 @@ struct BusinessProfileEditorView: View {
     @State private var identityContinueFeedbackTrigger = 0
     @State private var showsCurrencyLockExplanation = false
     @FocusState private var focusedField: Field?
+    @FocusState private var focusedServiceField: ServiceFormFields.Field?
 
     private let onSaved: (() -> Void)?
     private let mode: Mode
@@ -57,9 +58,18 @@ struct BusinessProfileEditorView: View {
                 }
             }
         }
+        .onChange(of: focusedField) { previous, _ in
+            if previous == .phone { model.formatPhone() }
+        }
         .navigationTitle(mode == .identity ? "Your Business" : "My Business")
         .toolbarTitleDisplayMode(.inline)
         .toolbarVisibility(mode == .full ? .hidden : .automatic, for: .tabBar)
+        .keyboardDoneAccessory(isFocused: (mode == .full && focusedField != nil) || focusedServiceField != nil, identifier: "business-keyboard-done") {
+            focusedField = nil
+            focusedServiceField = nil
+        }
+        .keepFocusedInputVisible(focusedField)
+        .keepFocusedInputVisible(focusedServiceField)
         .toolbar {
             if allowsEditing,
                model.loadState == .loaded,
@@ -68,16 +78,6 @@ struct BusinessProfileEditorView: View {
                     Button(mode == .identity ? "Continue" : "Save", action: save)
                         .disabled(!model.canSave)
                         .accessibilityIdentifier("business-profile-save-action")
-                }
-            }
-            if allowsEditing,
-               model.loadState == .loaded,
-               mode == .full {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") {
-                        focusedField = nil
-                    }
                 }
             }
         }
@@ -104,7 +104,7 @@ struct BusinessProfileEditorView: View {
                 .foregroundStyle(ColorTokens.textSecondary)
             ForEach($model.setupServices) { $entry in
                 VStack(alignment: .leading, spacing: SpacingTokens.related) {
-                    ServiceFormFields(draft: $entry.service)
+                    ServiceFormFields(draft: $entry.service, inputID: entry.id, focusedField: $focusedServiceField)
                         .textFieldStyle(.roundedBorder)
                     Button(role: .destructive) {
                         model.setupServices.removeAll { $0.id == entry.id }
@@ -205,6 +205,7 @@ struct BusinessProfileEditorView: View {
                     text: $model.draft.name
                 )
                 .textFieldStyle(.plain)
+
                 .font(.body.weight(.medium))
                 .padding(.horizontal, SpacingTokens.standard)
                 .frame(minHeight: 58)
@@ -231,12 +232,15 @@ struct BusinessProfileEditorView: View {
                     )
                 }
                 .textContentType(.organizationName)
+
                 .textInputAutocapitalization(.words)
                 .autocorrectionDisabled()
                 .submitLabel(.go)
                 .focused($focusedField, equals: .name)
                 .onSubmit(continueFromIdentitySetup)
                 .accessibilityIdentifier("business-profile-name-field")
+                .inputLimit($model.draft.name, maximum: InputLimits.name)
+                .focusedInputAnchor(Field.name)
                 .accessibilityHint(
                     "Required. Use letters, numbers, and spaces only."
                 )
@@ -302,6 +306,7 @@ struct BusinessProfileEditorView: View {
                         )
                         .foregroundStyle(ColorTokens.textPrimary)
                         .textContentType(.organizationName)
+
                         .textInputAutocapitalization(.words)
                         .submitLabel(.next)
                         .focused($focusedField, equals: .name)
@@ -310,9 +315,11 @@ struct BusinessProfileEditorView: View {
                         }
                         .accessibilityLabel("Business or farrier name")
                         .accessibilityIdentifier("business-profile-name-field")
+                        .inputLimit($model.draft.name, maximum: InputLimits.name)
                         .accessibilityHint("Required. Used on future invoices.")
                         .disabled(!allowsEditing)
                     }
+                    .focusedInputAnchor(Field.name)
 
                     if allowsEditing,
                        !model.draft.name.isEmpty,
@@ -348,7 +355,13 @@ struct BusinessProfileEditorView: View {
                     .accessibilityLabel("Phone")
                     .accessibilityIdentifier("business-profile-phone-field")
                     .disabled(!allowsEditing)
+                    .inputLimit($model.draft.phone, maximum: InputLimits.phone, rejectOverflow: true)
+                    Text("Include + and country code for international numbers.")
+                        .font(.footnote)
+                        .foregroundStyle(ColorTokens.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
+                .focusedInputAnchor(Field.phone)
 
                 labeledField("Email") {
                     TextField(
@@ -370,7 +383,17 @@ struct BusinessProfileEditorView: View {
                     .accessibilityLabel("Email")
                     .accessibilityIdentifier("business-profile-email-field")
                     .disabled(!allowsEditing)
+                    .inputLimit($model.draft.email, maximum: InputLimits.email, rejectOverflow: true)
+                    if focusedField != .email, !EmailAddress.isValidOptional(model.draft.email) {
+                        Label("Enter a valid email address.", systemImage: "exclamationmark.circle")
+                            .font(.footnote)
+                            .foregroundStyle(ColorTokens.destructive)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityIdentifier("business-profile-email-error")
+                    }
                 }
+                .focusedInputAnchor(Field.email)
 
                 labeledField("Address") {
                     TextField(
@@ -386,8 +409,10 @@ struct BusinessProfileEditorView: View {
                     .focused($focusedField, equals: .address)
                     .accessibilityLabel("Address")
                     .accessibilityIdentifier("business-profile-address-field")
+                    .inputLimit($model.draft.address, maximum: InputLimits.address)
                     .disabled(!allowsEditing)
                 }
+                .focusedInputAnchor(Field.address)
             } header: {
                 Text("Contact Information").recordSectionHeading()
             } footer: {
@@ -453,8 +478,10 @@ struct BusinessProfileEditorView: View {
                     .accessibilityIdentifier(
                         "business-profile-default-invoice-note-field"
                     )
+                    .inputLimit($model.draft.defaultInvoiceNote, maximum: InputLimits.notes)
                     .disabled(!allowsEditing)
                 }
+                .focusedInputAnchor(Field.defaultInvoiceNote)
             } header: {
                 Text("Appointment & Invoice Defaults").recordSectionHeading()
             } footer: {

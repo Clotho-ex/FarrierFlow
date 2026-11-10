@@ -2,22 +2,23 @@ import XCTest
 
 final class HorseDeletionUITests: XCTestCase {
     @MainActor
-    func testHorseDeletionSheetCancelsAndDeletesLinkedHistory() {
-        verifySheet(largestText: false)
+    func testNativeHorseDeletionAlertCancelsAndDeletesLinkedHistory() {
+        verifyAlert(largestText: false)
     }
 
     @MainActor
-    func testHorseDeletionSheetSupportsLargestText() {
-        verifySheet(largestText: true)
+    func testNativeHorseDeletionAlertSupportsLargestText() {
+        verifyAlert(largestText: true)
     }
 
     @MainActor
-    private func verifySheet(largestText: Bool) {
+    private func verifyAlert(largestText: Bool) {
         let app = XCUIApplication()
         app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] = "HorseDeletion-\(UUID().uuidString)"
         app.launchEnvironment["FARRIERFLOW_UI_TEST_SCENARIO"] = "payment-pending"
         app.launchEnvironment["FARRIERFLOW_UI_TEST_COLOR_SCHEME"] = largestText ? "dark" : "light"
         if largestText {
+            app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
             app.launchEnvironment["FARRIERFLOW_UI_TEST_DYNAMIC_TYPE_SIZE"] = "accessibility5"
         }
         app.launch()
@@ -31,9 +32,9 @@ final class HorseDeletionUITests: XCTestCase {
         guard horse.exists else { return }
         horse.tap()
         app.buttons["Delete"].tap()
-        let confirm = app.buttons["horse-delete-confirmation"]
+        let confirm = app.buttons["horse-delete-confirmation"].firstMatch
         guard confirm.waitForExistence(timeout: 3) else {
-            XCTFail("Horse deletion must use the shared sheet")
+            XCTFail("Horse deletion must use a native alert")
             return
         }
         let cancel = app.buttons["Cancel"]
@@ -45,17 +46,8 @@ final class HorseDeletionUITests: XCTestCase {
 
         app.buttons["Delete"].tap()
         XCTAssertTrue(confirm.waitForExistence(timeout: 3))
-        if !largestText {
-            let sheet = app.descendants(matching: .any)["horse-delete-sheet"].firstMatch
-            XCTAssertLessThan(sheet.frame.height, app.frame.height * 0.75)
-            app.buttons["Sheet Grabber"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-                .press(forDuration: 0.1, thenDragTo: app.coordinate(
-                    withNormalizedOffset: CGVector(dx: 0.5, dy: 0.98)
-                ))
-            XCTAssertFalse(sheet.exists)
-            app.buttons["Delete"].tap()
-            XCTAssertTrue(confirm.waitForExistence(timeout: 3))
-        }
+        XCTAssertTrue(app.alerts["Delete Horse?"].exists)
+        XCTAssertFalse(app.scrollViews["horse-delete-sheet"].exists)
         reveal(confirm, in: app)
         confirm.tap()
         XCTAssertTrue(app.navigationBars["Client"].waitForExistence(timeout: 5))

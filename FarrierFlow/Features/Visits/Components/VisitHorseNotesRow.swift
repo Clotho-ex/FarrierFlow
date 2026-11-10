@@ -8,6 +8,9 @@ struct VisitHorseNotesRow: View {
     @FocusState.Binding var focusedHorseID: PersistentIdentifier?
     let horseID: PersistentIdentifier
     let horseName: String
+    var isNotServiced = false
+
+    private var title: LocalizedStringKey { isNotServiced ? "Reason" : "Work Notes" }
 
     var body: some View {
         VStack(alignment: .leading, spacing: SpacingTokens.compact) {
@@ -15,12 +18,12 @@ struct VisitHorseNotesRow: View {
                 EmptyView()
             } label: {
                 if !isExpanded, TextNormalization.optional(note) == nil {
-                    LabeledContent("Work Notes") {
+                    LabeledContent(title) {
                         Text("Add Note").foregroundStyle(ColorTokens.textSecondary)
                     }
                 } else {
                     VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
-                        Text("Work Notes")
+                        Text(title)
                         if !isExpanded {
                             Text(verbatim: note)
                                 .lineLimit(2)
@@ -33,11 +36,12 @@ struct VisitHorseNotesRow: View {
             .accessibilityIdentifier("visit-work-notes-toggle-\(horseName)")
             if isExpanded {
                 if subscription.allowsMutations {
-                    TextField("Work Notes", text: $note, axis: .vertical)
+                    TextField(title, text: $note, axis: .vertical)
                         .lineLimit(3...8)
                         .focused($focusedHorseID, equals: horseID)
-                        .accessibilityLabel("Work Notes")
+                        .accessibilityLabel(Text(title))
                         .accessibilityIdentifier("visit-work-notes-\(horseName)")
+                        .inputLimit($note, maximum: InputLimits.notes)
                 } else {
                     Text(verbatim: note)
                         .textSelection(.enabled)
@@ -45,6 +49,7 @@ struct VisitHorseNotesRow: View {
                 }
             }
         }
+        .focusedInputAnchor(horseID)
         .onChange(of: isExpanded) { _, expanded in
             focusedHorseID = expanded && subscription.allowsMutations ? horseID : nil
         }

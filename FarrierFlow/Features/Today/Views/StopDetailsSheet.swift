@@ -3,11 +3,17 @@ import SwiftUI
 
 struct StopDetailsSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appClock) private var appClock
+    @Environment(\.analyticsClient) private var analyticsClient
+    @Environment(SubscriptionAccessModel.self) private var subscription
     @Environment(\.modelContext) private var context
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var model: StopDetailsModel
+    @State private var alert: FeatureAlert?
+    private let onVisitRequested: (PersistentIdentifier) -> Void
 
-    init(stop: TodayStopSummary) {
+    init(stop: TodayStopSummary, onVisitRequested: @escaping (PersistentIdentifier) -> Void) {
+        self.onVisitRequested = onVisitRequested
         _model = State(initialValue: StopDetailsModel(stop: stop))
     }
 
@@ -46,6 +52,14 @@ struct StopDetailsSheet: View {
             dynamicTypeSize.isAccessibilitySize ? [.large] : [.medium, .large]
         )
         .presentationDragIndicator(.visible)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let stop = model.stop, stop.id.state != .completed, subscription.allowsMutations {
+                stopAction(stop)
+                    .padding(SpacingTokens.standard)
+                    .background(ColorTokens.background)
+            }
+        }
+        .alert(item: $alert) { Alert(title: Text($0.title), message: Text($0.message)) }
         .onReceive(
             ModelSaveChanges.publisher(in: context.container, entities: [
                 "Appointment", "AppointmentHorse", "Barn", "Horse", "Visit"
@@ -72,7 +86,7 @@ struct StopDetailsSheet: View {
                     .accessibilityElement(children: .combine)
                     .accessibilityIdentifier("today-stop-identity")
                     if let address = stop.appointments.first?.serviceLocationAddress {
-                        ServiceLocationAddress(address: address)
+                        ServiceLocationAddress(address: address, title: "Directions")
                             .font(.subheadline)
                             .foregroundStyle(ColorTokens.textSecondary)
                     }
@@ -86,7 +100,7 @@ struct StopDetailsSheet: View {
             Section {
                 ForEach(stop.appointments) { appointment in
                     NavigationLink(value: appointment.id) {
-                        StopAppointmentRow(appointment: appointment)
+                        StopAppointmentRow(appointment: appointment, clientName: model.clientNamesByAppointment[appointment.id])
                     }
                     .accessibilityHint("Opens appointment details.")
                     .accessibilityIdentifier("today-stop-appointment")
@@ -115,6 +129,48 @@ struct StopDetailsSheet: View {
         .farrierFlowScrollBackground()
     }
 
+    @ViewBuilder
+    private func stopAction(_ stop: TodayStopSummary) -> some View {
+        if let appointment = stop.appointments.first, stop.appointments.count == 1 {
+            Button {
+                enterVisit(appointment.id)
+            } label: {
+                Text(stop.id.state == .inProgress ? "Resume Visit" : "Start Visit")
+                    .frame(maxWidth: .infinity)
+            }
+            .font(.headline)
+            .farrierFlowPrimaryAction()
+            .controlSize(.large)
+            .accessibilityIdentifier("stop-start-resume-visit")
+        } else {
+            Menu {
+                ForEach(stop.appointments) { appointment in
+                    Button(appointment.horseNames.formatted(.list(type: .and))) { enterVisit(appointment.id) }
+                }
+            } label: {
+                Text(stop.id.state == .inProgress ? "Resume Visit" : "Start Visit")
+                    .frame(maxWidth: .infinity)
+            }
+            .font(.headline)
+            .farrierFlowPrimaryAction()
+            .controlSize(.large)
+            .accessibilityIdentifier("stop-start-resume-visit")
+        }
+    }
+
+    private func enterVisit(_ appointmentID: PersistentIdentifier) {
+        guard subscription.allowsMutations else { return }
+        do {
+            let id = try model.startOrResume(appointmentID: appointmentID, now: appClock.now(),
+                in: context.container, analyticsClient: analyticsClient)
+            onVisitRequested(id)
+        } catch {
+            alert = FeatureAlert(title: "Couldn’t Open Visit",
+                message: "Refresh this stop and try again. Completed visits cannot be started again.")
+            reload()
+        }
+    }
+
     private var appointmentsHeading: some View {
         Text("Appointments").recordSectionHeading()
     }
@@ -128,6 +184,7 @@ struct StopDetailsSheet: View {
 
 private struct StopAppointmentRow: View {
     let appointment: TodayAppointmentSummary
+    let clientName: String?
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
@@ -146,10 +203,17 @@ private struct StopAppointmentRow: View {
     }
 
     private var horseNames: some View {
-        Text(appointment.horseNames.formatted(.list(type: .and)))
-            .font(.headline)
-            .foregroundStyle(ColorTokens.textPrimary)
-            .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
+            Text(appointment.horseNames.formatted(.list(type: .and)))
+                .font(.headline)
+                .foregroundStyle(ColorTokens.textPrimary)
+            if let clientName, !clientName.isEmpty {
+                Text(verbatim: clientName)
+                    .font(.subheadline)
+                    .foregroundStyle(ColorTokens.textSecondary)
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private var status: some View {

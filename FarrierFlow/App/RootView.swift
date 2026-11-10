@@ -27,6 +27,7 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var selectedTab = AppTab.today
+    @State private var appointmentSaveFeedback = false
     @State private var setupModel = OwnerSetupReadinessModel()
     @State private var onboarding: OnboardingExperienceModel
     @State private var showsBackupInvitation = false
@@ -187,6 +188,12 @@ struct RootView: View {
                 BusinessView()
             }
         }
+        .environment(\.selectedAppTab, $selectedTab)
+        .environment(\.appointmentSaved) {
+            appointmentSaveFeedback.toggle()
+            AccessibilityNotification.Announcement(String(localized: "Appointment saved.")).post()
+        }
+        .sensoryFeedback(.success, trigger: appointmentSaveFeedback)
         .sensoryFeedback(.selection, trigger: selectedTab)
     }
 

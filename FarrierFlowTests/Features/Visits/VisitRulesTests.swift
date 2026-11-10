@@ -27,10 +27,7 @@ struct VisitRulesTests {
         let draft = try makeDraft(outcomes: [(.pending, " \n\t ")])
 
         #expect(VisitRules.progressViolation(in: draft) == nil)
-        #expect(!VisitRules.requiresWorkNotesClearConfirmation(
-            from: draft.horses[0],
-            to: .notServiced
-        ))
+
     }
 
     @Test
@@ -54,10 +51,10 @@ struct VisitRulesTests {
     }
 
     @Test(arguments: [VisitOutcome.pending, .notServiced])
-    func progressRejectsWorkNotesForNonServicedOutcome(_ outcome: VisitOutcome) throws {
+    func progressAllowsWorkNotesForEveryOutcome(_ outcome: VisitOutcome) throws {
         let draft = try makeDraft(outcomes: [(outcome, "Could not complete")])
 
-        #expect(VisitRules.progressViolation(in: draft) == .workNotesRequireServicedOutcome)
+        #expect(VisitRules.progressViolation(in: draft) == nil)
     }
 
     @Test
@@ -75,10 +72,10 @@ struct VisitRulesTests {
     }
 
     @Test
-    func completionRequiresAtLeastOneServicedHorse() throws {
+    func completionAllowsAttendanceWithoutPerformedServices() throws {
         let draft = try makeDraft(outcomes: [(.notServiced, ""), (.notServiced, "")])
 
-        #expect(VisitRules.completionViolation(in: draft) == .completionRequiresServicedHorse)
+        #expect(VisitRules.completionViolation(in: draft) == nil)
     }
 
     @Test
@@ -103,11 +100,12 @@ struct VisitRulesTests {
     }
 
     @Test
-    func progressRejectsWorkItemsForNotServicedHorse() throws {
+    func progressPreservesNotServicedConflictButCompletionRejectsIt() throws {
         var draft = try makeDraft(outcomes: [(.serviced, "")])
         draft.horses[0].outcome = .notServiced
 
-        #expect(VisitRules.progressViolation(in: draft) == .notServicedHorseHasWorkItems)
+        #expect(VisitRules.progressViolation(in: draft) == nil)
+        #expect(VisitRules.completionViolation(in: draft) == .notServicedHorseHasWorkItems)
     }
 
     @Test
@@ -145,29 +143,20 @@ struct VisitRulesTests {
     }
 
     @Test
-    func leavingServicedOutcomeWithNotesRequiresConfirmationBeforeClearingThem() throws {
-        let draft = try makeDraft(outcomes: [(.serviced, "Trimmed front hooves")])
-
-        #expect(VisitRules.requiresWorkNotesClearConfirmation(
-            from: draft.horses[0],
-            to: .notServiced
-        ))
-        #expect(!VisitRules.requiresWorkNotesClearConfirmation(
-            from: draft.horses[0],
-            to: .serviced
-        ))
+    func notServicedReasonIsValidWithoutPerformedServices() throws {
+        let draft = try makeDraft(outcomes: [(.notServiced, "Horse could not be handled safely.")])
+        #expect(VisitRules.progressViolation(in: draft) == nil)
+        #expect(VisitRules.completionViolation(in: draft) == nil)
     }
 
     @Test
-    func leavingPendingOutcomeWithDraftWorkItemsRequiresConfirmationBeforeClearingThem() throws {
-        let draft = try makeDraft(outcomes: [(.serviced, "")])
-        var pendingHorse = draft.horses[0]
-        pendingHorse.outcome = .pending
-
-        #expect(VisitRules.requiresWorkNotesClearConfirmation(
-            from: pendingHorse,
-            to: .notServiced
-        ))
+    func returningToPendingPreservesRecordedWorkForLaterReview() throws {
+        var draft = try makeDraft(outcomes: [(.serviced, "Trimmed front hooves")])
+        draft.horses[0].outcome = .pending
+        #expect(VisitRules.progressViolation(in: draft) == nil)
+        #expect(VisitRules.completionViolation(in: draft) == .pendingOutcomePreventsCompletion)
+        #expect(!draft.horses[0].workItems.isEmpty)
+        #expect(draft.horses[0].workNotes == "Trimmed front hooves")
     }
 
     @Test

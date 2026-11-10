@@ -1,4 +1,20 @@
 ---
+
+## Appointment and visit workflow refinement — 2026-10-27
+
+Selectors retain native menus with neutral trailing chevrons and explicit Choose
+Service placeholders. Appointment saves provide native success sensory and
+accessibility feedback while preserving the launching context. Stop Details
+provides direct Start/Resume; multi-appointment stops explicitly choose one.
+
+Horse controls read Services → Photos → Notes/Reason → Work Outcome. A native
+bottom safe-area footer keeps Save Progress visible when Complete Visit becomes
+available and remains usable above the keyboard. Observable draft WorkItems
+supply live Draft/Saved totals. Edit Visit Service applies to one recorded line.
+
+Schedule Next Visit uses explicit Schedule Next Appointment and Not Now footer
+actions, retains multi-horse selection, and returns to Today after either choice.
+No custom navigation or animation system is introduced.
 name: FarrierFlow
 description: A native field book for running an independent farrier business.
 ---

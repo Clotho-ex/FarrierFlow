@@ -51,6 +51,7 @@ struct ClientListView: View {
                             }
                         } header: {
                             Text(clientCountLabel(matchingClients.count))
+                                .rollingStateText(value: matchingClients.count)
                                 .recordSectionHeading()
                         }
                     }

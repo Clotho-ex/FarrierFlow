@@ -30,9 +30,24 @@ final class BusinessProfileEditorModel {
 
     var canSave: Bool {
         loadState == .loaded
+            && inputsAreValid
             && (!isCurrencyLocked || draft.currencyCode == originalCurrencyCode)
             && (try? BusinessProfileRules.validated(draft)) != nil
             && setupServicesAreValid
+    }
+
+    private var inputsAreValid: Bool {
+        InputLimits.fits(draft.name, maximum: InputLimits.name)
+            && InputLimits.fits(draft.phone, maximum: InputLimits.phone)
+            && InputLimits.fits(draft.email, maximum: InputLimits.email)
+            && InputLimits.fits(draft.address, maximum: InputLimits.address)
+            && InputLimits.fits(draft.defaultInvoiceNote, maximum: InputLimits.notes)
+            && EmailAddress.isValidOptional(draft.email)
+    }
+
+    func formatPhone() {
+        guard draft.phone != originalDraft?.phone else { return }
+        draft.phone = PhoneNumberFormatting.formattedInput(draft.phone, region: locale.region?.identifier ?? "ZZ")
     }
 
     func load(in context: ModelContext, locale: Locale = .current) {
@@ -97,13 +112,16 @@ final class BusinessProfileEditorModel {
     func save(in context: ModelContext) -> Bool {
         guard
             loadState == .loaded,
+            inputsAreValid,
             (try? BusinessProfileRules.validated(draft)) != nil
         else {
             return false
         }
 
+        let phoneWasEdited = draft.phone != originalDraft?.phone
         do {
             let profiles = try fetchProfiles(in: context)
+            let retainedPhone = profiles.first?.phone
             guard profiles.count <= 1 else {
                 throw BusinessProfileEditorError.multipleProfiles
             }
@@ -112,6 +130,10 @@ final class BusinessProfileEditorModel {
                 if let profile = profiles.first {
                     draft = try DraftSaveRules.merge(original: originalDraft, proposed: draft, current: Self.snapshot(profile))
                 }
+            }
+            guard inputsAreValid else {
+                alert = DraftSaveRules.changedAlert
+                return false
             }
             let values = try BusinessProfileRules.validated(draft)
             let newServices = try setupServices.map { try ServiceRules.validated(serviceDraft($0), locale: locale) }
@@ -135,7 +157,9 @@ final class BusinessProfileEditorModel {
             }
 
             profile.name = values.name
-            profile.phone = values.phone
+            profile.phone = phoneWasEdited
+                ? PhoneNumberFormatting.normalized(values.phone ?? "", region: locale.region?.identifier ?? "ZZ") ?? values.phone
+                : retainedPhone
             profile.email = values.email
             profile.address = values.address
             profile.defaultInvoiceNote = values.defaultInvoiceNote
@@ -181,7 +205,7 @@ final class BusinessProfileEditorModel {
     private static func snapshot(_ profile: BusinessProfile) -> BusinessProfileDraft {
         BusinessProfileDraft(
             name: profile.name,
-            phone: profile.phone ?? "",
+            phone: PhoneNumberFormatting.display(profile.phone ?? ""),
             email: profile.email ?? "",
             address: profile.address ?? "",
             defaultInvoiceNote: profile.defaultInvoiceNote ?? "",

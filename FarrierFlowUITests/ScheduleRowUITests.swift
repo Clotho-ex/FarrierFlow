@@ -65,6 +65,9 @@ final class ScheduleRowUITests: XCTestCase {
         protection.buttons["OK"].tap()
         app.buttons["visit-resume-action"].tap()
         XCTAssertTrue(app.navigationBars["Visit"].waitForExistence(timeout: 5))
+        let record = app.buttons["visit-record-planned-Horse 4-1"]
+        reveal(record, in: app)
+        record.tap()
         let outcome = app.buttons["visit-outcome-Horse 4-1"]
         if !outcome.exists { app.buttons["visit-horse-toggle-Horse 4-1"].tap() }
         reveal(outcome, in: app)
@@ -74,9 +77,10 @@ final class ScheduleRowUITests: XCTestCase {
         XCTAssertTrue(complete.waitForExistence(timeout: 3))
         XCTAssertTrue(complete.isEnabled)
         complete.tap()
-        XCTAssertTrue(app.navigationBars["Next Appointment"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Schedule Next Visit"].waitForExistence(timeout: 5))
         app.buttons["next-appointment-not-now"].tap()
-        XCTAssertTrue(app.navigationBars["Appointment"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 5))
+        app.selectFarrierFlowTab("Business")
         app.navigationBars.buttons["Trim"].tap()
         XCTAssertTrue(app.navigationBars["Trim"].waitForExistence(timeout: 5))
         XCTAssertFalse(linked.exists, "Completed work must leave the service's Appointments tab")
@@ -203,6 +207,9 @@ final class ScheduleRowUITests: XCTestCase {
         openAppointment(active, in: app)
         app.buttons["visit-resume-action"].tap()
         XCTAssertTrue(app.navigationBars["Visit"].waitForExistence(timeout: 5))
+        let record = app.buttons["visit-record-planned-Horse 4-1"]
+        reveal(record, in: app)
+        record.tap()
         let outcome = app.descendants(matching: .any)["visit-outcome-Horse 4-1"].firstMatch
         if !outcome.exists { app.buttons["visit-horse-toggle-Horse 4-1"].tap() }
         reveal(outcome, in: app)
@@ -215,9 +222,10 @@ final class ScheduleRowUITests: XCTestCase {
         XCTAssertTrue(complete.isHittable)
         XCTAssertTrue(complete.isEnabled)
         complete.tap()
-        XCTAssertTrue(app.navigationBars["Next Appointment"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Schedule Next Visit"].waitForExistence(timeout: 5))
         app.buttons["next-appointment-not-now"].tap()
-        XCTAssertTrue(app.navigationBars["Appointment"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 5))
+        app.selectFarrierFlowTab("Schedule")
         XCTAssertTrue(app.buttons["visit-view-action"].exists)
         app.navigationBars.buttons["Schedule"].tap()
         XCTAssertTrue(app.navigationBars["Schedule"].waitForExistence(timeout: 5))

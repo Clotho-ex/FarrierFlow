@@ -136,9 +136,8 @@ begin
       where workspace_id = p_workspace and kind = 'workItem'
         and fields->>'visitHorse' = r.id::text;
     if total > 9223372036854775807 or
-       (r.fields->>'outcomeRawValue' = 'notServiced' and count_items > 0) or
-       (r.fields->>'outcomeRawValue' <> 'serviced'
-        and r.fields->'workNotes' <> 'null'::jsonb) or
+       (target.fields->'completedAt' <> 'null'::jsonb
+        and r.fields->>'outcomeRawValue' = 'notServiced' and count_items > 0) or
        (target.fields->'completedAt' <> 'null'::jsonb
         and r.fields->>'outcomeRawValue' = 'serviced' and count_items = 0) then
       raise exception 'Invalid visit work' using errcode = '23514';

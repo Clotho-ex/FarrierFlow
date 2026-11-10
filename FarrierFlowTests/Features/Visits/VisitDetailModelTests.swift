@@ -227,9 +227,9 @@ struct VisitDetailModelTests {
             visit.serviceLocationNameSnapshot = "   "
         }
         try assertUnavailableAfterDirectSave { visit, _ in
-            let horse = try #require(visit.visitHorses.first)
+            let horse = try #require(visit.visitHorses.first { !$0.workItems.isEmpty })
             horse.outcomeRawValue = VisitOutcome.notServiced.rawValue
-            horse.workNotes = "Must be rejected"
+            horse.workNotes = "Recorded services conflict with this final outcome."
         }
         try assertUnavailableAfterDirectSave { visit, _ in
             visit.completedAt = Date(timeIntervalSinceReferenceDate: 99)
@@ -394,6 +394,10 @@ struct VisitDetailModelTests {
             let scoutIndex = try horseIndex(named: "Scout", in: draft)
             draft.horses[miloIndex].outcome = .serviced
             draft.horses[miloIndex].workNotes = "Front shoes"
+            draft.horses[miloIndex].workItems = [WorkItemDraft(
+                serviceID: defaultService.persistentModelID,
+                serviceNameSnapshot: "Basic Trim", amountMinorUnits: 5_000
+            )]
             draft.horses[scoutIndex].outcome = .notServiced
             _ = try VisitSaveUseCase.complete(
                 draft: draft,

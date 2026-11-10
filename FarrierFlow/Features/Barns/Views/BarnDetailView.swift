@@ -4,7 +4,7 @@ import SwiftUI
 struct BarnDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @Environment(\.modelContext) private var context
+     @Environment(\.modelContext) private var context
     @Environment(SubscriptionAccessModel.self) private var subscription
     @Environment(\.backupSync) private var backupSync
     @State private var model = BarnDetailModel()
@@ -118,7 +118,7 @@ struct BarnDetailView: View {
                 .sheet(isPresented: $showsExistingHorsePicker, onDismiss: reload) {
                     ExistingHorsePickerView(destinationBarnID: barnID)
                 }
-                .recordDeletionSheet(
+                .recordDeletionConfirmation(
                     .barn(barnID), isPresented: $showsDeleteConfirmation,
                     title: "Delete Service Location?", confirmationTitle: "Delete Service Location",
                     accessibilityPrefix: "barn-delete", alert: $model.alert

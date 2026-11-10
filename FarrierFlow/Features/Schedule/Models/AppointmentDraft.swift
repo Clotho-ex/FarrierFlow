@@ -5,6 +5,7 @@ nonisolated enum AppointmentSaveRequirement: Equatable {
     case serviceLocation
     case horse
     case expectedDuration
+    case notesTooLong
     case lockedMembership
 }
 
@@ -38,6 +39,7 @@ nonisolated struct AppointmentDraft: Equatable {
     }
 
     var saveRequirement: AppointmentSaveRequirement? {
+        guard InputLimits.fits(notes, maximum: InputLimits.notes) else { return .notesTooLong }
         guard barnID != nil else { return .serviceLocation }
         guard !selectedHorseIDs.isEmpty else { return .horse }
         let duration = expectedDurationText.trimmingCharacters(in: .whitespacesAndNewlines)

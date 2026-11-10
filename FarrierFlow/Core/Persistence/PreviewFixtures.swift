@@ -184,6 +184,8 @@ enum UITestFixtures {
         screenshotStage: ScreenshotFixtureStage? = nil
     ) throws {
         switch scenario {
+        case .visitWorkflow:
+            try seedVisitWorkflow(in: container, now: now)
         case .appStoreShowcase:
             try seedAppStoreShowcase(
                 in: container,
@@ -234,6 +236,33 @@ enum UITestFixtures {
             return
         }
         context.insert(BusinessProfile(name: "UI Test Farrier"))
+        try DomainGraphValidator.save(context)
+    }
+
+    private static func seedVisitWorkflow(in container: ModelContainer, now: Date) throws {
+        try seedOwnerIdentity(in: container)
+        let context = container.mainContext
+        guard try context.fetchCount(FetchDescriptor<Client>()) == 0 else { return }
+        let client = Client(name: "Jeremy Clarkson")
+        let barn = Barn(name: "The Clarkson Farm", address: "47 W 13th St, New York, NY")
+        context.insert(client)
+        context.insert(barn)
+        let horse = Horse(name: "Burger", client: client, currentBarn: barn)
+        context.insert(horse)
+        client.horses.append(horse)
+        barn.horses.append(horse)
+        let service = Service(name: "Brushing", defaultAmountMinorUnits: 10_000, currencyCode: "USD")
+        context.insert(service)
+        horse.defaultService = service
+        service.horsesUsingAsDefault.append(horse)
+        let appointment = Appointment(startDate: now.addingTimeInterval(3_600), barn: barn)
+        context.insert(appointment)
+        barn.appointments.append(appointment)
+        let member = AppointmentHorse(appointment: appointment, horse: horse)
+        member.plannedService = service
+        context.insert(member)
+        appointment.appointmentHorses.append(member)
+        horse.appointmentHorses.append(member)
         try DomainGraphValidator.save(context)
     }
 
@@ -686,6 +715,12 @@ enum UITestFixtures {
         var draft = try VisitSaveUseCase.loadDraft(visitID: visitID, in: context)
         for index in draft.horses.indices {
             draft.horses[index].outcome = .serviced
+            if let plan = draft.horses[index].plannedService {
+                draft.horses[index].workItems = [WorkItemDraft(
+                    serviceID: plan.id, serviceNameSnapshot: plan.name,
+                    amountMinorUnits: plan.defaultAmountMinorUnits, currencyCode: plan.currencyCode
+                )]
+            }
         }
         let completedAt = startedAt.addingTimeInterval(30 * 60)
         _ = try VisitSaveUseCase.complete(

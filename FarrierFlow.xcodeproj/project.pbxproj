@@ -10,6 +10,7 @@
 		F10000000000000000000001 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = F10000000000000000000003 /* RevenueCat */; };
 		F20000000000000000000001 /* PostHog in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000003 /* PostHog */; };
 		F40000000000000000000001 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = F40000000000000000000003 /* Supabase */; };
+		F60000000000000000000001 /* PhoneNumberKit in Frameworks */ = {isa = PBXBuildFile; productRef = F60000000000000000000003 /* PhoneNumberKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -78,6 +79,7 @@
 				F20000000000000000000001 /* PostHog in Frameworks */,
 				F40000000000000000000001 /* Supabase in Frameworks */,
 				F10000000000000000000001 /* RevenueCat in Frameworks */,
+				F60000000000000000000001 /* PhoneNumberKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -152,6 +154,7 @@
 				F20000000000000000000003 /* PostHog */,
 				F40000000000000000000003 /* Supabase */,
 				F10000000000000000000003 /* RevenueCat */,
+				F60000000000000000000003 /* PhoneNumberKit */,
 			);
 			productName = FarrierFlow;
 			productReference = C2E75D50301641FF008B005F /* FarrierFlow.app */;
@@ -241,6 +244,7 @@
 			mainGroup = C2E75D47301641FF008B005F;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				F60000000000000000000002 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */,
 				F20000000000000000000002 /* XCRemoteSwiftPackageReference "posthog-ios" */,
 				F40000000000000000000002 /* XCRemoteSwiftPackageReference "supabase-swift" */,
 				F10000000000000000000002 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */,
@@ -694,6 +698,14 @@
 				version = 2.55.3;
 			};
 		};
+		F60000000000000000000002 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/PhoneNumberKit/PhoneNumberKit.git";
+			requirement = {
+				kind = exactVersion;
+				version = 5.0.13;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -711,6 +723,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = F40000000000000000000002 /* XCRemoteSwiftPackageReference "supabase-swift" */;
 			productName = Supabase;
+		};
+		F60000000000000000000003 /* PhoneNumberKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F60000000000000000000002 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */;
+			productName = PhoneNumberKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

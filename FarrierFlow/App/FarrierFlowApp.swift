@@ -8,6 +8,7 @@
 import Foundation
 import SwiftData
 import SwiftUI
+import UIKit
 
 @main
 struct FarrierFlowApp: App {
@@ -17,6 +18,10 @@ struct FarrierFlowApp: App {
     private let uiTestReferenceDate: Date?
 
     init() {
+        if #unavailable(iOS 26) {
+            // Older UIKit-backed alerts do not inherit SwiftUI’s tint.
+            UIView.appearance(whenContainedInInstancesOf: [UIAlertController.self]).tintColor = .label
+        }
         #if DEBUG
         let uiTestConfiguration = UITestLaunchConfiguration()
         uiTestDynamicTypeSize = uiTestConfiguration.dynamicTypeSize

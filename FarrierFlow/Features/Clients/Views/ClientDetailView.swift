@@ -37,20 +37,14 @@ struct ClientDetailView: View {
                     if hasContactDetails(client) || subscription.allowsMutations {
                         Section {
                             if let phone = client.phone {
-                                contactRow(
-                                    "Phone", value: phone,
-                                    url: ClientContactURL.phone(phone),
-                                    accessibilityLabel: Text("Call \(phone)")
-                                )
-                                .accessibilityIdentifier("client-phone-action")
+                                contactLabel("Phone", value: PhoneNumberFormatting.display(phone))
+                                    .accessibilityElement(children: .combine)
+                                    .accessibilityIdentifier("client-phone-information")
                             }
                             if let email = client.email {
-                                contactRow(
-                                    "Email", value: email,
-                                    url: ClientContactURL.email(email),
-                                    accessibilityLabel: Text("Email \(email)")
-                                )
-                                .accessibilityIdentifier("client-email-action")
+                                contactLabel("Email", value: email)
+                                    .accessibilityElement(children: .combine)
+                                    .accessibilityIdentifier("client-email-information")
                             }
                             if let notes = client.notes {
                                 RecordDetailField("Notes") {
@@ -59,7 +53,6 @@ struct ClientDetailView: View {
                                         .frame(maxWidth: .infinity, alignment: .leading)
                                         .padding(SpacingTokens.related)
                                         .background(ColorTokens.noteSurface, in: .rect(cornerRadius: SpacingTokens.related))
-                                        .textSelection(.enabled)
                                 }
                                 .accessibilityElement(children: .combine)
                                 .accessibilityIdentifier("client-notes")
@@ -183,7 +176,7 @@ struct ClientDetailView: View {
                 .sheet(isPresented: $showsHorseEditor, onDismiss: reload) {
                     HorseEditorView(preselectedClientID: clientID)
                 }
-                .recordDeletionSheet(
+                .recordDeletionConfirmation(
                     .client(clientID), isPresented: $showsDeleteConfirmation,
                     title: "Delete Client?", confirmationTitle: "Delete Client",
                     accessibilityPrefix: "client-delete", alert: $model.alert
@@ -201,24 +194,6 @@ struct ClientDetailView: View {
 
     private func reload() {
         model.load(id: clientID, in: ModelContext(context.container))
-    }
-
-    @ViewBuilder
-    private func contactRow(
-        _ title: LocalizedStringKey,
-        value: String,
-        url: URL?,
-        accessibilityLabel: Text
-    ) -> some View {
-        if let url {
-            Link(destination: url) {
-                contactLabel(title, value: value)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(accessibilityLabel)
-        } else {
-            contactLabel(title, value: value)
-        }
     }
 
     private func contactLabel(

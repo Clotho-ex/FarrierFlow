@@ -73,7 +73,7 @@ final class ServiceDeletionUITests: XCTestCase {
         let alert = app.alerts["Delete Service?"]
         XCTAssertTrue(alert.waitForExistence(timeout: 3))
         XCTAssertTrue(alert.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS %@", "Recorded work, saved invoices and photos are kept.")
+            NSPredicate(format: "label CONTAINS %@", "Recorded work, invoices and photos stay.")
         ).firstMatch.exists)
         app.buttons["service-delete-confirmation"].firstMatch.tap()
         XCTAssertTrue(app.navigationBars["Services"].waitForExistence(timeout: 5))

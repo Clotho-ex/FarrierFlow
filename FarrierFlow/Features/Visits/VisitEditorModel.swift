@@ -9,11 +9,6 @@ nonisolated enum VisitEditorLoadState: Equatable {
     case failed
 }
 
-nonisolated struct VisitOutcomeChange: Equatable {
-    let visitHorseID: PersistentIdentifier
-    let outcome: VisitOutcome
-}
-
 nonisolated enum VisitEditorMode: Equatable {
     case inProgress
     case correction
@@ -63,7 +58,6 @@ final class VisitEditorModel {
     private(set) var serviceLocationAddress: String?
     private(set) var horseContext: [PersistentIdentifier: VisitHorseContext] = [:]
     var draft: VisitDraft?
-    private(set) var pendingOutcomeChange: VisitOutcomeChange?
     private var backgroundSaveErrorPending = false
     private var didCompleteVisit = false
     var alert: FeatureAlert?
@@ -73,6 +67,18 @@ final class VisitEditorModel {
 
     var isDirty: Bool {
         draft != lastSavedDraft
+    }
+
+    var recordedServiceCount: Int {
+        draft?.horses.reduce(0) { $0 + $1.workItems.count } ?? 0
+    }
+
+    var notServicedHorseCount: Int {
+        draft?.horses.filter { $0.outcome == .notServiced && $0.workItems.isEmpty }.count ?? 0
+    }
+
+    var pendingOutcomeCount: Int {
+        draft?.horses.filter { $0.outcome == .pending }.count ?? 0
     }
 
     var recordedHorseCount: Int {
@@ -96,7 +102,7 @@ final class VisitEditorModel {
 
     var canSaveProgress: Bool {
         guard mode == .inProgress, loadState == .loaded, let draft else { return false }
-        return VisitRules.progressViolation(in: draft) == nil
+        return isDirty && VisitRules.progressViolation(in: draft) == nil
     }
 
     var canComplete: Bool {
@@ -221,29 +227,8 @@ final class VisitEditorModel {
             return false
         }
 
-        if VisitRules.requiresWorkNotesClearConfirmation(from: horse, to: outcome) {
-            pendingOutcomeChange = VisitOutcomeChange(
-                visitHorseID: visitHorseID,
-                outcome: outcome
-            )
-            return true
-        }
-
         applyOutcomeChange(for: visitHorseID, to: outcome)
-        return false
-    }
-
-    func confirmPendingOutcomeChange() {
-        guard let pendingOutcomeChange else { return }
-        applyOutcomeChange(
-            for: pendingOutcomeChange.visitHorseID,
-            to: pendingOutcomeChange.outcome
-        )
-        self.pendingOutcomeChange = nil
-    }
-
-    func cancelPendingOutcomeChange() {
-        pendingOutcomeChange = nil
+        return outcome == .notServiced && !horse.workItems.isEmpty
     }
 
     func setWorkNotes(_ workNotes: String, for visitHorseID: PersistentIdentifier) {
@@ -365,6 +350,14 @@ final class VisitEditorModel {
     }
 
     @discardableResult
+    func confirmPlannedService(for visitHorseID: PersistentIdentifier) -> Bool {
+        guard let service = draft?.horses.first(where: { $0.id == visitHorseID })?.plannedService else {
+            return false
+        }
+        return addService(service.id, to: visitHorseID)
+    }
+
+    @discardableResult
     func removeWorkItem(
         _ workItemID: UUID,
         from visitHorseID: PersistentIdentifier
@@ -476,7 +469,6 @@ final class VisitEditorModel {
 
     func discardUnsavedChanges() {
         draft = lastSavedDraft
-        pendingOutcomeChange = nil
     }
 
     @discardableResult
@@ -577,12 +569,6 @@ final class VisitEditorModel {
             return
         }
         updatedDraft.horses[index].outcome = outcome
-        if outcome != .serviced {
-            updatedDraft.horses[index].workNotes = ""
-        }
-        if outcome == .notServiced {
-            updatedDraft.horses[index].workItems = []
-        }
         draft = updatedDraft
     }
 

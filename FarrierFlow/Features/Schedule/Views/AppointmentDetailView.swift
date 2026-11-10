@@ -3,6 +3,7 @@ import SwiftUI
 
 struct AppointmentDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appClock) private var appClock
     @Environment(\.locale) private var locale
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.modelContext) private var context
@@ -65,6 +66,7 @@ struct AppointmentDetailView: View {
                             Button {
                                 guard subscription.allowsMutations else { return }
                                 model.startVisit(
+                                    now: appClock.now(),
                                     in: context.container,
                                     analyticsClient: analyticsClient
                                 )
@@ -127,42 +129,44 @@ struct AppointmentDetailView: View {
                     RecordSection(Text("Horses")) {
                         ForEach(detail.horses) { horse in
                             if let horseName = horse.name {
-                                VStack(
-                                    alignment: .leading,
-                                    spacing: SpacingTokens.rowContent
-                                ) {
-                                    Text(horseName)
-                                        .font(Typography.recordTitle)
-                                    Text(
-                                        horse.clientName
-                                            ?? String(
-                                                localized: "Client unavailable",
-                                                locale: locale
-                                            )
-                                    )
-                                        .font(Typography.recordMetadata)
-                                        .foregroundStyle(ColorTokens.textSecondary)
+                                VStack(alignment: .leading, spacing: SpacingTokens.standard) {
+                                    VStack(alignment: .leading, spacing: SpacingTokens.compact) {
+                                        Text(verbatim: horseName)
+                                            .font(Typography.recordTitle)
+                                        if let safetyNotes = horse.safetyNotes {
+                                            HStack(alignment: .firstTextBaseline, spacing: SpacingTokens.compact) {
+                                                Image(systemName: "exclamationmark.triangle")
+                                                    .foregroundStyle(ColorTokens.warning)
+                                                    .accessibilityHidden(true)
+                                                Text(verbatim: safetyNotes)
+                                                    .fixedSize(horizontal: false, vertical: true)
+                                            }
+                                            .font(.subheadline)
+                                            .foregroundStyle(ColorTokens.textPrimary)
+                                            .accessibilityElement(children: .combine)
+                                            .accessibilityLabel("Safety note for \(horseName): \(safetyNotes)")
+                                            .accessibilityIdentifier("appointment-safety-\(horseName)")
+                                        }
+                                    }
+                                    VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
+                                        Text("Owner")
+                                            .font(.subheadline)
+                                            .foregroundStyle(ColorTokens.textSecondary)
+                                        Text(verbatim: horse.clientName ?? String(localized: "Client unavailable", locale: locale))
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
+                                    .accessibilityElement(children: .combine)
                                     if detail.visit?.completedAt == nil,
                                        let serviceName = horse.plannedServiceName {
-                                        LabeledContent("Service", value: serviceName)
-                                            .font(Typography.recordMetadata)
-                                            .accessibilityIdentifier("appointment-planned-service-\(horseName)")
-                                    }
-                                    if let phone = horse.clientPhone {
-                                        clientPhone(phone)
-                                            .font(Typography.recordMetadata)
-                                            .foregroundStyle(ColorTokens.textSecondary)
-                                            .accessibilityIdentifier("appointment-call-\(horseName)")
-                                    }
-                                    if let safetyNotes = horse.safetyNotes {
-                                        Label {
-                                            Text(safetyNotes)
-                                                .foregroundStyle(ColorTokens.textPrimary)
-                                        } icon: {
-                                            Image(systemName: "exclamationmark.triangle.fill")
-                                                .foregroundStyle(ColorTokens.warning)
+                                        VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
+                                            Text("Planned Service")
+                                                .font(.subheadline)
+                                                .foregroundStyle(ColorTokens.textSecondary)
+                                            Text(verbatim: serviceName)
+                                                .fixedSize(horizontal: false, vertical: true)
                                         }
-                                        .font(Typography.recordMetadata)
+                                        .accessibilityElement(children: .combine)
+                                        .accessibilityIdentifier("appointment-planned-service-\(horseName)")
                                     }
                                 }
                             } else {
@@ -253,7 +257,7 @@ struct AppointmentDetailView: View {
                     AppointmentEditorDestination(appointmentID: appointmentID)
                         .dynamicTypeSize(dynamicTypeSize)
                 }
-                .recordDeletionSheet(
+                .recordDeletionConfirmation(
                     .appointment(appointmentID), isPresented: $showsDeleteConfirmation,
                     title: "Delete Appointment?", confirmationTitle: "Delete Appointment",
                     accessibilityPrefix: "appointment-delete", alert: $model.alert
@@ -310,26 +314,6 @@ struct AppointmentDetailView: View {
             || detail.barnContactNotes != nil
             || detail.expectedDurationMinutes != nil
             || TextNormalization.optional(detail.notes ?? "") != nil
-    }
-
-    @ViewBuilder
-    private func clientPhone(_ phone: String) -> some View {
-        if let url = ClientContactURL.phone(phone) {
-            Link(destination: url) {
-                HStack(alignment: .firstTextBaseline, spacing: SpacingTokens.compact) {
-                    Image(systemName: "phone")
-                        .accessibilityHidden(true)
-                    Text(verbatim: phone)
-                }
-                .foregroundStyle(ColorTokens.brandActionText)
-                .frame(maxWidth: .infinity, minHeight: SpacingTokens.minimumTouchTarget, alignment: .leading)
-                .contentShape(.rect)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Text("Call \(phone)"))
-        } else {
-            Text(verbatim: phone)
-        }
     }
 
     private func handleVisitEditorDismissal() {

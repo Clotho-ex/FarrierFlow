@@ -14,7 +14,7 @@ enum ClientContactURL {
 
     static func email(_ value: String) -> URL? {
         let address = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard address.contains("@"), !address.contains(where: \.isWhitespace) else { return nil }
+        guard EmailAddress.isValid(address) else { return nil }
         return recipientURL(scheme: "mailto", recipient: address)
     }
 

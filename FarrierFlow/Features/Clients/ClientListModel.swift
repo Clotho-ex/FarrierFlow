@@ -11,11 +11,13 @@ struct ClientListSnapshot: Equatable, Identifiable {
     let email: String?
     let horseNames: [String]
     let horseCount: Int
+    private let nationalPhoneDigits: String?
 
     init(client: Client) {
         id = client.persistentModelID
         name = client.name
         phone = client.phone
+        nationalPhoneDigits = client.phone.flatMap(PhoneNumberFormatting.nationalDigits)
         email = client.email
         horseNames = client.horses.map(\.name).sorted()
         horseCount = client.horses.count
@@ -26,6 +28,7 @@ struct ClientListSnapshot: Equatable, Identifiable {
         let digits = query.filter(\.isNumber)
         guard !digits.isEmpty, query.allSatisfy({ $0.isNumber || $0.isWhitespace || "+()- .".contains($0) }) else { return false }
         return phone?.filter(\.isNumber).contains(digits) == true
+            || nationalPhoneDigits?.contains(digits) == true
     }
 }
 

@@ -794,10 +794,9 @@ final class OwnerSetupUITests: XCTestCase {
         ]
         guard tapUntilDestinationAppears(
             scheduledStop,
-            destination: app.buttons["today-stop-appointment"].firstMatch,
+            destination: detailAddress,
             in: app
         ) else { return }
-        app.buttons["today-stop-appointment"].firstMatch.tap()
         XCTAssertTrue(detailAddress.waitForExistence(timeout: 3))
         XCTAssertTrue(accessibilityText(of: detailAddress).contains(locationAddress))
         let detailArrivalNotes = app.descendants(matching: .any)[
@@ -831,7 +830,7 @@ final class OwnerSetupUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter().wait(for: [enabled], timeout: 3), .completed)
         completeVisit.tap()
 
-        XCTAssertTrue(app.navigationBars["Next Appointment"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Schedule Next Visit"].waitForExistence(timeout: 5))
         app.buttons["Not Now"].tap()
         XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 5))
         let createInvoice = app.buttons.matching(

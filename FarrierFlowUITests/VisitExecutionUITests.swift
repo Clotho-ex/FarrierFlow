@@ -12,7 +12,7 @@ final class VisitExecutionUITests: XCTestCase {
         defer { app.terminate() }
         openPendingVisit(in: app)
         let summary = app.staticTexts["visit-progress-summary"]
-        XCTAssertTrue(summary.label.contains("0 of 2"))
+        XCTAssertTrue(summary.label == "0 services recorded")
         XCTAssertTrue(app.staticTexts["visit-shared-client"].label.contains("Morgan Reed"))
         XCTAssertFalse(app.descendants(matching: .any)["visit-saved-total"].exists)
         XCTAssertFalse(app.buttons["visit-complete"].exists)
@@ -21,8 +21,11 @@ final class VisitExecutionUITests: XCTestCase {
         XCTAssertFalse(app.buttons["visit-outcome-Scout"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["visit-work-item-subtotal-Milo"].exists)
         capture("Visit pending, one horse expanded", in: app)
+        let plan = app.buttons["visit-record-planned-Milo"]
+        reveal(plan, in: app)
+        plan.tap()
         select("Serviced", horse: "Milo", in: app)
-        XCTAssertFalse(app.descendants(matching: .any)["visit-saved-total"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["visit-draft-total"].exists)
         let notes = notesEditor("Milo", in: app)
         notes.tap()
         notes.typeText("Gate code 1428; rear shoe checked.")
@@ -41,13 +44,10 @@ final class VisitExecutionUITests: XCTestCase {
         expand("Scout", in: app)
         XCTAssertFalse(notes.exists)
         select("Not Serviced", horse: "Scout", in: app)
-        if app.buttons["Clear Recorded Work"].waitForExistence(timeout: 2) {
-            app.buttons["Clear Recorded Work"].tap()
-        }
+        XCTAssertFalse(app.buttons["Clear Recorded Work"].exists)
         XCTAssertTrue(app.buttons["visit-complete"].waitForExistence(timeout: 3))
         reveal(summary, in: app, towardTop: true)
-        XCTAssertTrue(summary.label.contains("2 of 2"))
-        app.buttons["visit-actions-menu"].tap()
+        XCTAssertTrue(summary.label == "1 service recorded")
         app.buttons["visit-save-progress"]
             .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssertTrue(app.buttons["Delete Visit"].waitForNonExistence(timeout: 3))
@@ -77,8 +77,8 @@ final class VisitExecutionUITests: XCTestCase {
         XCTAssertTrue(work.exists)
         let photos = app.buttons["visit-photographs-Milo"]
         reveal(photos, in: app)
-        XCTAssertTrue(photos.label.contains("Photos"))
-        XCTAssertTrue(photos.label.contains("0 photos"))
+        XCTAssertTrue(photos.label.contains("Add Photo"), photos.label)
+        XCTAssertFalse(photos.label.contains("0"), photos.label)
         XCTAssertLessThanOrEqual(photos.frame.maxY, app.buttons["visit-complete"].frame.minY)
         capture("Visit final controls above completion footer", in: app)
         photos.tap()
@@ -92,37 +92,59 @@ final class VisitExecutionUITests: XCTestCase {
         app.alerts.buttons["Cancel"].tap()
         XCTAssertTrue(app.navigationBars["Visit"].exists)
         app.buttons["visit-complete"].tap()
-        XCTAssertTrue(app.navigationBars["Next Appointment"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Schedule Next Visit"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    func testLargestTextLeavesRoomToReviewVisit() {
+        let app = launch(largestText: true)
+        defer { app.terminate() }
+        capture("Today active action visible at largest text", in: app)
+        openActiveVisit(in: app)
+        let complete = app.buttons["visit-complete"]
+        let save = app.buttons["visit-save-progress"]
+        XCTAssertTrue(complete.isHittable)
+        XCTAssertTrue(save.exists)
+        XCTAssertGreaterThan(complete.frame.minY, app.frame.height * 0.72,
+                             "Visit actions must leave room to review the scrolling records.")
+        XCTAssertLessThanOrEqual(save.frame.maxY, app.frame.maxY - 8)
+        capture("Visit accessible action area leaves room for records", in: app)
     }
 
     @MainActor
     func testSafetyCollapsingAndFooterAtLargestTextInDarkMode() {
         let app = launch(largestText: true)
         defer { app.terminate() }
-        app.buttons["today-run-sheet-active"]
-            .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2)).tap()
-        XCTAssertTrue(app.navigationBars["Visit"].waitForExistence(timeout: 5))
+        openActiveVisit(in: app)
+        let total = app.descendants(matching: .any)["visit-saved-total"].firstMatch
+        reveal(total, in: app)
+        XCTAssertTrue(total.label.contains("$355.00"), total.label)
         let atlas = app.buttons["visit-horse-toggle-Atlas"]
         reveal(atlas, in: app)
         XCTAssertTrue(atlas.label.contains("Jordan Ellis"))
-        XCTAssertTrue(atlas.label.contains("watch the right-front flare"))
+        XCTAssertFalse(atlas.label.contains("watch the right-front flare"))
+        let safety = app.staticTexts["visit-safety-notes-Atlas"]
+        reveal(safety, in: app, towardTop: true)
+        XCTAssertTrue(safety.label.contains("Atlas"), safety.label)
+        XCTAssertTrue(safety.label.contains("watch the right-front flare"), safety.label)
         expand("Beacon", in: app)
         XCTAssertFalse(app.buttons["visit-work-item-Atlas-Full Set"].exists)
         reveal(atlas, in: app, towardTop: true)
-        XCTAssertTrue(atlas.label.contains("watch the right-front flare"))
-        capture("Visit collapsed horse retains safety and owner AX dark", in: app)
+        reveal(safety, in: app, towardTop: true)
+        XCTAssertTrue(safety.isHittable)
+        capture("Visit compact safety remains visible when horse collapsed AX dark", in: app)
         let photos = app.buttons["visit-photographs-Beacon"]
         reveal(photos, in: app)
         let complete = app.buttons["visit-complete"]
         XCTAssertTrue(complete.isHittable)
-        let total = app.descendants(matching: .any)["visit-saved-total"].firstMatch
-        XCTAssertTrue(total.exists)
-        XCTAssertLessThanOrEqual(photos.frame.maxY, total.frame.minY)
+        let footer = app.otherElements["visit-footer"].firstMatch
+        XCTAssertTrue(footer.exists)
+        XCTAssertLessThanOrEqual(photos.frame.maxY, footer.frame.minY)
         capture("Visit Photos and footer remain separate AX dark", in: app)
         let notes = app.buttons["visit-work-notes-toggle-Beacon"]
         reveal(notes, in: app)
-        XCTAssertLessThanOrEqual(notes.frame.maxY, total.frame.minY)
-        capture("Visit final Notes row above floating total AX dark", in: app)
+        XCTAssertLessThanOrEqual(notes.frame.maxY, footer.frame.minY)
+        capture("Visit final Notes row above native action footer AX dark", in: app)
         reveal(photos, in: app, towardTop: true)
         photos.tap()
         XCTAssertTrue(app.navigationBars["Photos"].waitForExistence(timeout: 3))
@@ -135,13 +157,31 @@ final class VisitExecutionUITests: XCTestCase {
     func testSafetyHeaderRemainsReadableWithStandardText() {
         let app = launch()
         defer { app.terminate() }
-        app.buttons["today-run-sheet-active"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        XCTAssertTrue(app.navigationBars["Visit"].waitForExistence(timeout: 5))
+        openActiveVisit(in: app)
         let header = app.buttons["visit-horse-toggle-Atlas"]
         reveal(header, in: app)
         XCTAssertLessThan(header.frame.height, 180)
-        XCTAssertTrue(header.label.contains("watch the right-front flare"))
-        capture("Visit safety name and status standard text", in: app)
+        XCTAssertFalse(header.label.contains("watch the right-front flare"))
+        let safety = app.staticTexts["visit-safety-notes-Atlas"]
+        reveal(safety, in: app, towardTop: true)
+        XCTAssertTrue(safety.label.contains("watch the right-front flare"), safety.label)
+        XCTAssertTrue(safety.label.contains("Safety note for Atlas"), safety.label)
+        XCTAssertGreaterThanOrEqual(safety.frame.minY, header.frame.maxY - 1)
+        XCTAssertLessThan(safety.frame.minY - header.frame.maxY, 25)
+        XCTAssertFalse(app.staticTexts["Safety Notes"].exists)
+        let services = app.staticTexts["Services"]
+        XCTAssertLessThanOrEqual(services.frame.minY - safety.frame.maxY, 24)
+        capture("Visit compact warning directly below horse name", in: app)
+        let photos = app.buttons["visit-photographs-Atlas"]
+        reveal(photos, in: app)
+        XCTAssertTrue(photos.label.contains("Add Photo"), photos.label)
+        XCTAssertFalse(photos.label.contains("0"), photos.label)
+        capture("Visit empty Add Photo row without a disclosure indicator", in: app)
+        photos.tap()
+        XCTAssertTrue(app.navigationBars["Photos"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["No Photos"].exists)
+        app.navigationBars["Photos"].buttons["Visit"].tap()
+        XCTAssertTrue(photos.waitForExistence(timeout: 3))
     }
 
     @MainActor
@@ -161,7 +201,7 @@ final class VisitExecutionUITests: XCTestCase {
         XCTAssertTrue(picker.waitForExistence(timeout: 3))
         picker.buttons["Cancel"].tap()
         XCTAssertTrue(picker.waitForNonExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts["visit-work-items-empty-Clover"].exists)
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "visit-work-item-Clover-")).firstMatch.exists)
         expand("Atlas", in: app)
         XCTAssertTrue(app.buttons["visit-work-item-Atlas-Full Set"].exists)
         XCTAssertFalse(app.buttons["visit-work-item-Clover-Full Set"].exists)
@@ -173,6 +213,9 @@ final class VisitExecutionUITests: XCTestCase {
         defer { app.terminate() }
         openPendingVisit(in: app)
         expand("Milo", in: app)
+        let planned = app.buttons["visit-record-planned-Milo"]
+        reveal(planned, in: app)
+        planned.tap()
         for service in ["Trim", "Full Set"] {
             let add = app.buttons["visit-add-service-Milo"]
             reveal(add, in: app)
@@ -215,12 +258,13 @@ final class VisitExecutionUITests: XCTestCase {
         XCTAssertTrue(confirmation.waitForExistence(timeout: 3))
         capture("Native remove recorded service confirmation", in: app)
         confirmation.buttons["Cancel"].tap()
-        XCTAssertTrue(app.navigationBars["Edit Service"].exists)
+        XCTAssertTrue(app.navigationBars["Edit Visit Service"].exists)
         remove.tap()
         confirmation.buttons["Remove Service"].firstMatch.tap()
-        XCTAssertTrue(app.navigationBars["Edit Service"].waitForNonExistence(timeout: 3))
+        XCTAssertTrue(app.navigationBars["Edit Visit Service"].waitForNonExistence(timeout: 3))
         XCTAssertFalse(trim.exists)
-        XCTAssertTrue(total.label.contains("$410.00"))
+        let draftTotal = app.descendants(matching: .any)["visit-draft-total"].firstMatch
+        XCTAssertTrue(draftTotal.label.contains("$355.00"), draftTotal.label)
         app.buttons["visit-save-progress"].tap()
         XCTAssertTrue(total.label.contains("$355.00"), total.label)
         reveal(app.buttons["visit-work-item-Milo-Front Shoes"], in: app)
@@ -289,6 +333,24 @@ final class VisitExecutionUITests: XCTestCase {
     }
 
     @MainActor
+    private func openActiveVisit(in app: XCUIApplication) {
+        let active = app.buttons["today-run-sheet-active"]
+        XCTAssertTrue(active.waitForExistence(timeout: 5))
+        let action = active.staticTexts["Resume Visit"].firstMatch
+        if action.exists {
+            XCTAssertTrue(action.isHittable)
+            XCTAssertLessThanOrEqual(action.frame.maxY, app.tabBars.firstMatch.frame.minY)
+            action.tap()
+        } else {
+            active.tap()
+        }
+        if !app.navigationBars["Visit"].waitForExistence(timeout: 5), active.exists {
+            active.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        }
+        XCTAssertTrue(app.navigationBars["Visit"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
     private func openPendingVisit(in app: XCUIApplication) {
         app.selectFarrierFlowTab("Schedule")
         let appointment = app.buttons["appointment-row-Oak Ridge Farm"]
@@ -339,15 +401,15 @@ final class VisitExecutionUITests: XCTestCase {
     @MainActor
     private func reveal(_ element: XCUIElement, in app: XCUIApplication, towardTop: Bool = false) {
         for _ in 0..<14 {
-            let navigationBar = app.navigationBars.allElementsBoundByIndex.max {
+            let navigationBar = app.navigationBars.allElementsBoundByIndex.filter(\.isHittable).max {
                 $0.frame.maxY < $1.frame.maxY
             }
             let top = navigationBar?.frame.maxY ?? 100
             let isVisit = navigationBar?.identifier == "Visit"
             let footer = isVisit ? [app.buttons["visit-complete"], app.buttons["visit-save-progress"]]
                 .first { $0.exists && $0.isHittable && $0.frame.minY > app.frame.midY } : nil
-            let total = app.descendants(matching: .any)["visit-saved-total"].firstMatch
-            let footerTop = isVisit && total.exists ? total.frame.minY : footer?.frame.minY ?? app.frame.maxY
+            let actionArea = app.otherElements["visit-footer"].firstMatch
+            let footerTop = isVisit && actionArea.exists ? actionArea.frame.minY : footer?.frame.minY ?? app.frame.maxY
             let bottom = min(footerTop, app.keyboards.firstMatch.exists
                              ? app.keyboards.firstMatch.frame.minY : app.frame.maxY)
             let frame = element.exists ? element.frame : .zero

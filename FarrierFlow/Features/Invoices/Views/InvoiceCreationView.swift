@@ -46,6 +46,8 @@ struct InvoiceCreationView: View {
         }
         .navigationTitle("Create Invoice")
         .navigationBarTitleDisplayMode(.inline)
+        .keyboardDoneAccessory(isFocused: isNoteFocused, identifier: "invoice-keyboard-done") { isNoteFocused = false }
+        .keepFocusedInputVisible(isNoteFocused ? true : nil)
         .toolbar {
             if subscription.allowsMutations {
                 ToolbarItem(placement: .confirmationAction) {
@@ -53,10 +55,6 @@ struct InvoiceCreationView: View {
                         .disabled(!model.canGenerate)
                         .accessibilityIdentifier("invoice-generate-action")
                 }
-            }
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("Done") { isNoteFocused = false }
             }
         }
         .alert(item: $model.alert) {
@@ -72,9 +70,19 @@ struct InvoiceCreationView: View {
             }
             .listRowBackground(ColorTokens.surface)
             Section {
-                Button("Select All", action: model.selectAll)
-                    .disabled(model.visitChoices.isEmpty)
+                if model.visitChoices.count > 1 {
+                    Toggle(isOn: Binding(
+                        get: { model.areAllVisitsSelected },
+                        set: { model.setAllVisitsSelected($0) }
+                    )) {
+                        Label("Select All", systemImage: model.areAllVisitsSelected
+                              ? "checkmark.circle.fill" : "circle")
+                    }
+                    .toggleStyle(.button)
+                    .buttonStyle(.bordered)
+                    .accessibilityValue(model.areAllVisitsSelected ? Text("Selected") : Text("Not selected"))
                     .accessibilityIdentifier("invoice-select-all-action")
+                }
                 ForEach(Array(model.visitChoices.enumerated()), id: \.element.id) { index, choice in
                     InvoiceVisitSelectionRow(
                         choice: choice,
@@ -97,14 +105,20 @@ struct InvoiceCreationView: View {
             RecordSection(Text("Selection Summary")) {
                 LabeledContent("Visits") {
                     Text(model.selectionSummary?.visitCount ?? 0, format: .number)
+                        .rollingStateText(value: model.selectionSummary?.visitCount ?? 0)
+                        .monospacedDigit()
                 }
                 .accessibilityIdentifier("invoice-selection-visit-count")
                 LabeledContent("Recorded Services") {
                     Text(model.selectionSummary?.recordedServiceCount ?? 0, format: .number)
+                        .rollingStateText(value: model.selectionSummary?.recordedServiceCount ?? 0)
+                        .monospacedDigit()
                 }
                 .accessibilityIdentifier("invoice-selection-service-count")
                 LabeledContent("Total") {
                     Text(selectionTotal)
+                        .rollingStateText(value: selectionTotal)
+                        .monospacedDigit()
                         .fontWeight(.semibold)
                 }
                 .accessibilityIdentifier("invoice-selection-total")
@@ -146,6 +160,8 @@ struct InvoiceCreationView: View {
                     )
                         .lineLimit(3...6)
                         .focused($isNoteFocused)
+                        .inputLimit(draftBinding(\.note, fallback: draft.note), maximum: InputLimits.notes)
+                        .focusedInputAnchor(true)
                 }
                 .listRowBackground(ColorTokens.surface)
             }

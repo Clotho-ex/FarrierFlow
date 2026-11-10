@@ -55,7 +55,7 @@ final class ClientListHierarchyUITests: XCTestCase {
     }
 
     @MainActor
-    func testClientProfileHasNeutralNativeContactActions() {
+    func testClientProfileHasReadOnlyContactInformation() {
         let app = launch()
         defer {
             XCUIDevice.shared.orientation = .portrait
@@ -67,7 +67,7 @@ final class ClientListHierarchyUITests: XCTestCase {
         capture(app, name: "Client profile — Light")
         XCTAssertTrue(app.staticTexts["Contact"].exists)
         XCTAssertFalse(app.staticTexts["Client profile"].exists)
-        assertContactActions(in: app, email: "example@gmail.com")
+        assertContactInformation(in: app, email: "example@gmail.com")
         XCTAssertTrue(app.buttons["Add Horse"].isHittable)
         app.buttons["Add Horse"].tap()
         XCTAssertTrue(app.navigationBars["New Horse"].waitForExistence(timeout: 3))
@@ -78,7 +78,7 @@ final class ClientListHierarchyUITests: XCTestCase {
         app.launch()
         app.selectFarrierFlowTab("Clients")
         app.buttons["client-row-John Doe"].tap()
-        assertContactActions(in: app, email: "example@gmail.com")
+        assertContactInformation(in: app, email: "example@gmail.com")
         capture(app, name: "Client profile — Dark")
         XCUIDevice.shared.orientation = .landscapeLeft
         app.collectionViews.firstMatch.swipeDown(velocity: .slow)
@@ -93,7 +93,7 @@ final class ClientListHierarchyUITests: XCTestCase {
         defer { app.terminate() }
         editSeededClient(name: longName, email: address, in: app)
         app.buttons["client-row-\(longName)"].tap()
-        assertContactActions(in: app, email: address)
+        assertContactInformation(in: app, email: address)
         capture(app, name: "Client profile — Long email, standard text")
         app.terminate()
         app.launchEnvironment["FARRIERFLOW_UI_TEST_COLOR_SCHEME"] = "dark"
@@ -103,8 +103,8 @@ final class ClientListHierarchyUITests: XCTestCase {
         app.buttons["client-row-\(longName)"].tap()
         XCTAssertTrue(app.staticTexts["Contact"].waitForExistence(timeout: 3))
         capture(app, name: "Client profile — Largest accessibility text, top")
-        assertContactActions(in: app, email: address)
-        let email = contactAction("client-email-action", in: app)
+        assertContactInformation(in: app, email: address)
+        let email = contactAction("client-email-information", in: app)
         app.collectionViews.firstMatch.swipeUp(velocity: .slow)
         XCTAssertTrue(email.exists)
         capture(app, name: "Client profile — Largest accessibility text, email")
@@ -119,7 +119,7 @@ final class ClientListHierarchyUITests: XCTestCase {
     }
 
     @MainActor
-    func testClientPhoneLinksAreDiscoverableInProfileAndAppointment() {
+    func testClientContactInformationAndAppointmentHorseCardsAreReadOnly() {
         for largestText in [false, true] {
             let app = XCUIApplication()
             app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] = "PhoneAffordances-\(UUID())"
@@ -132,15 +132,16 @@ final class ClientListHierarchyUITests: XCTestCase {
             app.launch()
             app.selectFarrierFlowTab("Clients")
             app.buttons["client-row-Invoice Client"].tap()
-            verifyPhone("client-phone-action", largestText: largestText, in: app)
-            capture(app, name: "Client profile call affordance AX \(largestText)")
+            verifyPhone("client-phone-information", largestText: largestText, in: app)
+            capture(app, name: "Client profile contact information AX \(largestText)")
             app.selectFarrierFlowTab("Schedule")
             app.segmentedControls["schedule-status-tabs"].buttons["Completed"].tap()
             let appointment = app.buttons["appointment-row-Invoice Service Location"].firstMatch
             XCTAssertTrue(appointment.waitForExistence(timeout: 3))
             appointment.tap()
-            verifyPhone("appointment-call-Milo", largestText: largestText, in: app)
-            capture(app, name: "Appointment call affordance AX \(largestText)")
+            XCTAssertFalse(contactAction("appointment-call-Milo", in: app).exists)
+            XCTAssertFalse(app.staticTexts["555-0100"].exists)
+            capture(app, name: "Appointment horse card without phone AX \(largestText)")
             app.terminate()
         }
     }
@@ -157,8 +158,9 @@ final class ClientListHierarchyUITests: XCTestCase {
         XCTAssertTrue(phone.exists)
         XCTAssertTrue(phone.isHittable)
         XCTAssertTrue(phone.isEnabled)
-        XCTAssertTrue(phone.label.contains("Call 555-0100"))
-        XCTAssertTrue(phone.elementType == .link || phone.elementType == .button)
+        XCTAssertTrue(phone.label.contains("555-0100"))
+        XCTAssertNotEqual(phone.elementType, .link)
+        XCTAssertNotEqual(phone.elementType, .button)
         XCTAssertGreaterThanOrEqual(phone.frame.height, 44)
         if !largestText {
             XCTAssertLessThan(phone.frame.height, 100, "A short phone number must retain a compact row.")
@@ -166,18 +168,20 @@ final class ClientListHierarchyUITests: XCTestCase {
     }
 
     @MainActor
-    private func assertContactActions(in app: XCUIApplication, email address: String) {
-        let phone = contactAction("client-phone-action", in: app)
-        let email = contactAction("client-email-action", in: app)
+    private func assertContactInformation(in app: XCUIApplication, email address: String) {
+        let phone = contactAction("client-phone-information", in: app)
+        let email = contactAction("client-email-information", in: app)
         XCTAssertTrue(phone.waitForExistence(timeout: 3))
         XCTAssertTrue(phone.label.contains("+13625849"))
-        XCTAssertTrue(phone.elementType == .link || phone.elementType == .button)
+        XCTAssertNotEqual(phone.elementType, .link)
+        XCTAssertNotEqual(phone.elementType, .button)
         for _ in 0..<8 where !email.exists {
             app.collectionViews.firstMatch.swipeUp(velocity: .slow)
         }
         XCTAssertTrue(email.exists)
         XCTAssertTrue(email.label.contains(address))
-        XCTAssertTrue(email.elementType == .link || email.elementType == .button)
+        XCTAssertNotEqual(email.elementType, .link)
+        XCTAssertNotEqual(email.elementType, .button)
     }
 
     @MainActor

@@ -42,7 +42,7 @@ struct ClientContactURLTests {
 
     @Test
     func contactTextCannotAddMailHeadersOrAFragment() throws {
-        let address = "client@example.com?bcc=other@example.com#notes"
+        let address = "client?invoices#tag@example.com"
         let url = try #require(ClientContactURL.email(address))
         let components = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false))
         #expect(components.path == address)
@@ -50,7 +50,7 @@ struct ClientContactURLTests {
         #expect(components.fragment == nil)
     }
 
-    @Test(arguments: ["", " ", "No email", "client@example.com\nBcc:other@example.com"])
+    @Test(arguments: ["", " ", "No email", "client@example.com\nBcc:other@example.com", "client@example.com?bcc=other@example.com#notes"])
     func missingOrInvalidEmailHasNoMailAction(_ value: String) {
         #expect(ClientContactURL.email(value) == nil)
     }

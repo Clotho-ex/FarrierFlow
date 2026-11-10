@@ -7,6 +7,49 @@ import Testing
 @MainActor
 struct InvoiceCreationModelTests {
     @Test
+    func selectAllStateTracksIndividualChoicesAndClearsOnlySelection() throws {
+        let graph = try makeCreationGraph(hasBusinessProfile: true)
+        let model = InvoiceCreationModel(clientID: graph.clientID)
+        model.load(in: graph.context)
+        let initial = try #require(model.draft)
+        #expect(!model.areAllVisitsSelected)
+
+        model.setAllVisitsSelected(true)
+        #expect(model.areAllVisitsSelected)
+        #expect(model.selectionSummary?.visitCount == 2)
+        model.toggleVisit(graph.firstVisitID)
+        #expect(!model.areAllVisitsSelected)
+        model.toggleVisit(graph.firstVisitID)
+        #expect(model.areAllVisitsSelected)
+
+        model.setAllVisitsSelected(false)
+        #expect(!model.areAllVisitsSelected)
+        #expect(model.draft?.selectedVisitIDs.isEmpty == true)
+        #expect(model.selectionSummary == nil)
+        #expect(!model.canGenerate)
+        #expect(model.draft?.invoiceDate == initial.invoiceDate)
+        #expect(model.draft?.dueDate == initial.dueDate)
+        #expect(model.draft?.note == initial.note)
+    }
+
+    @Test
+    func selectAllStaysOffWithoutEligibleVisits() throws {
+        let graph = try makeCreationGraph(hasBusinessProfile: true)
+        let client = Client(name: "No Work")
+        graph.context.insert(client)
+        try DomainGraphValidator.save(graph.context)
+        let model = InvoiceCreationModel(clientID: client.persistentModelID)
+        #expect(!model.areAllVisitsSelected)
+        model.setAllVisitsSelected(true)
+        #expect(model.draft == nil)
+        model.load(in: graph.context)
+        model.selectAll()
+        #expect(!model.areAllVisitsSelected)
+        #expect(model.draft?.selectedVisitIDs.isEmpty == true)
+        #expect(!model.canGenerate)
+    }
+
+    @Test
     func secondaryPhoneExplainsRecoveryAndKeepsVisitSelection() throws {
         let graph = try makeCreationGraph(hasBusinessProfile: true)
         let device = UUID()

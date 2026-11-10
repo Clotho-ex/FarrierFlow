@@ -63,7 +63,7 @@ struct VisitStartUseCaseTests {
     }
 
     @Test
-    func startingVisitCopiesEachActiveHorseDefaultServiceIntoExactlyOneWorkItem() throws {
+    func startingVisitLeavesDefaultServicesUnrecordedUntilExplicitConfirmation() throws {
         let graph = try makeTwoHorseGraph()
         let defaultService = ModelFixtures.makeService(
             name: "Full Set",
@@ -82,22 +82,14 @@ struct VisitStartUseCaseTests {
 
         let context = ModelContext(graph.container)
         let visit = try #require(context.model(for: visitID) as? Visit)
-        let service = try #require(
-            context.model(for: defaultService.persistentModelID) as? Service
-        )
-        let defaultedVisitHorse = try #require(
-            visit.visitHorses.first { $0.horse?.persistentModelID == graph.horses[0].persistentModelID }
-        )
-
-        #expect(defaultedVisitHorse.workItems.count == 1)
-        let workItem = try #require(defaultedVisitHorse.workItems.first)
-        #expect(workItem.service?.persistentModelID == service.persistentModelID)
-        #expect(workItem.serviceNameSnapshot == "Full Set")
-        #expect(workItem.amountMinorUnits == 12_500)
-        #expect(workItem.currencyCode == "USD")
-        #expect(service.workItems.contains { $0.persistentModelID == workItem.persistentModelID })
-        #expect(workItem.visitHorse === defaultedVisitHorse)
-        #expect(try context.fetchCount(FetchDescriptor<WorkItem>()) == 1)
+        #expect(visit.visitHorses.allSatisfy { $0.workItems.isEmpty })
+        let draft = try VisitSaveUseCase.loadDraft(visitID: visitID, in: context)
+        let horse = try #require(draft.horses.first { $0.horseID == graph.horses[0].persistentModelID })
+        #expect(horse.plannedService?.id == defaultService.persistentModelID)
+        #expect(horse.plannedService?.name == "Full Set")
+        #expect(horse.plannedService?.defaultAmountMinorUnits == 12_500)
+        #expect(horse.plannedService?.currencyCode == "USD")
+        #expect(try context.fetchCount(FetchDescriptor<WorkItem>()) == 0)
     }
 
     @Test
@@ -125,7 +117,9 @@ struct VisitStartUseCaseTests {
         let defaultedVisitHorse = try #require(
             visit.visitHorses.first { $0.horse?.name == graph.horses[0].name }
         )
-        #expect(defaultedVisitHorse.workItems.first?.currencyCode == "GBP")
+        #expect(defaultedVisitHorse.workItems.isEmpty)
+        let draft = try VisitSaveUseCase.loadDraft(visitID: visitID, in: context)
+        #expect(draft.horses.first { $0.horseName == graph.horses[0].name }?.plannedService?.currencyCode == "GBP")
     }
 
     @Test

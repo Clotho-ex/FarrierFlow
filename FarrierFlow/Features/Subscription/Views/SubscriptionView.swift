@@ -403,6 +403,7 @@ struct SubscriptionView: View {
             if let selectedPlan {
                 Button(action: performPrimaryOnboardingAction) {
                     Text(SubscriptionPurchaseCopy.actionTitle(for: selectedPlan))
+                        .rollingStateText(value: selectedPlan.id)
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                 }
@@ -819,11 +820,13 @@ private struct OnboardingPlanDetailPanel: View {
 
     private var planTitle: some View {
         Text(plan.kind == .annual ? "Yearly Pro" : "Monthly Pro")
+            .rollingStateText(value: plan.id)
             .font(.title3.weight(.bold))
     }
 
     private var planPrice: some View {
         Text("\(plan.localizedPrice) / \(plan.subscriptionPeriod)")
+            .rollingStateText(value: plan.localizedPrice)
             .font(.title3.weight(.semibold))
             .monospacedDigit()
     }

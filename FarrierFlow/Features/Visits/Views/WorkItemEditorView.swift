@@ -63,9 +63,8 @@ struct WorkItemEditorView: View {
                         .accessibilityLabel("Price")
                         .accessibilityHint("Enter an amount in \(currencyLabel) with up to two decimal places.")
                         .accessibilityIdentifier("work-item-price-field")
-                    Text("Enter an amount in \(currencyLabel) with up to two decimal places.")
-                        .font(.footnote)
-                        .foregroundStyle(ColorTokens.textSecondary)
+                        .inputLimit($priceInput, maximum: InputLimits.price, rejectOverflow: true)
+                        .focusedInputAnchor(true)
                     if !priceInput.isEmpty, !model.isValidPriceInput(
                         priceInput,
                         currencyCode: workItem.currencyCode,
@@ -76,6 +75,7 @@ struct WorkItemEditorView: View {
                             .foregroundStyle(ColorTokens.destructive)
                     } else {
                         Text(currentFormattedAmount)
+                            .rollingStateText(value: currentFormattedAmount)
                             .font(.footnote)
                             .foregroundStyle(ColorTokens.textSecondary)
                             .monospacedDigit()
@@ -95,14 +95,11 @@ struct WorkItemEditorView: View {
             .farrierFlowScrollBackground()
             .scrollDismissesKeyboard(.interactively)
             .disabled(!subscription.allowsMutations)
-            .navigationTitle("Edit Service")
+            .navigationTitle("Edit Visit Service")
             .navigationBarTitleDisplayMode(.inline)
+            .keyboardDoneAccessory(isFocused: isPriceFocused, identifier: "work-item-keyboard-done") { isPriceFocused = false }
+            .keepFocusedInputVisible(isPriceFocused ? true : nil)
             .toolbar {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") { isPriceFocused = false }
-                        .accessibilityIdentifier("work-item-keyboard-done")
-                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                         .tint(ColorTokens.textSecondary)
@@ -133,8 +130,9 @@ struct WorkItemEditorView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This removes the Service from this horse’s visit. The reusable Service is kept.")
+            Text("This only removes the service from this visit.")
         }
+        .tint(.primary)
         .alert("Couldn’t Update Work Item", isPresented: $showsUpdateError) {
             Button("OK", role: .cancel) {}
         } message: {

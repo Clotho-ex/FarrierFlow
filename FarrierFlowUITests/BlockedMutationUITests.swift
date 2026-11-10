@@ -33,7 +33,7 @@ final class BlockedMutationUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Safe Client Edited"].waitForExistence(timeout: 3))
         app.buttons["Actions"].tap()
         app.buttons["Delete"].tap()
-        let deleteClient = app.buttons["client-delete-confirmation"]
+        let deleteClient = app.buttons["client-delete-confirmation"].firstMatch
         XCTAssertTrue(deleteClient.waitForExistence(timeout: 3))
         deleteClient.tap()
         XCTAssertTrue(app.navigationBars["Clients"].waitForExistence(timeout: 3))
@@ -151,7 +151,7 @@ final class BlockedMutationUITests: XCTestCase {
         ) else { return }
         app.buttons["appointment-actions-menu"].tap()
         app.buttons["appointment-delete-action"].tap()
-        let deleteAppointment = app.buttons["appointment-delete-confirmation"]
+        let deleteAppointment = app.buttons["appointment-delete-confirmation"].firstMatch
         XCTAssertTrue(deleteAppointment.waitForExistence(timeout: 3))
         deleteAppointment.tap()
         XCTAssertTrue(

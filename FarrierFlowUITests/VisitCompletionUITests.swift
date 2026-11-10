@@ -177,10 +177,8 @@ final class VisitCompletionUITests: XCTestCase {
             in: app
         )
         select(.notServiced, for: graph.notServicedHorseName, in: app)
-        assertCompletionRequirement(
-            "Mark at least one horse as Serviced.",
-            in: app
-        )
+        XCTAssertTrue(app.buttons["visit-complete"].isEnabled)
+        XCTAssertFalse(app.staticTexts["visit-completion-requirement"].exists)
 
         select(.serviced, for: graph.servicedHorseName, in: app)
         assertCompletionRequirement(
@@ -210,7 +208,7 @@ final class VisitCompletionUITests: XCTestCase {
     }
 
     @MainActor
-    func testVisitEditorManagesWorkItemsAndConfirmsClearingRecordedWork() throws {
+    func testVisitEditorManagesWorkItemsAndRequiresExplicitRemovalAfterOutcomeChange() throws {
         let graph = makeGraph(prefix: "Work Items")
         let trimServiceName = "Work Items Trim"
         let shoeServiceName = "Work Items Shoes"
@@ -280,28 +278,19 @@ final class VisitCompletionUITests: XCTestCase {
             assertsSelection: false,
             in: app
         )
-        XCTAssertTrue(app.staticTexts["Clear Recorded Work?"].waitForExistence(timeout: 3))
-        keepEditing(in: app)
+        XCTAssertFalse(app.staticTexts["Clear Recorded Work?"].exists)
         XCTAssertTrue(padRow.exists)
-
-        select(
-            .notServiced,
-            for: graph.servicedHorseName,
-            assertsSelection: false,
-            in: app
-        )
-        let clearWorkConfirmation = app.sheets["Clear Recorded Work?"]
-        XCTAssertTrue(clearWorkConfirmation.waitForExistence(timeout: 3))
-        for _ in 0..<2 where clearWorkConfirmation.exists {
-            clearWorkConfirmation.buttons["Clear Recorded Work"].tap()
-            if clearWorkConfirmation.waitForNonExistence(timeout: 3) { break }
-        }
-        XCTAssertFalse(clearWorkConfirmation.exists)
+        XCTAssertFalse(app.buttons["visit-complete"].exists)
+        padRow.tap()
+        app.buttons["visit-remove-service"].tap()
+        let removal = app.alerts["Remove Service?"]
+        XCTAssertTrue(removal.waitForExistence(timeout: 3))
+        removal.buttons["Cancel"].tap()
+        XCTAssertTrue(app.navigationBars["Edit Visit Service"].exists)
+        app.buttons["visit-remove-service"].tap()
+        removal.buttons["Remove Service"].tap()
         XCTAssertTrue(padRow.waitForNonExistence(timeout: 3))
-        XCTAssertTrue(
-            app.buttons["visit-add-service-\(graph.servicedHorseName)"]
-                .waitForNonExistence(timeout: 3)
-        )
+        XCTAssertTrue(app.buttons["visit-add-service-\(graph.servicedHorseName)"].exists)
     }
 
     @MainActor
@@ -466,7 +455,7 @@ final class VisitCompletionUITests: XCTestCase {
     }
 
     @MainActor
-    func testPendingAndAllNotServicedOutcomesBlockCompletionAndDirtyCancelKeepsEditor() throws {
+    func testPendingAndConflictingWorkBlockCompletionAndDirtyCancelKeepsEditor() throws {
         let graph = makeGraph(prefix: "Draft")
         let app = launch(
             storeName: "VisitDraftRules-\(UUID().uuidString)",
@@ -500,7 +489,7 @@ final class VisitCompletionUITests: XCTestCase {
         select(.notServiced, for: graph.servicedHorseName, in: app)
         select(.notServiced, for: graph.notServicedHorseName, in: app)
         XCTAssertFalse(complete.exists)
-        XCTAssertFalse(app.navigationBars["Next Appointment"].exists)
+        XCTAssertFalse(app.navigationBars["Schedule Next Visit"].exists)
 
         select(.serviced, for: graph.servicedHorseName, in: app)
         XCTAssertTrue(app.staticTexts["visit-unsaved-state"].waitForExistence(timeout: 3))
@@ -512,7 +501,7 @@ final class VisitCompletionUITests: XCTestCase {
                 .waitForExistence(timeout: 3)
         )
         XCTAssertTrue(app.staticTexts["visit-unsaved-state"].exists)
-        XCTAssertFalse(app.navigationBars["Next Appointment"].exists)
+        XCTAssertFalse(app.navigationBars["Schedule Next Visit"].exists)
     }
 
     @MainActor
@@ -989,8 +978,6 @@ final class VisitCompletionUITests: XCTestCase {
             appointment.coordinate(
                 withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
             ).tap()
-            let stopAppointment = app.buttons["today-stop-appointment"].firstMatch
-            if stopAppointment.waitForExistence(timeout: 1) { stopAppointment.tap() }
             if app.buttons["visit-start-action"].waitForExistence(timeout: 2)
                 || app.buttons["visit-resume-action"].waitForExistence(timeout: 2)
                 || app.buttons["visit-view-action"].waitForExistence(timeout: 2)
@@ -1200,7 +1187,7 @@ final class VisitCompletionUITests: XCTestCase {
     private func assertNextAppointmentAppearsAfterVisitDismisses(
         in app: XCUIApplication
     ) {
-        XCTAssertTrue(app.navigationBars["Next Appointment"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.navigationBars["Schedule Next Visit"].waitForExistence(timeout: 3))
         XCTAssertFalse(app.navigationBars["Visit"].exists)
     }
 

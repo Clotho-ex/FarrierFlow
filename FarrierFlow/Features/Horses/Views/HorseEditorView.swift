@@ -70,9 +70,11 @@ struct HorseEditorView: View {
                         }
                         .accessibilityLabel("Horse Name")
                         .accessibilityIdentifier("horse-name-field")
+                        .inputLimit($model.draft.name, maximum: InputLimits.name)
                         .accessibilityHint(Text(requiredMessage(for: .name)), isEnabled: isMissing(.name))
                         .frame(minHeight: SpacingTokens.minimumTouchTarget)
                     }
+                    .focusedInputAnchor(Field.name)
 
                     if model.choicesLoadState == .loaded {
                         relationshipLink(
@@ -145,7 +147,9 @@ struct HorseEditorView: View {
                                     .frame(minHeight: 88)
                                     .focused($focusedField, equals: .safetyNotes)
                                     .accessibilityLabel("Additional Notes")
+                                    .inputLimit($model.draft.safetyNotes, maximum: InputLimits.notes)
                             }
+                            .focusedInputAnchor(Field.safetyNotes)
                         }
                         .accessibilityIdentifier("horse-more-details")
                     }
@@ -162,6 +166,8 @@ struct HorseEditorView: View {
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle(model.horseID == nil ? "New Horse" : "Edit Horse")
             .toolbarTitleDisplayMode(.inline)
+            .keyboardDoneAccessory(isFocused: focusedField != nil, identifier: "horse-keyboard-done") { focusedField = nil }
+            .keepFocusedInputVisible(focusedField)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -175,15 +181,6 @@ struct HorseEditorView: View {
                     .tint(ColorTokens.brandActionText)
                     .disabled(!subscription.allowsMutations || model.choicesLoadState != .loaded)
                     .accessibilityIdentifier("horse-save-action")
-                }
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") {
-                        focusedField = nil
-                    }
-                    .font(.subheadline.weight(.semibold))
-                    .accessibilityHint("Dismisses the keyboard without saving")
-                    .accessibilityIdentifier("horse-keyboard-done")
                 }
             }
             .navigationDestination(for: HorseEditorRoute.self) {

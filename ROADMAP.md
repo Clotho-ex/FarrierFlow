@@ -1,5 +1,21 @@
 # FarrierFlow Roadmap
 
+## Authorized workflow refinement — 2026-10-27
+
+- Keep appointment plans distinct from explicitly performed WorkItems.
+- Save unresolved progress and notes without completing a visit.
+- Preserve work and reasons on outcome changes; resolve conflicts explicitly.
+- Show observable draft totals and retain visible Save Progress beside completion.
+- Start/resume directly from Stop Details, with native selectors and save feedback.
+- Confirm follow-up scheduling explicitly, or dismiss without creating a record.
+- Preserve native grouped layouts, accessibility, and existing invoice snapshots.
+
+This refinement updates the historical visit rules below. It introduces no new
+persisted fields or local migration. The matching backend validator was deployed to FarrierFlow Dev on
+2026-10-27 after explicit authorization. All three hosted rollback-only workflow
+and deletion-preservation contracts pass; existing business records are unchanged.
+
+
 ## Current Development
 
 The 1.0 release plan and numbered slice histories below describe their original
@@ -317,16 +333,16 @@ historical graph survives process termination and store reopening.
 - Visit state derives from optional `completedAt`; no redundant Visit status is
   persisted.
 - VisitHorse outcome is Pending, Serviced, or Not Serviced.
-- Work Notes are optional only for serviced Horses.
+- Work Notes are optional for every outcome, including a Not Serviced reason.
 - Unscheduled Horses cannot be added.
 
 #### Progress and completion
 
 - Save Progress persists valid pending or resolved outcomes and keeps the Visit
   in progress.
-- Complete Visit requires every outcome resolved, at least one serviced Horse,
-  exact Appointment-to-Visit membership, valid relationships, and valid Work
-  Notes.
+- Complete Visit requires every outcome resolved, actual work for serviced Horses,
+  no actual work for Not Serviced Horses, exact Appointment-to-Visit membership,
+  and valid relationships. An attendance-only visit may be completed.
 - Completion saves the draft and immutable `completedAt` atomically.
 - Dirty drafts require dismissal confirmation.
 - Backgrounding makes a best-effort Save Progress attempt only.

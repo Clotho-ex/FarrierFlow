@@ -101,7 +101,7 @@ struct InvoiceDetailView: View {
                 }
             }
         }
-        .recordDeletionSheet(
+        .recordDeletionConfirmation(
             .invoice(invoiceID), isPresented: $showsDeleteConfirmation,
             title: "Delete Invoice?", confirmationTitle: "Delete Invoice",
             accessibilityPrefix: "invoice-delete", alert: $model.alert
@@ -124,7 +124,7 @@ struct InvoiceDetailView: View {
         } message: { confirmation in
             switch confirmation {
             case .markUnpaid:
-                Text("This removes the recorded payment and makes the invoice outstanding again.")
+                Text("This clears the recorded payment and marks the invoice as unpaid.")
 
             }
         }
@@ -371,10 +371,12 @@ private struct InvoiceDetailHeader: View {
     private func amountSummary(alignment: HorizontalAlignment) -> some View {
         VStack(alignment: alignment, spacing: SpacingTokens.rowContent) {
             Text(amount)
+                .rollingStateText(value: amount)
                 .font(.largeTitle.weight(.bold))
                 .monospacedDigit()
                 .accessibilityIdentifier("invoice-detail-total")
             Text(amountLabel)
+                .rollingStateText(value: status)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(ColorTokens.textSecondary)
         }
@@ -490,6 +492,8 @@ private struct PaymentRecordingView: View {
                         TextField("Describe Payment Method", text: $model.draft.otherDescription)
                             .focused($focusedField, equals: .methodDescription)
                             .accessibilityIdentifier("payment-other-description")
+                            .inputLimit($model.draft.otherDescription, maximum: InputLimits.name)
+                            .focusedInputAnchor(Field.methodDescription)
                     }
                 }
                 .listRowBackground(ColorTokens.surface)
@@ -502,7 +506,9 @@ private struct PaymentRecordingView: View {
                         TextField("Reference (Optional)", text: $model.draft.reference)
                             .focused($focusedField, equals: .reference)
                             .accessibilityIdentifier("payment-reference")
+                            .inputLimit($model.draft.reference, maximum: InputLimits.reference, rejectOverflow: true)
                     }
+                    .focusedInputAnchor(Field.reference)
                     VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
                         Text("Internal Note")
                             .font(.caption)
@@ -512,7 +518,9 @@ private struct PaymentRecordingView: View {
                             .lineLimit(2...5)
                             .focused($focusedField, equals: .note)
                             .accessibilityIdentifier("payment-note")
+                            .inputLimit($model.draft.note, maximum: InputLimits.notes)
                     }
+                    .focusedInputAnchor(Field.note)
                 }
                 .listRowBackground(ColorTokens.surface)
             }
@@ -520,12 +528,9 @@ private struct PaymentRecordingView: View {
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Record Payment")
             .navigationBarTitleDisplayMode(.inline)
+            .keyboardDoneAccessory(isFocused: focusedField != nil, identifier: "payment-keyboard-done") { focusedField = nil }
+            .keepFocusedInputVisible(focusedField)
             .toolbar {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") { focusedField = nil }
-                        .accessibilityIdentifier("payment-keyboard-done")
-                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                         .tint(ColorTokens.textSecondary)
@@ -574,7 +579,7 @@ private struct InvoiceContactSection: View {
             Text(name)
                 .font(.title3.weight(.semibold))
             if let phone {
-                Text(phone)
+                Text(PhoneNumberFormatting.display(phone))
                     .foregroundStyle(ColorTokens.textSecondary)
             }
             if let email {

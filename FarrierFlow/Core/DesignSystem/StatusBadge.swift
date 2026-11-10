@@ -71,6 +71,7 @@ struct StatusBadge: View {
                 .fixedSize()
                 .accessibilityHidden(true)
             Text(title)
+                .rollingStateText(value: title)
                 .foregroundStyle(ColorTokens.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -94,6 +95,7 @@ struct RecordStatusPill: View {
 
     var body: some View {
         Text(title)
+            .rollingStateText(value: String(localized: title))
             .font(.caption.weight(.semibold))
             .foregroundStyle(ColorTokens.textPrimary)
             .fixedSize(horizontal: false, vertical: true)

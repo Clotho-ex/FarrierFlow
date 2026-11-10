@@ -1,3 +1,22 @@
+## Appointment and visit workflow refinement — 2026-10-27
+
+Planned services stay on AppointmentHorse (or the horse default) and appear in
+Visit as unconfirmed proposals. Starting a visit and selecting Serviced do not
+create WorkItems. Record as Performed or Add Service explicitly records actual
+work; visit-specific replacements and prices never modify the plan or catalog.
+Existing saved WorkItems retain their recorded meaning.
+
+Save Progress persists valid dirty drafts without completing them. Pending notes
+and Not Serviced reasons are allowed. Outcome changes preserve notes, photos,
+and recorded services; a Not Serviced/service conflict blocks completion until
+the farrier reviews and explicitly removes entries or changes the outcome.
+All-not-serviced attendance can complete without creating billable work.
+
+The matching sync validator was deployed to FarrierFlow Dev on 2026-10-27 as
+migration `20261027143913` (`preserve_visit_progress_and_attendance_notes`).
+Hosted rollback-only contracts verify the new states and existing service/schedule
+deletion preservation. Function permissions and existing business records are unchanged.
+
 # FarrierFlow Architecture
 
 ## Independent schedule removal and recorded work (2026-10-25)
@@ -16,8 +35,8 @@ a source Appointment is present and accept its deliberate absence.
 V5 adds an optional `AppointmentHorse.plannedService` relationship, separate
 from `Horse.defaultService`. A selected service applies only to that appointment
 and takes precedence when the visit starts; an absent choice preserves the
-existing horse-default behavior. Services and prices become WorkItem snapshots
-when work starts. Appointment membership and service choices remain fixed after
+existing horse-default proposal. Services and prices become WorkItem snapshots
+only when explicitly recorded as performed. Appointment membership and service choices remain fixed after
 a visit starts. V1–V4 schemas remain frozen; V4 upgrades through a lightweight
 migration. Sync includes the optional `plannedService` service UUID and accepts
 legacy records that omit it. The matching backend contract was deployed to FarrierFlow Dev on 2026-10-18.
@@ -557,8 +576,8 @@ removes invoice snapshots/payment evidence and releases its WorkItem links/holds
 preserving operational work and photos. Completed Visit correction is allowed
 with invoiced work: source lines detach and matching WorkItems receive billing
 holds, preserving saved financial values and preventing accidental repeat billing.
-Corrections may leave every horse Not Serviced; initial completion still requires
-one serviced horse.
+Both initial completion and correction may leave every horse Not Serviced,
+with an optional reason and no performed WorkItems.
 
 Reads never force-unwrap stored relationships. If corrupted or externally
 invalid persisted data is encountered, views render an unavailable value or
@@ -617,7 +636,8 @@ Recorded Work through the existing completed-Visit projection and destinations.
 
 Next Appointment confirmation saves its immutable seed through the existing
 AppointmentEditorModel, after rechecking current horse availability. Not Now
-only dismisses the assistant; confirmation is always explicit.
+dismisses without creating anything. The explicit Schedule Next Appointment
+footer action creates the appointment; either choice returns to Today.
 
 Expected duration remains optional. The absence of duration does not create or
 imply an end date. The first slice does not derive duration from horse count,
@@ -653,8 +673,10 @@ Required-record disappearance is shown as a native unavailable state.
 Start Visit atomically creates the Visit, immutable Barn snapshots, and one
 pending VisitHorse per AppointmentHorse. Save Progress and Complete Visit use
 explicit feature-model drafts. Completion requires every outcome to be
-resolved, at least one serviced Horse, exact Visit-to-Appointment membership,
-and valid relationships.
+resolved, a valid performed WorkItem for each serviced Horse, no WorkItems
+for not-serviced Horses, exact Visit-to-Appointment membership, and valid
+relationships. Pending notes and unresolved work conflicts can be saved as
+progress. All-not-serviced attendance may be completed without billable work.
 
 Invoice generation similarly validates Business Profile, Client-specific
 eligibility, one-time WorkItem billing, sequence monotonicity, snapshot

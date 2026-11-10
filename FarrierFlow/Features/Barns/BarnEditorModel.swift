@@ -26,7 +26,7 @@ final class BarnEditorModel {
         in context: ModelContext,
         analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()
     ) -> PersistentIdentifier? {
-        guard let name = TextNormalization.required(draft.name) else { return nil }
+        guard draft.isValid, let name = TextNormalization.required(draft.name) else { return nil }
 
         let isCreating = barnID == nil
         do {
@@ -43,6 +43,10 @@ final class BarnEditorModel {
                 let proposed = BarnDraft(name: name, address: TextNormalization.optional(draft.address) ?? "", contactNotes: TextNormalization.optional(draft.contactNotes) ?? "")
                 guard let merged = try? DraftSaveRules.mergeFields(original: originalDraft, proposed: proposed,
                     current: current, fields: [\.name, \.address, \.contactNotes]) else {
+                    alert = DraftSaveRules.changedAlert
+                    return nil
+                }
+                guard merged.isValid else {
                     alert = DraftSaveRules.changedAlert
                     return nil
                 }

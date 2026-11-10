@@ -1,6 +1,15 @@
 {
-  "originHash" : "ba13daf20e55ce2a07cf222ad01579b1c84f3ff745fce2fede88ef4ef22f9870",
+  "originHash" : "6215310f0b4c1856b557ca67a376d750a08bfd7a2013cd9b2bf5b5ec3d85ac16",
   "pins" : [
+    {
+      "identity" : "phonenumberkit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/PhoneNumberKit/PhoneNumberKit.git",
+      "state" : {
+        "revision" : "eae725a2e62eb2f291d8188dd457e2a7b28d5003",
+        "version" : "5.0.13"
+      }
+    },
     {
       "identity" : "posthog-ios",
       "kind" : "remoteSourceControl",

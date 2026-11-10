@@ -88,17 +88,18 @@ struct TodayModelTests {
         try DomainGraphValidator.save(context)
         let model = TodayModel()
         model.load(in: context, now: now, calendar: .current)
-        let stops = [model.featuredStop].compactMap { $0 } + model.remainingStops
+        let stops = TodayStopSummary.grouped(([model.featuredStop].compactMap { $0 } + model.remainingStops).flatMap(\.appointments))
         #expect(stops.count == 3)
         #expect(Set(stops.flatMap(\.appointments).map(\.id)) == Set(appointments.map(\.persistentModelID)))
         let grouped = try #require(stops.first { $0.appointments.count == 3 })
         #expect(grouped.horseNames == ["Peanut", "Thunder"])
         #expect(try context.fetchCount(FetchDescriptor<Appointment>()) == 5)
-        #expect(model.remainingStops.allSatisfy { $0.id != model.featuredStop?.id })
+        let featuredIDs = Set(model.featuredStop?.appointments.map(\.id) ?? [])
+        #expect(model.remainingStops.flatMap(\.appointments).allSatisfy { !featuredIDs.contains($0.id) })
     }
 
     @Test
-    func featuredStopIncludesItsOtherAppointmentsWithoutRepeatingThemBelow() throws {
+    func featuredAppointmentLeavesOtherAppointmentsDirectlyReachable() throws {
         let container = try ModelContainerFactory.inMemoryTest()
         let context = container.mainContext
         _ = ModelFixtures.makeBusinessProfile(in: context)
@@ -117,9 +118,10 @@ struct TodayModelTests {
         try DomainGraphValidator.save(context)
         let model = TodayModel()
         model.load(in: context, now: now, calendar: .current)
-        #expect(model.featuredStop?.appointments.count == 2)
+        #expect(model.featuredStop?.appointments.count == 1)
         #expect(model.featuredStop?.horseNames == ["Milo"])
-        #expect(model.remainingStops.isEmpty)
+        #expect(model.remainingStops.count == 1)
+        #expect(model.remainingStops.first?.appointments.count == 1)
 
         let appointment = try #require(context.fetch(FetchDescriptor<Appointment>()).first)
         _ = ModelFixtures.makeVisit(startedAt: now, appointment: appointment, in: context)
@@ -268,6 +270,16 @@ struct TodayModelTests {
         }
         #expect(summary.id == visit.persistentModelID)
         #expect(summary.resolvedHorseCount == 1)
+        #expect(summary.recordedServiceCount == 1)
+        visit.visitHorses[0].outcomeRawValue = VisitOutcome.pending.rawValue
+        try DomainGraphValidator.save(context)
+        model.load(in: context, now: now, calendar: .current)
+        guard case .resumeVisit(let pending) = model.primaryAction else {
+            Issue.record("Expected the saved visit to remain active")
+            return
+        }
+        #expect(pending.resolvedHorseCount == 0)
+        #expect(pending.recordedServiceCount == 1)
         #expect(summary.totalHorseCount == 1)
         #expect(model.remainingAppointments.map(\.id) == [laterAppointment.persistentModelID])
     }

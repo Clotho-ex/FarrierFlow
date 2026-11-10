@@ -299,16 +299,15 @@ struct DomainGraphValidatorTests {
     }
 
     @Test
-    func saveRejectsWorkNotesForUnservicedHorse() throws {
+    func savePreservesReasonsForNotServicedHorse() throws {
         let graph = try makeGraph()
         let visit = ModelFixtures.makeVisit(appointment: graph.appointment, in: graph.context)
         let visitHorse = try #require(visit.visitHorses.first)
         visitHorse.outcomeRawValue = VisitOutcome.notServiced.rawValue
         visitHorse.workNotes = "Could not safely handle"
 
-        #expect(throws: DomainGraphViolation.workNotesRequireServicedOutcome) {
-            try DomainGraphValidator.save(graph.context)
-        }
+        try DomainGraphValidator.save(graph.context)
+        #expect(visitHorse.workNotes == "Could not safely handle")
     }
 
     @Test

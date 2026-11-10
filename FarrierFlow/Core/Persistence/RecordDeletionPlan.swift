@@ -25,23 +25,23 @@ struct RecordDeletionImpact: Equatable {
     var warning: LocalizedStringResource {
         switch target {
         case .client:
-            "Deletes this client, its horses and their recorded work and photos. Removes their appointment and visit memberships; empty appointments and visits are deleted. Saved invoices are kept. This cannot be undone."
+            "This also deletes their horses, recorded work and photos, and any empty appointments or visits. Saved invoices will stay."
         case .horse:
-            "Deletes this horse and its recorded work and photos. Removes it from appointments and visits; empty appointments and visits are deleted. Saved invoices are kept. This cannot be undone."
+            "This horse’s work and photos will also be deleted. Empty appointments and visits will be removed. Saved invoices will stay."
         case .barn:
-            "Deletes this service location, its horses and related appointments, visits, recorded work and photos. Saved invoices are kept. This cannot be undone."
+            "This also deletes the horses here, their appointments, visits, work and photos. Saved invoices will stay."
         case .service:
-            "Deletes this service. Clears horse defaults and scheduled service choices. Recorded work, saved invoices and photos are kept. This cannot be undone."
+            "Horse defaults and appointment plans will no longer use this service. Recorded work, invoices and photos will stay."
         case .appointment:
-            "Deletes this appointment and its horse assignments. Horses, clients and recorded work are kept. This cannot be undone."
+            "You can’t undo this."
         case .scheduledVisit:
-            "Removes this visit from Today and Schedule. Recorded work, photos and saved invoices are kept in Recorded Work. This cannot be undone."
+            "This visit will leave Today and Schedule. You’ll still find its work and photos in Recorded Work. Saved invoices will stay."
         case .visit:
-            "Deletes this recorded work and its photos. Its scheduled appointment and saved invoices are kept. This cannot be undone."
+            "You can’t recover this work or its photos. The appointment and saved invoices will stay."
         case .invoice:
-            "Deletes this invoice and any recorded payment. Recorded work and photos are kept. This cannot be undone."
+            "Any recorded payment will also be deleted. Your work and photos will stay."
         case .workItem:
-            "Deletes this recorded service. Saved invoices and photos are kept. This cannot be undone."
+            "Only this service entry will be deleted. Saved invoices and photos will stay."
         }
     }
 }

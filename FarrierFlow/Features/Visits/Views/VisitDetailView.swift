@@ -15,6 +15,8 @@ struct VisitDetailView: View {
     @State private var nextAppointmentModel: NextAppointmentAssistantModel
     @State private var showsEditor = false
     @State private var showsDeleteConfirmation = false
+    @State private var isDeleting = false
+    @State private var didDelete = false
     @State private var showsNextAppointmentAssistant = false
     private let showsDismissAction: Bool
     private let allowsDeletingRecordedWork: Bool
@@ -105,13 +107,18 @@ struct VisitDetailView: View {
                 }
             }
         }
-        .recordDeletionSheet(
+        .recordDeletionConfirmation(
             allowsDeletingRecordedWork ? .visit(model.visitID) : .scheduledVisit(model.visitID),
             isPresented: $showsDeleteConfirmation,
             title: allowsDeletingRecordedWork ? "Delete Recorded Work?" : "Delete Visit?",
             confirmationTitle: allowsDeletingRecordedWork ? "Delete Recorded Work" : "Delete Visit",
-            accessibilityPrefix: "visit-delete", alert: $model.alert
-        ) { dismiss() }
+            accessibilityPrefix: "visit-delete", alert: $model.alert,
+            isDeleting: $isDeleting
+        ) {
+            didDelete = true
+            model.alert = nil
+            dismiss()
+        }
         .onAppear {
             loadVisitDetail()
         }
@@ -166,7 +173,7 @@ struct VisitDetailView: View {
                         )
                         if let notes = horse.workNotes {
                             VStack(alignment: .leading, spacing: SpacingTokens.compact) {
-                                Text("Work Notes")
+                                Text(horse.outcome == .notServiced ? "Reason" : "Work Notes")
                                     .font(.subheadline.weight(.semibold))
                                     .foregroundStyle(ColorTokens.textPrimary)
                                 Text(verbatim: notes)
@@ -190,10 +197,13 @@ struct VisitDetailView: View {
                     .listRowBackground(ColorTokens.surface)
                     .listRowSeparator(.hidden)
                 }
-                if detail.completedAt != nil {
+                if detail.completedAt != nil, detail.horses.contains(where: { !$0.workItems.isEmpty }) {
                     Section {
-                        LabeledContent("Total recorded work", value: totalText(for: detail.total))
-                            .accessibilityIdentifier("visit-detail-total")
+                        LabeledContent("Total recorded work") {
+                            Text(totalText(for: detail.total))
+                                .rollingStateText(value: totalText(for: detail.total))
+                        }
+                        .accessibilityIdentifier("visit-detail-total")
                     }
                     .listRowBackground(ColorTokens.surface)
                     .listRowSeparator(.hidden)
@@ -224,6 +234,7 @@ struct VisitDetailView: View {
                                 .foregroundStyle(ColorTokens.textSecondary)
                             if dynamicTypeSize.isAccessibilitySize {
                                 Text(invoice.status.displayName)
+                                    .rollingStateText(value: invoice.status.rawValue)
                                     .font(Typography.recordMetadata)
                                     .foregroundStyle(invoice.status == .paid ? ColorTokens.success : ColorTokens.textSecondary)
                             }
@@ -343,6 +354,7 @@ struct VisitDetailView: View {
     }
 
     private func loadVisitDetail() {
+        guard !isDeleting, !didDelete else { return }
         model.load(locale: locale)
         if model.detail?.completedAt != nil {
             reloadNextAppointmentProjection()
@@ -431,19 +443,17 @@ struct VisitDetailView: View {
 
     @ViewBuilder
     private func recordedServices(for horse: VisitHorseResult) -> some View {
-        if horse.outcome != .notServiced {
-            ForEach(horse.workItems) { workItem in
-                if let serviceID = workItem.serviceID {
-                    RecordNavigationLink {
-                        ServiceDetailView(serviceID: serviceID)
-                    } label: {
-                        workItemRow(workItem)
-                    }
-                    .accessibilityIdentifier("visit-detail-work-item-\(horse.id)-\(workItem.id)")
-                } else {
+        ForEach(horse.workItems) { workItem in
+            if let serviceID = workItem.serviceID {
+                RecordNavigationLink {
+                    ServiceDetailView(serviceID: serviceID)
+                } label: {
                     workItemRow(workItem)
-                        .accessibilityIdentifier("visit-detail-work-item-\(horse.id)-\(workItem.id)")
                 }
+                .accessibilityIdentifier("visit-detail-work-item-\(horse.id)-\(workItem.id)")
+            } else {
+                workItemRow(workItem)
+                    .accessibilityIdentifier("visit-detail-work-item-\(horse.id)-\(workItem.id)")
             }
         }
     }

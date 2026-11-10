@@ -68,7 +68,7 @@ final class BusinessOverviewUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Visit"].waitForExistence(timeout: 3))
         app.buttons["visit-detail-actions"].tap()
         app.buttons["visit-delete-action"].tap()
-        let confirm = app.buttons["visit-delete-confirmation"]
+        let confirm = app.buttons["visit-delete-confirmation"].firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 3))
         confirm.tap()
         XCTAssertTrue(app.navigationBars["Completed Visits"].waitForExistence(timeout: 5))

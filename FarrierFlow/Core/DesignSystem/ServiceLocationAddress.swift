@@ -8,7 +8,7 @@ struct ServiceLocationAddress: View {
     var body: some View {
         if let url = ServiceLocationDirections.url(for: address) {
             Link(destination: url) {
-                addressLabel
+                ExternalLinkLabel { addressLabel }
                     .frame(
                         minWidth: SpacingTokens.minimumTouchTarget,
                         minHeight: SpacingTokens.minimumTouchTarget,

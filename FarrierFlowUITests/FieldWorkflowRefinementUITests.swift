@@ -17,17 +17,45 @@ final class FieldWorkflowRefinementUITests: XCTestCase {
     }
 
     @MainActor
+    func testAppointmentSafetyAndDatesFollowThePhoneRegion() {
+        for region in ["en_US", "en_GB"] {
+            let app = launch(region: region)
+            app.selectFarrierFlowTab("Schedule")
+            let appointment = app.buttons["appointment-row-Willow Creek Stables"].firstMatch
+            reveal(appointment, in: app)
+            appointment.tap()
+            let time = app.staticTexts["appointment-summary-time"]
+            XCTAssertTrue(time.waitForExistence(timeout: 5), app.debugDescription)
+            let date = app.staticTexts.matching(NSPredicate(
+                format: "label CONTAINS %@", region == "en_US" ? "October 27" : "27 October"
+            )).firstMatch
+            XCTAssertTrue(date.exists, app.debugDescription)
+            let hasMeridiem = time.label.range(of: #"\b(AM|PM)\b"#, options: .regularExpression) != nil
+            XCTAssertEqual(hasMeridiem, region == "en_US", time.label)
+            capture("Appointment date and time — \(region)")
+            let safety = app.descendants(matching: .any)["appointment-safety-Atlas"].firstMatch
+            reveal(safety, in: app)
+            XCTAssertTrue(safety.label.contains("Safety note for Atlas"))
+            XCTAssertTrue(safety.label.contains("watch the right-front flare"))
+            XCTAssertFalse(app.descendants(matching: .any)["appointment-call-Atlas"].firstMatch.exists)
+            capture("Appointment safety without phone — \(region)")
+            app.terminate()
+        }
+    }
+
+    @MainActor
     func testStopIdentityAndDirectionsRemainSeparateAccessibleElements() {
         for largestText in [false, true] {
             let app = launch(largestText: largestText, scenario: "today-stops")
-            let row = app.buttons["today-stop-row"]
+            app.selectFarrierFlowTab("Schedule")
+            let row = app.buttons["appointment-row-The Old Barn"].firstMatch
             reveal(row, in: app)
             row.tap()
-            XCTAssertTrue(app.navigationBars["Stop Details"].waitForExistence(timeout: 3))
-            let identity = app.descendants(matching: .any)["today-stop-identity"].firstMatch
+            XCTAssertTrue(app.navigationBars["Appointment"].waitForExistence(timeout: 3))
+            let identity = app.descendants(matching: .any)["appointment-summary"].firstMatch
             XCTAssertTrue(identity.label.contains("The Old Barn"))
             XCTAssertTrue(identity.label.contains("4:00"))
-            let directions = app.descendants(matching: .any)["service-location-directions"].firstMatch
+            let directions = app.descendants(matching: .any)["appointment-detail-address"].firstMatch
             reveal(directions, in: app)
             XCTAssertTrue(directions.elementType == .link || directions.elementType == .button)
             XCTAssertTrue(directions.label.contains("Directions to 120 Meadow Road"))
@@ -80,12 +108,8 @@ final class FieldWorkflowRefinementUITests: XCTestCase {
         XCTAssertTrue(directions.label.contains("Directions to"))
         XCTAssertGreaterThanOrEqual(directions.frame.height, 44)
         capture("Appointment native directions \(largestText ? "AX dark" : "light")")
-        let phone = app.descendants(matching: .any)["appointment-call-Milo"].firstMatch
-        reveal(phone, in: app)
-        XCTAssertTrue(phone.label.contains("Call"))
-        XCTAssertTrue(phone.elementType == .link || phone.elementType == .button)
-        XCTAssertGreaterThanOrEqual(phone.frame.height, 44)
-        capture("Appointment native phone \(largestText ? "AX dark" : "light")")
+        XCTAssertFalse(app.descendants(matching: .any)["appointment-call-Milo"].firstMatch.exists)
+        capture("Appointment horse card without phone \(largestText ? "AX dark" : "light")")
     }
 
     @MainActor
@@ -208,7 +232,7 @@ final class FieldWorkflowRefinementUITests: XCTestCase {
         let work = app.buttons["visit-work-item-Atlas-Full Set"]
         reveal(work, in: app)
         work.tap()
-        XCTAssertTrue(app.navigationBars["Edit Service"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.navigationBars["Edit Visit Service"].waitForExistence(timeout: 3))
         type("0", into: app.textFields["work-item-price-field"], in: app)
         dismissKeyboard("work-item-keyboard-done", in: app)
         app.buttons["visit-replace-service"].tap()
@@ -224,7 +248,6 @@ final class FieldWorkflowRefinementUITests: XCTestCase {
         let replacement = app.buttons["visit-work-item-Atlas-Field Correction"]
         reveal(replacement, in: app)
         XCTAssertFalse(app.buttons["visit-work-item-Atlas-Full Set"].exists)
-        app.buttons["visit-actions-menu"].tap()
         XCTAssertTrue(app.buttons["visit-save-progress"].isEnabled)
         capture("New service replaces only the selected horse work")
         app.buttons["visit-save-progress"]
@@ -246,11 +269,12 @@ final class FieldWorkflowRefinementUITests: XCTestCase {
     }
 
     @MainActor
-    private func launch(largestText: Bool = false, scenario: String = "app-store-showcase") -> XCUIApplication {
+    private func launch(largestText: Bool = false, scenario: String = "app-store-showcase", region: String = "en_US") -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", region]
         app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] = "FieldAudit-\(UUID())"
         app.launchEnvironment["FARRIERFLOW_UI_TEST_SCENARIO"] = scenario
+        app.launchEnvironment["FARRIERFLOW_UI_TEST_NOW"] = "2026-10-27T12:00:00Z"
         if largestText {
             app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
             app.launchEnvironment["FARRIERFLOW_UI_TEST_DYNAMIC_TYPE_SIZE"] = "accessibility5"

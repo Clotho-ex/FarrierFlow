@@ -42,16 +42,16 @@ final class RecordDeletionController {
         let message: LocalizedStringResource
         switch error {
         case RecordDeletionError.dependenciesChanged:
-            message = "The linked records changed. Open Delete again to review the updated warning. Nothing was deleted."
+            message = "Some details have changed. Review them and try again. Nothing was deleted."
         case RecordDeletionError.unavailable:
             message = "This record is no longer available."
         case PhotographLibraryError.protectedDataUnavailable:
-            message = "Unlock your iPhone to access its protected photos, then try deleting again. Nothing was deleted."
+            message = "Unlock your iPhone, then try again. Your records and photos are unchanged."
         case PhotographLibraryError.quarantineRestoreFailed:
-            message = "Your records were kept, but some photos could not be restored yet. Reopen FarrierFlow to recover them before trying again."
+            message = "Your records are safe. Reopen FarrierFlow to restore the photos before trying again."
         default:
-            message = "Nothing was deleted. Your records and photos are unchanged. Try again."
+            message = "Your records and photos are unchanged. Please try again."
         }
-        alert = FeatureAlert(title: "Couldn’t Delete Record", message: message)
+        alert = FeatureAlert(title: "Couldn’t Delete", message: message)
     }
 }

@@ -21,6 +21,7 @@ struct PhotographCountLabel: View {
                 ProgressView()
             case .loaded(let count):
                 Text(count, format: .number)
+                    .rollingStateText(value: count)
             case .unavailable:
                 Text("Unavailable")
             }

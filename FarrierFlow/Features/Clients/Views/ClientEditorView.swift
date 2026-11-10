@@ -60,7 +60,9 @@ struct ClientEditorView: View {
                         }
                         .accessibilityLabel("Client Name")
                         .accessibilityIdentifier("client-name-field")
+                        .inputLimit($model.draft.name, maximum: InputLimits.name)
                     }
+                    .focusedInputAnchor(ClientField.name)
 
                     Button {
                         showsMoreDetails.toggle()
@@ -99,7 +101,13 @@ struct ClientEditorView: View {
                             .focused($focusedField, equals: .phone)
                             .accessibilityLabel("Phone")
                             .accessibilityIdentifier("client-phone-field")
+                            .inputLimit($model.draft.phone, maximum: InputLimits.phone, rejectOverflow: true)
+                            Text("Include + and country code for international numbers.")
+                                .font(.footnote)
+                                .foregroundStyle(ColorTokens.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
+                        .focusedInputAnchor(ClientField.phone)
 
                         labeledField("Email") {
                             TextField(
@@ -120,7 +128,17 @@ struct ClientEditorView: View {
                             }
                             .accessibilityLabel("Email")
                             .accessibilityIdentifier("client-email-field")
+                            .inputLimit($model.draft.email, maximum: InputLimits.email, rejectOverflow: true)
+                            if focusedField != .email, !EmailAddress.isValidOptional(model.draft.email) {
+                                Label("Enter a valid email address.", systemImage: "exclamationmark.circle")
+                                    .font(.footnote)
+                                    .foregroundStyle(ColorTokens.destructive)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .accessibilityElement(children: .combine)
+                                    .accessibilityIdentifier("client-email-error")
+                            }
                         }
+                        .focusedInputAnchor(ClientField.email)
 
                         labeledField("Notes") {
                             TextField(
@@ -139,7 +157,9 @@ struct ClientEditorView: View {
                             }
                             .accessibilityLabel("Client Notes")
                             .accessibilityIdentifier("client-notes-field")
+                            .inputLimit($model.draft.notes, maximum: InputLimits.notes)
                         }
+                        .focusedInputAnchor(ClientField.notes)
                     }
                 }
                 .listRowBackground(ColorTokens.surface)
@@ -153,6 +173,8 @@ struct ClientEditorView: View {
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle(model.clientID == nil ? "New Client" : "Edit Client")
             .toolbarTitleDisplayMode(.inline)
+            .keyboardDoneAccessory(isFocused: focusedField != nil, identifier: "client-keyboard-done") { focusedField = nil }
+            .keepFocusedInputVisible(focusedField)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -166,17 +188,9 @@ struct ClientEditorView: View {
                             !subscription.allowsMutations || !model.canSave
                         )
                 }
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") {
-                        focusedField = nil
-                    }
-                    .font(.subheadline.weight(.semibold))
-                    .accessibilityHint("Dismisses the keyboard without saving")
-                    .accessibilityIdentifier("client-keyboard-done")
-                }
             }
-            .onChange(of: focusedField) { _, field in
+            .onChange(of: focusedField) { previous, field in
+                if previous == .phone { model.formatPhone() }
                 if field != nil {
                     expandSheet()
                 }

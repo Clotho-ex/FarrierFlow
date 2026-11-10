@@ -2,17 +2,18 @@ import SwiftData
 import SwiftUI
 
 extension View {
-    func recordDeletionSheet(
+    func recordDeletionConfirmation(
         _ target: RecordDeletionTarget,
         isPresented: Binding<Bool>,
         title: LocalizedStringKey,
         confirmationTitle: LocalizedStringKey,
         accessibilityPrefix: String,
         alert: Binding<FeatureAlert?>,
+        isDeleting: Binding<Bool> = .constant(false),
         onDelete: @escaping () -> Void
     ) -> some View {
         modifier(RecordDeletionPresentation(
-            target: target, isPresented: isPresented, alert: alert, title: title,
+            target: target, isPresented: isPresented, alert: alert, isDeleting: isDeleting, title: title,
             confirmationTitle: confirmationTitle, accessibilityPrefix: accessibilityPrefix,
             onDelete: onDelete
         ))
@@ -21,15 +22,14 @@ extension View {
 
 private struct RecordDeletionPresentation: ViewModifier {
     @Environment(\.modelContext) private var context
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(PhotographLibrary.self) private var library
     @Environment(SubscriptionAccessModel.self) private var subscription
     @State private var controller = RecordDeletionController()
-    @State private var confirmed: RecordDeletionImpact?
 
     let target: RecordDeletionTarget
     @Binding var isPresented: Bool
     @Binding var alert: FeatureAlert?
+    @Binding var isDeleting: Bool
     let title: LocalizedStringKey
     let confirmationTitle: LocalizedStringKey
     let accessibilityPrefix: String
@@ -38,39 +38,42 @@ private struct RecordDeletionPresentation: ViewModifier {
     func body(content: Content) -> some View {
         content
             .disabled(controller.isDeleting)
-            .sheet(isPresented: $isPresented, onDismiss: performConfirmedDeletion) {
-                Group {
-                    if let impact = controller.impact {
-                        DeletionConfirmationSheet(
-                            title: title, warning: impact.warning,
-                            confirmationTitle: confirmationTitle,
-                            accessibilityPrefix: accessibilityPrefix
-                        ) {
-                            confirmed = impact
-                        }
-                    } else {
-                        ProgressView("Loading…")
-                            .presentationDetents([.medium])
+            .onChange(of: isPresented) { _, presented in
+                if presented {
+                    controller.prepare(target, in: context.container)
+                    if controller.impact == nil {
+                        isPresented = false
+                        alert = controller.alert
                     }
                 }
-                .dynamicTypeSize(dynamicTypeSize)
-                .task {
-                    confirmed = nil
-                    controller.prepare(target, in: context.container)
-                    if controller.impact == nil { isPresented = false }
-                }
             }
+            .alert(title, isPresented: confirmationIsPresented, presenting: controller.impact) { impact in
+                Button(confirmationTitle, role: .destructive) {
+                    performDeletion(impact)
+                }
+                .accessibilityIdentifier("\(accessibilityPrefix)-confirmation")
+                Button("Cancel", role: .cancel) {}
+            } message: { impact in
+                Text(impact.warning)
+            }
+            .tint(.primary)
     }
 
-    private func performConfirmedDeletion() {
-        guard let impact = confirmed else {
-            if let failure = controller.alert { alert = failure }
-            return
-        }
-        confirmed = nil
-        guard subscription.allowsMutations else { return }
+    private var confirmationIsPresented: Binding<Bool> {
+        Binding(
+            get: { isPresented && controller.impact != nil },
+            set: { isPresented = $0 }
+        )
+    }
+
+    private func performDeletion(_ impact: RecordDeletionImpact) {
+        guard subscription.allowsMutations, !controller.isDeleting else { return }
+        isPresented = false
+        isDeleting = true
         Task {
+            defer { isDeleting = false }
             if await controller.delete(impact, using: library) {
+                alert = nil
                 onDelete()
             } else {
                 alert = controller.alert

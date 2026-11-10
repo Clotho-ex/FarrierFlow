@@ -174,6 +174,7 @@ enum ScreenshotFixtureStage: String {
 }
 
 enum UITestScenario: String {
+    case visitWorkflow = "visit-workflow"
     case appStoreShowcase = "app-store-showcase"
     case todayStops = "today-stops"
     case todayStopsBoundary = "today-stops-boundary"

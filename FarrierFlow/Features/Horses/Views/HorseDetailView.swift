@@ -108,7 +108,7 @@ struct HorseDetailView: View {
                 .sheet(isPresented: $showsEditor, onDismiss: reload) {
                     HorseEditorDestination(horseID: horse.id)
                 }
-                .recordDeletionSheet(
+                .recordDeletionConfirmation(
                     .horse(horseID), isPresented: $showsDeleteConfirmation,
                     title: "Delete Horse?", confirmationTitle: "Delete Horse",
                     accessibilityPrefix: "horse-delete", alert: $model.alert

@@ -1,5 +1,20 @@
 # Product
 
+## Appointment and visit workflow refinement — 2026-10-27
+
+Planned services stay on AppointmentHorse (or the horse default) and appear in
+Visit as unconfirmed proposals. Starting a visit and selecting Serviced do not
+create WorkItems. Record as Performed or Add Service explicitly records actual
+work; visit-specific replacements and prices never modify the plan or catalog.
+Existing saved WorkItems retain their recorded meaning.
+
+Save Progress persists valid dirty drafts without completing them. Pending notes
+and Not Serviced reasons are allowed. Outcome changes preserve notes, photos,
+and recorded services; a Not Serviced/service conflict blocks completion until
+the farrier reviews and explicitly removes entries or changes the outcome.
+All-not-serviced attendance can complete without creating billable work.
+
+
 <!-- impeccable:product-schema 1 -->
 
 ## Platform

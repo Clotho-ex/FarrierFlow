@@ -29,8 +29,8 @@ final class TodayRunSheetUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Remaining Today"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["Later Today"].exists)
         XCTAssertTrue(app.buttons["today-run-sheet-scheduled"].label.hasPrefix("Due Now"))
-        let row = app.buttons["today-stop-row"]
-        XCTAssertEqual(row.value as? String, "2 horses · Scheduled, Peanut and Thunder")
+        let row = app.buttons["today-stop-row"].firstMatch
+        XCTAssertTrue((row.value as? String)?.contains("1 horse · Scheduled") == true)
         capture(app, name: "Today remaining unfinished stops")
     }
 
@@ -42,10 +42,10 @@ final class TodayRunSheetUITests: XCTestCase {
         )
         defer { app.terminate() }
         XCTAssertTrue(app.staticTexts["Later Today"].waitForExistence(timeout: 5))
-        let row = app.buttons["today-stop-row"]
+        let row = app.buttons["today-stop-row"].firstMatch
         let value = row.value as? String
         XCTAssertTrue(app.staticTexts["Remaining Today"].waitForExistence(timeout: 25))
-        XCTAssertEqual(app.buttons.matching(identifier: "today-stop-row").count, 1)
+        XCTAssertEqual(app.buttons.matching(identifier: "today-stop-row").count, 2)
         XCTAssertEqual(row.value as? String, value)
         XCTAssertTrue(value?.contains("Scheduled") == true)
     }
@@ -58,15 +58,11 @@ final class TodayRunSheetUITests: XCTestCase {
             doublesLocalizedStrings: true
         )
         defer { app.terminate() }
-        let row = app.buttons["today-stop-row"]
+        let row = app.buttons["today-stop-row"].firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 5))
         XCTAssertTrue(row.isHittable)
         capture(app, name: "Today metadata double length localization")
         row.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.7)).tap()
-        XCTAssertTrue(app.buttons["today-stop-appointment"].firstMatch.waitForExistence(timeout: 3))
-        XCTAssertEqual(app.buttons.matching(identifier: "today-stop-appointment").count, 2)
-        capture(app, name: "Stop Details double length localization")
-        app.buttons["today-stop-appointment"].firstMatch.tap()
         XCTAssertTrue(app.descendants(matching: .any)["appointment-summary"].waitForExistence(timeout: 3))
         capture(app, name: "Appointment double length localization")
     }
@@ -77,41 +73,28 @@ final class TodayRunSheetUITests: XCTestCase {
         var app = launch(storeName: store, scenario: "today-stops")
         XCTAssertTrue(app.buttons["today-run-sheet-scheduled"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Later Today"].exists)
-        XCTAssertTrue(app.staticTexts["1 stop"].exists)
-        let row = app.buttons["today-stop-row"]
-        XCTAssertTrue(row.waitForExistence(timeout: 3))
-        XCTAssertTrue(row.value as? String == "2 horses · Scheduled, Peanut and Thunder")
-        capture(app, name: "Today compact grouped stops light")
-        row.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.7)).tap()
-        XCTAssertTrue(app.navigationBars["Stop Details"].waitForExistence(timeout: 3))
-        let identity = app.descendants(matching: .any)["today-stop-identity"]
-        XCTAssertTrue(identity.waitForExistence(timeout: 3))
-        capture(app, name: "Stop Details light hierarchy")
-        let choices = app.buttons.matching(identifier: "today-stop-appointment")
-        XCTAssertTrue(choices.firstMatch.waitForExistence(timeout: 3))
-        XCTAssertEqual(choices.count, 2)
-        choices.element(boundBy: 0).tap()
-        XCTAssertTrue(app.navigationBars["Appointment"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.descendants(matching: .any)["appointment-summary"].exists)
-        XCTAssertTrue(app.buttons["visit-start-action"].isEnabled)
-        capture(app, name: "Appointment light time date and record surfaces")
-        app.navigationBars.buttons["Stop Details"].tap()
-        choices.element(boundBy: 1).tap()
-        XCTAssertTrue(app.navigationBars["Appointment"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["2 appointments"].exists)
+        let rows = app.buttons.matching(identifier: "today-stop-row")
+        XCTAssertEqual(rows.count, 2)
+        for index in 0..<2 {
+            let row = rows.element(boundBy: index)
+            let horse = (row.value as? String)?.contains("Peanut") == true ? "Peanut" : "Thunder"
+            XCTAssertTrue((row.value as? String)?.contains(horse) == true)
+            row.tap()
+            XCTAssertTrue(app.navigationBars["Appointment"].waitForExistence(timeout: 3))
+            XCTAssertFalse(app.navigationBars["Stop Details"].exists)
+            XCTAssertTrue(app.staticTexts[horse].firstMatch.exists)
+            capture(app, name: "Direct appointment \(horse) light")
+            app.navigationBars.buttons["Today"].tap()
+        }
         app.terminate()
         app = launch(storeName: store, scenario: "today-stops", colorScheme: "dark")
         defer { app.terminate() }
-        XCTAssertTrue(app.buttons["today-stop-row"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.buttons.matching(identifier: "today-stop-row").count, 1)
-        capture(app, name: "Today compact grouped stops dark")
-        app.buttons["today-stop-row"].tap()
-        XCTAssertTrue(app.navigationBars["Stop Details"].waitForExistence(timeout: 3))
-        capture(app, name: "Stop Details dark hierarchy")
-        let darkChoice = app.buttons.matching(identifier: "today-stop-appointment").firstMatch
-        XCTAssertTrue(darkChoice.waitForExistence(timeout: 3))
-        darkChoice.tap()
+        XCTAssertTrue(app.buttons["today-stop-row"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons.matching(identifier: "today-stop-row").count, 2)
+        app.buttons["today-stop-row"].firstMatch.tap()
         XCTAssertTrue(app.navigationBars["Appointment"].waitForExistence(timeout: 3))
-        capture(app, name: "Appointment dark time date and record surfaces")
+        capture(app, name: "Appointment direct navigation after relaunch dark")
     }
 
     @MainActor
@@ -126,7 +109,7 @@ final class TodayRunSheetUITests: XCTestCase {
         let featured = app.buttons["today-run-sheet-scheduled"]
         XCTAssertTrue(featured.waitForExistence(timeout: 5))
         capture(app, name: "Today featured appointment dark largest text")
-        let row = app.buttons["today-stop-row"]
+        let row = app.buttons["today-stop-row"].firstMatch
         for _ in 0..<6 {
             if row.exists && row.frame.maxY < app.tabBars.firstMatch.frame.minY { break }
             app.swipeUp()
@@ -134,14 +117,6 @@ final class TodayRunSheetUITests: XCTestCase {
         XCTAssertTrue(row.isHittable)
         capture(app, name: "Today later stop dark largest text")
         row.tap()
-        XCTAssertTrue(app.navigationBars["Stop Details"].waitForExistence(timeout: 3))
-        XCTAssertGreaterThan(app.descendants(matching: .any)["today-stop-identity"].frame.height, 150)
-        capture(app, name: "Stop Details largest text dark")
-        let choices = app.buttons.matching(identifier: "today-stop-appointment")
-        let choice = choices.firstMatch
-        reveal(choice, in: app)
-        XCTAssertEqual(choices.count, 2)
-        choice.tap()
         XCTAssertTrue(app.navigationBars["Appointment"].waitForExistence(timeout: 3))
         capture(app, name: "Appointment largest text dark identity")
         let start = app.buttons["visit-start-action"]
@@ -159,16 +134,10 @@ final class TodayRunSheetUITests: XCTestCase {
             colorScheme: "light"
         )
         defer { app.terminate() }
-        let row = app.buttons["today-stop-row"]
+        let row = app.buttons["today-stop-row"].firstMatch
         XCTAssertTrue(app.buttons["today-run-sheet-scheduled"].waitForExistence(timeout: 5))
         reveal(row, in: app)
         row.tap()
-        XCTAssertTrue(app.navigationBars["Stop Details"].waitForExistence(timeout: 3))
-        XCTAssertGreaterThan(app.descendants(matching: .any)["today-stop-identity"].frame.height, 150)
-        capture(app, name: "Stop Details largest text light")
-        let choice = app.buttons.matching(identifier: "today-stop-appointment").firstMatch
-        reveal(choice, in: app)
-        choice.tap()
         XCTAssertTrue(app.navigationBars["Appointment"].waitForExistence(timeout: 3))
         capture(app, name: "Appointment largest text light identity")
         let start = app.buttons["visit-start-action"]
@@ -321,6 +290,7 @@ final class TodayRunSheetUITests: XCTestCase {
                 preferredContentSizeCategory,
                 "UICTContentSizeCategoryAccessibilityExtraExtraExtraLarge"
             )
+            app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
             app.launchEnvironment["FARRIERFLOW_UI_TEST_DYNAMIC_TYPE_SIZE"] =
                 "accessibility5"
         }

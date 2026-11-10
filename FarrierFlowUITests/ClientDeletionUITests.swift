@@ -2,7 +2,7 @@ import XCTest
 
 final class ClientDeletionUITests: XCTestCase {
     @MainActor
-    func testContentSizedSheetCancelsAndDeletesOnlyAfterConfirmation() {
+    func testNativeAlertCancelsAndDeletesOnlyAfterConfirmation() {
         let store = "ClientDelete-\(UUID().uuidString)"
         var app = launch(store)
         openClients(in: app)
@@ -17,25 +17,17 @@ final class ClientDeletionUITests: XCTestCase {
         row.tap()
 
         openConfirmation(in: app)
-        let sheet = app.scrollViews["client-delete-sheet"]
-        let cancel = app.buttons["Cancel"]
-        XCTAssertTrue(cancel.isHittable)
-        XCTAssertLessThan(sheet.frame.height, app.frame.height * 0.48)
-        XCTAssertLessThan(sheet.frame.maxY - cancel.frame.maxY, 65)
-        capture(app, "Client deletion fits standard text light")
-        cancel.tap()
+        let alert = app.alerts["Delete Client?"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 3))
+        XCTAssertFalse(app.scrollViews["client-delete-sheet"].exists)
+        capture(app, "Native client deletion alert standard text")
+        alert.buttons["Cancel"].tap()
+        XCTAssertTrue(alert.waitForNonExistence(timeout: 3))
         XCTAssertTrue(app.navigationBars["Client"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["Delete Me"].exists)
 
         openConfirmation(in: app)
-        app.buttons["Sheet Grabber"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            .press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.98)))
-        XCTAssertTrue(app.navigationBars["Client"].waitForExistence(timeout: 3))
-        XCTAssertFalse(sheet.exists)
-        XCTAssertTrue(app.staticTexts["Delete Me"].exists)
-
-        openConfirmation(in: app)
-        app.buttons["client-delete-confirmation"].tap()
+        app.buttons["client-delete-confirmation"].firstMatch.tap()
         XCTAssertTrue(app.navigationBars["Clients"].waitForExistence(timeout: 3))
         XCTAssertFalse(row.exists)
         app.terminate()
@@ -47,7 +39,7 @@ final class ClientDeletionUITests: XCTestCase {
     }
 
     @MainActor
-    func testLargestTextSheetDeletesClientAndItsHorses() {
+    func testNativeAlertAtLargestTextDeletesClientAndItsHorses() {
         let app = launch("ClientDeleteBlocked-\(UUID().uuidString)", largestText: true)
         defer { app.terminate() }
         openClients(in: app)
@@ -55,16 +47,11 @@ final class ClientDeletionUITests: XCTestCase {
         XCTAssertTrue(row.waitForExistence(timeout: 3))
         row.tap()
         openConfirmation(in: app)
-        let sheet = app.scrollViews["client-delete-sheet"]
-        XCTAssertGreaterThan(sheet.frame.height, app.frame.height * 0.5)
-        let cancel = app.buttons["Cancel"]
-        for _ in 0..<4 {
-            if cancel.isHittable && cancel.frame.maxY < app.frame.maxY - 30 { break }
-            sheet.swipeUp()
-        }
-        XCTAssertTrue(cancel.isHittable)
-        capture(app, "Client deletion accommodates largest text dark")
-        let confirm = app.buttons["client-delete-confirmation"]
+        let alert = app.alerts["Delete Client?"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 3))
+        XCTAssertTrue(alert.buttons["Cancel"].isHittable)
+        capture(app, "Native client deletion alert largest text dark")
+        let confirm = app.buttons["client-delete-confirmation"].firstMatch
         XCTAssertTrue(confirm.isHittable)
         confirm.tap()
         XCTAssertTrue(app.navigationBars["Clients"].waitForExistence(timeout: 5))
@@ -91,9 +78,15 @@ final class ClientDeletionUITests: XCTestCase {
 
     @MainActor
     private func openConfirmation(in app: XCUIApplication) {
-        app.buttons["Actions"].tap()
-        app.buttons["Delete"].tap()
-        XCTAssertTrue(app.buttons["client-delete-confirmation"].waitForExistence(timeout: 3))
+        let client = app.navigationBars["Client"]
+        XCTAssertTrue(client.waitForExistence(timeout: 5))
+        let actions = client.buttons["Actions"]
+        XCTAssertTrue(actions.waitForExistence(timeout: 5))
+        actions.tap()
+        let delete = app.buttons["Delete"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 5))
+        delete.tap()
+        XCTAssertTrue(app.buttons["client-delete-confirmation"].firstMatch.waitForExistence(timeout: 5))
     }
 
     @MainActor
@@ -111,6 +104,7 @@ final class ClientDeletionUITests: XCTestCase {
         app.launchEnvironment["FARRIERFLOW_UI_TEST_SCENARIO"] = "today-stops"
         app.launchEnvironment["FARRIERFLOW_UI_TEST_COLOR_SCHEME"] = largestText ? "dark" : "light"
         if largestText {
+            app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
             app.launchEnvironment["FARRIERFLOW_UI_TEST_DYNAMIC_TYPE_SIZE"] = "accessibility5"
         }
         app.launch()

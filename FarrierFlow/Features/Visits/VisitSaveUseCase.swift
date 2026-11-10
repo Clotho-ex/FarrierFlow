@@ -49,13 +49,21 @@ enum VisitSaveUseCase {
                     serviceIsArchived: workItem.service?.isArchived ?? false
                 )
             }
+            let plannedService = visit.appointment?.appointmentHorses
+                .first(where: { $0.horse?.persistentModelID == horse.persistentModelID })?.plannedService
+                ?? horse.defaultService
             return VisitHorseDraft(
                 id: visitHorse.persistentModelID,
                 horseID: horse.persistentModelID,
                 horseName: horse.name,
                 outcome: outcome,
                 workNotes: visitHorse.workNotes ?? "",
-                workItems: WorkItemRules.sorted(workItems)
+                workItems: WorkItemRules.sorted(workItems),
+                plannedService: plannedService.map {
+                    ServiceChoice(id: $0.persistentModelID, name: $0.name,
+                        defaultAmountMinorUnits: $0.defaultAmountMinorUnits, currencyCode: $0.currencyCode)
+                },
+                plannedServiceIsArchived: plannedService?.isArchived ?? false
             )
         }
 

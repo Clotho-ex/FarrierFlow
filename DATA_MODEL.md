@@ -1,3 +1,17 @@
+## Appointment and visit workflow refinement — 2026-10-27
+
+Planned services stay on AppointmentHorse (or the horse default) and appear in
+Visit as unconfirmed proposals. Starting a visit and selecting Serviced do not
+create WorkItems. Record as Performed or Add Service explicitly records actual
+work; visit-specific replacements and prices never modify the plan or catalog.
+Existing saved WorkItems retain their recorded meaning.
+
+Save Progress persists valid dirty drafts without completing them. Pending notes
+and Not Serviced reasons are allowed. Outcome changes preserve notes, photos,
+and recorded services; a Not Serviced/service conflict blocks completion until
+the farrier reviews and explicitly removes entries or changes the outcome.
+All-not-serviced attendance can complete without creating billable work.
+
 ## Schedule removal and Recorded Work (2026-10-25)
 
 Removing an appointment or using Delete Visit outside Recorded Work deletes only
@@ -26,8 +40,8 @@ contract update is deployed to FarrierFlow Dev.
 V5 adds an optional `AppointmentHorse.plannedService` relationship, separate
 from `Horse.defaultService`. A selected service applies only to that appointment
 and takes precedence when the visit starts; an absent choice preserves the
-existing horse-default behavior. Services and prices become WorkItem snapshots
-when work starts. Appointment membership and service choices remain fixed after
+existing horse-default proposal. Services and prices become WorkItem snapshots
+only when explicitly recorded as performed. Appointment membership and service choices remain fixed after
 a visit starts. V1–V4 schemas remain frozen; V4 upgrades through a lightweight
 migration. Sync includes the optional `plannedService` service UUID and accepts
 legacy records that omit it. The matching backend contract was deployed to FarrierFlow Dev on 2026-10-18.
@@ -406,9 +420,10 @@ One save creates the Visit and exactly one pending VisitHorse for every
 AppointmentHorse. No partial graph may remain if validation or saving fails.
 
 Save Progress permits pending outcomes and requires `completedAt == nil`.
-Completion requires every outcome to be resolved, at least one serviced Horse,
-exact VisitHorse-to-AppointmentHorse Horse equality, and all required
-relationships. Completion saves the current draft and `completedAt` atomically.
+Completion requires every outcome to be resolved, recorded work for each serviced
+Horse, no recorded services for a not-serviced Horse, exact
+VisitHorse-to-AppointmentHorse Horse equality, and all required relationships.
+An attendance-only visit may finish with every Horse Not Serviced. Completion saves the current draft and `completedAt` atomically.
 
 ### Correction and deletion
 
@@ -428,7 +443,7 @@ VisitHorse records. A completed Visit cannot be deleted.
 | Field | Type | Requirement |
 | --- | --- | --- |
 | `outcomeRawValue` | `String` | Required; defaults to `pending` |
-| `workNotes` | `String?` | Optional only when serviced |
+| `workNotes` | `String?` | Optional for every outcome; may explain why a Horse was not serviced |
 
 The domain outcome is exactly one of:
 
@@ -437,8 +452,10 @@ The domain outcome is exactly one of:
 - `notServiced`
 
 Unknown raw values are invalid and are never displayed directly. Work Notes
-store `nil` after normalization when empty and must be nil for pending or
-not-serviced outcomes.
+store `nil` after normalization when empty. Pending notes and not-serviced
+reasons are preserved. Changing an outcome never removes notes or WorkItems.
+A Not Serviced outcome with WorkItems may be saved as progress, but the conflict
+must be resolved explicitly before completing or correcting a completed Visit.
 
 ### Relationships
 
@@ -499,7 +516,7 @@ a Horse default.
 It stores the recorded Service-name, amount, and currency snapshots, which survive
 catalog deletion. A VisitHorse prevents
 duplicate WorkItems for the same Service. Every serviced VisitHorse must have at
-least one WorkItem before completion; not-serviced VisitHorses have none. A
+least one WorkItem before completion; completed not-serviced VisitHorses have none. A
 completed Visit may correct these values only until any of its WorkItems is
 invoiced.
 
@@ -666,8 +683,9 @@ Domain rules validate relationships that span models:
   most 2,560 pixels, and Photograph UUIDs are unique.
 - Service names, amounts, and supported business currencies are valid; archived Services are not used for
   new defaults or WorkItems.
-- Serviced VisitHorses have recorded WorkItems, with no duplicate Service;
-  not-serviced VisitHorses have none.
+- Completed serviced VisitHorses have recorded WorkItems, with no duplicate
+  Service; completed not-serviced VisitHorses have none. Progress may retain
+  unresolved work and outcome conflicts.
 - Business Profile count is at most one and its sequence remains ahead of every
   issued Invoice number. Optional duration and due-day defaults are positive
   when present.
@@ -700,9 +718,9 @@ Immediately before every controlled save, complete-graph validation rejects:
 - Duplicate Horse membership in one Visit.
 - VisitHorse membership different from AppointmentHorse membership.
 - An in-progress Visit with `completedAt`.
-- A completed Visit with pending outcomes or no serviced Horse.
+- A completed Visit with pending outcomes, serviced membership without work,
+  or not-serviced membership with work.
 - `completedAt` earlier than `startedAt`.
-- Work Notes on pending or not-serviced membership.
 - A Photograph without an inverse-matching VisitHorse, with invalid dimensions
   or byte count, or with a duplicate UUID.
 - A WorkItem without an inverse-matching VisitHorse, with a non-matching Service

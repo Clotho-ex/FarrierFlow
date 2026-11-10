@@ -71,10 +71,12 @@ private struct BusinessMetricRow: View {
                 .font(Typography.recordMetadata)
                 .foregroundStyle(ColorTokens.textSecondary)
             Text(value)
+                .rollingStateText(value: value)
                 .font(.title2.weight(.semibold))
                 .monospacedDigit()
                 .foregroundStyle(ColorTokens.textPrimary)
             Text(detail)
+                .rollingStateText(value: detail)
                 .font(.footnote)
                 .foregroundStyle(ColorTokens.textSecondary)
         }

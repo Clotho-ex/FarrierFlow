@@ -13,7 +13,7 @@ final class UserControlledDeletionUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Visit"].waitForExistence(timeout: 3))
         app.buttons["visit-detail-actions"].tap()
         app.buttons["visit-delete-action"].tap()
-        let confirm = app.buttons["visit-delete-confirmation"]
+        let confirm = app.buttons["visit-delete-confirmation"].firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 3))
         app.buttons["Cancel"].tap()
         XCTAssertTrue(app.buttons["visit-detail-actions"].exists)
@@ -67,6 +67,49 @@ final class UserControlledDeletionUITests: XCTestCase {
     }
 
     @MainActor
+    func testRecordedWorkDeletionReturnsToListWithoutAnUnavailableError() {
+        let app = launch()
+        defer { app.terminate() }
+        app.openBusinessRoot()
+        let recordedWork = app.buttons["business-recorded-work"]
+        reveal(recordedWork, in: app)
+        recordedWork.tap()
+        XCTAssertTrue(app.navigationBars["Recorded Work"].waitForExistence(timeout: 5))
+        let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "business-completed-visit-"))
+        let count = rows.count
+        XCTAssertGreaterThan(count, 0)
+        rows.firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Visit"].waitForExistence(timeout: 5))
+        app.buttons["visit-detail-actions"].tap()
+        app.buttons["visit-delete-action"].tap()
+        let confirmation = app.alerts["Delete Recorded Work?"]
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 3))
+        XCTAssertTrue(confirmation.staticTexts["You can’t recover this work or its photos. The appointment and saved invoices will stay."].exists)
+        capture(app, "Native Recorded Work deletion confirmation")
+        confirmation.buttons["Cancel"].tap()
+        XCTAssertTrue(confirmation.waitForNonExistence(timeout: 3))
+        XCTAssertTrue(app.navigationBars["Visit"].exists)
+        app.buttons["visit-detail-actions"].tap()
+        app.buttons["visit-delete-action"].tap()
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 3))
+        confirmation.buttons["visit-delete-confirmation"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Recorded Work"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.alerts.firstMatch.waitForNonExistence(timeout: 3))
+        XCTAssertFalse(app.staticTexts["Visit Unavailable"].exists)
+        XCTAssertEqual(rows.count, count - 1)
+        capture(app, "Recorded Work returns to list without a load error")
+        app.terminate()
+        app.launchEnvironment.removeValue(forKey: "FARRIERFLOW_UI_TEST_SCENARIO")
+        app.launch()
+        app.openBusinessRoot()
+        reveal(recordedWork, in: app)
+        recordedWork.tap()
+        XCTAssertTrue(app.navigationBars["Recorded Work"].waitForExistence(timeout: 5))
+        XCTAssertEqual(rows.count, count - 1)
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+    }
+
+    @MainActor
     private func capture(_ app: XCUIApplication, _ name: String) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = name
@@ -75,7 +118,7 @@ final class UserControlledDeletionUITests: XCTestCase {
     }
 
     @MainActor
-    func testPaidInvoiceCanBeDeletedUsingSheetWithoutDeletingHorseOrVisit() {
+    func testPaidInvoiceCanBeDeletedUsingNativeAlertWithoutDeletingHorseOrVisit() {
         let app = launch()
         defer { app.terminate() }
         openClient(in: app)
@@ -90,7 +133,7 @@ final class UserControlledDeletionUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Status, Paid"].waitForExistence(timeout: 3))
         app.buttons["invoice-more-actions"].tap()
         app.buttons["invoice-delete-action"].tap()
-        let confirm = app.buttons["invoice-delete-confirmation"]
+        let confirm = app.buttons["invoice-delete-confirmation"].firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 3))
         app.buttons["Cancel"].tap()
         XCTAssertTrue(app.navigationBars["Invoice 0001"].exists)
@@ -113,7 +156,7 @@ final class UserControlledDeletionUITests: XCTestCase {
     }
 
     @MainActor
-    func testFailedDeletionShowsErrorAfterSheetAndKeepsRecordsForRetry() {
+    func testFailedDeletionShowsErrorAfterConfirmationAndKeepsRecordsForRetry() {
         let app = XCUIApplication()
         app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] = "FailedDeletion-\(UUID())"
         app.launchEnvironment["FARRIERFLOW_UI_TEST_SCENARIO"] = "payment-pending"
@@ -123,13 +166,13 @@ final class UserControlledDeletionUITests: XCTestCase {
         openClient(in: app)
         app.buttons["Actions"].tap()
         app.buttons["Delete"].tap()
-        let confirm = app.buttons["client-delete-confirmation"]
+        let confirm = app.buttons["client-delete-confirmation"].firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 3))
         confirm.tap()
-        let alert = app.alerts["Couldn’t Delete Record"]
+        let alert = app.alerts["Couldn’t Delete"]
         XCTAssertTrue(alert.waitForExistence(timeout: 5))
         XCTAssertFalse(confirm.exists)
-        XCTAssertTrue(alert.staticTexts["Nothing was deleted. Your records and photos are unchanged. Try again."].exists)
+        XCTAssertTrue(alert.staticTexts["Your records and photos are unchanged. Please try again."].exists)
         alert.buttons["OK"].tap()
         XCTAssertTrue(app.buttons["horse-row-Milo"].exists)
         app.terminate()

@@ -79,7 +79,7 @@ struct AppointmentEditorModelTests {
     }
 
     @Test
-    func appointmentServiceOverridesDefaultWithoutChangingHorseAndCarriesIntoVisit() throws {
+    func appointmentServiceOverridesDefaultAndRemainsAnUnconfirmedPlan() throws {
         let fixture = try makeTwoHorseFixture()
         let horse = fixture.horses[0]
         let usual = ModelFixtures.makeService(name: "Usual Trim", in: fixture.context)
@@ -101,7 +101,8 @@ struct AppointmentEditorModelTests {
         let visitID = try VisitStartUseCase.start(appointmentID: id, now: .now, in: fixture.container)
         let check = ModelContext(fixture.container)
         let visit = try #require(try check.existingModel(Visit.self, for: visitID))
-        #expect(visit.visitHorses.first?.workItems.first?.serviceNameSnapshot == "Full Set")
+        #expect(visit.visitHorses.first?.workItems.isEmpty == true)
+        #expect(try VisitSaveUseCase.loadDraft(visitID: visitID, in: check).horses.first?.plannedService?.name == "Full Set")
         #expect(visit.visitHorses.first?.horse?.defaultService?.name == "Usual Trim")
     }
 
@@ -169,7 +170,10 @@ struct AppointmentEditorModelTests {
         let visitID = try VisitStartUseCase.start(appointmentID: id, now: .now, in: fixture.container)
         let check = ModelContext(fixture.container)
         let visit = try #require(try check.existingModel(Visit.self, for: visitID))
-        #expect(visit.visitHorses.first?.workItems.first?.serviceNameSnapshot == "Front Shoes")
+        #expect(visit.visitHorses.first?.workItems.isEmpty == true)
+        let draft = try VisitSaveUseCase.loadDraft(visitID: visitID, in: check)
+        #expect(draft.horses.first?.plannedService?.name == "Front Shoes")
+        #expect(draft.horses.first?.plannedServiceIsArchived == true)
         try RecordDeletionRules.delete(service, in: fixture.context)
         let updated = ModelContext(fixture.container)
         #expect(try updated.fetch(FetchDescriptor<AppointmentHorse>()).allSatisfy { $0.plannedService == nil })

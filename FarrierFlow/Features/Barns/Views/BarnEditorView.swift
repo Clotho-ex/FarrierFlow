@@ -31,6 +31,8 @@ struct BarnEditorView: View {
                         .submitLabel(.done)
                         .onSubmit { focusedField = nil }
                         .accessibilityIdentifier("barn-name-field")
+                        .inputLimit($model.draft.name, maximum: InputLimits.name)
+                        .focusedInputAnchor(Field.name)
                     DisclosureGroup(isExpanded: $showsMoreDetails) {
                         TextField(
                             "Address",
@@ -40,6 +42,8 @@ struct BarnEditorView: View {
                         .focused($focusedField, equals: .address)
                         .textContentType(.fullStreetAddress)
                         .accessibilityIdentifier("barn-address-field")
+                        .inputLimit($model.draft.address, maximum: InputLimits.address)
+                        .focusedInputAnchor(Field.address)
                         VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
                             Text("Contact Notes")
                                 .font(.caption)
@@ -50,7 +54,9 @@ struct BarnEditorView: View {
                                 .focused($focusedField, equals: .contactNotes)
                                 .accessibilityLabel("Contact Notes")
                                 .accessibilityIdentifier("barn-contact-notes-field")
+                                .inputLimit($model.draft.contactNotes, maximum: InputLimits.notes)
                         }
+                        .focusedInputAnchor(Field.contactNotes)
                         Text("Gate codes, parking, or arrival instructions.")
                             .font(.footnote)
                             .foregroundStyle(ColorTokens.textSecondary)
@@ -66,12 +72,9 @@ struct BarnEditorView: View {
             .disabled(!subscription.allowsMutations)
             .navigationTitle(model.barnID == nil ? "New Service Location" : "Edit Service Location")
             .navigationBarTitleDisplayMode(.inline)
+            .keyboardDoneAccessory(isFocused: focusedField != nil, identifier: "barn-keyboard-done") { focusedField = nil }
+            .keepFocusedInputVisible(focusedField)
             .toolbar {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") { focusedField = nil }
-                        .accessibilityIdentifier("barn-keyboard-done")
-                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                         .tint(ColorTokens.textSecondary)

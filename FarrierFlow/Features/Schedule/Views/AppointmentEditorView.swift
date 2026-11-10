@@ -7,11 +7,8 @@ struct AppointmentEditorView: View {
         case notes
     }
 
-    private enum Layout {
-        static let minimumRowHeight: CGFloat = 56
-    }
-
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appointmentSaved) private var appointmentSaved
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.locale) private var locale
     @Environment(\.analyticsClient) private var analyticsClient
@@ -120,6 +117,7 @@ struct AppointmentEditorView: View {
                                 Text(
                                     "\(model.draft.selectedHorseIDs.count) of \(model.eligibleHorses.count) selected"
                                 )
+                                .rollingStateText(value: "\(model.draft.selectedHorseIDs.count)-\(model.eligibleHorses.count)")
                                 .font(Typography.sectionHeading)
                                 .multilineTextAlignment(.trailing)
                                 .frame(maxWidth: .infinity, alignment: .trailing)
@@ -176,6 +174,9 @@ struct AppointmentEditorView: View {
                                         .font(.body)
                                         .accessibilityLabel("Expected Duration (minutes)")
                                         .accessibilityIdentifier("appointment-duration")
+                                        .onChange(of: model.draft.expectedDurationText) { previous, value in
+                                            model.draft.expectedDurationText = InputLimits.accepting(value, previous: previous, maximum: InputLimits.duration, rejectOverflow: true)
+                                        }
                                         .keyboardType(.numberPad)
                                         .focused($focusedField, equals: .duration)
                                 }
@@ -189,6 +190,7 @@ struct AppointmentEditorView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .frame(minHeight: SpacingTokens.minimumTouchTarget, alignment: .leading)
+                        .focusedInputAnchor(Field.duration)
                         .contentShape(.rect)
                         .simultaneousGesture(TapGesture().onEnded {
                             focusedField = .duration
@@ -203,34 +205,27 @@ struct AppointmentEditorView: View {
                                 .frame(minHeight: 88)
                                 .focused($focusedField, equals: .notes)
                                 .accessibilityLabel("Appointment Notes")
+                                .inputLimit($model.draft.notes, maximum: InputLimits.notes)
                         }
+                        .focusedInputAnchor(Field.notes)
                     }
                 } footer: {
                     appointmentRequirementGuidance
                 }
                 .listRowBackground(ColorTokens.surface)
             }
-            .environment(
-                \.defaultMinListRowHeight,
-                Layout.minimumRowHeight
-            )
-            .listSectionSpacing(.custom(SpacingTokens.recordSection))
+            .listSectionSpacing(.custom(SpacingTokens.section))
             .farrierFlowScrollBackground()
             .scrollDismissesKeyboard(.interactively)
             .disabled(!subscription.allowsMutations)
             .navigationTitle(model.appointmentID == nil ? "New Appointment" : "Edit Appointment")
             .toolbarTitleDisplayMode(.inline)
+            .keyboardDoneAccessory(isFocused: focusedField != nil, identifier: "appointment-keyboard-done") { focusedField = nil }
+            .keepFocusedInputVisible(focusedField)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                         .tint(ColorTokens.textSecondary)
-                }
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") { focusedField = nil }
-                        .font(.subheadline.weight(.semibold))
-                        .accessibilityHint("Dismisses the keyboard without saving")
-                        .accessibilityIdentifier("appointment-keyboard-done")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
@@ -239,6 +234,7 @@ struct AppointmentEditorView: View {
                             in: context,
                             analyticsClient: analyticsClient
                         ) {
+                            appointmentSaved()
                             onSaved?(appointmentID)
                             dismiss()
                         }
@@ -301,8 +297,15 @@ struct AppointmentEditorView: View {
             .accessibilityIdentifier("appointment-create-location")
         } label: {
             LabeledContent("Service Location") {
-                Text(verbatim: selectedBarnName)
-                    .foregroundStyle(ColorTokens.textSecondary)
+                HStack(spacing: SpacingTokens.compact) {
+                    Text(verbatim: selectedBarnName)
+                        .foregroundStyle(ColorTokens.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.caption)
+                        .foregroundStyle(ColorTokens.textSecondary)
+                        .accessibilityHidden(true)
+                }
             }
             .contentShape(.rect)
         }
@@ -350,7 +353,7 @@ struct AppointmentEditorView: View {
             }
             .accessibilityIdentifier("appointment-create-service")
         } label: {
-            Group {
+            HStack(spacing: SpacingTokens.compact) {
                 if dynamicTypeSize.isAccessibilitySize {
                     VStack(alignment: .leading, spacing: SpacingTokens.rowContent) {
                         Text(verbatim: horse.name)
@@ -368,7 +371,12 @@ struct AppointmentEditorView: View {
                             .foregroundStyle(ColorTokens.textPrimary)
                     }
                 }
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption)
+                    .foregroundStyle(ColorTokens.textSecondary)
+                    .accessibilityHidden(true)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(.rect)
         }
         .accessibilityLabel("Service for \(horse.name)")
@@ -403,6 +411,8 @@ struct AppointmentEditorView: View {
     @ViewBuilder
     private var appointmentRequirementGuidance: some View {
         switch model.saveRequirement {
+        case .notesTooLong:
+            Text("Maximum \(InputLimits.notes) characters.").font(.footnote)
         case .expectedDuration:
             Text("Enter a duration greater than zero, or leave it blank.")
                 .font(.footnote.weight(.semibold))

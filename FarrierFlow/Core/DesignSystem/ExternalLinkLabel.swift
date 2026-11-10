@@ -9,7 +9,7 @@ struct ExternalLinkLabel<Content: View>: View {
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: SpacingTokens.compact)
             Image(systemName: "arrow.up.right")
-                .font(.title3.weight(.semibold))
+                .font(.footnote.weight(.semibold))
                 .foregroundStyle(ColorTokens.textSecondary)
                 .accessibilityHidden(true)
         }

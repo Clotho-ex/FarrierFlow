@@ -7,13 +7,15 @@ nonisolated struct VisitHorseDraft: Equatable, Identifiable {
     var outcome: VisitOutcome
     var workNotes: String
     var workItems: [WorkItemDraft] = []
+    var plannedService: ServiceChoice? = nil
+    var plannedServiceIsArchived = false
 
     var hasRecordedOutcome: Bool {
         switch outcome {
         case .pending:
             false
         case .notServiced:
-            workItems.isEmpty && TextNormalization.optional(workNotes) == nil
+            workItems.isEmpty
         case .serviced:
             !workItems.isEmpty && WorkItemRules.violation(in: workItems) == nil
         }
@@ -41,9 +43,9 @@ nonisolated enum VisitRecordedTotal: Equatable {
 
 extension VisitDraft {
     var recordedTotal: VisitRecordedTotal {
-        let recordedHorses = horses.filter { $0.outcome == .serviced && !$0.workItems.isEmpty }
+        let recordedHorses = horses.filter { !$0.workItems.isEmpty }
         guard !recordedHorses.isEmpty else { return .none }
-        guard recordedHorses.allSatisfy(\.hasRecordedOutcome) else { return .unavailable }
+        guard recordedHorses.allSatisfy({ WorkItemRules.violation(in: $0.workItems) == nil }) else { return .unavailable }
         let items = recordedHorses.flatMap(\.workItems)
         guard let currency = items.first?.currencyCode,
               items.allSatisfy({ $0.currencyCode == currency }),

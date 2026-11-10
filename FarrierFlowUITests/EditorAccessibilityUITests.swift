@@ -158,7 +158,7 @@ final class EditorAccessibilityUITests: XCTestCase {
     }
 
     @MainActor
-    func testAppointmentServiceSelectionPersistsAfterRelaunchAndSeedsVisit() throws {
+    func testAppointmentServiceSelectionPersistsAfterRelaunchAsAnUnconfirmedPlan() throws {
         try verifyAppointmentServiceFlow(largeText: false)
     }
 
@@ -220,6 +220,10 @@ final class EditorAccessibilityUITests: XCTestCase {
         guard revealElement(start, in: app, towardTop: true) else { return }
         start.tap()
         XCTAssertTrue(app.navigationBars["Visit"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["visit-work-item-Atlas-Next Appointment Trim"].exists)
+        let record = app.buttons["visit-record-planned-Atlas"]
+        XCTAssertTrue(revealElement(record, in: app))
+        record.tap()
         XCTAssertTrue(revealElement(app.buttons["visit-work-item-Atlas-Next Appointment Trim"], in: app))
     }
 

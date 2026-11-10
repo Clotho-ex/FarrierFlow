@@ -10,24 +10,33 @@ final class ClientEditorModel {
     let clientID: PersistentIdentifier?
     var alert: FeatureAlert?
 
+    @ObservationIgnored private let region: String
+
     var canSave: Bool { draft.isValid }
 
-    init(client: Client? = nil) {
+    init(client: Client? = nil, locale: Locale = .autoupdatingCurrent) {
+        region = locale.region?.identifier ?? "ZZ"
         clientID = client?.persistentModelID
         draft = ClientDraft(
             name: client?.name ?? "",
-            phone: client?.phone ?? "",
+            phone: PhoneNumberFormatting.display(client?.phone ?? ""),
             email: client?.email ?? "",
             notes: client?.notes ?? ""
         )
         originalDraft = draft
     }
 
+    func formatPhone() {
+        guard draft.phone != originalDraft.phone else { return }
+        draft.phone = PhoneNumberFormatting.formattedInput(draft.phone, region: region)
+    }
+
     func save(
         in context: ModelContext,
         analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()
     ) -> PersistentIdentifier? {
-        guard let name = TextNormalization.required(draft.name) else { return nil }
+        guard draft.isValid, let name = TextNormalization.required(draft.name) else { return nil }
+        let phoneWasEdited = clientID == nil || draft.phone != originalDraft.phone
 
         let isCreating = clientID == nil
         do {
@@ -47,6 +56,10 @@ final class ClientEditorModel {
                     alert = DraftSaveRules.changedAlert
                     return nil
                 }
+                guard merged.isValid else {
+                    alert = DraftSaveRules.changedAlert
+                    return nil
+                }
                 draft = merged
                 client = existing
             } else {
@@ -55,7 +68,10 @@ final class ClientEditorModel {
             }
 
             client.name = TextNormalization.required(draft.name) ?? name
-            client.phone = TextNormalization.optional(draft.phone)
+            if phoneWasEdited {
+                client.phone = PhoneNumberFormatting.normalized(draft.phone, region: region)
+                    ?? TextNormalization.optional(draft.phone)
+            }
             client.email = TextNormalization.optional(draft.email)
             client.notes = TextNormalization.optional(draft.notes)
 

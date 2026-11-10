@@ -2,6 +2,150 @@ import XCTest
 
 final class InvoiceFlowUITests: XCTestCase {
     @MainActor
+    func testSelectAllTogglesSelectionAndTracksIndividualVisits() {
+        continueAfterFailure = false
+        let app = launch(storeName: "InvoiceSelectAll-\(UUID().uuidString)")
+        defer { app.terminate() }
+        let create = app.buttons["today-create-invoice-action"]
+        XCTAssertTrue(create.waitForExistence(timeout: 5))
+        create.tap()
+        let all = app.switches["invoice-select-all-action"]
+        let first = app.buttons["invoice-visit-choice-0"]
+        let second = app.buttons["invoice-visit-choice-1"]
+        XCTAssertTrue(all.waitForExistence(timeout: 5))
+        XCTAssertGreaterThanOrEqual(all.frame.height, 44)
+        XCTAssertTrue(second.exists)
+
+        all.tap()
+        XCTAssertEqual(all.value as? String, "Selected", app.debugDescription)
+        XCTAssertEqual(first.value as? String, "Selected")
+        XCTAssertEqual(second.value as? String, "Selected")
+        XCTAssertTrue(app.buttons["invoice-generate-action"].isEnabled)
+        XCTAssertTrue(accessibilityText(of: app.descendants(matching: .any)["invoice-selection-visit-count"].firstMatch).contains("2"))
+        let selected = XCTAttachment(screenshot: app.screenshot())
+        selected.name = "Create Invoice all selected"
+        selected.lifetime = .keepAlways
+        add(selected)
+
+        all.tap()
+        XCTAssertEqual(all.value as? String, "Not selected")
+        XCTAssertEqual(first.value as? String, "Not selected")
+        XCTAssertEqual(second.value as? String, "Not selected")
+        XCTAssertFalse(app.buttons["invoice-generate-action"].isEnabled)
+        XCTAssertTrue(accessibilityText(of: app.descendants(matching: .any)["invoice-selection-visit-count"].firstMatch).contains("0"))
+        let cleared = XCTAttachment(screenshot: app.screenshot())
+        cleared.name = "Create Invoice all deselected"
+        cleared.lifetime = .keepAlways
+        add(cleared)
+
+        first.tap()
+        XCTAssertEqual(all.value as? String, "Not selected")
+        XCTAssertEqual(first.value as? String, "Selected")
+        XCTAssertEqual(second.value as? String, "Not selected")
+        all.tap()
+        XCTAssertEqual(second.value as? String, "Selected")
+        second.tap()
+        XCTAssertEqual(second.value as? String, "Not selected")
+        all.tap()
+        XCTAssertEqual(second.value as? String, "Selected")
+        all.tap()
+        XCTAssertFalse(app.buttons["invoice-generate-action"].isEnabled)
+    }
+
+    @MainActor
+    func testSelectAllIsHiddenWithOneEligibleVisit() {
+        continueAfterFailure = false
+        let app = launch(storeName: "InvoiceSingleVisit-\(UUID().uuidString)")
+        defer { app.terminate() }
+        let create = app.buttons["today-create-invoice-action"]
+        XCTAssertTrue(create.waitForExistence(timeout: 5))
+        create.tap()
+        XCTAssertTrue(app.switches["invoice-select-all-action"].waitForExistence(timeout: 5))
+        let first = app.buttons["invoice-visit-choice-0"]
+        if first.value as? String != "Selected" { first.tap() }
+        app.buttons["invoice-generate-action"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["invoice-detail-0001"].waitForExistence(timeout: 5))
+
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(create.waitForExistence(timeout: 5))
+        create.tap()
+        XCTAssertTrue(first.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["invoice-visit-choice-1"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["invoice-select-all-action"].exists)
+        if first.value as? String == "Selected" { first.tap() }
+        XCTAssertFalse(app.buttons["invoice-generate-action"].isEnabled)
+        first.tap()
+        XCTAssertEqual(first.value as? String, "Selected")
+        XCTAssertTrue(app.buttons["invoice-generate-action"].isEnabled)
+        let capture = XCTAttachment(screenshot: app.screenshot())
+        capture.name = "Create Invoice with one visit and no Select All"
+        capture.lifetime = .keepAlways
+        add(capture)
+    }
+
+    @MainActor
+    func testSelectAllToggleAtLargestTextInDarkMode() {
+        continueAfterFailure = false
+        let app = launch(
+            storeName: "InvoiceSelectAllLarge-\(UUID().uuidString)",
+            preferredContentSizeCategory: "UICTContentSizeCategoryAccessibilityXXXL",
+            colorScheme: "dark"
+        )
+        defer { app.terminate() }
+        let create = app.buttons["today-create-invoice-action"]
+        XCTAssertTrue(create.waitForExistence(timeout: 5))
+        create.tap()
+        let all = app.switches["invoice-select-all-action"]
+        XCTAssertTrue(all.waitForExistence(timeout: 5))
+        XCTAssertTrue(all.isHittable)
+        all.tap()
+        XCTAssertEqual(all.value as? String, "Selected")
+        XCTAssertTrue(app.buttons["invoice-generate-action"].isEnabled)
+        let selected = XCTAttachment(screenshot: app.screenshot())
+        selected.name = "Create Invoice native selection at largest text dark"
+        selected.lifetime = .keepAlways
+        add(selected)
+        all.tap()
+        XCTAssertEqual(all.value as? String, "Not selected")
+        XCTAssertFalse(app.buttons["invoice-generate-action"].isEnabled)
+    }
+
+    @MainActor
+    func testShortInvoiceDeletionConfirmationCancelsWithoutChangingInvoice() {
+        continueAfterFailure = false
+        let app = launch(storeName: "InvoiceDeleteCopy-\(UUID().uuidString)")
+        defer { app.terminate() }
+        let create = app.buttons["today-create-invoice-action"]
+        XCTAssertTrue(create.waitForExistence(timeout: 5))
+        create.tap()
+        let first = app.buttons["invoice-visit-choice-0"]
+        XCTAssertTrue(first.waitForExistence(timeout: 5))
+        selectAllVisits(firstVisit: first, in: app)
+        app.buttons["invoice-generate-action"].tap()
+        let more = app.buttons["invoice-more-actions"]
+        XCTAssertTrue(more.waitForExistence(timeout: 5))
+        more.tap()
+        let delete = app.buttons["invoice-delete-action"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 5))
+        delete.tap()
+        let alert = app.alerts["Delete Invoice?"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 5))
+        XCTAssertTrue(alert.staticTexts.matching(NSPredicate(
+            format: "label CONTAINS %@",
+            "Any recorded payment will also be deleted. Your work and photos will stay."
+        )).firstMatch.exists)
+        let capture = XCTAttachment(screenshot: app.screenshot())
+        capture.name = "Short invoice deletion confirmation"
+        capture.lifetime = .keepAlways
+        add(capture)
+        alert.buttons["Cancel"].tap()
+        XCTAssertTrue(alert.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["invoice-detail-0001"].exists)
+        XCTAssertTrue(accessibilityText(of: app.descendants(matching: .any)["invoice-detail-total"]).contains("$100.00"))
+    }
+
+    @MainActor
     func testMarkUnpaidKeepsConfirmationCancellationAndPersistence() {
         verifyMarkUnpaid(colorScheme: "light")
     }
@@ -56,7 +200,7 @@ final class InvoiceFlowUITests: XCTestCase {
         let confirmation = app.alerts["Mark Invoice Unpaid?"]
         XCTAssertTrue(confirmation.waitForExistence(timeout: 3))
         XCTAssertTrue(confirmation.staticTexts[
-            "This removes the recorded payment and makes the invoice outstanding again."
+            "This clears the recorded payment and marks the invoice as unpaid."
         ].exists)
         let confirmationCapture = XCTAttachment(screenshot: app.screenshot())
         confirmationCapture.name = "Neutral payment reversal confirmation \(colorScheme)"
@@ -493,12 +637,16 @@ final class InvoiceFlowUITests: XCTestCase {
         storeName: String,
         preferredContentSizeCategory: String? = nil,
         currencyCode: String = "USD",
-        localeIdentifier: String = "en_US"
+        localeIdentifier: String = "en_US",
+        colorScheme: String? = nil
     ) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] = storeName
         app.launchEnvironment["FARRIERFLOW_UI_TEST_SCENARIO"] = "invoice-ready"
         app.launchEnvironment["FARRIERFLOW_UI_TEST_BUSINESS_CURRENCY"] = currencyCode
+        if let colorScheme {
+            app.launchEnvironment["FARRIERFLOW_UI_TEST_COLOR_SCHEME"] = colorScheme
+        }
         app.launchArguments = [
             "-AppleLanguages", "(en)",
             "-AppleLocale", localeIdentifier,
@@ -539,14 +687,12 @@ final class InvoiceFlowUITests: XCTestCase {
         firstVisit: XCUIElement,
         in app: XCUIApplication
     ) {
-        let selectAll = app.buttons["invoice-select-all-action"]
-        for _ in 0..<2 {
+        let selectAll = app.switches["invoice-select-all-action"]
+        if selectAll.value as? String != "Selected" {
             selectAll.tap()
-            if firstVisit.value as? String == "Selected" {
-                return
-            }
         }
-        XCTFail("Select All did not select the eligible Visits")
+        XCTAssertEqual(selectAll.value as? String, "Selected")
+        XCTAssertEqual(firstVisit.value as? String, "Selected")
     }
 
     @MainActor

@@ -49,9 +49,6 @@ struct TodayView: View {
             }
             .sheet(item: $presentedSheet, onDismiss: handleSheetDismissal) { sheet in
                 switch sheet {
-                case .stop(let stop):
-                    StopDetailsSheet(stop: stop)
-                        .dynamicTypeSize(dynamicTypeSize)
                 case .appointment:
                     AppointmentEditorView()
                 case .client:
@@ -255,11 +252,13 @@ struct TodayView: View {
     private func stopSection(_ stops: [TodayStopSummary], title: LocalizedStringResource?) -> some View {
         if !stops.isEmpty {
             Section {
-                ForEach(stops) { stop in
-                    Button {
-                        presentedSheet = .stop(stop)
-                    } label: {
-                        TodayStopRow(stop: stop)
+                ForEach(stops.flatMap(\.appointments)) { appointment in
+                    NavigationLink(value: TodayRoute.appointment(appointment.id)) {
+                        TodayStopRow(stop: TodayStopSummary(
+                            id: .init(serviceLocationID: appointment.serviceLocationID,
+                                      startDate: appointment.startDate, state: appointment.state),
+                            appointments: [appointment]
+                        ))
                             .foregroundStyle(ColorTokens.textPrimary)
                     }
                     .buttonStyle(.automatic)
@@ -269,11 +268,11 @@ struct TodayView: View {
                 }
             } header: {
                 if let title {
-                    stopSectionHeader(title: title, count: stops.count)
+                    stopSectionHeader(title: title, count: stops.reduce(0) { $0 + $1.appointments.count })
                 } else {
                     stopSectionHeader(
                         title: model.remainingSectionTitle(at: scheduleNow ?? appClock.now()),
-                        count: stops.count
+                        count: stops.reduce(0) { $0 + $1.appointments.count }
                     )
                 }
             }
@@ -317,11 +316,15 @@ struct TodayView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(title).recordSectionHeading()
                 Spacer()
-                Text("\(count) stops").font(.subheadline)
+                Text("\(count) appointments")
+                    .font(.subheadline)
+                    .rollingStateText(value: count)
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text(title).recordSectionHeading()
-                Text("\(count) stops").font(.subheadline)
+                Text("\(count) appointments")
+                    .font(.subheadline)
+                    .rollingStateText(value: count)
             }
         }
         .foregroundStyle(ColorTokens.textSecondary)
@@ -351,9 +354,7 @@ struct TodayView: View {
         case .openAppointment(let appointment):
             Section {
                 Button {
-                    if let stop = model.featuredStop {
-                        presentedSheet = .stop(stop)
-                    }
+                    path.append(TodayRoute.appointment(appointment.id))
                 } label: {
                     TodayRunSheetBand(state: .scheduled(appointment, model.featuredStop), now: scheduleNow ?? appClock.now())
                 }
@@ -432,6 +433,10 @@ struct TodayView: View {
             ) { invoiceID in
                 if path.count > 0 { path.removeLast() }
                 path.append(TodayRoute.invoice(invoiceID))
+            }
+        case .appointment(let id):
+            AppointmentDetailView(appointmentID: id) {
+                if path.count > 0 { path.removeLast() }
             }
         case .invoice(let id):
             InvoiceDetailView(invoiceID: id)
@@ -539,6 +544,7 @@ private enum TodayRoute: Hashable {
         clientID: PersistentIdentifier,
         visitID: PersistentIdentifier
     )
+    case appointment(PersistentIdentifier)
     case invoice(PersistentIdentifier)
     case visit(PersistentIdentifier)
 }
@@ -579,7 +585,7 @@ private struct TodayStopRow: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(stop.id.startDate.formatted(date: .omitted, time: .shortened)), \(stop.appointments.first?.serviceLocationName ?? "")")
         .accessibilityValue("\(metadataText), \(stop.horseNames.formatted(.list(type: .and)))")
-        .accessibilityHint("Opens stop details.")
+        .accessibilityHint("Opens the appointment.")
     }
 
     private var timeText: some View {
@@ -654,37 +660,39 @@ private struct TodayRunSheetBand: View {
             recordDetails(
                 location: appointment.serviceLocationName,
                 address: appointment.serviceLocationAddress,
-                horseNames: stop?.horseNames ?? appointment.horseNames
+                horseNames: stop?.horseNames ?? appointment.horseNames,
+                actionTitle: "Open Appointment"
             )
-            Label("Open Stop", systemImage: "arrow.right")
-                .font(.headline)
-                .foregroundStyle(ColorTokens.brandActionText)
+            if !dynamicTypeSize.isAccessibilitySize {
+                actionLabel("Open Appointment")
+            }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(String(localized: appointment.heading(at: now))), \(appointment.serviceLocationName)")
         .accessibilityValue(scheduledAccessibilityValue(appointment, horseNames: stop?.horseNames ?? appointment.horseNames))
-        .accessibilityHint("Opens stop details.")
+        .accessibilityHint("Opens the appointment.")
     }
 
     private func activeContent(_ visit: TodayVisitSummary) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            statusHeader(title: "Continue Visit", status: "In Progress", tone: .active)
+            if dynamicTypeSize.isAccessibilitySize {
+                RecordStatusPill(title: "In Progress", tone: .active)
+            } else {
+                statusHeader(title: "Continue Visit", status: "In Progress", tone: .active)
+            }
             recordDetails(
                 location: visit.serviceLocationName,
                 address: visit.serviceLocationAddress,
-                horseNames: visit.horseNames
+                horseNames: visit.horseNames,
+                actionTitle: activeActionLabel
             )
-            ProgressView(
-                value: Double(visit.resolvedHorseCount),
-                total: Double(visit.totalHorseCount)
-            )
-            .tint(ColorTokens.brandActionText)
-            Text("\(visit.resolvedHorseCount) of \(visit.totalHorseCount) horses recorded")
+            Text("\(visit.recordedServiceCount) services recorded")
+                .rollingStateText(value: visit.recordedServiceCount)
                 .font(.subheadline)
                 .monospacedDigit()
-            Label(activeActionLabel, systemImage: "arrow.right")
-                .font(.headline)
-                .foregroundStyle(ColorTokens.brandActionText)
+            if !dynamicTypeSize.isAccessibilitySize {
+                actionLabel(activeActionLabel)
+            }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Visit in progress, \(visit.serviceLocationName)")
@@ -705,12 +713,14 @@ private struct TodayRunSheetBand: View {
         if dynamicTypeSize.isAccessibilitySize {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
+                    .rollingStateText(value: String(localized: title))
                     .font(.headline)
                 RecordStatusPill(title: status, tone: tone)
             }
         } else {
             HStack(alignment: .firstTextBaseline) {
                 Text(title)
+                    .rollingStateText(value: String(localized: title))
                     .font(.headline)
                 Spacer()
                 RecordStatusPill(title: status, tone: tone)
@@ -718,16 +728,27 @@ private struct TodayRunSheetBand: View {
         }
     }
 
-    private var activeActionLabel: String {
+    private var activeActionLabel: LocalizedStringKey {
         subscription.allowsMutations ? "Resume Visit" : "View Visit"
+    }
+
+    private func actionLabel(_ title: LocalizedStringKey) -> some View {
+        Label(title, systemImage: "arrow.right")
+            .font(.headline)
+            .foregroundStyle(ColorTokens.brandActionText)
     }
 
     private func recordDetails(
         location: String,
         address: String?,
-        horseNames: [String]
+        horseNames: [String],
+        actionTitle: LocalizedStringKey
     ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
+            if dynamicTypeSize.isAccessibilitySize {
+                actionLabel(actionTitle)
+                    .padding(.bottom, SpacingTokens.compact)
+            }
             Text(location)
                 .font(.title3.weight(.semibold))
             if let address {
@@ -761,8 +782,8 @@ private struct TodayRunSheetBand: View {
 
     private func activeAccessibilityValue(_ visit: TodayVisitSummary) -> String {
         let progress = String(
-            localized: "\(visit.resolvedHorseCount) of \(visit.totalHorseCount) horses recorded",
-            comment: "VoiceOver progress for horses recorded during the active visit."
+            localized: "\(visit.recordedServiceCount) services recorded",
+            comment: "Number of saved service entries in the active visit."
         )
         return [
             progress,
@@ -786,7 +807,6 @@ private func todayHorseSummaryText(_ horseNames: [String]) -> String {
 }
 
 private enum TodaySheet: Identifiable {
-    case stop(TodayStopSummary)
     case appointment
     case client
     case horse(PersistentIdentifier?)
@@ -795,8 +815,6 @@ private enum TodaySheet: Identifiable {
 
     var id: String {
         switch self {
-        case .stop(let stop):
-            "stop-\(String(describing: stop.id))"
         case .appointment:
             "appointment"
         case .client:

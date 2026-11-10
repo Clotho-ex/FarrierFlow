@@ -4,6 +4,7 @@ import SwiftData
 nonisolated enum ServiceRulesError: Error, Equatable {
     case nameRequired
     case invalidPrice
+    case inputTooLong
     case unsupportedCurrency
 }
 
@@ -14,6 +15,10 @@ nonisolated enum ServiceRules {
     ) throws -> ServiceValues {
         guard let name = TextNormalization.required(draft.name) else {
             throw ServiceRulesError.nameRequired
+        }
+        guard InputLimits.fits(draft.name, maximum: InputLimits.name),
+              InputLimits.fits(draft.priceInput, maximum: InputLimits.price) else {
+            throw ServiceRulesError.inputTooLong
         }
         let currencyCode = draft.currencyCode.uppercased()
         guard BusinessCurrency.isSupported(currencyCode) else {

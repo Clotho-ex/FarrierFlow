@@ -123,6 +123,7 @@ struct BackupSyncView: View {
                         } label: {
                             Text(InvoiceHistoryCopy.localOnly)
                             Text(localHistoryCount, format: .number)
+                                .rollingStateText(value: localHistoryCount)
                                 .foregroundStyle(ColorTokens.textSecondary)
                         }
                     }
@@ -207,6 +208,7 @@ struct BackupSyncView: View {
             titleVisibility: .visible) {
                 Button(BackupSyncCopy.deleteCloudAccount, role: .destructive) { authorizesCloudDeletion = true }
             } message: { Text(BackupSyncCopy.deletionConfirmation) }
+        .tint(.primary)
         .sheet(isPresented: $authorizesCloudDeletion, onDismiss: {
             if model?.deletion?.state == .awaitingApple {
                 Task { await model?.cancelCloudDeletion() }
@@ -399,6 +401,7 @@ struct BackupSyncView: View {
                             } label: {
                                 Text(BackupSyncCopy.pendingBillingHold)
                                 Text(status.pendingBillingHoldCount, format: .number)
+                                    .rollingStateText(value: status.pendingBillingHoldCount)
                                     .foregroundStyle(ColorTokens.textSecondary)
                             }
                         }
@@ -552,9 +555,11 @@ private struct BackupStatusPill: View {
                 .accessibilityHidden(true)
             if let identifier {
                 Text(title)
+                    .rollingStateText(value: String(localized: title))
                     .accessibilityIdentifier(identifier)
             } else {
                 Text(title)
+                    .rollingStateText(value: String(localized: title))
             }
         }
         .font(.caption2.weight(.semibold))
@@ -591,18 +596,14 @@ private struct BackupSummaryStatusRow: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: BackupSyncLayout.subtitleGap) {
                 Text(title)
+                    .rollingStateText(value: String(localized: title))
                     .font(.headline)
                     .foregroundStyle(ColorTokens.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
-                if let lastSuccessfulSync {
-                    Text(lastSyncMessage(lastSuccessfulSync))
+                Text(lastSuccessfulSync.map(lastSyncMessage) ?? BackupSyncCopy.noSyncYet)
+                    .rollingStateText(value: lastSuccessfulSync)
                     .font(.subheadline)
                     .foregroundStyle(ColorTokens.textSecondary)
-                } else {
-                    Text(BackupSyncCopy.noSyncYet)
-                        .font(.subheadline)
-                        .foregroundStyle(ColorTokens.textSecondary)
-                }
             }
         }
         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
@@ -638,6 +639,7 @@ private struct BackupDeviceRow: View {
                 .frame(width: BackupSyncLayout.symbolSide, height: BackupSyncLayout.symbolSide)
                 .accessibilityHidden(true)
             Text(isThisIPhone ? BackupSyncCopy.invoicingHere : BackupSyncCopy.invoicingElsewhere)
+                .rollingStateText(value: isThisIPhone)
                 .foregroundStyle(ColorTokens.textPrimary)
             Spacer(minLength: BackupSyncLayout.contentGap)
             Image(systemName: isThisIPhone ? "checkmark.circle" : "exclamationmark.triangle")
@@ -707,6 +709,7 @@ private struct BackupProtectionProgressRow: View {
                     ? completeValue
                     : BackupSyncCopy.counts(protected: protectedCount, total: totalCount, locale: locale)
             )
+                .rollingStateText(value: "\(isComplete)-\(protectedCount)-\(totalCount)")
                 .font(.subheadline)
                 .monospacedDigit()
                 .foregroundStyle(ColorTokens.textSecondary)
@@ -763,7 +766,6 @@ private struct CloudDeletionAuthorizationSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    Text(BackupSyncCopy.deletionConfirmation)
                     Text(BackupSyncCopy.deletionRetention)
                         .accessibilityIdentifier("backup-sync-deletion-retention")
                 }
@@ -824,7 +826,7 @@ enum BackupSyncCopy {
     static let invoiceRecoveryTitle = LocalizedStringResource("backupSync.recovery.title", defaultValue: "Review Invoice History")
     static let invoiceRecoveryExplanation = LocalizedStringResource("backupSync.recovery.explanation", defaultValue: "Keep these invoices on this iPhone to continue syncing.")
     static let invoiceRecoveryContinue = LocalizedStringResource("backupSync.recovery.continue", defaultValue: "Keep History & Continue")
-    static let invoiceRecoveryConfirmation = LocalizedStringResource("backupSync.recovery.confirmation", defaultValue: "Original invoices stay on this iPhone only. Their numbers and payment details will not change. Export PDFs for a separate copy. Safe records can then sync.")
+    static let invoiceRecoveryConfirmation = LocalizedStringResource("backupSync.recovery.confirmation", defaultValue: "Invoices stay on this iPhone only, with unchanged numbers and payments. Export PDFs for another copy. Safe records can sync.")
     static let invoiceRecoveryFailure = LocalizedStringResource("backupSync.recovery.failure", defaultValue: "Recovery could not be confirmed. Your original invoices and pending changes are kept. Save any open edits, reconnect and review again. Different currencies or incompatible histories cannot be merged.")
     static let loadingReview = LocalizedStringResource("backupSync.recovery.loading", defaultValue: "Loading cloud history…")
     static let keepLocalSettings = LocalizedStringResource("backupSync.recovery.keepLocalSettings", defaultValue: "Keep iPhone Settings")
@@ -835,15 +837,15 @@ enum BackupSyncCopy {
     static let activeProtected = LocalizedStringResource("backupSync.activeProtected", defaultValue: "Current data is backed up")
     static let updateRequired = LocalizedStringResource("backupSync.updateRequired", defaultValue: "Update App to Sync")
     static let deleteCloudAccount = LocalizedStringResource("backupSync.deletion.title", defaultValue: "Delete Cloud Account")
-    static let deleteCloudQuestion = LocalizedStringResource("backupSync.deletion.question", defaultValue: "Permanently delete your cloud account?")
-    static let deletionConfirmation = LocalizedStringResource("backupSync.deletion.confirmation", defaultValue: "This permanently removes your FarrierFlow cloud account, backed-up business records and cloud photos. Other iPhones lose access. This cannot be undone.")
-    static let deletionRetention = LocalizedStringResource("backupSync.deletion.retention", defaultValue: "Records and photos already on this iPhone are kept. Deleting your cloud account does not cancel your App Store subscription.")
+    static let deleteCloudQuestion = LocalizedStringResource("backupSync.deletion.question", defaultValue: "Delete your cloud account?")
+    static let deletionConfirmation = LocalizedStringResource("backupSync.deletion.confirmation", defaultValue: "Your cloud account and backups will be deleted. Records and photos on this iPhone will stay. Other iPhones will lose access.")
+    static let deletionRetention = LocalizedStringResource("backupSync.deletion.retention", defaultValue: "Your records and photos will stay on this iPhone. This won’t cancel your App Store subscription.")
     static let deletionAppleExplanation = LocalizedStringResource("backupSync.deletion.apple", defaultValue: "Confirm with the same Apple account.")
     static let deletionLocalOnly = LocalizedStringResource("backupSync.deletion.localOnly", defaultValue: "Local records are kept. Backup is off.")
     static let deletionComplete = LocalizedStringResource("backupSync.deletion.complete", defaultValue: "Cloud account deletion is complete. Your records and photos on this iPhone have been kept.")
     static let deletionPending = LocalizedStringResource("backupSync.deletion.pending", defaultValue: "Your cloud account deletion is in progress. Sync has stopped. The server will retry unfinished cleanup.")
     static let deletionSubmitting = LocalizedStringResource("backupSync.deletion.submitting", defaultValue: "Requesting cloud account deletion…")
-    static let deletionAwaitingApple = LocalizedStringResource("backupSync.deletion.awaitingApple", defaultValue: "Deletion has not been sent. Continue with Apple to confirm, or cancel to keep your cloud account.")
+    static let deletionAwaitingApple = LocalizedStringResource("backupSync.deletion.awaitingApple", defaultValue: "Continue with Apple to delete your cloud account, or cancel to keep it.")
     static let checkDeletion = LocalizedStringResource("backupSync.deletion.check", defaultValue: "Check Deletion Progress")
     static let retryDeletion = LocalizedStringResource("backupSync.deletion.retry", defaultValue: "Retry with Apple")
     static let cancelDeletion = LocalizedStringResource("backupSync.deletion.cancel", defaultValue: "Cancel Deletion")
@@ -854,7 +856,7 @@ enum BackupSyncCopy {
     static let invoicingElsewhere = LocalizedStringResource("backupSync.invoicing.elsewhere", defaultValue: "Another iPhone")
     static let invoicingExplanation = LocalizedStringResource("backupSync.invoicing.explanation", defaultValue: "Only one iPhone creates invoices, so offline invoice numbers do not collide. A replacement iPhone can take over while online.")
     static let takeOverInvoicing = LocalizedStringResource("backupSync.invoicing.takeOver", defaultValue: "Make This My Invoicing iPhone")
-    static let takeOverConfirmation = LocalizedStringResource("backupSync.invoicing.confirmation", defaultValue: "This requires an internet connection. The other iPhone will stop creating invoices when it next syncs. Any invoices it issued while offline are kept for review, not silently renumbered.")
+    static let takeOverConfirmation = LocalizedStringResource("backupSync.invoicing.confirmation", defaultValue: "Requires an internet connection. The other iPhone stops invoicing at its next sync. Offline invoices keep their numbers for review.")
     static let continueLocally = LocalizedStringResource("backupSync.continueLocally", defaultValue: "Continue Without Signing In")
     static func counts(protected: Int, total: Int, locale: Locale) -> LocalizedStringResource {
         LocalizedStringResource("backupSync.counts", defaultValue: "\(protected.formatted(.number.locale(locale))) of \(total.formatted(.number.locale(locale)))")
@@ -882,7 +884,7 @@ enum BackupSyncCopy {
     }
     static let reviewTitle = LocalizedStringResource("backupSync.review.title", defaultValue: "Review Changes")
     static let reviewExplanation = LocalizedStringResource("backupSync.review.explanation", defaultValue: "Choose the version to keep. Both versions are kept until you confirm.")
-    static let reviewConfirmation = LocalizedStringResource("backupSync.review.confirmation", defaultValue: "Your choices replace the conflicting versions. Records with different IDs are not combined, and issued invoices are not renumbered.")
+    static let reviewConfirmation = LocalizedStringResource("backupSync.review.confirmation", defaultValue: "Your choices replace conflicting versions. Other records aren’t merged, and invoice numbers stay unchanged.")
     static let relatedReview = LocalizedStringResource("backupSync.review.related", defaultValue: "These histories could not be combined safely. No records have been replaced. Overlapping business settings or issued invoice numbers need review before sync can continue.")
     static let reviewFailure = LocalizedStringResource("backupSync.review.failure", defaultValue: "The changes could not be applied safely. Save or cancel any open edit, then reload and review all related records. No choices have been applied.")
     static let noConflicts = LocalizedStringResource("backupSync.review.none", defaultValue: "There are no conflicting changes to review.")
@@ -928,6 +930,6 @@ enum BackupSyncCopy {
     static let signInFailure = LocalizedStringResource("backupSync.signInFailure.message", defaultValue: "Your records are still on this iPhone. Try signing in again when you have an internet connection.")
     static let signOut = LocalizedStringResource("backupSync.signOut", defaultValue: "Sign Out")
     static let signOutQuestion = LocalizedStringResource("backupSync.signOut.question", defaultValue: "Stop syncing this iPhone?")
-    static let signOutExplanation = LocalizedStringResource("backupSync.signOut.explanation", defaultValue: "Signing out stops cloud backup and sync on this iPhone. Your local records and existing cloud backup are kept. Other iPhones stay signed in.")
+    static let signOutExplanation = LocalizedStringResource("backupSync.signOut.explanation", defaultValue: "Stops backup and sync on this iPhone. Local records and cloud backups stay; other iPhones remain signed in.")
     static let unconfirmedSignOut = LocalizedStringResource("backupSync.signOut.unconfirmed", defaultValue: "Sync has stopped, but sign-out could not be confirmed. Connect to the internet and retry signing out.")
 }

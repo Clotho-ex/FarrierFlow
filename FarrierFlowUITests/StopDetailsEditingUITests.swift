@@ -2,17 +2,16 @@ import XCTest
 
 final class StopDetailsEditingUITests: XCTestCase {
     @MainActor
-    func testDeleteConfirmationFitsContentsAndCancelPreservesAppointment() {
+    func testNativeDeleteConfirmationCancelPreservesAppointment() {
         let app = launch("CompactDelete-\(UUID().uuidString)")
         defer { app.terminate() }
         app.tabBars.buttons["Schedule"].tap()
         openSchedulePeanut(in: app)
         openDeletion(in: app)
-        let sheet = app.scrollViews["appointment-delete-sheet"]
+        let alert = app.alerts["Delete Appointment?"]
         let cancel = app.buttons["Cancel"]
         XCTAssertTrue(cancel.isHittable)
-        XCTAssertLessThan(sheet.frame.height, app.frame.height * 0.48)
-        XCTAssertLessThan(sheet.frame.maxY - cancel.frame.maxY, 65)
+        XCTAssertTrue(alert.exists)
         capture(app, "Delete confirmation fits standard text")
         cancel.tap()
         XCTAssertTrue(app.navigationBars["Appointment"].waitForExistence(timeout: 3))
@@ -28,29 +27,27 @@ final class StopDetailsEditingUITests: XCTestCase {
             if app.buttons["today-stop-row"].exists { break }
             app.swipeUp()
         }
-        app.buttons["today-stop-row"].tap()
-        XCTAssertTrue(app.navigationBars["Stop Details"].waitForExistence(timeout: 3))
         openAppointment("Peanut", in: app)
         openDeletion(in: app)
-        let sheet = app.scrollViews["appointment-delete-sheet"]
-        XCTAssertGreaterThan(sheet.frame.height, app.frame.height * 0.5)
+        let alert = app.alerts["Delete Appointment?"]
+        XCTAssertTrue(alert.exists)
         let cancel = app.buttons["Cancel"]
         reveal(cancel, in: app)
         XCTAssertTrue(cancel.isHittable)
         capture(app, "Delete confirmation accommodates largest text")
-        let confirm = app.buttons["appointment-delete-confirmation"]
+        let confirm = app.buttons["appointment-delete-confirmation"].firstMatch
         reveal(confirm, in: app)
         confirm.tap()
-        XCTAssertTrue(app.navigationBars["Stop Details"].waitForExistence(timeout: 3))
-        XCTAssertEqual(app.buttons.matching(identifier: "today-stop-appointment").count, 1)
-        XCTAssertTrue(app.buttons["today-stop-appointment"].label.contains("Thunder"))
+        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 3))
+        XCTAssertEqual(app.buttons.matching(identifier: "today-stop-row").count, 1)
+        XCTAssertTrue((app.buttons["today-stop-row"].value as? String)?.contains("Thunder") == true)
     }
 
     @MainActor
     private func openDeletion(in app: XCUIApplication) {
         app.buttons["appointment-actions-menu"].tap()
         app.buttons["appointment-delete-action"].tap()
-        XCTAssertTrue(app.buttons["appointment-delete-confirmation"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["appointment-delete-confirmation"].firstMatch.waitForExistence(timeout: 3))
     }
 
     @MainActor
@@ -69,15 +66,13 @@ final class StopDetailsEditingUITests: XCTestCase {
         let savedNotes = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Saved from Schedule")).firstMatch
         XCTAssertTrue(savedNotes.waitForExistence(timeout: 3))
         app.tabBars.buttons["Today"].tap()
-        openOldBarn(in: app)
         openAppointment("Peanut", in: app)
         XCTAssertTrue(savedNotes.waitForExistence(timeout: 3))
         openEditor(in: app)
         reveal(notes, in: app)
         XCTAssertEqual(notes.value as? String, "Saved from Schedule")
         app.navigationBars["Edit Appointment"].buttons["Cancel"].tap()
-        app.navigationBars.buttons["Stop Details"].tap()
-        app.buttons["stop-details-close"].tap()
+        app.navigationBars.buttons["Today"].tap()
         XCTAssertTrue(app.tabBars.buttons["Today"].isSelected)
     }
 
@@ -85,16 +80,14 @@ final class StopDetailsEditingUITests: XCTestCase {
     func testVisitStartFromStopPreservesAppointmentNavigationAndRelationships() {
         let app = launch("VisitFromStop-\(UUID().uuidString)")
         defer { app.terminate() }
-        openOldBarn(in: app)
         openAppointment("Peanut", in: app)
         app.buttons["visit-start-action"].tap()
         XCTAssertTrue(app.buttons["visit-save-progress"].waitForExistence(timeout: 3))
-        app.buttons["Cancel"].tap()
+        app.buttons["visit-close"].tap()
         XCTAssertTrue(app.buttons["visit-resume-action"].waitForExistence(timeout: 3))
-        app.navigationBars.buttons["Stop Details"].tap()
-        XCTAssertEqual(app.buttons.matching(identifier: "today-stop-appointment").count, 1)
-        XCTAssertTrue(app.buttons["today-stop-appointment"].label.contains("Thunder"))
-        app.buttons["stop-details-close"].tap()
+        app.navigationBars.buttons["Today"].tap()
+        XCTAssertEqual(app.buttons.matching(identifier: "today-stop-row").count, 1)
+        XCTAssertTrue((app.buttons["today-stop-row"].value as? String)?.contains("Thunder") == true)
         XCTAssertTrue(app.buttons["today-run-sheet-active"].waitForExistence(timeout: 3))
         app.tabBars.buttons["Schedule"].tap()
         openSchedulePeanut(in: app)
@@ -110,9 +103,6 @@ final class StopDetailsEditingUITests: XCTestCase {
         app.buttons["appointment-row-Chestnut Barn"].tap()
         XCTAssertTrue(app.navigationBars["Appointment"].waitForExistence(timeout: 3))
         app.tabBars.buttons["Today"].tap()
-        openOldBarn(in: app)
-        capture(app, "Native Stop Details medium light")
-        XCTAssertFalse(app.buttons["appointment-edit-action"].exists)
         openAppointment("Peanut", in: app)
         openEditor(in: app)
         XCTAssertEqual(app.buttons["appointment-barn-picker"].value as? String, "The Old Barn")
@@ -130,14 +120,13 @@ final class StopDetailsEditingUITests: XCTestCase {
         app.buttons["appointment-keyboard-done"].tap()
         app.navigationBars["Edit Appointment"].buttons["Save"].tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Saved through the shared editor")).firstMatch.waitForExistence(timeout: 3))
-        app.navigationBars.buttons["Stop Details"].tap()
-        let choices = app.buttons.matching(identifier: "today-stop-appointment")
+        app.navigationBars.buttons["Today"].tap()
+        let choices = app.buttons.matching(identifier: "today-stop-row")
         XCTAssertEqual(choices.count, 2)
-        XCTAssertTrue(choices.matching(NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "Peanut", "Thunder")).firstMatch.exists)
-        capture(app, "Stop Details refreshed after shared editor save")
-        app.buttons["stop-details-close"].tap()
+        XCTAssertTrue(choices.matching(NSPredicate(format: "value CONTAINS %@ AND value CONTAINS %@", "Peanut", "Thunder")).firstMatch.exists)
+        capture(app, "Today refreshed after shared editor save")
         XCTAssertTrue(app.tabBars.buttons["Today"].isSelected)
-        XCTAssertEqual(app.buttons["today-stop-row"].value as? String, "2 horses · Scheduled, Peanut and Thunder")
+        XCTAssertTrue(app.buttons.matching(identifier: "today-stop-row").matching(NSPredicate(format: "value CONTAINS %@ AND value CONTAINS %@", "Peanut", "Thunder")).firstMatch.exists)
         app.tabBars.buttons["Schedule"].tap()
         XCTAssertTrue(app.navigationBars["Appointment"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["Monnahey Boy"].exists)
@@ -160,7 +149,6 @@ final class StopDetailsEditingUITests: XCTestCase {
     func testChangingTimeSeparatesStopsAndUpdatesTheSchedule() {
         let app = launch("StopTimeEditing-\(UUID().uuidString)")
         defer { app.terminate() }
-        openOldBarn(in: app)
         openAppointment("Peanut", in: app)
         openEditor(in: app)
         let datePicker = app.datePickers.firstMatch
@@ -175,10 +163,7 @@ final class StopDetailsEditingUITests: XCTestCase {
         let summary = app.descendants(matching: .any)["appointment-summary"]
         XCTAssertTrue(summary.waitForExistence(timeout: 3))
         XCTAssertTrue(summary.label.contains("17:00"))
-        app.navigationBars.buttons["Stop Details"].tap()
-        XCTAssertEqual(app.buttons.matching(identifier: "today-stop-appointment").count, 1)
-        XCTAssertTrue(app.buttons["today-stop-appointment"].label.contains("Thunder"))
-        app.buttons["stop-details-close"].tap()
+        app.navigationBars.buttons["Today"].tap()
         XCTAssertEqual(app.buttons.matching(identifier: "today-stop-row").count, 2)
         capture(app, "Today distinct times remain separate physical stops")
         app.tabBars.buttons["Schedule"].tap()
@@ -195,9 +180,8 @@ final class StopDetailsEditingUITests: XCTestCase {
         let featured = app.buttons["today-run-sheet-scheduled"]
         XCTAssertTrue(featured.waitForExistence(timeout: 5))
         featured.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.7)).tap()
-        XCTAssertTrue(app.navigationBars["Stop Details"].waitForExistence(timeout: 3))
-        XCTAssertEqual(app.buttons.matching(identifier: "today-stop-appointment").count, 1)
-        openAppointment("Monnahey Boy", in: app)
+        XCTAssertTrue(app.navigationBars["Appointment"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Monnahey Boy"].exists)
         openEditor(in: app)
         let picker = app.buttons["appointment-barn-picker"]
         for _ in 0..<2 {
@@ -215,56 +199,30 @@ final class StopDetailsEditingUITests: XCTestCase {
         app.buttons["appointment-horse-Peanut"].tap()
         app.navigationBars["Edit Appointment"].buttons["Save"].tap()
         XCTAssertTrue(app.navigationBars["Appointment"].waitForExistence(timeout: 3))
-        app.navigationBars.buttons["Stop Details"].tap()
-        let identity = app.descendants(matching: .any)["today-stop-identity"]
-        XCTAssertTrue(identity.label.contains("The Old Barn"))
-        XCTAssertTrue(identity.label.contains("15:30"))
-        XCTAssertEqual(app.buttons.matching(identifier: "today-stop-appointment").count, 1)
-        XCTAssertTrue(app.buttons["today-stop-appointment"].label.contains("Peanut"))
-        app.buttons["stop-details-close"].tap()
+        app.navigationBars.buttons["Today"].tap()
         XCTAssertTrue(featured.label.contains("The Old Barn"))
         XCTAssertTrue((featured.value as? String)?.contains("Peanut") == true)
-        XCTAssertEqual(app.buttons.matching(identifier: "today-stop-row").count, 1)
+        XCTAssertEqual(app.buttons.matching(identifier: "today-stop-row").count, 2)
         app.tabBars.buttons["Schedule"].tap()
         XCTAssertEqual(app.buttons.matching(identifier: "appointment-row-The Old Barn").count, 3)
         XCTAssertFalse(app.buttons["appointment-row-Chestnut Barn"].exists)
     }
 
     @MainActor
-    private func openOldBarn(in app: XCUIApplication) {
-        let stop = app.buttons["today-stop-row"]
-        XCTAssertTrue(stop.waitForExistence(timeout: 5))
-        stop.tap()
-        XCTAssertTrue(app.navigationBars["Stop Details"].waitForExistence(timeout: 3))
-        XCTAssertEqual(app.buttons.matching(identifier: "today-stop-appointment").count, 2)
-    }
-
-    @MainActor
     private func openAppointment(_ horse: String, in app: XCUIApplication) {
-        let choice = app.buttons.matching(identifier: "today-stop-appointment")
-            .matching(NSPredicate(format: "label CONTAINS %@", horse)).firstMatch
-        XCTAssertTrue(choice.waitForExistence(timeout: 3))
+        let choice = app.buttons.matching(identifier: "today-stop-row")
+            .matching(NSPredicate(format: "value CONTAINS %@", horse)).firstMatch
+        reveal(choice, in: app)
         choice.tap()
-        let navigationBar = app.navigationBars["Appointment"]
-        XCTAssertTrue(navigationBar.waitForExistence(timeout: 3))
-        if navigationBar.frame.minY >= app.frame.height * 0.3 {
-            let grabber = app.buttons["Sheet Grabber"]
-            XCTAssertTrue(grabber.waitForExistence(timeout: 3))
-            grabber.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-                .press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1)))
-        }
-        let expanded = XCTNSPredicateExpectation(predicate: NSPredicate { element, _ in
-            guard let bar = element as? XCUIElement else { return false }
-            return bar.frame.minY < app.frame.height * 0.3
-        }, object: navigationBar)
-        XCTAssertEqual(XCTWaiter.wait(for: [expanded], timeout: 3), .completed)
+        XCTAssertTrue(app.navigationBars["Appointment"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.navigationBars["Stop Details"].exists)
     }
 
     @MainActor
     private func openSchedulePeanut(in app: XCUIApplication) {
         let choice = app.buttons.matching(identifier: "appointment-row-The Old Barn")
-            .matching(NSPredicate(format: "label CONTAINS %@", "Peanut")).firstMatch
-        XCTAssertTrue(choice.waitForExistence(timeout: 3))
+            .matching(NSPredicate(format: "label CONTAINS %@ OR label CONTAINS %@", "Peanut", "2 horses")).firstMatch
+        reveal(choice, in: app)
         choice.tap()
         XCTAssertTrue(app.navigationBars["Appointment"].waitForExistence(timeout: 3))
     }
@@ -296,6 +254,8 @@ final class StopDetailsEditingUITests: XCTestCase {
     @MainActor
     private func launch(_ store: String, dynamicType: String? = nil) -> XCUIApplication {
         let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_GB"]
+        if dynamicType != nil { app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"] }
         app.launchEnvironment["FARRIERFLOW_UI_TEST_STORE"] = store
         app.launchEnvironment["FARRIERFLOW_UI_TEST_SCENARIO"] = "today-stops"
         let now = Calendar.current.startOfDay(for: .now).addingTimeInterval(12 * 3_600)

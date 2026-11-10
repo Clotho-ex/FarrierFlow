@@ -12,8 +12,14 @@ final class PaymentRecordingModel: Identifiable {
     var alert: FeatureAlert?
 
     var canConfirm: Bool {
-        guard let method = draft.method else { return false }
+        guard let method = draft.method, inputsFit else { return false }
         return method != .other || TextNormalization.required(draft.otherDescription) != nil
+    }
+
+    private var inputsFit: Bool {
+        InputLimits.fits(draft.otherDescription, maximum: InputLimits.name)
+            && InputLimits.fits(draft.reference, maximum: InputLimits.reference)
+            && InputLimits.fits(draft.note, maximum: InputLimits.notes)
     }
 
     init(
@@ -34,6 +40,10 @@ final class PaymentRecordingModel: Identifiable {
         in context: ModelContext,
         analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()
     ) {
+        guard inputsFit else {
+            alert = FeatureAlert(title: "Payment Details Too Long", message: "Shorten the payment details and try again.")
+            return
+        }
         guard let method = draft.method, canConfirm else {
             alert = FeatureAlert(
                 title: "Payment Method Required",

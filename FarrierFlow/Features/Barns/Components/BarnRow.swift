@@ -8,6 +8,7 @@ struct BarnRow: View {
             Text(barn.name)
                 .font(Typography.recordTitle)
             Text(horseCountLabel)
+                .rollingStateText(value: barn.horses.count)
                 .font(Typography.recordMetadata)
                 .foregroundStyle(ColorTokens.textSecondary)
         }

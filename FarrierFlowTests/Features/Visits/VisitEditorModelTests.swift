@@ -7,16 +7,40 @@ import Testing
 @MainActor
 struct VisitEditorModelTests {
     @Test
-    func sharedClientUsesEveryVisitHorseAndSavedTotalExcludesPlannedAndUnsavedWork() throws {
+    func serviceProgressSurvivesSaveAndReloadBeforeChoosingOutcomes() throws {
+        let graph = try makeVisitGraph()
+        let model = VisitEditorModel(visitID: graph.visitID, in: graph.container)
+        model.load()
+        #expect(model.recordedServiceCount == 1)
+        #expect(model.pendingOutcomeCount == 2)
+        #expect(model.recordedHorseCount == 0)
+        var draft = try #require(model.draft)
+        draft.horses[0].workNotes = "Saved work in progress"
+        model.draft = draft
+        model.saveProgress()
+        #expect(model.alert == nil)
+        model.load()
+        #expect(model.recordedServiceCount == 1)
+        #expect(model.pendingOutcomeCount == 2)
+        #expect(model.notServicedHorseCount == 0)
+        #expect(!model.canComplete)
+        let scout = try #require(model.draft?.horses.first { $0.horseName == "Scout" })
+        _ = model.requestOutcomeChange(for: scout.id, to: .notServiced)
+        #expect(model.notServicedHorseCount == 1)
+        #expect(model.recordedServiceCount == 1)
+    }
+
+    @Test
+    func sharedClientUsesEveryVisitHorseAndSavedTotalExcludesUnsavedEdits() throws {
         let graph = try makeVisitGraph()
         let model = VisitEditorModel(visitID: graph.visitID, in: graph.container)
         model.load()
         #expect(model.sharedClientName == model.horseContext.values.first?.clientName)
         #expect(model.sharedClientName != nil)
-        #expect(model.savedRecordedTotal == .none)
+        #expect(model.savedRecordedTotal == .available(minorUnits: 12_500, currencyCode: "USD"))
         let milo = try #require(model.draft?.horses.first { $0.horseName == "Milo" })
         _ = model.requestOutcomeChange(for: milo.id, to: .serviced)
-        #expect(model.savedRecordedTotal == .none)
+        #expect(model.savedRecordedTotal == .available(minorUnits: 12_500, currencyCode: "USD"))
         model.saveProgress()
         #expect(model.alert == nil)
         #expect(model.savedRecordedTotal == .available(minorUnits: 12_500, currencyCode: "USD"))
@@ -55,6 +79,8 @@ struct VisitEditorModelTests {
         draft.horses[scout].workItems[0].amountMinorUnits = -1
         #expect(draft.recordedTotal == .unavailable)
         draft.horses[scout].outcome = .pending
+        #expect(draft.recordedTotal == .unavailable)
+        draft.horses[scout].workItems = []
         #expect(draft.recordedTotal == .available(minorUnits: 12_500, currencyCode: "USD"))
         draft.horses[milo].workItems[0].amountMinorUnits = 0
         #expect(draft.recordedTotal == .available(minorUnits: 0, currencyCode: "USD"))
@@ -509,29 +535,21 @@ struct VisitEditorModelTests {
     }
 
     @Test
-    func servicedNotesRequireConfirmationBeforeAnOutcomeChangeClearsThem() throws {
+    func changingOutcomePreservesServicesAndNotesForExplicitReview() throws {
         let graph = try makeVisitGraph()
         let model = VisitEditorModel(visitID: graph.visitID, in: graph.container)
         model.load()
-
         var draft = try #require(model.draft)
-        let miloIndex = try horseIndex(named: "Milo", in: draft)
-        let horseID = draft.horses[miloIndex].id
-        draft.horses[miloIndex].outcome = .serviced
-        draft.horses[miloIndex].workNotes = "Watch for tenderness"
+        let index = try horseIndex(named: "Milo", in: draft)
+        let horseID = draft.horses[index].id
+        draft.horses[index].outcome = .serviced
+        draft.horses[index].workNotes = "Watch for tenderness"
         model.draft = draft
-
         #expect(model.requestOutcomeChange(for: horseID, to: .notServiced))
-        #expect(model.pendingOutcomeChange != nil)
-        #expect(model.draft?.horses.first(where: { $0.horseName == "Milo" })?.outcome == .serviced)
-        #expect(model.draft?.horses.first(where: { $0.horseName == "Milo" })?.workNotes == "Watch for tenderness")
-
-        model.confirmPendingOutcomeChange()
-
-        #expect(model.pendingOutcomeChange == nil)
-        #expect(model.draft?.horses.first(where: { $0.horseName == "Milo" })?.outcome == .notServiced)
-        #expect(model.draft?.horses.first(where: { $0.horseName == "Milo" })?.workNotes.isEmpty == true)
-        #expect(model.draft?.horses.first(where: { $0.horseName == "Milo" })?.workItems.isEmpty == true)
+        let changed = try #require(model.draft?.horses.first(where: { $0.id == horseID }))
+        #expect(changed.outcome == .notServiced)
+        #expect(changed.workNotes == "Watch for tenderness")
+        #expect(changed.workItems == draft.horses[index].workItems)
         #expect(model.isDirty)
     }
 
@@ -654,25 +672,24 @@ struct VisitEditorModelTests {
     }
 
     @Test
-    func invalidWorkNotesKeepProgressSaveUnavailableAndDiscardRestoresBaseline() throws {
+    func conflictingOutcomeNotesSaveAndDiscardRestoresTheSavedProgress() throws {
         let graph = try makeVisitGraph()
         let model = VisitEditorModel(visitID: graph.visitID, in: graph.container)
         model.load()
-        let baseline = try #require(model.lastSavedDraft)
-
         var draft = try #require(model.draft)
         let miloIndex = try horseIndex(named: "Milo", in: draft)
         draft.horses[miloIndex].outcome = .notServiced
-        draft.horses[miloIndex].workNotes = "Cannot be stored"
+        draft.horses[miloIndex].workNotes = "Horse could not be handled safely."
         model.draft = draft
 
-        #expect(!model.canSaveProgress)
-        #expect(!model.saveProgress())
+        #expect(model.canSaveProgress)
+        #expect(model.saveProgress())
+        #expect(!model.isDirty)
+        let saved = try #require(model.lastSavedDraft)
+        model.setWorkNotes("Unsaved change", for: draft.horses[miloIndex].id)
         #expect(model.isDirty)
-
         model.discardUnsavedChanges()
-
-        #expect(model.draft == baseline)
+        #expect(model.draft == saved)
         #expect(!model.isDirty)
     }
 
@@ -767,9 +784,10 @@ struct VisitEditorModelTests {
         #expect(model.completionBlocker == .pendingOutcomePreventsCompletion)
 
         #expect(model.requestOutcomeChange(for: milo.id, to: .notServiced))
-        model.confirmPendingOutcomeChange()
         #expect(!model.requestOutcomeChange(for: scout.id, to: .notServiced))
-        #expect(model.completionBlocker == .completionRequiresServicedHorse)
+        #expect(model.completionBlocker == .notServicedHorseHasWorkItems)
+        for item in milo.workItems { _ = model.removeWorkItem(item.id, from: milo.id) }
+        #expect(model.completionBlocker == nil)
 
         #expect(!model.requestOutcomeChange(for: scout.id, to: .serviced))
         #expect(model.completionBlocker == .servicedHorseRequiresWorkItem)
@@ -854,7 +872,7 @@ struct VisitEditorModelTests {
     }
 
     @Test
-    func completionRejectsNotesOnNotServicedHorseAndTimeBeforeVisitStart() throws {
+    func completionPreservesANotServicedReasonAndRejectsTimeBeforeVisitStart() throws {
         let graph = try makeVisitGraph()
         let model = VisitEditorModel(visitID: graph.visitID, in: graph.container)
         model.load()
@@ -864,7 +882,7 @@ struct VisitEditorModelTests {
         let scoutIndex = try horseIndex(named: "Scout", in: draft)
         let miloWorkItem = try #require(draft.horses[miloIndex].workItems.first)
         draft.horses[miloIndex].outcome = .notServiced
-        draft.horses[miloIndex].workNotes = "Cannot remain"
+        draft.horses[miloIndex].workNotes = "Horse unavailable"
         draft.horses[miloIndex].workItems = []
         draft.horses[scoutIndex].outcome = .serviced
         draft.horses[scoutIndex].workItems = [
@@ -875,13 +893,9 @@ struct VisitEditorModelTests {
             ),
         ]
         model.draft = draft
-        #expect(!model.canComplete)
-        #expect(!model.completeVisit(at: Date(timeIntervalSinceReferenceDate: 200)))
-
-        draft.horses[miloIndex].workNotes = ""
-        model.draft = draft
         #expect(model.canComplete)
         #expect(!model.completeVisit(at: Date(timeIntervalSinceReferenceDate: 99)))
+        #expect(model.draft?.horses[miloIndex].workNotes == "Horse unavailable")
 
         let context = ModelContext(graph.container)
         let visit = try #require(context.model(for: graph.visitID) as? Visit)
@@ -1141,6 +1155,17 @@ struct VisitEditorModelTests {
             now: Date(timeIntervalSinceReferenceDate: 100),
             in: container
         )
+
+        let recordingContext = ModelContext(container)
+        if includesDefaultService,
+           let serviceID = firstHorse.defaultService?.persistentModelID,
+           let visit = try recordingContext.existingModel(Visit.self, for: visitID),
+           let member = visit.visitHorses.first(where: { $0.horse?.persistentModelID == firstHorse.persistentModelID }),
+           let service = try recordingContext.existingModel(Service.self, for: serviceID) {
+            // These editor fixtures represent work already explicitly recorded.
+            _ = ModelFixtures.makeWorkItem(service: service, visitHorse: member, in: recordingContext)
+            try DomainGraphValidator.save(recordingContext)
+        }
 
         return VisitEditorGraph(
             container: container,

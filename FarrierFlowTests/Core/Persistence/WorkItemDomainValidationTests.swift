@@ -29,7 +29,7 @@ struct WorkItemDomainValidationTests {
     }
 
     @Test
-    func rejectsWorkItemForNotServicedHorse() throws {
+    func allowsNotServicedWorkConflictInProgressButRejectsFinalization() throws {
         let graph = try makeVisitGraph(completed: false)
         graph.visitHorse.outcomeRawValue = VisitOutcome.notServiced.rawValue
         let service = ModelFixtures.makeService(in: graph.context)
@@ -39,6 +39,8 @@ struct WorkItemDomainValidationTests {
             in: graph.context
         )
 
+        try DomainGraphValidator.validateAll(in: graph.context)
+        graph.visitHorse.visit?.completedAt = Date(timeIntervalSinceReferenceDate: 200)
         #expect(throws: DomainGraphViolation.notServicedVisitHorseHasWorkItems) {
             try DomainGraphValidator.validateAll(in: graph.context)
         }

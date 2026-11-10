@@ -8,7 +8,7 @@ final class NextAppointmentFlowUITests: XCTestCase {
     private let notServicedHorseName = "Clover"
 
     @MainActor
-    func testConfirmationStaysInToolbarAndNotNowRemainsPinned() {
+    func testExplicitScheduleAndNotNowRemainPinnedInTheFooter() {
         let app = launch(storeName: "NextAppointmentPinnedAction-\(UUID().uuidString)")
         defer { app.terminate() }
 
@@ -20,13 +20,14 @@ final class NextAppointmentFlowUITests: XCTestCase {
         let continueButton = app.buttons["next-appointment-confirm"]
         XCTAssertTrue(continueButton.waitForExistence(timeout: 5))
         XCTAssertTrue(continueButton.isHittable)
-        XCTAssertLessThan(continueButton.frame.midY, app.frame.height * 0.2)
+        XCTAssertGreaterThan(continueButton.frame.midY, app.frame.height * 0.6)
+        XCTAssertEqual(continueButton.label, "Schedule Next Appointment")
         let notNow = app.buttons["next-appointment-not-now"]
         XCTAssertTrue(notNow.isHittable)
-        XCTAssertFalse(app.navigationBars["Next Appointment"].buttons["Not Now"].exists)
+        XCTAssertFalse(app.navigationBars["Schedule Next Visit"].buttons["Not Now"].exists)
         let pinnedFrame = notNow.frame
         let capture = XCTAttachment(screenshot: app.screenshot())
-        capture.name = "Next Appointment green toolbar confirmation and bottom Not Now"
+        capture.name = "Next Visit explicit footer confirmation and Not Now"
         capture.lifetime = .keepAlways
         add(capture)
 
@@ -63,9 +64,7 @@ final class NextAppointmentFlowUITests: XCTestCase {
 
         app.buttons["next-appointment-confirm"].tap()
 
-        XCTAssertTrue(app.navigationBars["Appointment"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.cells.staticTexts[laterHorseName].exists)
-        XCTAssertTrue(app.cells.staticTexts[notServicedHorseName].exists)
+        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 5))
 
         app.terminate()
         app.launch()
@@ -74,7 +73,7 @@ final class NextAppointmentFlowUITests: XCTestCase {
         XCTAssertEqual(appointmentRows(in: app).count, 1)
         openSourceVisit(for: earliestHorseName, in: app)
         app.buttons["schedule-next-appointment"].tap()
-        XCTAssertTrue(app.navigationBars["Next Appointment"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Schedule Next Visit"].waitForExistence(timeout: 5))
 
         assertHorse(
             earliestHorseName,
@@ -121,10 +120,11 @@ final class NextAppointmentFlowUITests: XCTestCase {
         screenshot.lifetime = .keepAlways
         add(screenshot)
         schedule.tap()
-        XCTAssertTrue(app.navigationBars["Next Appointment"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Schedule Next Visit"].waitForExistence(timeout: 5))
         app.buttons["next-appointment-not-now"].tap()
-        XCTAssertTrue(app.navigationBars["Visit"].waitForExistence(timeout: 5))
-        XCTAssertTrue(schedule.isEnabled)
+        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 5))
+        app.selectFarrierFlowTab("Schedule")
+        XCTAssertEqual(appointmentRows(in: app).count, 0)
     }
 
     @MainActor
@@ -220,7 +220,7 @@ final class NextAppointmentFlowUITests: XCTestCase {
 
     @MainActor
     private func assertInitialProjection(in app: XCUIApplication) {
-        XCTAssertTrue(app.navigationBars["Next Appointment"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Schedule Next Visit"].waitForExistence(timeout: 5))
         assertHorse(
             earliestHorseName,
             contains: ["Serviced", "4 weeks", "Suggested", "Selected"],
@@ -268,7 +268,17 @@ final class NextAppointmentFlowUITests: XCTestCase {
     ) {
         let row = app.descendants(matching: .any)["next-appointment-horse-\(name)"]
         XCTAssertTrue(row.waitForExistence(timeout: 5))
-        XCTAssertTrue(bringIntoView(row, in: app))
+        for _ in 0..<12 {
+            let footerTop = app.buttons["next-appointment-confirm"].frame.minY
+            let top = app.navigationBars["Schedule Next Visit"].frame.maxY
+            if row.isHittable, row.frame.minY > top, row.frame.maxY < footerTop - 8 { break }
+            let list = app.collectionViews.allElementsBoundByIndex.last(where: \.isHittable) ?? app
+            let origin = app.coordinate(withNormalizedOffset: .zero)
+            let x = list.frame.minX + list.frame.width * 0.02
+            let height = footerTop - top
+            origin.withOffset(CGVector(dx: x, dy: top + height * 0.8))
+                .press(forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(dx: x, dy: top + height * 0.2)))
+        }
         row.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
         let selectionChanged = expectation(
             for: NSPredicate { evaluated, _ in

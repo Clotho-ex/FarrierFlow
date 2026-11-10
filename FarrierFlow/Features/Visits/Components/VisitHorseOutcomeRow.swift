@@ -20,13 +20,16 @@ struct VisitHorseOutcomeRow: View {
                         .pickerStyle(.inline)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("\(horse.horseName) Work Outcome")
+                .accessibilityIdentifier("visit-outcome-\(horse.horseName)")
             } else {
                 outcomePicker
+                    .accessibilityLabel("\(horse.horseName) Work Outcome")
+                    .accessibilityValue(Text(horse.outcome.localizedTitle))
+                    .accessibilityIdentifier("visit-outcome-\(horse.horseName)")
             }
         }
-        .accessibilityLabel("\(horse.horseName) Work Outcome")
-        .accessibilityValue(Text(horse.outcome.localizedTitle))
-        .accessibilityIdentifier("visit-outcome-\(horse.horseName)")
 
     }
 

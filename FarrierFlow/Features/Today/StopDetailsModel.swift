@@ -6,6 +6,7 @@ import SwiftData
 @Observable
 final class StopDetailsModel {
     private(set) var stop: TodayStopSummary?
+    private(set) var clientNamesByAppointment: [PersistentIdentifier: String] = [:]
     private(set) var loadState: TodayLoadState = .loading
     private var selectedID: TodayStopSummary.ID
     private var appointmentIDs: [PersistentIdentifier]
@@ -19,7 +20,7 @@ final class StopDetailsModel {
         let context = ModelContext(container)
         do {
             if let current = try stop(matching: selectedID, in: context) {
-                apply(current)
+                try apply(current, in: context)
             } else {
                 // Keep the original physical stop while it still has appointments.
                 // Follow a moved record only when that stop no longer exists.
@@ -35,7 +36,7 @@ final class StopDetailsModel {
                     movedStop = try stop(matching: id, in: context)
                     if movedStop != nil { break }
                 }
-                if let movedStop { apply(movedStop) } else { stop = nil }
+                if let movedStop { try apply(movedStop, in: context) } else { stop = nil }
             }
             loadState = .loaded
         } catch {
@@ -44,10 +45,34 @@ final class StopDetailsModel {
         }
     }
 
-    private func apply(_ stop: TodayStopSummary) {
+    func startOrResume(
+        appointmentID: PersistentIdentifier, now: Date, in container: ModelContainer,
+        analyticsClient: any AnalyticsClient = NoOpAnalyticsClient()
+    ) throws -> PersistentIdentifier {
+        let context = ModelContext(container)
+        guard let appointment = try context.existingModel(Appointment.self, for: appointmentID) else {
+            throw VisitStartError.appointmentUnavailable
+        }
+        if let visit = appointment.visit {
+            guard visit.completedAt == nil else { throw VisitStartError.visitAlreadyExists }
+            return visit.persistentModelID
+        }
+        return try VisitStartUseCase.start(appointmentID: appointmentID, now: now,
+            in: container, analyticsClient: analyticsClient)
+    }
+
+    private func apply(_ stop: TodayStopSummary, in context: ModelContext) throws {
         self.stop = stop
         selectedID = stop.id
         appointmentIDs = stop.appointments.map(\.id)
+        clientNamesByAppointment = [:]
+        for item in stop.appointments {
+            guard let record = try context.existingModel(Appointment.self, for: item.id) else { continue }
+            let names = Set(record.appointmentHorses.compactMap { $0.horse?.client?.name })
+            clientNamesByAppointment[item.id] = names.sorted {
+                $0.localizedStandardCompare($1) == .orderedAscending
+            }.formatted(.list(type: .and))
+        }
     }
 
     private func stop(matching id: TodayStopSummary.ID, in context: ModelContext) throws -> TodayStopSummary? {

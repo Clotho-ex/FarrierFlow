@@ -22,7 +22,6 @@ nonisolated enum DomainGraphViolation: Error, Equatable {
     case completedVisitHasPendingHorse
     case completedVisitHasNoServicedHorse
     case completionPredatesStart
-    case workNotesRequireServicedOutcome
     case appointmentVisitMismatch
     case photographMissingVisitHorse
     case photographInverseMismatch
@@ -654,12 +653,8 @@ enum DomainGraphValidator {
             guard let outcome = VisitOutcome(rawValue: membership.outcomeRawValue) else {
                 throw DomainGraphViolation.visitMembershipMismatch
             }
-            if TextNormalization.optional(membership.workNotes ?? "") != nil,
-               outcome != .serviced {
-                throw DomainGraphViolation.workNotesRequireServicedOutcome
-            }
             let workItems = membership.workItems
-            if outcome == .notServiced, !workItems.isEmpty {
+            if visit.completedAt != nil, outcome == .notServiced, !workItems.isEmpty {
                 throw DomainGraphViolation.notServicedVisitHorseHasWorkItems
             }
             var serviceIDs = Set<PersistentIdentifier>()

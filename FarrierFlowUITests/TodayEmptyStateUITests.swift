@@ -125,8 +125,6 @@ final class TodayEmptyStateUITests: XCTestCase {
         XCTAssertTrue(stop.exists)
         XCTAssertTrue((stop.value as? String)?.contains("Work Complete") == true)
         stop.tap()
-        XCTAssertTrue(app.navigationBars["Stop Details"].waitForExistence(timeout: 3))
-        app.buttons["today-stop-appointment"].tap()
         XCTAssertTrue(app.navigationBars["Appointment"].waitForExistence(timeout: 3))
     }
 
