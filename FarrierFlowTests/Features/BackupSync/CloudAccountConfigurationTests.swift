@@ -12,6 +12,15 @@ struct CloudAccountConfigurationTests {
         #expect(configuration.url.host == "xufledziawaapvrifbfv.supabase.co")
         #expect(configuration.publishableKey.hasPrefix("sb_publishable_"))
     }
+    #else
+    @Test
+    func releaseHostIncludesProductionClientAndCloudDeletion() throws {
+        let info = try #require(Bundle.main.infoDictionary)
+        let configuration = try SupabaseConfiguration(infoDictionary: info)
+        #expect(configuration.url.host == "msyoovsdvvjjifrzzzbq.supabase.co")
+        #expect(info["SUPABASE_CLOUD_DELETION_ENABLED"] as? Bool == true)
+        #expect(configuration.cloudDeletionIsAvailable(infoDictionary: info, environment: [:]))
+    }
     #endif
 
     @Test

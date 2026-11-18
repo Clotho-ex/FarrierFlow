@@ -6,6 +6,32 @@ import Testing
 @Suite("Visit detail", .serialized)
 @MainActor
 struct VisitDetailModelTests {
+    @Test(arguments: ["Updated work note", ""])
+    func reloadingExistingDetailReadsCorrectionsSavedByAnotherContext(note: String) throws {
+        let directory = try TemporaryStoreFixtures.makeDirectory(prefix: "FarrierFlow-Visit-Detail-Refresh-")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let container = try ModelContainerFactory.persistentStoreTest(
+            at: directory.appending(path: "FarrierFlow.store")
+        )
+        let graph = try makeGraph(container: container, completedAt: Date(timeIntervalSinceReferenceDate: 200))
+        let model = VisitDetailModel(visitID: graph.visitID, in: container)
+        model.load()
+        let original = try #require(model.detail)
+        #expect(original.horses.first { $0.horseName == "Milo" }?.workNotes == "Front shoes")
+
+        let editorContext = ModelContext(container)
+        var draft = try VisitSaveUseCase.loadDraft(visitID: graph.visitID, in: editorContext)
+        let index = try horseIndex(named: "Milo", in: draft)
+        draft.horses[index].workNotes = note
+        _ = try VisitSaveUseCase.saveCorrection(draft: draft, in: editorContext)
+
+        model.load()
+
+        #expect(model.loadState == .loaded)
+        #expect(model.detail?.horses.first { $0.horseName == "Milo" }?.workNotes == (note.isEmpty ? nil : note))
+        #expect(original.horses.first { $0.horseName == "Milo" }?.workNotes == "Front shoes")
+    }
+
     @Test
     func completedVisitLoadsImmutableSnapshotsAndAllHorseResults() throws {
         let graph = try makeCompletedGraph()

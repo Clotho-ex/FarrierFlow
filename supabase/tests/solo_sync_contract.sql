@@ -1,4 +1,4 @@
--- Run only against FarrierFlow Dev. All synthetic users and sessions roll back.
+-- Run only on an explicitly authorized validation target. Synthetic data rolls back.
 begin;
 create function pg_temp.ff_expect(ok boolean, label text) returns void
 language plpgsql as $$
@@ -180,7 +180,7 @@ do $$
 declare fixture record; batch jsonb; receipt jsonb;
         appointment_id uuid := gen_random_uuid(); join_id uuid := gen_random_uuid();
         visit_id uuid := gen_random_uuid(); horse_join_id uuid := gen_random_uuid();
-        work_id uuid := gen_random_uuid(); outcome_record jsonb;
+        work_id uuid := gen_random_uuid(); outcome_record jsonb; visit_record jsonb;
 begin
   select * into fixture from ff_test_ids;
   outcome_record := jsonb_build_object('id', horse_join_id, 'kind', 'visitHorse',
@@ -218,19 +218,24 @@ begin
   receipt := public.ff_sync_push(batch);
   perform pg_temp.ff_expect((receipt->>'revision')::bigint = 3,
     'pending visit preserves saved work before outcome is resolved');
+  select value->'record' into visit_record from jsonb_array_elements(batch->'mutations')
+    where value->>'kind' = 'visit';
+  -- Progress may retain an unresolved outcome/service conflict; completing it may not.
   batch := jsonb_build_object(
     'operationID', gen_random_uuid(), 'workspaceID', fixture.workspace_id,
     'deviceID', fixture.device_id, 'invoicingGeneration', 1,
-    'mutations', jsonb_build_array(jsonb_build_object(
-      'id', horse_join_id, 'kind', 'visitHorse', 'expectedRevision', 3,
-      'record', jsonb_set(outcome_record, '{fields,outcomeRawValue}', '"notServiced"'))));
+    'mutations', jsonb_build_array(
+      jsonb_build_object('id', horse_join_id, 'kind', 'visitHorse', 'expectedRevision', 3,
+        'record', jsonb_set(outcome_record, '{fields,outcomeRawValue}', '"notServiced"')),
+      jsonb_build_object('id', visit_id, 'kind', 'visit', 'expectedRevision', 3,
+        'record', jsonb_set(visit_record, '{fields,completedAt}', '"900.0"'))));
   begin
     perform public.ff_sync_push(batch);
-    raise exception 'FAIL: not-serviced horse retained work items';
+    raise exception 'FAIL: completed not-serviced horse retained work items';
   exception when check_violation then null;
   end;
   perform pg_temp.ff_expect((public.ff_sync_pull(fixture.workspace_id, 3, 1)->>'cursor')::bigint = 3,
-    'rejected not-serviced work does not advance cursor');
+    'rejected conflicting completion does not advance cursor');
 end $$;
 
 do $$

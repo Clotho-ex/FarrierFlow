@@ -1,5 +1,22 @@
-# Declarative source for the Safari-administered project; no linked CLI project.
+# Declarative source; use an explicit --project-ref for hosted configuration.
 project_id = "FarrierFlow"
+
+[auth]
+enable_anonymous_sign_ins = false
+
+[auth.email]
+enable_signup = false
+enable_confirmations = true
+
+[auth.sms]
+enable_signup = false
+
+[auth.external.apple]
+enabled = true
+client_id = "com.farrierflow.yusufcan.FarrierFlow"
+# Native ID-token sign-in does not use a web OAuth client secret.
+secret = ""
+skip_nonce_check = false
 
 [functions.delete-cloud-account]
 # Auth removal makes a user JWT unavailable for later receipt confirmation.

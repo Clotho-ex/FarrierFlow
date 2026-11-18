@@ -1,0 +1,5 @@
+#include "PostHog.xcconfig"
+#include "Supabase.Release.xcconfig"
+INFOPLIST_PREPROCESS = YES
+// Production's endpoint and retry worker are configured; Debug stays isolated.
+INFOPLIST_PREPROCESSOR_DEFINITIONS = FARRIERFLOW_CLOUD_DELETION_ENABLED=1

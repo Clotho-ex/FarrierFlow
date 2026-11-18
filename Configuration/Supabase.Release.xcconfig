@@ -1,0 +1,3 @@
+// Production public client configuration. Never include the Dev project here.
+SUPABASE_URL = https:/$()/msyoovsdvvjjifrzzzbq.supabase.co
+SUPABASE_PUBLISHABLE_KEY = sb_publishable_k1kJUqia_2YY3zOz-OwbYA_hTyv3BMR

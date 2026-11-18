@@ -56,7 +56,7 @@ final class VisitDetailModel {
     )
 
     @ObservationIgnored
-    private let context: ModelContext
+    private let container: ModelContainer
     @ObservationIgnored
     private let loading: (PersistentIdentifier, ModelContext, Locale) throws -> VisitDetail
 
@@ -77,11 +77,13 @@ final class VisitDetailModel {
         }
     ) {
         self.visitID = visitID
-        context = ModelContext(container)
+        self.container = container
         self.loading = loading
     }
 
     func load(locale: Locale = .current) {
+        // Corrections save in another context; read committed values on every reload.
+        let context = ModelContext(container)
         loadState = .loading
         do {
             let loadedDetail = try loading(visitID, context, locale)

@@ -149,6 +149,10 @@ final class VisitHistoryAccessibilityUITests: XCTestCase {
         app.buttons["visit-dismiss-keyboard"].tap()
         app.buttons["visit-save-correction"].tap()
         XCTAssertTrue(app.buttons["visit-detail-actions"].waitForExistence(timeout: 5))
+        let savedNotes = app.descendants(matching: .any)["visit-result-notes-Milo"].firstMatch
+        XCTAssertTrue(bringIntoView(savedNotes, in: app))
+        XCTAssertTrue(accessibilityText(of: savedNotes).contains(note))
+        capture("Work Notes refresh immediately after Save Changes", in: app)
         app.terminate()
         app.launchEnvironment.removeValue(forKey: "FARRIERFLOW_UI_TEST_SCENARIO")
         app.launch()

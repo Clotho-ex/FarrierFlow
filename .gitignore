@@ -5,6 +5,7 @@ supabase/functions/.env.local
 *.p8
 
 # Generated build, test, and release output.
+output/releases/
 .artifacts/
 .derivedData/
 .asc/artifacts/
