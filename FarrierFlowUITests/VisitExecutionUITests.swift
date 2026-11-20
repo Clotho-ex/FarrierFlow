@@ -32,15 +32,17 @@ final class VisitExecutionUITests: XCTestCase {
         app.buttons["visit-dismiss-keyboard"].tap()
         let unsavedPhotos = app.buttons["visit-photographs-Milo"]
         reveal(unsavedPhotos, in: app)
-        unsavedPhotos.tap()
+        unsavedPhotos.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssertTrue(app.navigationBars["Photos"].waitForExistence(timeout: 3))
         app.navigationBars["Photos"].buttons["Visit"].tap()
         reveal(notes, in: app)
         XCTAssertEqual(notes.value as? String, "Gate code 1428; rear shoe checked.")
         app.buttons["visit-close"].tap()
         XCTAssertTrue(app.staticTexts["Discard Unsaved Changes?"].waitForExistence(timeout: 3))
+        capture("Discard visit changes anchored to Close", in: app)
         if app.buttons["Keep Editing"].exists { app.buttons["Keep Editing"].tap() }
-        else { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)).tap() }
+        else { app.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.8)).tap() }
+        XCTAssertTrue(app.navigationBars["Visit"].exists)
         expand("Scout", in: app)
         XCTAssertFalse(notes.exists)
         select("Not Serviced", horse: "Scout", in: app)
@@ -81,7 +83,7 @@ final class VisitExecutionUITests: XCTestCase {
         XCTAssertFalse(photos.label.contains("0"), photos.label)
         XCTAssertLessThanOrEqual(photos.frame.maxY, app.buttons["visit-complete"].frame.minY)
         capture("Visit final controls above completion footer", in: app)
-        photos.tap()
+        photos.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssertTrue(app.navigationBars["Photos"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["No Photos"].exists)
         app.navigationBars["Photos"].buttons["Visit"].tap()

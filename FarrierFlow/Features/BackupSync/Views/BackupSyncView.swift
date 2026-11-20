@@ -136,12 +136,17 @@ struct BackupSyncView: View {
                 if model.deletionAvailable {
                     Section {
                         Button(role: .destructive) { confirmsCloudDeletion = true } label: {
-                            rowActionLabel(BackupSyncCopy.deleteCloudAccount, symbol: "trash")
+                            borderedActionLabel(BackupSyncCopy.deleteCloudAccount, systemImage: "trash")
+                                .foregroundStyle(ColorTokens.destructive)
                         }
-                        .tint(ColorTokens.destructive)
+                        .farrierFlowBorderedAction(tint: ColorTokens.destructive)
                         .disabled(model.isBusy)
                         .accessibilityIdentifier("backup-sync-delete")
-                        .listRowBackground(ColorTokens.surface)
+                        .confirmationDialog(BackupSyncCopy.deleteCloudQuestion, isPresented: $confirmsCloudDeletion,
+                            titleVisibility: .visible) {
+                                Button(BackupSyncCopy.deleteCloudAccount, role: .destructive) { authorizesCloudDeletion = true }
+                            } message: { Text(BackupSyncCopy.deletionConfirmation) }
+                        .backupSyncCard()
                     } header: {
                         zoneHeading(BackupSyncCopy.dangerZone, identifier: "backup-sync-danger-heading")
                     } footer: {
@@ -196,18 +201,6 @@ struct BackupSyncView: View {
             case .invoiceRecovery: SyncInvoiceRecoveryView()
             }
         }
-        .confirmationDialog(BackupSyncCopy.signOutQuestion, isPresented: $confirmsSignOut,
-            titleVisibility: .visible) {
-                Button(BackupSyncCopy.signOut, role: .destructive) { Task { await model?.signOut() } }
-            } message: { Text(BackupSyncCopy.signOutExplanation) }
-        .confirmationDialog(BackupSyncCopy.takeOverInvoicing, isPresented: $confirmsInvoicingTakeover,
-            titleVisibility: .visible) {
-                Button(BackupSyncCopy.takeOverInvoicing, role: .destructive) { model?.runtime?.requestInvoicingTakeover() }
-            } message: { Text(BackupSyncCopy.takeOverConfirmation) }
-        .confirmationDialog(BackupSyncCopy.deleteCloudQuestion, isPresented: $confirmsCloudDeletion,
-            titleVisibility: .visible) {
-                Button(BackupSyncCopy.deleteCloudAccount, role: .destructive) { authorizesCloudDeletion = true }
-            } message: { Text(BackupSyncCopy.deletionConfirmation) }
         .tint(.primary)
         .sheet(isPresented: $authorizesCloudDeletion, onDismiss: {
             if model?.deletion?.state == .awaitingApple {
@@ -303,6 +296,10 @@ struct BackupSyncView: View {
                         .tint(ColorTokens.brandActionText)
                         .disabled(!runtime.canTakeOverInvoicing || model.isBusy)
                         .accessibilityIdentifier("backup-sync-invoicing-takeover")
+                        .confirmationDialog(BackupSyncCopy.takeOverInvoicing, isPresented: $confirmsInvoicingTakeover,
+                            titleVisibility: .visible) {
+                                Button(BackupSyncCopy.takeOverInvoicing, role: .destructive) { model.runtime?.requestInvoicingTakeover() }
+                            } message: { Text(BackupSyncCopy.takeOverConfirmation) }
                     }
                 }
                 BackupSyncCardDivider()
@@ -311,10 +308,15 @@ struct BackupSyncView: View {
                         BackupSyncCopy.signOut,
                         systemImage: "rectangle.portrait.and.arrow.right"
                     )
+                    .foregroundStyle(ColorTokens.destructive)
                 }
                 .farrierFlowBorderedAction(tint: ColorTokens.destructive)
                 .disabled(model.isBusy)
                 .accessibilityIdentifier("backup-sync-sign-out")
+                .confirmationDialog(BackupSyncCopy.signOutQuestion, isPresented: $confirmsSignOut,
+                    titleVisibility: .visible) {
+                        Button(BackupSyncCopy.signOut, role: .destructive) { Task { await model.signOut() } }
+                    } message: { Text(BackupSyncCopy.signOutExplanation) }
             }
             .backupSyncCard()
         } header: {

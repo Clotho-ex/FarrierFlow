@@ -105,6 +105,9 @@ struct SyncConflictReviewView: View {
                 Section {
                     Button(BackupSyncCopy.applyChoices) { confirmsChoices = true }
                         .disabled(choices.count != model.conflicts.count)
+                        .confirmationDialog(BackupSyncCopy.applyChoices, isPresented: $confirmsChoices, titleVisibility: .visible) {
+                            Button(BackupSyncCopy.applyChoices, role: .destructive, action: apply)
+                        } message: { Text(BackupSyncCopy.reviewConfirmation) }
                 }
             }
         }
@@ -112,9 +115,6 @@ struct SyncConflictReviewView: View {
         .navigationTitle(BackupSyncCopy.reviewTitle)
         .navigationBarTitleDisplayMode(.inline)
         .task { reload() }
-        .confirmationDialog(BackupSyncCopy.applyChoices, isPresented: $confirmsChoices, titleVisibility: .visible) {
-            Button(BackupSyncCopy.applyChoices, role: .destructive, action: apply)
-        } message: { Text(BackupSyncCopy.reviewConfirmation) }
         .alert(item: $alert) { Alert(title: Text($0.title), message: Text($0.message)) }
     }
 

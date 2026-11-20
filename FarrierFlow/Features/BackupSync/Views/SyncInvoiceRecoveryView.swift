@@ -41,6 +41,10 @@ struct SyncInvoiceRecoveryView: View {
                     Button(BackupSyncCopy.invoiceRecoveryContinue) { confirms = true }
                         .disabled(settings == nil || model?.isBusy == true)
                         .accessibilityIdentifier("invoice-recovery-continue")
+                        .confirmationDialog(BackupSyncCopy.invoiceRecoveryContinue, isPresented: $confirms, titleVisibility: .visible) {
+                            Button(BackupSyncCopy.invoiceRecoveryContinue, role: .destructive) { Task { await confirm() } }
+                            Button("Cancel", role: .cancel) { }
+                        } message: { Text(BackupSyncCopy.invoiceRecoveryConfirmation) }
                     if model?.isBusy == true { ProgressView() }
                 }
             } else { ProgressView(BackupSyncCopy.loadingReview) }
@@ -50,10 +54,6 @@ struct SyncInvoiceRecoveryView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
         .onDisappear { model?.cancel(); backupSync?.runtime?.finishRecoveryReview() }
-        .confirmationDialog(BackupSyncCopy.invoiceRecoveryContinue, isPresented: $confirms, titleVisibility: .visible) {
-            Button(BackupSyncCopy.invoiceRecoveryContinue, role: .destructive) { Task { await confirm() } }
-            Button("Cancel", role: .cancel) { }
-        } message: { Text(BackupSyncCopy.invoiceRecoveryConfirmation) }
         .alert(item: $alert) { Alert(title: Text($0.title), message: Text($0.message)) }
     }
 

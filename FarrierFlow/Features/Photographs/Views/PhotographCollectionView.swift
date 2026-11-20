@@ -12,7 +12,6 @@ struct PhotographCollectionView: View {
     @State private var showsPhotoPicker = false
     @State private var showsCamera = false
     @State private var selectedPhotograph: PhotographItem?
-    @State private var pendingDeletion: PhotographItem?
     private let library: PhotographLibrary
 
     init(
@@ -110,29 +109,6 @@ struct PhotographCollectionView: View {
                     total: model.items.count
                 )
             }
-            .confirmationDialog(
-                "Delete Photo?",
-                isPresented: Binding(
-                    get: { pendingDeletion != nil },
-                    set: { if !$0 { pendingDeletion = nil } }
-                ),
-                titleVisibility: .visible,
-                presenting: pendingDeletion
-            ) { item in
-                Button("Delete Photo", role: .destructive) {
-                    guard subscription.allowsMutations else { return }
-                    Task {
-                        await model.delete(id: item.id)
-                    }
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: { item in
-                Text(
-                    item.availability == .available
-                        ? "You can’t recover this photo after deleting it."
-                        : "The unavailable photo will be removed from this visit."
-                )
-            }
             .tint(.primary)
             .alert(item: $model.alert) {
                 Alert(title: Text($0.title), message: Text($0.message))
@@ -171,9 +147,12 @@ struct PhotographCollectionView: View {
                                 position: index + 1,
                                 total: model.items.count,
                                 onOpen: { selectedPhotograph = item },
-                            onDelete: subscription.allowsMutations
-                                ? { pendingDeletion = item }
-                                : nil
+                                onDelete: subscription.allowsMutations
+                                    ? {
+                                        guard subscription.allowsMutations else { return }
+                                        Task { await model.delete(id: item.id) }
+                                    }
+                                    : nil
                             )
                         }
                     }
@@ -314,6 +293,7 @@ private struct PhotographGridItemView: View {
     let total: Int
     let onOpen: () -> Void
     let onDelete: (() -> Void)?
+    @State private var showsDeleteConfirmation = false
 
     var body: some View {
         VStack(spacing: SpacingTokens.rowContent) {
@@ -333,10 +313,24 @@ private struct PhotographGridItemView: View {
                     .foregroundStyle(ColorTokens.textSecondary)
                 Spacer()
                 if let onDelete {
-                    Button("Delete", systemImage: "trash", role: .destructive, action: onDelete)
-                        .foregroundStyle(ColorTokens.destructive)
-                        .labelStyle(.iconOnly)
-                        .frame(minWidth: 44, minHeight: 44)
+                    Button("Delete", systemImage: "trash", role: .destructive) {
+                        showsDeleteConfirmation = true
+                    }
+                    .foregroundStyle(ColorTokens.destructive)
+                    .labelStyle(.iconOnly)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .confirmationDialog(
+                        "Delete Photo?", isPresented: $showsDeleteConfirmation, titleVisibility: .visible
+                    ) {
+                        Button("Delete Photo", role: .destructive, action: onDelete)
+                        Button("Cancel", role: .cancel) {}
+                    } message: {
+                        Text(
+                            item.availability == .available
+                                ? "You can’t recover this photo after deleting it."
+                                : "The unavailable photo will be removed from this visit."
+                        )
+                    }
                 }
             }
         }

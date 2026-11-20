@@ -44,9 +44,14 @@ final class BackupSyncUITests: XCTestCase {
         for _ in 0..<8 where !signOut.isHittable { app.swipeUp() }
         XCTAssertTrue(signOut.isHittable)
         guard signOut.isHittable else { return }
+        let actionFrame = signOut.frame
         signOut.tap()
         XCTAssertTrue(app.staticTexts["Stop syncing this iPhone?"].waitForExistence(timeout: 3))
         attachHistoryScreenshot(app, name: "Sign out confirmation")
+        assertConfirmationIsNearAction(
+            app, title: "Stop syncing this iPhone?", confirmation: "Sign Out",
+            excluding: "backup-sync-sign-out", actionFrame: actionFrame
+        )
         let cancel = app.buttons["Cancel"]
         if cancel.exists && cancel.isHittable { cancel.tap() }
         else { app.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.10)).tap() }
@@ -70,7 +75,7 @@ final class BackupSyncUITests: XCTestCase {
         let retry = app.buttons["backup-sync-retry"]
         for _ in 0..<8 where !retry.isHittable { app.swipeUp() }
         XCTAssertTrue(retry.isHittable)
-        XCTAssertGreaterThanOrEqual(retry.frame.height, 44)
+        XCTAssertGreaterThanOrEqual(retry.frame.height + 0.001, 44)
         XCTAssertTrue(app.staticTexts["backup-sync-protection-explanation"].exists)
         attachHistoryScreenshot(app, name: "Backup settings \(dark ? "Dark XXXL" : "Light")")
 
@@ -79,18 +84,41 @@ final class BackupSyncUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["backup-sync-account-heading"].exists)
         XCTAssertTrue(signOut.isHittable)
         guard signOut.exists else { return }
-        XCTAssertGreaterThanOrEqual(signOut.frame.height, 44)
-        XCTAssertLessThan(retry.frame.midY, signOut.frame.midY,
-            "Manual sync should remain in the backup group above the lower-priority sign-out row.")
+        XCTAssertGreaterThanOrEqual(signOut.frame.height + 0.001, 44)
+        // Large-text scrolling can recycle the earlier backup row.
+        if retry.exists {
+            XCTAssertLessThan(retry.frame.midY, signOut.frame.midY,
+                "Manual sync should remain above the lower-priority sign-out row.")
+        }
+        if accessibility {
+            let actionFrame = signOut.frame
+            signOut.tap()
+            XCTAssertTrue(app.staticTexts["Stop syncing this iPhone?"].waitForExistence(timeout: 3))
+            assertConfirmationIsNearAction(app, title: "Stop syncing this iPhone?", confirmation: "Sign Out",
+                excluding: "backup-sync-sign-out", actionFrame: actionFrame)
+            attachHistoryScreenshot(app, name: "Sign out confirmation Dark XXXL")
+            dismissConfirmation(in: app)
+            XCTAssertFalse(app.buttons["backup-sync-sign-in"].exists)
+        }
 
         let delete = app.buttons["backup-sync-delete"]
-        for _ in 0..<10 where !delete.isHittable { app.swipeUp() }
+        for _ in 0..<10 where !delete.isHittable || delete.frame.maxY > app.frame.maxY - 44 { app.swipeUp() }
         XCTAssertTrue(app.staticTexts["backup-sync-danger-heading"].exists)
         XCTAssertTrue(app.staticTexts["backup-sync-delete-hint"].exists)
         XCTAssertTrue(delete.isHittable)
         guard delete.exists else { return }
-        XCTAssertGreaterThanOrEqual(delete.frame.height, 44)
+        XCTAssertGreaterThanOrEqual(delete.frame.height + 0.001, 44)
         attachHistoryScreenshot(app, name: "Account and danger zones \(dark ? "Dark XXXL" : "Light")")
+        if accessibility {
+            let actionFrame = delete.frame
+            delete.tap()
+            XCTAssertTrue(app.staticTexts["Delete your cloud account?"].waitForExistence(timeout: 3))
+            assertConfirmationIsNearAction(app, title: "Delete your cloud account?", confirmation: "Delete Cloud Account",
+                excluding: "backup-sync-delete", actionFrame: actionFrame)
+            attachHistoryScreenshot(app, name: "Delete cloud account confirmation Dark XXXL")
+            dismissConfirmation(in: app)
+            XCTAssertFalse(app.navigationBars["Delete Cloud Account"].exists)
+        }
     }
 
     @MainActor
@@ -191,7 +219,8 @@ final class BackupSyncUITests: XCTestCase {
         XCTAssertTrue(save.isEnabled)
         save.tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@",
-            "Original invoices stay on this iPhone only.")).firstMatch.waitForExistence(timeout: 3))
+            "Invoices stay on this iPhone only,")).firstMatch.waitForExistence(timeout: 3))
+        attachHistoryScreenshot(app, name: "Invoice recovery confirmation")
         // iOS 26 adapts confirmationDialog to a native popover on this phone;
         // cancellation is an outside tap, not a rendered Cancel row.
         let cancel = app.buttons["Cancel"]
@@ -217,11 +246,17 @@ final class BackupSyncUITests: XCTestCase {
         for _ in 0..<8 where !delete.isHittable { app.swipeUp() }
         XCTAssertTrue(delete.exists)
         guard delete.exists else { return }
+        let actionFrame = delete.frame
         delete.tap()
         let confirm = app.buttons.matching(NSPredicate(
             format: "label == %@ AND identifier != %@", "Delete Cloud Account", "backup-sync-delete"
         )).firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 3))
+        attachHistoryScreenshot(app, name: "Delete cloud account confirmation")
+        assertConfirmationIsNearAction(
+            app, title: "Delete your cloud account?", confirmation: "Delete Cloud Account",
+            excluding: "backup-sync-delete", actionFrame: actionFrame
+        )
         confirm.tap()
         XCTAssertTrue(app.navigationBars["Delete Cloud Account"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["backup-sync-deletion-retention"].exists)
@@ -322,6 +357,33 @@ final class BackupSyncUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Invoice History"].waitForExistence(timeout: 3))
         app.navigationBars.buttons.element(boundBy: 0).tap()
         return true
+    }
+
+    @MainActor
+    private func dismissConfirmation(in app: XCUIApplication) {
+        let cancel = app.buttons["Cancel"]
+        if cancel.exists && cancel.isHittable { cancel.tap() }
+        else { app.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.10)).tap() }
+    }
+
+    @MainActor
+    private func assertConfirmationIsNearAction(
+        _ app: XCUIApplication, title: String, confirmation: String,
+        excluding identifier: String, actionFrame: CGRect,
+        file: StaticString = #filePath, line: UInt = #line
+    ) {
+        if #available(iOS 26, *) {
+            let action = app.buttons.matching(NSPredicate(
+                format: "label == %@ AND identifier != %@", confirmation, identifier
+            )).firstMatch
+            let heading = app.staticTexts[title].firstMatch
+            XCTAssertTrue(action.waitForExistence(timeout: 3), file: file, line: line)
+            let dialogFrame = heading.exists ? heading.frame.union(action.frame) : action.frame
+            let gap = max(actionFrame.minY - dialogFrame.maxY, dialogFrame.minY - actionFrame.maxY, 0)
+            XCTAssertLessThanOrEqual(gap, 80,
+                "Confirmation must stay near its action. Action: \(actionFrame), dialog: \(dialogFrame)",
+                file: file, line: line)
+        }
     }
 
     @MainActor

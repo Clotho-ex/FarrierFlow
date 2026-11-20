@@ -72,6 +72,19 @@ struct VisitEditorView: View {
                     }
                     .tint(ColorTokens.textSecondary)
                     .accessibilityIdentifier("visit-close")
+                    .confirmationDialog(
+                        "Discard Unsaved Changes?",
+                        isPresented: $showsDismissConfirmation,
+                        titleVisibility: .visible
+                    ) {
+                        Button("Discard Unsaved Changes", role: .destructive) {
+                            model.discardUnsavedChanges()
+                            dismiss()
+                        }
+                        Button("Keep Editing", role: .cancel) {}
+                    } message: {
+                        Text("Your unsaved visit changes will be lost.")
+                    }
                 }
                 if subscription.allowsMutations, model.mode == .inProgress, model.loadState == .loaded {
                     ToolbarItem(placement: .topBarTrailing) {
@@ -137,19 +150,6 @@ struct VisitEditorView: View {
             @unknown default:
                 break
             }
-        }
-        .confirmationDialog(
-            "Discard Unsaved Changes?",
-            isPresented: $showsDismissConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Discard Unsaved Changes", role: .destructive) {
-                model.discardUnsavedChanges()
-                dismiss()
-            }
-            Button("Keep Editing", role: .cancel) {}
-        } message: {
-            Text("Your unsaved visit changes will be lost.")
         }
         .alert("Delete Visit?", isPresented: $showsDiscardVisitConfirmation,
                presenting: deletion.impact) { impact in
