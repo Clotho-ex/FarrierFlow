@@ -1,9 +1,10 @@
 {
   "version": 1,
   "hooks": {
-    "preToolUse": [
+    "postToolUse": [
       {
-        "command": "[ ! -f \"/Users/prometheus/.cursor/skills/impeccable/scripts/hook-before-edit.mjs\" ] || node \"/Users/prometheus/.cursor/skills/impeccable/scripts/hook-before-edit.mjs\"",
+        "command": "[ ! -f '/Users/prometheus/.cursor/skills/impeccable/scripts/impeccable' ] || '/Users/prometheus/.cursor/skills/impeccable/scripts/impeccable' hook",
+        "matcher": "^Write$",
         "timeout": 5
       }
     ]
